@@ -141,6 +141,45 @@ Each simulation will be repeated n_seeds time with a different random seed.
 
 The set of all simulations performed in a runme.py is what we call an experiment.
 
+### Extracting trees from a simulation 
+If you want to get the trees of a simulation run, you can run the following code:
+
+```
+from simplicity.tree.tree_builder import get_tree
+
+output_directory = 
+tree_type        =
+tree_subtype     =
+
+get_tree(output_directory,
+         tree_type,
+         tree_subtype,
+         save_plot=True,
+         export='nexus',
+         dashplot=False)
+```
+Outpout directory must point to the output folder of a single simulation run. Tree_type is either 'infection' or 'phylogenetic'. For the tree  subtypes, here there is a short overview:
+```
+tree_subtype :  str
+    
+    __________________________FOR INFECTION TREE___________________________
+    binary - binary infection tree where each internal node is an infection 
+             event that has as offspring the newly infected individual and 
+             the parent that can continue to infect more individuals; the
+             tree is colored based on the compartment each individual is in.
+    
+    compact - infection tree, colored as above, but not binary. Each node 
+                is an individual connected with all the people they infected
+    
+    fitness - infection tree colored with heatmap of individuals fitness value
+    _________________________FOR PHYLOGENETIC TREE__________________________
+    binary - binary phylogenetic tree where each internal node is 
+             substitution event happening in the simulation
+    
+    non-binary - lineages tree where each edge connects parent and 
+                offspring variants
+    ________________________________________________________________________
+```
 ## Contributing
 State if you are open to contributions and what your requirements are for accepting them.
 
