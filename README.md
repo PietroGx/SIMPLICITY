@@ -131,9 +131,11 @@ STANDARD_VALUES for SIMPLICITY simulation:
 ```
 
 If you want to change any, for each parameter, specify a list of values that you would like to use for the simulation. If you want to change more than one parameter at the time, consider that you need to enter the same number of values for each parameter, e.g. :
-    par 1 = [value1, value2]
-    par 2 = [value3, value4]
-This will run a simulation with par 1 = value1 and par 2 = value 3, and a simulation with par 1 = value2 and par 2 = value4. 
+
+    par_1 = [value1, value2]
+    par_2 = [value3, value4]
+
+This will run a simulation with par_1 = value1 and par_2 = value3, and a simulation with par_1 = value2 and par_2 = value4. 
 
 Each simulation will be repeated n_seeds time with a different random seed.
 
