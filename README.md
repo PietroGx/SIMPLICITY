@@ -1,6 +1,6 @@
 # SIMPLICITY 
 
-This is a quick-start guide. For more detailed information please refer to the [wiki](https://gitlab.com/combio/simplicity-public/-/wikis/home).
+This is a quick-start guide. For more detailed information please refer to the [wiki].
 
 ## Description
 
@@ -41,7 +41,7 @@ SIMPLICITY do not require any installation. Once you set up the python environme
 
 ```bash
 mkdir path/to/my/folder
-git clone https://gitlab.com/combio/simplicity-public
+git clone https://github.com/PietroGx/SIMPLICITY
 ```
 
 ## Usage
@@ -55,52 +55,89 @@ conda activate simplicity
 Also make sure to move into the correct folder before running any script or code:
 
 ```bash
-cd path/to/my/folder/simplicity-public
+cd path/to/my/folder/simplicity
 ```
 
-Now you are ready to start using SIMPLICITY! If you want to run simulations from a Python interpreter, you will need to either use one of the provided tuned_parameters json files or to create your own. This file contains all the model parameters you need to specify to run a simulation. Below is an example file you can use as reference when setting up your simulation:
-
-```
-{
-    "population_size": 1000, # size of the simulated population (number of infected + susceptibles at any time point)
-    "infected_individuals_at_start": 10, # number of infected individuals at start
-    "R": 1.3, # relative reproduction number of the virus 
-    "pT": 11.41, # average infectious time of infected individuals. DO NOT CHANGE unless you know what you are doing.
-    "diagnosis rate": 0.0005, # diagnosis rate parameter. Please refer to the corresponding table to see the values that correspond to the desired individuals diagnosis rates.
-    "IH virus emergence rate": 0.085, # rate of emergence of intra-host lineages
-    "evolutionary rate": 0.0023, # model evolutionary rate. You need to fit this parameter for it to correspond to any desired observed evolutionary rate u
-    "t_0": 0, # starting time of the simulation in days
-    "final_time": 1095, # final time of the simulation in days (simulation lenght)
-    "max_runtime": 100000, # max runtime of simulation in seconds
-    "phenotype_model": "distance_from_wt", # phenotype model selection (the other option is immune_waning)
-    "sequencing_rate": 0.10, # sequencing rate of diagnosed individuals
-    "seed": null, # random seed
-    "F": 1.25 # extrande upper bound B factor. DO NOT CHANGE unless you know what you are doing.
-}
-```
-
-One you have your parameters_file.json ready, you can run a simulation as follows:
+Now you are ready to start using SIMPLICITY! If you want to run simulations from a Python interpreter, you will need to either use one of the provided runme.py files or to create your own. Below is an example file you can use as reference when setting up your simulation:
 
 ```python
-import Simplicity
-import Population
+import simplicity.config as config
+import simplicity.settings_manager as sm
+import simplicity.output_manager as om
+import simplicity.runners.serial 
+from   simplicity.runners.unit_run import run_seeded_simulation
 
-# create simplicity instance from parameters file
-simplicity = Simplicity.SIMPLICITY_simulation(parameters_file)
-# create population instance from parameters file
-population = Population.create_population(parameters_file)
-        
-# run SIMPLICITY simulation
-simplicity.run(population)
-# plot results
-simplicity.plot()
+experiment_name = 'EXAMPLE_RUNME'
 
-# build infection tree    
-simplicity.infection_tree()
+## experiment settings (sm.write_settings arguments)
+parameters      = {'evolutionary rate': [0.001]}
+n_seeds         = 3
 
-# build phylogenetic tree    
-simplicity.phylogenetic_tree()
+def run_experiment(experiment_name, 
+                   simplicity_runner,
+                   plot_trajectory,
+                   archive_experiment=False):
+    print('')
+    print('##########################################')
+    print('')
+    # setup experiment files directories
+    config.create_directories(experiment_name)
+    # set parameters 
+    sm.write_settings(parameters, n_seeds)
+    # Write experiment settings file
+    sm.write_experiment_settings(experiment_name)
+    # write simulation parameters files
+    sm.read_settings_and_write_simulation_parameters(experiment_name)
+    # write seeded simulation parameters files
+    sm.write_seeded_simulation_parameters(experiment_name)
+    
+    # let one of simplicity.runners run each seeded simulation
+    simplicity_runner.run_seeded_simulations(experiment_name, 
+                                             run_seeded_simulation,
+                                             plot_trajectory)
+    
+    if archive_experiment: 
+        om.archive_experiment(experiment_name)
+    
+    print('')
+    print(f'EXPERIMENT {experiment_name} EXECUTED SUCCESSFULLY.')
+    print('')
+    print('##########################################')
+
+if __name__ == "__main__":
+    
+    run_experiment(experiment_name,                      
+                   simplicity_runner  = simplicity.runners.serial,
+                   plot_trajectory = True,
+                   archive_experiment = False)
 ```
+The parameters of a SIMPLICITY simulation can be defined by the user in the runme.py file (when specifying the parameters dictionary). Here is an overview of all the parameters and their standard values:
+```
+STANDARD_VALUES for SIMPLICITY simulation: 
+    
+    "population_size": 1000               # size of the simulated population (number of infected + susceptibles at any time point)
+    "infected_individuals_at_start": 100  # number of infected individuals at start
+    "R": 1.5                              # relative reproduction number of the virus 
+    "k_d": 0.0055                         # diagnosis rate parameter. Please refer to the corresponding table to see the values that correspond to the desired individuals diagnosis rates.
+    "k_v": 0.0085                         # rate of emergence of intra-host lineages
+    "e": 0.0017 (evolutionary rate)       # model evolutionary rate. You need to fit this parameter for it to correspond to any desired observed evolutionary rate u
+    "final_time": 365*3                   # final time of the simulation in days (simulation lenght)
+    "max_runtime": 300                    # max runtime of simulation in seconds
+    "phenotype_model": 'immune waning' or 'distance from wt'
+    "sequencing_rate": 0.05               # sequencing rate of diagnosed individuals
+    "seed": None                          # random seed
+    "F": 1.25                             # extrande upper bound B factor. DO NOT CHANGE unless you know what you are doing.
+
+```
+
+If you want to change any, for each parameter, specify a list of values that you would like to use for the simulation. If you want to change more than one parameter at the time, consider that you need to enter the same number of values for each parameter, e.g. :
+    par 1 = [value1, value2]
+    par 2 = [value3, value4]
+This will run a simulation with par 1 = value1 and par 2 = value 3, and a simulation with par 1 = value2 and par 2 = value4. 
+
+Each simulation will be repeated n_seeds time with a different random seed.
+
+The set of all simulations performed in a runme.py is what we call an experiment.
 
 ## Contributing
 State if you are open to contributions and what your requirements are for accepting them.
