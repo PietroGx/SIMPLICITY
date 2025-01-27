@@ -10,7 +10,3 @@ dependencies:
   - numpy
   - pandas
   - scipy
-  - spyder
-  - scikit-learn
-  - scikit-posthocs
-prefix: /Applications/anaconda3/envs/simplicity

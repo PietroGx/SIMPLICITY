@@ -36,16 +36,20 @@ import simplicity.settings_manager as sm
 import simplicity.output_manager as om
 import simplicity.runners.serial 
 from   simplicity.runners.unit_run import run_seeded_simulation
-
+import types
 experiment_name = 'Test_runme'
 
 ## experiment settings (sm.write_settings arguments)
-parameters      = {'evolutionary rate': [0.001]}
-n_seeds         = 3
 
-def run_experiment(experiment_name, 
-                   simplicity_runner,
-                   plot_trajectory,
+def user_set_experiment_settings():
+    parameters      = {'evolutionary rate': [0.001]}
+    n_seeds         = 2
+    return (parameters, n_seeds)
+
+def run_experiment(experiment_name: str, 
+                   experiment_settings: types.FunctionType,
+                   simplicity_runner: types.ModuleType,
+                   plot_trajectory:bool,
                    archive_experiment=False):
     print('')
     print('##########################################')
@@ -53,6 +57,7 @@ def run_experiment(experiment_name,
     # setup experiment files directories
     config.create_directories(experiment_name)
     # set parameters 
+    parameters, n_seeds = experiment_settings()
     sm.write_settings(parameters, n_seeds)
     # Write experiment settings file
     sm.write_experiment_settings(experiment_name)
@@ -70,13 +75,14 @@ def run_experiment(experiment_name,
         om.archive_experiment(experiment_name)
     
     print('')
+    print('##########################################')
     print(f'EXPERIMENT {experiment_name} EXECUTED SUCCESSFULLY.')
-    print('')
     print('##########################################')
 
 if __name__ == "__main__":
     
-    run_experiment(experiment_name,                      
+    run_experiment(experiment_name,       
+                   user_set_experiment_settings,
                    simplicity_runner  = simplicity.runners.serial,
                    plot_trajectory = True,
                    archive_experiment = False)

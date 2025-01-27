@@ -9,12 +9,12 @@ with open('LICENSE') as f:
 
 setup(
     name='simplicity',
-    version='0.2.0',
+    version='0.2.2',
     description='Stochastic sIMulation of SARS-CoV-2 sPread and evoLutIon aCcountIng for within-hosT dYnamics (SIMPLICITY)',
     long_description=readme,
     author='Pietro Gerletti, Jean-Baptiste Escudié',
     author_email='pietro.gerletti@pm.me',
-    url='https://gitlab.com/combio/simplicity-public',
+    url='https://github.com/PietroGx/SIMPLICITY',
     license=license,
     packages=['simplicity'] 
     #packages=find_packages(exclude=('tests', 'docs'))

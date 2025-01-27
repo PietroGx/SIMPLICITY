@@ -49,7 +49,10 @@ def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
     output_dir = os.path.join(config.get_experiment_output_dir(experiment_name), 
                               root_folder_of_seed_file, 
                               seed_file_name)
-    os.makedirs(output_dir)
+    try:
+        os.makedirs(output_dir)
+    except:
+        raise RuntimeError('You already run an experiment with the same name!')
     # Return the output directory path
     return output_dir
 

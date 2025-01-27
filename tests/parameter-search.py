@@ -5,8 +5,8 @@
 """
 
 ##### <test fixtures>
-from common_test_fixtures import fixture_simplicity_runners
-from common_test_fixtures import fixture_users_run_seeded_simulation_functions
+from simplicity.tests.common_test_fixtures import fixture_simplicity_runners
+from simplicity.tests.common_test_fixtures import fixture_users_run_seeded_simulation_functions
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
@@ -27,7 +27,7 @@ def test_run_parameter_search(SIMPLICITY_DATA_DIR, experiment_name, experiment_s
     # select Data dir (must exists before import :/)
     print('##########################################')
     print('')
-    print(f"Using SIMPLICITY_DATA_DIR:", SIMPLICITY_DATA_DIR)
+    print("Using SIMPLICITY_DATA_DIR:", SIMPLICITY_DATA_DIR)
     os.makedirs(SIMPLICITY_DATA_DIR, exist_ok=True)
 
     # import simplicity

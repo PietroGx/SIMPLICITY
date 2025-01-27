@@ -15,6 +15,9 @@ os.makedirs(DEFAULT_DATA_DIR,exist_ok=True)
 # Global variable to store the data directory path
 _data_dir = DEFAULT_DATA_DIR
 
+# set env variables 
+os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS"] = str(5)
+
 def set_data_dir(path):
     """Set the data directory path."""
     global _data_dir
