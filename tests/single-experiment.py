@@ -5,8 +5,8 @@
 """
 
 ##### <test fixtures>
-from common_test_fixtures import fixture_simplicity_runners
-from common_test_fixtures import fixture_users_run_seeded_simulation_functions
+from tests.common_test_fixtures import fixture_simplicity_runners
+from tests.common_test_fixtures import fixture_users_run_seeded_simulation_functions
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
@@ -18,8 +18,10 @@ def fixture_experiment_settings():
 
 ##### <actual test>
 def test_run_single_experiment(experiment_name, 
-                               experiment_settings, simplicity_runner, 
-                               run_seeded_simulation):
+                               experiment_settings, 
+                               simplicity_runner, 
+                               run_seeded_simulation,
+                               plot_trajectory):
     print('')
     print('##########################################')
     print('')
@@ -43,7 +45,7 @@ def test_run_single_experiment(experiment_name,
     sm.write_seeded_simulation_parameters(experiment_name)
     
     # let one of simplicity.runners run each seeded simulation
-    sr.run_seeded_simulations(experiment_name, run_seeded_simulation)
+    sr.run_seeded_simulations(experiment_name, run_seeded_simulation, plot_trajectory)
     
     # archive experiment
     # om.archive_experiment(experiment_name)

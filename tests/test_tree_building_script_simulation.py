@@ -4,9 +4,9 @@
 @author: pietro
 """
 from simplicity.tree.tree_builder import get_tree
-from tests.common_test_fixtures import fixture_tree_builder_type
-from tests.common_test_fixtures import fixture_infection_tree_subtype
-from tests.common_test_fixtures import fixture_phylogenetic_tree_subtype
+from simplicity.tests.common_test_fixtures import fixture_tree_builder_type
+from simplicity.tests.common_test_fixtures import fixture_infection_tree_subtype
+from simplicity.tests.common_test_fixtures import fixture_phylogenetic_tree_subtype
 
 output_directory = ''
 

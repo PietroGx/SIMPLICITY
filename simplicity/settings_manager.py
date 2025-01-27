@@ -189,19 +189,10 @@ def read_settings_and_write_simulation_parameters(experiment_name):
     # Read the experiment settings file
     with open(experiment_settings_file_path, 'r') as config_file:
         all_experiment_settings = json.load(config_file)
-    
-    # Loop over each set of experiment settings and create a simulation parameters file
-    for i, experiment_settings in enumerate(all_experiment_settings):
-        modified_params = []
-        modified_values = []
-        
-        for key, value in experiment_settings.items():
-            modified_params.append(key)
-            modified_values.append(value)
-        
-        # Create a filename based on the parameters and their values
-        file_name_parts = [f"{param}_{value}" for param, value in zip(modified_params, modified_values)]
-        file_name = "_".join(file_name_parts) + '.json'
+    # handle case of no changes from standard values
+    if all_experiment_settings == []:
+        # Create a filename
+        file_name = 'standard_values.json'
         
         # Ensure the directory for simulation parameters exists
         simulation_parameters_file_path = os.path.join(_data_dir,
@@ -209,24 +200,59 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                                  '02_Simulation_parameters', 
                                                  file_name)
         
-        # Merge the standard values with the current experiment settings
-        settings = {**STANDARD_VALUES, **experiment_settings}
-        
         # Write the simulation parameters to a JSON file
         write_simulation_parameters(simulation_parameters_file_path, 
-                                    settings["population_size"],
-                                    settings["infected_individuals_at_start"],
-                                    settings["R"],
-                                    settings["k_d"],
-                                    settings["k_v"],
-                                    settings["e"],
-                                    settings["final_time"],
-                                    settings["max_runtime"],
-                                    settings["phenotype_model"],
-                                    settings["sequencing_rate"],
-                                    settings["seed"],
-                                    settings["F"]
+                                    STANDARD_VALUES["population_size"],
+                                    STANDARD_VALUES["infected_individuals_at_start"],
+                                    STANDARD_VALUES["R"],
+                                    STANDARD_VALUES["k_d"],
+                                    STANDARD_VALUES["k_v"],
+                                    STANDARD_VALUES["e"],
+                                    STANDARD_VALUES["final_time"],
+                                    STANDARD_VALUES["max_runtime"],
+                                    STANDARD_VALUES["phenotype_model"],
+                                    STANDARD_VALUES["sequencing_rate"],
+                                    STANDARD_VALUES["seed"],
+                                    STANDARD_VALUES["F"]
                                     )
+    else: 
+        # Loop over each set of experiment settings and create a simulation parameters file
+        for i, experiment_settings in enumerate(all_experiment_settings):
+            modified_params = []
+            modified_values = []
+            
+            for key, value in experiment_settings.items():
+                modified_params.append(key)
+                modified_values.append(value)
+            
+            # Create a filename based on the parameters and their values
+            file_name_parts = [f"{param}_{value}" for param, value in zip(modified_params, modified_values)]
+            file_name = "_".join(file_name_parts) + '.json'
+            
+            # Ensure the directory for simulation parameters exists
+            simulation_parameters_file_path = os.path.join(_data_dir,
+                                                     f'{experiment_name}',
+                                                     '02_Simulation_parameters', 
+                                                     file_name)
+            
+            # Merge the standard values with the current experiment settings
+            settings = {**STANDARD_VALUES, **experiment_settings}
+            
+            # Write the simulation parameters to a JSON file
+            write_simulation_parameters(simulation_parameters_file_path, 
+                                        settings["population_size"],
+                                        settings["infected_individuals_at_start"],
+                                        settings["R"],
+                                        settings["k_d"],
+                                        settings["k_v"],
+                                        settings["e"],
+                                        settings["final_time"],
+                                        settings["max_runtime"],
+                                        settings["phenotype_model"],
+                                        settings["sequencing_rate"],
+                                        settings["seed"],
+                                        settings["F"]
+                                        )
 
     print(f"Simulation parameters written to directory: {simulation_parameters_file_path}")
 

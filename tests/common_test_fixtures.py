@@ -25,11 +25,13 @@ def fixture_users_run_seeded_simulation_functions():
     yield run_seeded_simulation
     
     # user provided
-    from  common_test_fixtures import user_run_seeded_simulation
+    from  tests.common_test_fixtures import user_run_seeded_simulation
     yield user_run_seeded_simulation
 
 ## user's run_seeded_simulation function needs to be accessible by getattr(module, fn_name) for simplicity.runners.slurm
-def user_run_seeded_simulation(seeded_simulation_parameters_path: str, experiment_name: str) -> None:
+def user_run_seeded_simulation(seeded_simulation_parameters_path: str, 
+                               experiment_name: str,
+                               plot_trajectory: bool) -> None:
     print("Run seeded simulation routine:", seeded_simulation_parameters_path)
     
     # import simplicity
@@ -47,9 +49,9 @@ def user_run_seeded_simulation(seeded_simulation_parameters_path: str, experimen
     simulation = sim.Simplicity       (parameters, output_directory)
     population = pop.create_population(parameters)
     simulation.run(population)
-    #simulation.plot()
-    #simulation.infection_tree()
-    #simulation.phylogenetic_tree()
+    if plot_trajectory:    
+        simulation.plot()
+    
     ## </simplicity core>        
 
     print("Completed seeded simulation routine:", seeded_simulation_parameters_path)
