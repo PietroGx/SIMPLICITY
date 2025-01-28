@@ -6,7 +6,7 @@ Created on Sat Jan 25 11:07:15 2025
 @author: pietro
 """
 from simplicity.runme import run_experiment
-from tests.local_runme import test_experiment_output
+from tests.test_local_runme import test_experiment_output
 import simplicity.runners.slurm
 
 ## fixture  experiment settings (sm.write_settings arguments)
