@@ -43,7 +43,7 @@
    	* fixed variable name conflict causing bug in tree rendering
    	* created and tested new runme for local machines
 
-2025-01-pietro gerletti
+2025-01-24 pietro gerletti
 
 	Version 0.2.2
 
@@ -55,7 +55,11 @@
 	* implemented and tested complete test for local code serial runner
 	* implemented and tested complete test for local code multiprocessing runner
 	
+2025-01-24 pietro gerletti
+
+	Version 0.2.3
 	
+	* wrote test for HPC_runme
 	
 	
 	
