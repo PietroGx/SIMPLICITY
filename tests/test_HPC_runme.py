@@ -8,6 +8,7 @@ Created on Sat Jan 25 11:07:15 2025
 from simplicity.runme import run_experiment
 from tests.test_local_runme import test_experiment_output
 import simplicity.runners.slurm
+import argparse
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
@@ -41,6 +42,13 @@ def test_experiment_HPC(test_number:int):
     
 ##### </actual test>
 
+def main():
+    # Set up the argument parser
+    parser = argparse.ArgumentParser(description="Run test experiment on HPC")
+    parser.add_argument('param', type=int, help="Test number")
+    args = parser.parse_args()
+    # Run the test with the provided parameter
+    test_experiment_HPC(args.param)
+
 if __name__ == "__main__":
-    # test_experiment_local('serial',1)
-    test_experiment_HPC(1)
+    main()

@@ -14,7 +14,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation, plot_trajecto
     Uses CPython built-in concurrent.futures.ProcessPoolExecutor.
     """
     import os
-    SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS = int(os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS"])
+    SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS = int(os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"])
     
     seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
     # run a Simplicity simulation for each seeded parameters

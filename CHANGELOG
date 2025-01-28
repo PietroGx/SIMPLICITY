@@ -60,6 +60,10 @@
 	Version 0.2.3
 	
 	* wrote test for HPC_runme
+	* updated config with MAX_PARALLEL_SIMULATIONS env variables
+	* updated multiproccessing runner env MAX_PARALLEL_SIMULATIONS name
+	* updated test for HPC_runme
+	* updated slurm runner to accomodate new unit_run signature
 	
 	
 	
