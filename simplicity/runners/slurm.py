@@ -48,7 +48,10 @@ def get_platform_executable_extension():
     return ".exe" if platform.system() == "Windows" else  ""
 
 
-def submit_simulations(experiment_name: str, run_seeded_simulation: typing.Callable, n:int):
+def submit_simulations(experiment_name: str, 
+                       run_seeded_simulation: typing.Callable, 
+                       plot_trajectory,
+                       n:int):
     # run_seeded_simulation to qualname
     fn_name = run_seeded_simulation.__name__
     run_seeded_simulation_module_qualname = run_seeded_simulation.__module__
@@ -85,6 +88,7 @@ def submit_simulations(experiment_name: str, run_seeded_simulation: typing.Calla
         **os.environ,
         "SIMPLICITY_EXPERIMENT_NAME": experiment_name,
         "USER_RUN_SEEDED_SIMULATION": run_seeded_simulation_qualname,
+        "PLOT_TRAJECTORY"           : plot_trajectory
     }), input=stdin)
     assert slurm_process.returncode == 0, f"Slurm was called with the following arguments:\n{' '.join(args)}\n{env}\n=== stdin\n{stdin}\n=== /stdin"
     
@@ -131,7 +135,6 @@ def poll_simulations_status(experiment_name):
         failed   = failed,
     )
 
-
 def release_simulations(experiment_name, n: int):
     # get the seeded simulation parameters files paths
     import simplicity.settings_manager as sm
@@ -176,17 +179,16 @@ def release_simulations(experiment_name, n: int):
         signal_released_path  = seeded_simulation_parameters_path + ".released"
         pathlib.Path(signal_released_path).touch()
         
-
-def run_seeded_simulations(experiment_name, run_seeded_simulation):
+def run_seeded_simulations(experiment_name, run_seeded_simulation, plot_trajectory):
     """the simplicity.runner.run_seeded_simulations function"""
     import time, os
-    SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS = int(os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS"])
+    SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM = int(os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"])
 
     # retrieve status
     status = poll_simulations_status(experiment_name)
 
     # submit simulations
-    submit_simulations(experiment_name, run_seeded_simulation, n=status.total)
+    submit_simulations(experiment_name, run_seeded_simulation, plot_trajectory, n=status.total)
     print(f"submitted {status.total} seeded simulations"); last_printed = time.time()
     
     # loop until no simulation left to release
@@ -198,7 +200,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
         last_status = status
         
         # release simluations
-        n = min(status.left - status.pending, SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS - status.pending - status.running)
+        n = min(status.left - status.pending, SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM - status.pending - status.running)
         if n:
             print(f"release up to {n} seeded simulations"); last_printed = time.time()
             release_simulations(experiment_name, n)
@@ -226,7 +228,8 @@ def job():
     # retrieve arguments value (set by submit_simulation) 
     experiment_name                = os.environ["SIMPLICITY_EXPERIMENT_NAME"]
     run_seeded_simulation_qualname = os.environ["USER_RUN_SEEDED_SIMULATION"]
-
+    plot_trajectory                = os.environ["PLOT_TRAJECTORY"]
+    
     # resolve i_th seeded_simulation given Slurm's given rank
     i_th_seeded_simulation = int(os.environ["SLURM_ARRAY_TASK_ID"]) - int(os.environ["SLURM_ARRAY_TASK_MIN"])
     
@@ -252,7 +255,8 @@ def job():
         run_seeded_simulation = getattr(run_seeded_simulation_module, fn_name)
     
         # call run_seeded_simulation
-        run_seeded_simulation(seeded_simulation_parameters_path, experiment_name)
+        run_seeded_simulation(seeded_simulation_parameters_path, experiment_name, plot_trajectory)
+        
     except Exception as exc:
         # signal seeded simulation failed
         pathlib.Path(signal_failed_path).touch()
