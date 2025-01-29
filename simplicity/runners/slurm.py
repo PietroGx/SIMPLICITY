@@ -50,7 +50,7 @@ def get_platform_executable_extension():
 
 def submit_simulations(experiment_name: str, 
                        run_seeded_simulation: typing.Callable, 
-                       plot_trajectory,
+                       plot_trajectory: bool,
                        n:int):
     # run_seeded_simulation to qualname
     fn_name = run_seeded_simulation.__name__
@@ -67,8 +67,8 @@ def submit_simulations(experiment_name: str,
         # run the same python
         f"#!{sys.executable}",
         # call this module main()
-        f"import simplicity.runners.slurm",
-        f"simplicity.runners.slurm.job()",
+        "import simplicity.runners.slurm",
+        "simplicity.runners.slurm.job()",
     )).encode()
     
     # ! slurm array indexing is 1 based
@@ -88,7 +88,7 @@ def submit_simulations(experiment_name: str,
         **os.environ,
         "SIMPLICITY_EXPERIMENT_NAME": experiment_name,
         "USER_RUN_SEEDED_SIMULATION": run_seeded_simulation_qualname,
-        "PLOT_TRAJECTORY"           : plot_trajectory
+        "PLOT_TRAJECTORY"           : str(plot_trajectory)
     }), input=stdin)
     assert slurm_process.returncode == 0, f"Slurm was called with the following arguments:\n{' '.join(args)}\n{env}\n=== stdin\n{stdin}\n=== /stdin"
     
