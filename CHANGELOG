@@ -55,7 +55,7 @@
 	* implemented and tested complete test for local code serial runner
 	* implemented and tested complete test for local code multiprocessing runner
 	
-2025-01-24 pietro gerletti
+2025-01-29 pietro gerletti
 
 	Version 0.2.3
 	
@@ -64,6 +64,7 @@
 	* updated multiproccessing runner env MAX_PARALLEL_SIMULATIONS name
 	* updated test for HPC_runme
 	* updated slurm runner to accomodate new unit_run signature
+	* new tests and runners  work
 	
 	
 	
