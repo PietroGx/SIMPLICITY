@@ -156,11 +156,11 @@ def explore_u_e_space(runner:str, experiment_number:int):
 def main():
     # Set up the argument parser
     parser = argparse.ArgumentParser(description="Run script to explore u/e parameter space")
-    parser.add_argument('param', type=str, help="runner")
-    parser.add_argument('param', type=int, help="experiment number")
+    parser.add_argument('runner', type=str, help="runner")
+    parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()
     # Run the test with the provided parameter
-    explore_u_e_space(args.param)
+    explore_u_e_space(args.runner,args.experiment_number)
 
 if __name__ == "__main__":
     main()
