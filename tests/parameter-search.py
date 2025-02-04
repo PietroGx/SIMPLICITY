@@ -23,30 +23,31 @@ def fixture_parameter_search_settings():
 ##### </test fixtures>
 
 ##### <actual test>
-def test_run_parameter_search(SIMPLICITY_DATA_DIR, experiment_name, experiment_settings, paremeter_search_settings, simplicity_runner, run_seeded_simulation):
-    # select Data dir (must exists before import :/)
-    print('##########################################')
-    print('')
-    print("Using SIMPLICITY_DATA_DIR:", SIMPLICITY_DATA_DIR)
-    os.makedirs(SIMPLICITY_DATA_DIR, exist_ok=True)
-
+def test_run_parameter_search(experiment_name, 
+                              experiment_settings, 
+                              paremeter_search_settings, 
+                              simplicity_runner, 
+                              run_seeded_simulation):
     # import simplicity
     import simplicity.config                     as config
     import simplicity.settings_manager           as sm
-    import simplicity.output_manager             as om
+    # import simplicity.output_manager             as om
     import simplicity.tuning.parameter_search    as ps
     #import simplicity.runners.slurm   as sr      # is passed as a fixture instead
     sr = simplicity_runner
 
-    # set parameters and decide if search or not
+    # set parameters 
     parameters, n_seeds, target_value = experiment_settings
     sm.write_settings(parameters, n_seeds, target_value)
+    
     # setup experiment files directories
     config.create_directories(experiment_name)
+    
     # Write experiment settings file
     sm.write_experiment_settings(experiment_name)
     # write simulation parameters files
     sm.read_settings_and_write_simulation_parameters(experiment_name)
+    
     # write parameter search settings
     threshold, = paremeter_search_settings
     ps.write_paremeter_search_settings(experiment_name, threshold)
@@ -54,7 +55,7 @@ def test_run_parameter_search(SIMPLICITY_DATA_DIR, experiment_name, experiment_s
     ps.fit(experiment_name, sr, run_seeded_simulation)
     
     # archive experiment
-    om.archive_experiment(experiment_name)
+    # om.archive_experiment(experiment_name)
     # done
     print('')
     print(f'EXPERIMENT {experiment_name} EXECUTED SUCCESSFULLY.')

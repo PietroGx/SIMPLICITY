@@ -65,7 +65,23 @@
 	* updated test for HPC_runme
 	* updated slurm runner to accomodate new unit_run signature
 	* new tests and runners  work
+
+2025-04-02 pietro gerletti
+
+	Version 0.3.0
 	
+	* updated info for users on test_local_runme
+	* testing parameter space for e/u regression - created test file 
+	* sklearn added to dependencies
+	* changed value of runtime_max in settings manager (3600)
+    * added exception handling to config.get_output_directory
+    * added exception handling to config.get_simulation_parameters_dir	
+    * updated standard values dictionary and fixed parameter names conflicts
+    * rewrote and updated tempest regression funcs and plots 
+    * moved tempest regression plots to plot_manager
+    * added script to extract plots to Data/00_Tempest_regression_plots
+    * updated test_parameter_space - now parameter space exploration routine running locally
+    * created script explore_u_parameter_space
 	
 	
 	

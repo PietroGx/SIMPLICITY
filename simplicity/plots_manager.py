@@ -9,6 +9,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import numpy as np
+import json
+import simplicity.config as config
+import math
+from simplicity.tuning.evolutionary_rate import create_joint_sequencing_df
+from simplicity.tuning.evolutionary_rate import tempest_regression
+import glob
+
 
 def plot_fitness(simulation_output):
     """
@@ -42,7 +49,7 @@ def plot_fitness(simulation_output):
     # plt.savefig(figpath)
     plt.close()
     
-def plot(simulation_output):
+def plot_trajectory(simulation_output):
     '''
     Plots the simulation trajectory and the evolution of infectivity
     during the simulation.
@@ -78,9 +85,9 @@ def plot(simulation_output):
     
     plt.close()
 
-def plot_var_frequency(simulation_output,threshold):
+def plot_lineage_frequency(simulation_output,threshold):
     '''
-    Plot relative frequency of variants during the simulation
+    Plot relative frequency of lineages during the simulation
 
     Parameters
     ----------
@@ -147,6 +154,7 @@ def plot_simulation(output_directory, threshold):
         hspace=0.1,
         wspace=0.085
     )
+    
     # system trajectory subplot
     ######################################################################
     trajectory_file_path = os.path.join(output_directory, 'simulation_trajectory.csv')
@@ -163,6 +171,7 @@ def plot_simulation(output_directory, threshold):
     ax2.tick_params(axis='both', labelsize=15)
     ax2.set_ylabel('N individuals', fontsize=15)
     ax2.legend(loc='upper left', fontsize=15)
+    
     ######################################################################
     # variants frequency subplot
     lineage_frequency_file_path = os.path.join(output_directory, 'lineage_frequency.csv')
@@ -193,6 +202,7 @@ def plot_simulation(output_directory, threshold):
     # ax1.set_xlabel("Time (days)", fontsize=20)
     # ax2.legend(loc='upper left', bbox_to_anchor=(1, 2.95))
     ax1.legend().remove()
+    
     #######################################################################
     # fitness subplot
     fitness_trajectory_file_path = os.path.join(output_directory, 'fitness_trajectory.csv')
@@ -223,6 +233,7 @@ def plot_simulation(output_directory, threshold):
     # ax3.yaxis.set_label_coords(-0.1, 0)
     # Add legend
     ax3.legend(loc='upper left', fontsize=15)
+    
     #######################################################################
     # Align the y-axis labels
     fig.align_ylabels([ax2, ax3])
@@ -231,3 +242,128 @@ def plot_simulation(output_directory, threshold):
     plt.savefig(figure_output_path)
     plt.close()
     # fig.show()
+
+###############################################################################
+###############################################################################
+######################## PLOT TEMPEST REGRESSION ##############################
+###############################################################################
+###############################################################################
+
+def ideal_subplot_grid(num_plots):
+    # Calculate the number of columns (the ceiling of the square root of the number of plots)
+    num_cols = math.ceil(math.sqrt(num_plots))
+    
+    # Calculate the number of rows needed
+    num_rows = math.ceil(num_plots / num_cols)
+    
+    return num_rows, num_cols        
+ 
+def plot_combined_regressions(experiment_name):
+    # Get experiment output dir
+    experiment_output_dir = config.get_experiment_output_dir(experiment_name)
+    # Get seeded simulations output subfolders
+    seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
+                                    f.name) for f in os.scandir(experiment_output_dir
+                                                                ) if f.is_dir()]
+    
+    # Determine the number of rows and columns for subplots
+    num_rows, num_cols = ideal_subplot_grid(len(seeeded_simulations_output_directories))
+
+    fig, axs = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows))
+    
+    # If there's only one subplot, axs is not an array, so we convert it to a 2D array for consistency
+    if num_rows * num_cols == 1:
+        axs = [[axs]]
+    elif num_rows == 1 or num_cols == 1:
+        axs = axs.reshape(1, -1)
+    else:
+        axs = axs
+
+    for i, subdir in enumerate(seeeded_simulations_output_directories):
+        combined_df, _ = create_joint_sequencing_df(subdir)
+        u, model = tempest_regression(combined_df)
+        
+        x = combined_df['Sequencing_time'].values.reshape(-1, 1)
+        y_pred = model.predict(x)
+        
+        ax = axs[i // num_cols][i % num_cols]
+        combined_df.plot(kind='scatter', x='Sequencing_time', y='Distance_from_root', color='blue', ax=ax)
+        ax.plot(x, y_pred, color='red', linewidth=2, label=f'u = {u:.5f}')
+        ax.set_xlabel('Time [y]')
+        ax.set_ylabel('Distance from root [#S/site]')
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax.set_title(f'Regression - {os.path.basename(subdir)}')
+        ax.grid(True)
+        ax.legend()
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
+
+def plot_u_vs_parameter(experiment_name, parameter):
+    ''' Plot observed evolutionary rate (tempest regression) against desired parameter values
+    '''
+    # get simulation parameter files for the selected experiment
+    simulation_parameters_dir = config.get_simulation_parameters_dir(experiment_name)
+    simulation_parameters_files = glob.glob(os.path.join(simulation_parameters_dir, '*.json'))
+    # get output directory
+    experiment_output_dir     = config.get_experiment_output_dir(experiment_name)
+    # Get seeded simulations output subfolders
+    seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
+                                    f.name) for f in os.scandir(experiment_output_dir
+                                                                ) if f.is_dir()]
+    # for each simulation set in the experiment perfom the tempest regression
+    results = []
+    for simulation_parameters_file, seeeded_simulations_output_directory in zip(
+            simulation_parameters_files,seeeded_simulations_output_directories):
+        # Read the parameter from the settings file
+        with open(simulation_parameters_file, 'r') as file:
+            data = json.load(file)
+        parameter_value = data.get(parameter)
+        
+        # Perform regression for the settings output folder
+        combined_df, _ = create_joint_sequencing_df(seeeded_simulations_output_directory)
+        u, _ = tempest_regression(combined_df)
+        
+        results.append({str(parameter): parameter_value, 'u': u})
+    # add results to df
+    results_df = pd.DataFrame(results)
+    
+    # Sort the results by the 'parameter' values
+    results_df = results_df.sort_values(by=str(parameter))
+    
+    # Save the results to a CSV file
+    csv_file_path = os.path.join(experiment_output_dir, 
+                                 f'{experiment_name}_u_vs_{parameter}_values.csv')
+    results_df.to_csv(csv_file_path, index=False)
+    
+    # Plot target parameter vs u as a line plot with points
+    plt.figure(figsize=(10, 6))
+    plt.plot(results_df[str(parameter)], results_df['u'], 
+             marker='o', 
+             color='black', 
+             linestyle='-', 
+             label=f'{experiment_name}_{parameter} vs u')
+    plt.xlabel(parameter)
+    plt.ylabel('u')
+    plt.title(f'{parameter} vs u')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.legend()
+    plt.savefig(os.path.join(experiment_output_dir, 
+                             f"{experiment_name}_{parameter}_vs_u.png"))
+def export_u_regression_plots(experiment_name): 
+    ''' move tempest regression plots from experiment folder to plots folder
+    '''
+    # get experiment output dir
+    experiment_output_dir = config.get_experiment_output_dir(experiment_name)
+    # get plots directories
+    plots = glob.glob(os.path.join(experiment_output_dir, '*.png'))
+    # create target directories to move the plots to
+    plots_folder_dir = os.path.join(config.get_data_dir(), '00_Tempest_regression_plots')
+    os.makedirs(plots_folder_dir,exist_ok=True)
+    # get plots filenames
+    plot_filenames = [os.path.basename(plot) for plot in plots]
+    # move the plots
+    for plot,plot_filename in zip(plots,plot_filenames):
+        os.replace(plot, os.path.join(plots_folder_dir,plot_filename))

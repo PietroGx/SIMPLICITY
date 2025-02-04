@@ -4,6 +4,34 @@
 Created on Sat Jan 25 11:07:15 2025
 
 @author: pietro
+
+STANDARD_VALUES for SIMPLICITY simulation: 
+
+    "population_size": 1000,
+    "infected_individuals_at_start": 100,
+    "R": 1.5,
+    "diagnosis_rate": 0.0055,
+    "IH_virus_emergence_rate": 0.0085,
+    "evolutionary_rate": 0.0017,
+    "final_time": 365*3 ,
+    "max_runtime": 100000000, 
+    "phenotype_model": 'immune waning',  # or 'distance from wt'
+    "sequencing_rate": 0.05,
+    "seed": None,
+    "F": 1.25
+
+If you want to change any, you can specify them in the parameters dictionary below. 
+For each parameter, specify a list of values that you would like to use for the 
+simulation. If you want to change more than one parameter at the time, consider 
+that you need to enter the same number of values for each parameter, e.g. :
+    par 1 = [value1, value2]
+    par 2 = [value3, value4]
+This will run a simulation with par 1 = value1 and par 2 = value 3, and a simulation
+with par 1 = value2 and par 2 = value4. 
+
+Each simulation will be repeated n_seeds time with a different random seed.
+
+The set of all simulations is what we call an experiment.
 """
 from simplicity.runme import run_experiment
 from simplicity.config import get_experiment_output_dir
@@ -83,4 +111,4 @@ def test_experiment_local(runner:str, test_number:int):
 
 if __name__ == "__main__":
     # test_experiment_local('serial',1)
-    test_experiment_local('multiprocessing',2)
+    test_experiment_local('multiprocessing',5)
