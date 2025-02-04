@@ -42,7 +42,7 @@ experiment_name = 'Test_runme'
 ## experiment settings (sm.write_settings arguments)
 
 def user_set_experiment_settings():
-    parameters      = {'evolutionary rate': [0.001]}
+    parameters      = {}
     n_seeds         = 2
     return (parameters, n_seeds)
 

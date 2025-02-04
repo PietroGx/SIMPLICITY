@@ -17,16 +17,21 @@ STANDARD_VALUES = {
     "population_size": 1000,
     "infected_individuals_at_start": 100,
     "R": 1.5,
-    "k_d": 0.0055,
-    "k_v": 0.0085,
-    "e": 0.0017,
+    "diagnosis_rate": 0.0055,          # k_d in theoretical model equations
+    "IH_virus_emergence_rate": 0.0085, # k_v in theoretical model equations
+    "evolutionary_rate": 0.0017,       # e in theoretical model equations
     "final_time": 365*3 ,
-    "max_runtime": 300, 
+    "max_runtime": 100000000, 
     "phenotype_model": 'immune waning',  # or 'distance from wt'
     "sequencing_rate": 0.05,
     "seed": None,
     "F": 1.25
 }
+
+def check_parameters_names(parameters_dic):
+    for key in parameters_dic.keys():
+        if key not in STANDARD_VALUES.keys():
+            raise ValueError(f'Parameter {key} is not a valid parameter')
 
 def write_settings(parameters: dict, 
                    n_seeds: int,
@@ -46,7 +51,9 @@ def write_settings(parameters: dict,
     if target_value is not None:
         if len(parameters) != 1 or len(parameters[list(parameters.keys())[0]]) != 1:
             raise ValueError("If target_value is specified, parameters dict must contain exactly one entry with one value'.")
-
+    
+    check_parameters_names(parameters)
+    
     settings = {
         "parameters": parameters,
         "n_seeds": n_seeds,
@@ -136,9 +143,9 @@ def write_simulation_parameters(file_path,
                                 population_size, 
                                 infected_individuals_at_start, 
                                 R,
-                                k_d,
-                                k_v,
-                                e,
+                                diagnosis_rate,
+                                IH_virus_emergence_rate,
+                                evolutionary_rate,
                                 final_time, 
                                 max_runtime, 
                                 phenotype_model,
@@ -150,9 +157,9 @@ def write_simulation_parameters(file_path,
         "population_size": population_size,
         "infected_individuals_at_start": infected_individuals_at_start,
         "R": R,
-        "diagnosis rate": k_d,
-        "IH virus emergence rate" : k_v,
-        "evolutionary rate": e,
+        "diagnosis_rate": diagnosis_rate, 
+        "IH_virus_emergence_rate" : IH_virus_emergence_rate,
+        "evolutionary_rate": evolutionary_rate,
         "t_0": 0,
         "final_time": final_time,
         "max_runtime": max_runtime,
@@ -205,9 +212,9 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                     STANDARD_VALUES["population_size"],
                                     STANDARD_VALUES["infected_individuals_at_start"],
                                     STANDARD_VALUES["R"],
-                                    STANDARD_VALUES["k_d"],
-                                    STANDARD_VALUES["k_v"],
-                                    STANDARD_VALUES["e"],
+                                    STANDARD_VALUES["diagnosis_rate"],
+                                    STANDARD_VALUES["IH_virus_emergence_rate"],
+                                    STANDARD_VALUES["evolutionary_rate"],
                                     STANDARD_VALUES["final_time"],
                                     STANDARD_VALUES["max_runtime"],
                                     STANDARD_VALUES["phenotype_model"],
@@ -243,9 +250,9 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                         settings["population_size"],
                                         settings["infected_individuals_at_start"],
                                         settings["R"],
-                                        settings["k_d"],
-                                        settings["k_v"],
-                                        settings["e"],
+                                        settings["diagnosis_rate"],
+                                        settings["IH_virus_emergence_rate"],
+                                        settings["evolutionary_rate"],
                                         settings["final_time"],
                                         settings["max_runtime"],
                                         settings["phenotype_model"],

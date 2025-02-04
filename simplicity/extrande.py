@@ -49,12 +49,12 @@ def extrande_factory(phenotype_model, parameters,
     # average infectious time for individuals infected with SARS-CoV-2
     avg_infectious_time_normal = 11.41
     # diagnosis rate
-    k_d = parameters["diagnosis rate"]
+    k_d = parameters["diagnosis_rate"]
     # multiple variants rate
-    k_v = parameters["IH virus emergence rate"]
+    k_v = parameters["IH_virus_emergence_rate"]
     # per site per year SPIKE substitution rate
-    avg_spike_ssy = parameters["evolutionary rate"]
-    # substitution rates (per site, per year) of SARS-CoV-2 Spike gene
+    avg_spike_ssy = parameters["evolutionary_rate"]
+    # substitution rates (per site, pe_r year) of SARS-CoV-2 Spike gene
     rate_sites_var = [avg_spike_ssy for i in range(len(ref.get_reference()))]
     # substitution rate (per year) of SARS-CoV-2 variants
     e = np.sum(rate_sites_var)

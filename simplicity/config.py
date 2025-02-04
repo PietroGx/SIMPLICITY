@@ -16,7 +16,7 @@ os.makedirs(DEFAULT_DATA_DIR,exist_ok=True)
 _data_dir = DEFAULT_DATA_DIR
 
 # set env variables 
-os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(5)
+os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(50)
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(500)
 
 def set_data_dir(path):
@@ -44,8 +44,17 @@ def create_directories(experiment_name):
 
 def get_experiment_output_dir(experiment_name):
     """Get the experiment_name output directory path."""
-    return os.path.join(_data_dir, experiment_name, '04_Output')
+    experiment_dir = os.path.join(_data_dir,experiment_name)
+    if os.path.isdir(experiment_dir):
+        return os.path.join(experiment_dir, '04_Output')
+    else:
+         raise ValueError('No experiment with that name!')
+    
 
 def get_simulation_parameters_dir(experiment_name):
     """Get the experiment_name output directory path."""
-    return os.path.join(_data_dir, experiment_name, '02_Simulation_parameters')
+    experiment_dir = os.path.join(_data_dir,experiment_name)
+    if os.path.isdir(experiment_dir):
+        return os.path.join(experiment_dir, '02_Simulation_parameters')
+    else:
+         raise ValueError('No experiment with that name!')
