@@ -255,6 +255,7 @@ def job():
         run_seeded_simulation = getattr(run_seeded_simulation_module, fn_name)
     
         # call run_seeded_simulation
+        print(type(plot_trajectory))
         run_seeded_simulation(seeded_simulation_parameters_path, experiment_name, plot_trajectory)
         
     except Exception as exc:
