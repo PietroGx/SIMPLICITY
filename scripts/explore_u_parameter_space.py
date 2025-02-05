@@ -41,7 +41,7 @@ import simplicity.plots_manager as pm
 import warnings
 import argparse
 
-n_seeds_script = 1
+n_seeds_script = 500
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings_t100():
     parameters      = {'evolutionary_rate': [0.00001, 
@@ -163,5 +163,5 @@ def main():
     explore_u_e_space(args.runner,args.experiment_number)
 
 if __name__ == "__main__":
-    # main()
-    explore_u_e_space('serial',1)
+    main()
+    # explore_u_e_space('serial',1)
