@@ -41,7 +41,7 @@ import simplicity.plots_manager as pm
 import warnings
 import argparse
 
-n_seeds_script = 500
+n_seeds_script = 1
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings_t100():
     parameters      = {'evolutionary_rate': [0.00001, 
@@ -103,7 +103,7 @@ def explore_u_e_space(runner:str, experiment_number:int):
     print('##########################################')
     print('Running first batch, t_final=100')
     print('')
-    experiment_name = f'test_param_space_tfinal=100_#{experiment_number}'
+    experiment_name = f'explore_param_space_tfinal=100_#{experiment_number}'
     try:
         run_experiment(experiment_name, 
                        fixture_experiment_settings_t100,             
@@ -119,7 +119,7 @@ def explore_u_e_space(runner:str, experiment_number:int):
     print('##########################################')
     print('Running second batch, t_final=500')
     print('')
-    experiment_name = f'test_param_space_tfinal=500_#{experiment_number}'
+    experiment_name = f'explore_param_space_tfinal=500_#{experiment_number}'
 
     try:
         run_experiment(experiment_name, 
@@ -136,7 +136,7 @@ def explore_u_e_space(runner:str, experiment_number:int):
     print('##########################################')
     print('Running third batch, t_final=1000')
     print('')
-    experiment_name = f'test_param_space_tfinal=1000_#{experiment_number}'
+    experiment_name = f'explore_param_space_tfinal=1000_#{experiment_number}'
     try:
         run_experiment(experiment_name, 
                        fixture_experiment_settings_t1000,             
@@ -163,4 +163,5 @@ def main():
     explore_u_e_space(args.runner,args.experiment_number)
 
 if __name__ == "__main__":
-    main()
+    # main()
+    explore_u_e_space('serial',1)

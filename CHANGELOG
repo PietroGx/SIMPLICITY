@@ -83,6 +83,12 @@
     * updated test_parameter_space - now parameter space exploration routine running locally
     * created script explore_u_parameter_space
 	
+2025-04-02 pietro gerletti
+
+	Version 0.3.1
+	
+	* updated plot manager to use Agg instead of Qt for slurm plotting
+	* found bug that causes simulation plots to be created also when plot set to False (on HPC)
 	
 	
 	
