@@ -228,7 +228,7 @@ def job():
     # retrieve arguments value (set by submit_simulation) 
     experiment_name                = os.environ["SIMPLICITY_EXPERIMENT_NAME"]
     run_seeded_simulation_qualname = os.environ["USER_RUN_SEEDED_SIMULATION"]
-    plot_trajectory                = os.environ["PLOT_TRAJECTORY"]
+    plot_trajectory = os.getenv("PLOT_TRAJECTORY", "False").lower() == "true"
     
     # resolve i_th seeded_simulation given Slurm's given rank
     i_th_seeded_simulation = int(os.environ["SLURM_ARRAY_TASK_ID"]) - int(os.environ["SLURM_ARRAY_TASK_MIN"])
