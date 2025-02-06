@@ -28,7 +28,7 @@ def plot_fitness(simulation_output):
     # Extract time, mean, and standard deviation data
     times = [coord[0] for coord in simulation_output.fitness_trajectory]
     means = [coord[1][0] for coord in simulation_output.fitness_trajectory]
-    stds = [coord[1][1] for coord in simulation_output.fitness_trajectory]
+    stds  = [coord[1][1] for coord in simulation_output.fitness_trajectory]
 
     # Create a plot
     plt.figure(figsize=(10, 6))
@@ -281,7 +281,7 @@ def plot_combined_regressions(experiment_name):
         axs = axs.reshape(1, -1)
     else:
         axs = axs
-
+    
     for i, subdir in enumerate(seeeded_simulations_output_directories):
         combined_df, _ = create_joint_sequencing_df(subdir)
         u, model = tempest_regression(combined_df)

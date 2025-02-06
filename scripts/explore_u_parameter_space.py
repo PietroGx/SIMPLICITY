@@ -41,46 +41,24 @@ import simplicity.plots_manager as pm
 import warnings
 import argparse
 
-n_seeds_script = 500
 ## fixture  experiment settings (sm.write_settings arguments)
-def fixture_experiment_settings_t100():
+def fixture_experiment_settings():
     parameters      = {'evolutionary_rate': [0.00001, 
                                              0.0001,
                                              0.001,
                                              0.01,
                                              0.1],
-                       'final_time':[100,
-                                     100,
-                                     100, 
-                                     100,
-                                     100
-                           ]}
-    n_seeds = n_seeds_script
-    return (parameters, n_seeds)
-
-def fixture_experiment_settings_t500():
-    parameters      = {'evolutionary_rate': [0.00001, 
-                                             0.0001,
-                                             0.001,
-                                             0.01,
-                                             0.1],
-                       'final_time':[500,
-                                     500,
-                                     500,
-                                     500,
-                                     500
-                           ]}
-    n_seeds = n_seeds_script
-    return (parameters, n_seeds)
-
-def fixture_experiment_settings_t1000():
-    parameters      = {'evolutionary_rate': [0.00001, 
-                                             0.0001,
-                                             0.001,
-                                             0.01,
-                                             0.1
-                           ]}
-    n_seeds = n_seeds_script
+                       'final_time':[365,
+                                     365,
+                                     365, 
+                                     365,
+                                     365],
+                       'population_size':[1000,
+                                          1000,
+                                          1000,
+                                          1000,
+                                          1000]}
+    n_seeds = 300
     return (parameters, n_seeds)
 
 def plot_regressions_and_export(experiment_name):
@@ -106,40 +84,7 @@ def explore_u_e_space(runner:str, experiment_number:int):
     experiment_name = f'explore_param_space_tfinal=100_#{experiment_number}'
     try:
         run_experiment(experiment_name, 
-                       fixture_experiment_settings_t100,             
-                       simplicity_runner  = runner_module,
-                       plot_trajectory = False,
-                       archive_experiment = False)
-    except RuntimeError:
-            warnings.warn(f'Experiment {experiment_name} already ran, proceeding to plotting')
-    except Exception as e:
-        print(f'The simulation failed to run: {e}')
-    plot_regressions_and_export(experiment_name)
-        
-    print('##########################################')
-    print('Running second batch, t_final=500')
-    print('')
-    experiment_name = f'explore_param_space_tfinal=500_#{experiment_number}'
-
-    try:
-        run_experiment(experiment_name, 
-                       fixture_experiment_settings_t500,             
-                       simplicity_runner  = runner_module,
-                       plot_trajectory = False,
-                       archive_experiment = False)
-    except RuntimeError:
-            warnings.warn(f'Experiment {experiment_name} already ran, proceeding to plotting')
-    except Exception as e:
-        print(f'The simulation failed to run: {e}')
-    plot_regressions_and_export(experiment_name)
-        
-    print('##########################################')
-    print('Running third batch, t_final=1000')
-    print('')
-    experiment_name = f'explore_param_space_tfinal=1000_#{experiment_number}'
-    try:
-        run_experiment(experiment_name, 
-                       fixture_experiment_settings_t1000,             
+                       fixture_experiment_settings,             
                        simplicity_runner  = runner_module,
                        plot_trajectory = False,
                        archive_experiment = False)

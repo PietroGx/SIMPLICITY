@@ -47,12 +47,18 @@ def fixture_experiment_settings():
                                              0.001,
                                              0.01,
                                              0.1],
-                       'final_time':[100,
-                                     100,
-                                     100, 
-                                     100,
-                                     100
-                           ]}
+                       'final_time':[365,
+                                     365,
+                                     365, 
+                                     365,
+                                     365],
+                       'max_runtime': [1200,
+                                       1200,
+                                       1200,
+                                       1200,
+                                       1200
+                                       ]
+                           }
     n_seeds = 3
     return (parameters, n_seeds)
 
@@ -75,12 +81,12 @@ def test_param_space_local(runner:str, test_number:int):
     print('##########################################')
     print('Running first batch, t_final=100')
     print('')
-    experiment_name = f'test_param_space_tfinal=100_#{test_number}'
+    experiment_name = f'test_param_space_{test_number}'
     try:
         run_experiment(experiment_name, 
                        fixture_experiment_settings,             
                        simplicity_runner  = runner_module,
-                       plot_trajectory = False,
+                       plot_trajectory = True,
                        archive_experiment = False)
     except RuntimeError:
             warnings.warn(f'Experiment {experiment_name} already ran, proceeding to plotting')
@@ -97,5 +103,5 @@ def test_param_space_local(runner:str, test_number:int):
 ##### </actual test>
 
 if __name__ == "__main__":
-    
-    test_param_space_local('multiprocessing',3)
+    plot_regressions_and_export('test_param_space_3')
+    # test_param_space_local('multiprocessing',3)

@@ -28,12 +28,16 @@ def create_joint_sequencing_df(seeeded_simulations_output_directory):
     data_frames = []
     for csv_file in csv_files:
         # Read each CSV file into a DataFrame
-        df = pd.read_csv(csv_file)
-        data_frames.append(df)
-    
+        try:
+            df = pd.read_csv(csv_file)
+            data_frames.append(df)
+        except:
+            pass
     # Concatenate all DataFrames into one
-    combined_df = pd.concat(data_frames, ignore_index=True)
-    
+    try:
+        combined_df = pd.concat(data_frames, ignore_index=True)
+    except:
+        raise ValueError('No sequencing data available to plot!')
     return combined_df, csv_files
 
 def tempest_regression(df):
