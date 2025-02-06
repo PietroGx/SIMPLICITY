@@ -95,6 +95,10 @@
 	Version 0.3.2
 	
 	* fixed bug caused by storing bool as string in env var (slurm runner)
+	* updated test_parameter_space and explore_u_parameter_space
+    * added exception handling to plot_combined_regressions
+    * working on fixing subplot order in plot_manager.plot_combined_regressions
+    
 	
 	
 	

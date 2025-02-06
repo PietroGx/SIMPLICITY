@@ -16,7 +16,7 @@ os.makedirs(DEFAULT_DATA_DIR,exist_ok=True)
 _data_dir = DEFAULT_DATA_DIR
 
 # set env variables 
-os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(50)
+os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(15)
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(500)
 
 def set_data_dir(path):

@@ -15,7 +15,7 @@ _data_dir = config.get_data_dir()
 # Define the standard values
 STANDARD_VALUES = {
     "population_size": 1000,
-    "infected_individuals_at_start": 100,
+    "infected_individuals_at_start": 10,
     "R": 1.5,
     "diagnosis_rate": 0.0055,          # k_d in theoretical model equations
     "IH_virus_emergence_rate": 0.0085, # k_v in theoretical model equations
@@ -44,7 +44,6 @@ def write_settings(parameters: dict,
                            of possible values for those parameters. All lists must be of 
                            the same length and contain at least one value.
         n_seeds (int): Number of random seeds for the experiment.
-        target_value (float): The target value if running a parameter search.
     """
     
     # Check if target_value is not None and parameters contain more than one entry

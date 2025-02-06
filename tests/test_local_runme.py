@@ -41,8 +41,8 @@ import os
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {}
-    n_seeds         = 2
+    parameters      = {'max_runtime': [60]}
+    n_seeds         = 15
     return (parameters, n_seeds)
 
 def check_output_file(directory, filename): 
@@ -111,4 +111,4 @@ def test_experiment_local(runner:str, test_number:int):
 
 if __name__ == "__main__":
     # test_experiment_local('serial',1)
-    test_experiment_local('multiprocessing',5)
+    test_experiment_local('multiprocessing',4)
