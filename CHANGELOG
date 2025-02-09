@@ -90,14 +90,20 @@
 	* updated plot manager to use Agg instead of Qt for slurm plotting
 	* found bug that causes simulation plots to be created also when plot set to False (on HPC)
 	
-2025-05-02 pietro gerletti
+2025-09-02 pietro gerletti
 
 	Version 0.3.2
 	
 	* fixed bug caused by storing bool as string in env var (slurm runner)
 	* updated test_parameter_space and explore_u_parameter_space
     * added exception handling to plot_combined_regressions
-    * working on fixing subplot order in plot_manager.plot_combined_regressions
+    * fixed subplot order in plot_manager.plot_combined_regressions
+    * added config.get_experiment_dir
+    * added statistics_simulations_lenght.py script 
+    * removed parameter_search.py - working on new tuning routine 
+    * fixed subplot titles in plot_manager.plot_combined_regressions
+    * updated slurm runner to save log files in correct folder
+    * updated setup.py
     
 	
 	

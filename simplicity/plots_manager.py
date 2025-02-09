@@ -268,7 +268,21 @@ def plot_combined_regressions(experiment_name):
     seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
                                     f.name) for f in os.scandir(experiment_output_dir
                                                                 ) if f.is_dir()]
-    
+   
+    def extract_rate(seeeded_simulations_output_directory):
+        json_file = seeeded_simulations_output_directory.replace(
+                    '04_Output','02_Simulation_parameters') +'.json'
+        try:
+            with open(json_file, 'r') as file:
+                data = json.load(file)
+                return data.get('evolutionary_rate')
+        except Exception as e:
+            print(f"Error reading JSON file: {e}")
+            return None
+        
+    # Sort the subdirectories based on the evolutionary rate
+    sorted_dirs = sorted(seeeded_simulations_output_directories, 
+                            key=extract_rate)
     # Determine the number of rows and columns for subplots
     num_rows, num_cols = ideal_subplot_grid(len(seeeded_simulations_output_directories))
 
@@ -282,7 +296,8 @@ def plot_combined_regressions(experiment_name):
     else:
         axs = axs
     
-    for i, subdir in enumerate(seeeded_simulations_output_directories):
+    for i, subdir in enumerate(sorted_dirs):
+        evo_rate = extract_rate(subdir)
         combined_df, _ = create_joint_sequencing_df(subdir)
         u, model = tempest_regression(combined_df)
         
@@ -296,7 +311,7 @@ def plot_combined_regressions(experiment_name):
         ax.set_ylabel('Distance from root [#S/site]')
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
-        ax.set_title(f'Regression - {os.path.basename(subdir)}')
+        ax.set_title(f'Regression - Evolutionary_rate: {evo_rate}')
         ax.grid(True)
         ax.legend()
 

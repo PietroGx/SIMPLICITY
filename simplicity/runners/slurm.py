@@ -29,7 +29,7 @@ Kown bugs:
 
 """
 import typing, os, pathlib, subprocess, platform
-
+import simplicity.config as c
 
 class SimulationsStatus(typing.NamedTuple):
     total    : int
@@ -75,15 +75,25 @@ def submit_simulations(experiment_name: str,
     batch_start = 1
     batch_size  = n
     batch_end   = batch_start + batch_size - 1
+   
+    # Define the output and error file paths
+    slurm_output_dir = os.makedirs(
+                os.path.join(c.get_experiment_output_dir,'slurm_logs')
+                ,exist_ok=True)
+    output_file = f"{slurm_output_dir}/{experiment_name}_out_%A_%a.txt"  # %A = job ID, %a = array index
+    error_file  = f"{slurm_output_dir}/{experiment_name}_err_%A_%a.txt"  # %A = job ID, %a = array index
     
     # submit the job
     slurm_process = subprocess.run((args:=[
         # calls sbatch
         "sbatch" + get_platform_executable_extension(),
         # to create the job array on hold 
-        f"--array={batch_start}-{batch_end}", "--hold",
+        f"--array={batch_start}-{batch_end}", 
+        "--hold",
         # with a name (used later for lookup)
         f"--job-name={experiment_name}",
+        f"--output={output_file}",  # Specify the output file path
+        f"--error={error_file}",  # Specify the error file path
     ]), env=(env:={
         **os.environ,
         "SIMPLICITY_EXPERIMENT_NAME": experiment_name,

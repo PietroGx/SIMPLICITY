@@ -49,12 +49,19 @@ def get_experiment_output_dir(experiment_name):
         return os.path.join(experiment_dir, '04_Output')
     else:
          raise ValueError('No experiment with that name!')
-    
 
 def get_simulation_parameters_dir(experiment_name):
     """Get the experiment_name output directory path."""
     experiment_dir = os.path.join(_data_dir,experiment_name)
     if os.path.isdir(experiment_dir):
         return os.path.join(experiment_dir, '02_Simulation_parameters')
+    else:
+         raise ValueError('No experiment with that name!')
+         
+def get_experiment_dir(experiment_name):
+    """Get the experiment_name output directory path."""
+    experiment_dir = os.path.join(_data_dir,experiment_name)
+    if os.path.isdir(experiment_dir):
+        return experiment_dir
     else:
          raise ValueError('No experiment with that name!')
