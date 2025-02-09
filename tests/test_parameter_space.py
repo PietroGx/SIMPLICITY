@@ -98,10 +98,7 @@ def test_param_space_local(runner:str, test_number:int):
     print(f'TEST PARAM SPACE #{test_number} -- COMPLETED.')
     print('##########################################')
  
-
- 
 ##### </actual test>
 
 if __name__ == "__main__":
-    plot_regressions_and_export('test_param_space_3')
-    # test_param_space_local('multiprocessing',3)
+    test_param_space_local('multiprocessing',3)

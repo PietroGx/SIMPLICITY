@@ -40,25 +40,25 @@ import simplicity.runners.slurm
 import simplicity.plots_manager as pm
 import warnings
 import argparse
+import numpy as np
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {'evolutionary_rate': [0.00001, 
-                                             0.0001,
-                                             0.001,
-                                             0.01,
-                                             0.1],
-                       'final_time':[365,
-                                     365,
-                                     365, 
-                                     365,
-                                     365],
-                       'population_size':[1000,
-                                          1000,
-                                          1000,
-                                          1000,
-                                          1000]}
-    n_seeds = 300
+
+    # number of values for evolutionary rate
+    evolutionary_rate_num_values = 30
+    
+    # Generate values spaced logarithmically between 10^-5 and 1
+    values = np.logspace(np.log10(0.00001), np.log10(1), 
+                         num=evolutionary_rate_num_values)
+    evolutionary_rate_values = values.tolist()
+
+    
+    parameters      = {'evolutionary_rate': evolutionary_rate_values,
+                       'final_time':[365] * evolutionary_rate_num_values
+                       }
+    n_seeds = 500
+
     return (parameters, n_seeds)
 
 def plot_regressions_and_export(experiment_name):
@@ -81,7 +81,7 @@ def explore_u_e_space(runner:str, experiment_number:int):
     print('##########################################')
     print('Running first batch, t_final=100')
     print('')
-    experiment_name = f'explore_param_space_tfinal=100_#{experiment_number}'
+    experiment_name = f'explore_param_space_#{experiment_number}'
     try:
         run_experiment(experiment_name, 
                        fixture_experiment_settings,             
@@ -104,7 +104,7 @@ def main():
     parser.add_argument('runner', type=str, help="runner")
     parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()
-    # Run the test with the provided parameter
+    # Run the script with the provided parameter
     explore_u_e_space(args.runner,args.experiment_number)
 
 if __name__ == "__main__":
