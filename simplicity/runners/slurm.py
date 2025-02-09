@@ -78,7 +78,7 @@ def submit_simulations(experiment_name: str,
    
     # Define the output and error file paths
     slurm_output_dir = os.makedirs(
-                os.path.join(c.get_experiment_output_dir,'slurm_logs')
+                os.path.join(c.get_experiment_output_dir(),'slurm_logs')
                 ,exist_ok=True)
     output_file = f"{slurm_output_dir}/{experiment_name}_out_%A_%a.txt"  # %A = job ID, %a = array index
     error_file  = f"{slurm_output_dir}/{experiment_name}_err_%A_%a.txt"  # %A = job ID, %a = array index
