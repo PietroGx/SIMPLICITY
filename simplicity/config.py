@@ -64,4 +64,4 @@ def get_experiment_dir(experiment_name):
     if os.path.isdir(experiment_dir):
         return experiment_dir
     else:
-         raise ValueError('No experiment with that name!')
+        create_directories(experiment_name)

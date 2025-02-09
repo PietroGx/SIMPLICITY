@@ -79,7 +79,6 @@ def explore_u_e_space(runner:str, experiment_number:int):
     print('##########################################')
     print('testing parameter space for e/u regression')
     print('##########################################')
-    print('Running first batch, t_final=100')
     print('')
     experiment_name = f'explore_param_space_#{experiment_number}'
     try:
