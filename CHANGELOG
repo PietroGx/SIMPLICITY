@@ -112,6 +112,15 @@
 	* added (in test phase) script to fit a log curve to u/e plot
 	* updated yml env file (adding lmfit)
 	* updated setup.py
+
+2025-11-02 pietro gerletti
+
+	Version 0.3.4
+	
+	* fitting u log script works 
+	* moved plotting from statistics_simulations_lenght to plot manager 
+	* updated host.py by making get_A_matrix function available outside of class
+	* working on k_d tuning script
 	
 	
 	

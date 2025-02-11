@@ -12,6 +12,68 @@ import scipy.linalg
 
 np.set_printoptions(precision=3, suppress=True)
 
+def method_wrapper(func):
+    def wrapper(self, *args):
+        return func(self, *args)
+    return wrapper
+
+def _get_A_matrix(tau_3):
+    '''
+    Generate the matrix that defines the intra-host model of SARS-CoV-2 
+    pathogenesis
+
+    Parameters
+    ----------
+    tau_3 : float
+        the model parameter that regulates the transition rate of individuals
+        in the infected compartment. The standard value is, like the others,
+        taken from the model of Van der Toorn et al. 
+        It can be modified to obtain a model of immunocompromised individuals 
+        that stay infected for a long time.
+
+    Returns
+    -------
+    A : matrix
+        21x21 matrix that defines the intra-host model
+
+    '''
+    # Model parameters
+    
+    # subphases number for each phase 
+    n_1 = 5   # pre-detection
+    n_2 = 1   # pre-symptomatic
+    n_3 = 13  # infectious
+    n_4 = 1   # post-infectious
+    # last state is recovered
+    
+    # parameters for each sub-phase
+    tau_1 = 2.86 # pre-detection
+    tau_2 = 3.91 # pre-symptomatic
+    #tau_3 = 7.5  # infectious
+    tau_4 = 8    # post-infectious
+    
+    compartments = [[n_1,tau_1],
+                    [n_2,tau_2],
+                    [n_3,tau_3],
+                    [n_4,tau_4]]
+    
+    # create empty matrix to be filled
+    dim = np.sum([i[0] for i in compartments])+1 # matrix dimensions
+    A = np.zeros((dim,dim))
+    # fill the matrix with the corresponding compartment parameters
+    start = 0
+    comp = 0
+    for c in compartments:
+        comp = comp + c[0]
+        r = c[0]/c[1]
+        for i in range(start,comp+1):
+            A[i][i] = -r
+            if A[i][i-1] == 0: 
+                A[i][i-1]= r
+            A[i][-1] = 0
+        start = start+c[0]
+    return A
+
 class Host:
     '''
     The class defines the intra-host model and the functions needed to solve it.
@@ -19,70 +81,16 @@ class Host:
     def __init__(self,tau_3=7.5):
         
         # setup intra-host model matrix and calculate matrix exponential
-        self.A = self._matrix(tau_3)
+        self.A = self._get_A_matrix(tau_3)
         self.A_ex = scipy.linalg.expm(self.A)
         
         # possible states of individual in the system
         self.states = np.arange(0,21,1) # state 20 is "healed"
         
     # setup ODE system matrix A 
-    def _matrix(self,tau_3):
-        '''
-        Generate the matrix that defines the intra-host model of SARS-CoV-2 
-        pathogenesis
-    
-        Parameters
-        ----------
-        tau_3 : float
-            the model parameter that regulates the transition rate of individuals
-            in the infected compartment. The standard value is, like the others,
-            taken from the model of Van der Toorn et al. 
-            It can be modified to obtain a model of immunocompromised individuals 
-            that stay infected for a long time.
-    
-        Returns
-        -------
-        A : matrix
-            21x21 matrix that defines the intra-host model
-    
-        '''
-        # Model parameters
-        
-        # subphases number for each phase 
-        n_1 = 5   # pre-detection
-        n_2 = 1   # pre-symptomatic
-        n_3 = 13  # infectious
-        n_4 = 1   # post-infectious
-        # last state is recovered
-        
-        # parameters for each sub-phase
-        tau_1 = 2.86 # pre-detection
-        tau_2 = 3.91 # pre-symptomatic
-        #tau_3 = 7.5  # infectious
-        tau_4 = 8    # post-infectious
-        
-        compartments = [[n_1,tau_1],
-                        [n_2,tau_2],
-                        [n_3,tau_3],
-                        [n_4,tau_4]]
-        
-        # create empty matrix to be filled
-        dim = np.sum([i[0] for i in compartments])+1 # matrix dimensions
-        A = np.zeros((dim,dim))
-        # fill the matrix with the corresponding compartment parameters
-        start = 0
-        comp = 0
-        for c in compartments:
-            comp = comp + c[0]
-            r = c[0]/c[1]
-            for i in range(start,comp+1):
-                A[i][i] = -r
-                if A[i][i-1] == 0: 
-                    A[i][i-1]= r
-                A[i][-1] = 0
-            start = start+c[0]
-        self.A = A
-        return A
+    @method_wrapper
+    def _get_A_matrix(self, tau_3):
+        return _get_A_matrix(tau_3)
     
     def _A_t(self,t):
         # the method returns A**t

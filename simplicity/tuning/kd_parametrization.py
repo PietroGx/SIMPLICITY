@@ -8,69 +8,6 @@ Created on Fri Jul 29 13:26:33 2022
 import numpy as np
 import scipy 
 
-def get_A(tau_3 = 7.5):
-        '''
-        Generate the matrix that defines the intra-host model of SARS-CoV-2 
-        pathogenesis
-    
-        Returns
-        -------
-        A : matrix
-            21x21 matrix that defines the intra-host model
-    
-        '''
-        # Model parameters
-        
-        # subphases number for each phase 
-        n_1 = 5   # pre-detection
-        n_2 = 1   # pre-symptomatic
-        n_3 = 13  # infectious
-        n_4 = 1   # post-infectious
-        # last state is recovered
-        
-        # parameters for each sub-phase
-        tau_1 = 2.86 # pre-detection
-        tau_2 = 3.91 # pre-symptomatic
-        tau_3 = 7.5  # infectious
-        tau_4 = 8    # post-infectious
-        
-        compartments = [[n_1,tau_1],
-                        [n_2,tau_2],
-                        [n_3,tau_3],
-                        [n_4,tau_4]]
-        
-        # create empty matrix to be filled
-        dim = np.sum([i[0] for i in compartments])+1 # matrix dimensions
-        A = np.zeros((dim,dim))
-        # fill the matrix with the corresponding compartment parameters
-        start = 0
-        comp = 0
-        for c in compartments:
-            comp = comp + c[0]
-            r = c[0]/c[1]
-            for i in range(start,comp+1):
-                A[i][i] = -r
-                if A[i][i-1] == 0: 
-                    A[i][i-1]= r
-                A[i][-1] = 0
-            start = start+c[0]
-        return A
-    
-def integrate_p_inf(M,t):
-    # returns integral of p(infectious)
-    # used to obtain R (reproduction number) 
-    y = np.zeros((1,21))
-    y[0][5:19] = 1
-    M_aug = np.concatenate((M,y))
-    z = np.zeros((22,1))
-    M_aug = np.concatenate((M_aug,z),axis=1)
-    M_ex = scipy.linalg.expm(M_aug)
-    Mt = scipy.linalg.fractional_matrix_power(M_ex,t)
-    p_t0 = np.zeros((1,22))[0]
-    p_t0[0] = 1
-    prob_t = np.matmul(Mt,p_t0) 
-    return prob_t
-
 def get_B(k_i,tau_3 = 7.5):
         '''
         Generate the matrix that defines the intra-host model of SARS-CoV-2 
