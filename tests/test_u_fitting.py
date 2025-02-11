@@ -13,6 +13,8 @@ import simplicity.output_manager as om
 import argparse 
 import os 
 import simplicity.config as c 
+import matplotlib
+matplotlib.use("Agg")
 
 # Define the model
 def log_model(x, A, B, C, D):
