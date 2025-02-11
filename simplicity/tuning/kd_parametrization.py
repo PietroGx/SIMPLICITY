@@ -60,10 +60,13 @@ def get_B(k_i,tau_3 = 7.5):
             start = start+c[0]
         return B
 
-def detectrate(k_i,tau_3 = 7.5):
+def get_diagnosis_rate_in_percent(k_d,tau_3 = 7.5):
+    '''
+    refer to method paper to read the math behind this.
+    '''
     y = np.zeros((1,21))
-    y[0][5:20] = k_i
-    B = get_B(k_i,tau_3)
+    y[0][5:20] = k_d
+    B = get_B(k_d,tau_3)
     B_aug = np.concatenate((B,y))
     z = np.zeros((22,1))
     B_aug = np.concatenate((B_aug,z),axis=1)
@@ -74,43 +77,43 @@ def detectrate(k_i,tau_3 = 7.5):
     prob_t = np.matmul(Bt,p_t0) 
     return prob_t[-1]    
 
-def get_k_i(diagnosis_rate, start, step, tau_3 = 7.5, max_iter=10000):
+def get_k_d(target_diagnosis_rate_in_percent, start, step, tau_3 = 7.5, max_iter=10000):
     """
-    Adjusts the input to the function `func` until the output reaches the `target` value.
+    linear search to find k_d value that correspond to desired diagnosis rate 
+    in percent (0.00-1)
 
-    :param func: Function to be adjusted
-    :param target: Target output value
+    :param diagnosis_rate_percent: Target value
     :param start: Starting input value
     :param step: Step size to adjust the input
-    :param max_iter: Maximum number of iterations to prevent infinite loops
-    :return: The input value that makes the function output close to the target, and the actual output
+    :param max_iter: Maximum number of iterations
+    :return: value of k_d corresponding to diagnosis_rate_in_percent
     """
-    input_value = start
-    output = detectrate(input_value)
+    k_d = start 
+    diagnosis_rate_in_percent = get_diagnosis_rate_in_percent(k_d)
     iter_count = 0
 
     # Loop until output is close to the target or max iterations reached
-    while abs(output - diagnosis_rate) > 0.001 and iter_count < max_iter:  # 0.001 is the tolerance
-        # Adjust input_value depending on whether output is greater or less than the target
-        if output < diagnosis_rate:
-            input_value += step
+    while abs(diagnosis_rate_in_percent - target_diagnosis_rate_in_percent) > 0.001 and iter_count < max_iter:  # 0.001 is the tolerance
+        # Adjust input_value depending on whether output is greater or smaller than the target
+        if diagnosis_rate_in_percent < target_diagnosis_rate_in_percent:
+            k_d += step
         else:
-            input_value -= step
+            k_d -= step
         
-        output = detectrate(input_value,tau_3)
+        diagnosis_rate_in_percent = get_diagnosis_rate_in_percent(k_d,tau_3)
         iter_count += 1
 
-    return input_value
+    return k_d
 
-def k_d_to_rate(diagnosis_rates):
+def diagnosis_rate_table(diagnosis_rates):
     '''
-    Solve IH augmented B matrix to find ki values corresponging to the desired
-    diagnosis rates and saves them to a file.
+    Solve IH augmented B matrix to find k_d values corresponging to the desired
+    diagnosis rates (in decimal % of diagnosed individuals)
 
     Parameters
     ----------
     diagnosis_rates : lst
-        rate of diagnosis for which to find k values.
+         human readable diagnosis rates (0.00-1) for which to find k_d values.
 
     Returns
     -------
@@ -120,11 +123,11 @@ def k_d_to_rate(diagnosis_rates):
     import pandas as pd
     
     dic = {}
-    for dr in diagnosis_rates:
+    for diagnosis_rate in diagnosis_rates:
         
-        k_i = get_k_i(dr, 0.0001, 0.0001)
+        k_d = get_k_d(diagnosis_rate, 0.0001, 0.0001)
     
-        dic[dr] = k_i
+        dic[diagnosis_rate] = k_d
     
     df = pd.DataFrame(list(dic.values()),index=dic.keys(),columns=['k_d value'])
     
@@ -132,6 +135,5 @@ def k_d_to_rate(diagnosis_rates):
 
 
 
-diagnosis_rates = [0.01,0.05,0.1]
-
-k_d_to_rate(diagnosis_rates)
+diagnosis_rates = np.arange(0,0.21,0.01).tolist()
+diagnosis_rate_table(diagnosis_rates)
