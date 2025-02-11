@@ -47,7 +47,7 @@ def fit_log_u(experiment_name):
     plt.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
     plt.plot(x_data, result.best_fit, label='Fitted curve', color='red', linewidth=2)
     plt.xlabel('Evolutionary Rate')
-    plt.xlim(0)
+    plt.xscale("log")
     plt.ylim(0)
     plt.ylabel('u')
     plt.legend()
