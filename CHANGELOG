@@ -120,7 +120,9 @@
 	* fitting u log script works 
 	* moved plotting from statistics_simulations_lenght to plot manager 
 	* updated host.py by making get_A_matrix function available outside of class
-	* working on k_d tuning script
+	* updated kd_parametrization.py 
+	* added explore_R_k_d_parameter_space.py to scripts
+	* updated setup.py
 	
 	
 	
