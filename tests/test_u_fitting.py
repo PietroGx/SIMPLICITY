@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 from lmfit import Model
 import simplicity.output_manager as om
 import argparse 
+import os 
+import simplicity.config as c 
 
 # Define the model
 def log_model(x, A, B, C, D):
@@ -48,12 +50,13 @@ def fit_log_u(experiment_name):
     plt.ylabel('u')
     plt.legend()
     plt.title('Logarithmic Fit to Data')
-    plt.show()
+    file_path = os.path.join(c.get_experiment_dir(),'ue_fitting.png')
+    plt.savefig(file_path)
 
 def main():
     # Set up the argument parser
     parser = argparse.ArgumentParser(description="Run script to fit curve to u data")
-    parser.add_argument('experiment_name', type=int, help="experiment name")
+    parser.add_argument('experiment_name', type=str, help="experiment name")
     args = parser.parse_args()
     # Run the script with the provided parameter
     fit_log_u(args)
