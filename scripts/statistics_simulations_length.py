@@ -35,7 +35,6 @@ def load_data(experiment_name):
                     print(f"Error reading {final_time_file}: {e}")
         
         dic[os.path.basename(os.path.normpath(seeded_simulations_folder_path))] = final_times
-    print(dic)
  
     df = pd.DataFrame(dic)
     
@@ -43,7 +42,8 @@ def load_data(experiment_name):
 
 def plot_histograms(experiment_name):
     final_times_data_frames = load_data(experiment_name)
-    pm.plot_histograms(experiment_name,final_times_data_frames)
+    print(len(final_times_data_frames))
+    # pm.plot_histograms(experiment_name,final_times_data_frames)
 
 def main():
     # Set up the argument parser
