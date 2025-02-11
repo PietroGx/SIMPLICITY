@@ -203,7 +203,52 @@ def save_final_time(simulation_output, output_path):
         writer = csv.writer(file)
         writer.writerow([final_time]) 
                           
+def extract_u_e_values(experiment_name):
+    ''' Perform tempest regression (get u) and saves the values vs evolutionary rate
+    '''
+    import glob
+    import json
+    from simplicity.tuning.evolutionary_rate import tempest_regression, create_joint_sequencing_df
+    # get simulation parameter files for the selected experiment
+    simulation_parameters_dir = config.get_simulation_parameters_dir(experiment_name)
+    simulation_parameters_files = glob.glob(os.path.join(simulation_parameters_dir, '*.json'))
+    # get output directory
+    experiment_output_dir     = config.get_experiment_output_dir(experiment_name)
+    # Get seeded simulations output subfolders
+    seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
+                                    f.name) for f in os.scandir(experiment_output_dir
+                                                                ) if f.is_dir()]
+    # for each simulation set in the experiment perfom the tempest regression
+    results = []
+    for simulation_parameters_file, seeeded_simulations_output_directory in zip(
+            simulation_parameters_files,seeeded_simulations_output_directories):
+        # Read the parameter from the settings file
+        with open(simulation_parameters_file, 'r') as file:
+            data = json.load(file)
+        parameter_value = data.get('evolutionary_rate')
+        
+        # Perform regression for the settings output folder
+        combined_df, _ = create_joint_sequencing_df(seeeded_simulations_output_directory)
+        u, _ = tempest_regression(combined_df)
+        
+        results.append({str('evolutionary_rate'): parameter_value, 'u': u})
+    # add results to df
+    results_df = pd.DataFrame(results)
+    
+    # Sort the results by the 'parameter' values
+    results_df = results_df.sort_values(by=str('evolutionary_rate'))
+    
+    # Save the results to a CSV file
+    csv_file_path = os.path.join(experiment_output_dir, 
+                                 f'{experiment_name}_u_vs_evolutionary_rate_values.csv')
+    results_df.to_csv(csv_file_path, index=False)
 
+def read_u_e_values(experiment_name):
+    experiment_output_dir     = config.get_experiment_output_dir(experiment_name)
+    csv_file_path = os.path.join(experiment_output_dir, 
+                                 f'{experiment_name}_u_vs_evolutionary_rate_values.csv')
+    data = pd.read_csv(csv_file_path)
+    return data
     
     
     
