@@ -56,7 +56,7 @@ def fit_log_u(experiment_name):
 def main():
     # Set up the argument parser
     parser = argparse.ArgumentParser(description="Run script to fit curve to u data")
-    parser.add_argument('experiment_name', type=str, help="experiment name")
+    parser.add_argument('experiment_name', type=str, required=True, help="experiment name")
     args = parser.parse_args()
     # Run the script with the provided parameter
     fit_log_u(args)
