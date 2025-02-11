@@ -50,7 +50,7 @@ def fit_log_u(experiment_name):
     plt.ylabel('u')
     plt.legend()
     plt.title('Logarithmic Fit to Data')
-    file_path = os.path.join(c.get_experiment_dir(),'ue_fitting.png')
+    file_path = os.path.join(c.get_experiment_dir(experiment_name),'ue_fitting.png')
     plt.savefig(file_path)
 
 def main():
