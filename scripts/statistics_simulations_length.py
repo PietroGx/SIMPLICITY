@@ -59,7 +59,7 @@ def plot_histograms(experiment_name):
 def main():
     # Set up the argument parser
     parser = argparse.ArgumentParser(description="Run script to plot simulation lenght histogram")
-    parser.add_argument('experiment_name', type=int, help="experiment name")
+    parser.add_argument('experiment_name', type=str, help="experiment name")
     args = parser.parse_args()
     # Run the script with the provided parameter
     plot_histograms(args.experiment_name)
