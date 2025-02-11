@@ -8,9 +8,9 @@ Created on Thu Feb  6 13:28:55 2025
 import os
 import glob
 import pandas as pd
-import matplotlib.pyplot as plt
 import simplicity.config as c
 import argparse
+import simplicity.plots_manager as pm
 
 def load_data(experiment_name):
     
@@ -43,18 +43,7 @@ def load_data(experiment_name):
 
 def plot_histograms(experiment_name):
     final_times_data_frames = load_data(experiment_name)
-    num_folders = len(final_times_data_frames)
-    fig, axes = plt.subplots(num_folders, 1, figsize=(10, 5 * num_folders), squeeze=False)
-    
-    for ax, (folder_name, data) in zip(axes.flatten(), final_times_data_frames.items()):
-        ax.hist(data, bins=30, edgecolor='black')
-        ax.set_title(f'Histogram for {folder_name}')
-        ax.set_xlabel('Last Time Value')
-        ax.set_ylabel('Frequency')
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(c.get_experiment_dir(experiment_name),
-                             'simulations_lenght_histogram.png'))
+    pm.plot_histograms(experiment_name,final_times_data_frames)
 
 def main():
     # Set up the argument parser

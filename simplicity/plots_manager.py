@@ -385,3 +385,64 @@ def export_u_regression_plots(experiment_name):
     # move the plots
     for plot,plot_filename in zip(plots,plot_filenames):
         os.replace(plot, os.path.join(plots_folder_dir,plot_filename))
+        
+###############################################################################
+###############################################################################
+def plot_histograms(experiment_name, final_times_data_frames):
+    num_folders = len(final_times_data_frames)
+    fig, axes = plt.subplots(num_folders, 1, figsize=(10, 5 * num_folders), squeeze=False)
+    
+    for ax, (folder_name, data) in zip(axes.flatten(), final_times_data_frames.items()):
+        ax.hist(data, bins=30, edgecolor='black')
+        ax.set_title(f'Histogram for {folder_name}')
+        ax.set_xlabel('Last Time Value')
+        ax.set_ylabel('Frequency')
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(config.get_experiment_dir(experiment_name),
+                             'simulations_lenght_histogram.png'))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
