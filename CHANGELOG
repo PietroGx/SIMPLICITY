@@ -105,7 +105,13 @@
     * updated slurm runner to save log files in correct folder
     * updated setup.py
     
+2025-11-02 pietro gerletti
+
+	Version 0.3.3
 	
+	* added (in test phase) script to fit a log curve to u/e plot
+	* updated yml env file (adding lmfit)
+	* updated setup.py
 	
 	
 	
