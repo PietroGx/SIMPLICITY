@@ -42,9 +42,7 @@ def load_data(experiment_name):
 
 def plot_histograms(experiment_name):
     final_times_data_frames = load_data(experiment_name)
-    print(len(final_times_data_frames))
-    print(final_times_data_frames.head(3))
-    # pm.plot_histograms(experiment_name,final_times_data_frames)
+    pm.plot_histograms(experiment_name,final_times_data_frames)
 
 def main():
     # Set up the argument parser
