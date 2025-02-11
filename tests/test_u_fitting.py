@@ -59,7 +59,7 @@ def main():
     parser.add_argument('experiment_name', type=str, help="experiment name")
     args = parser.parse_args()
     # Run the script with the provided parameter
-    fit_log_u(args)
+    fit_log_u(args.experiment_name)
     
 if __name__ == "__main__":
     main()
