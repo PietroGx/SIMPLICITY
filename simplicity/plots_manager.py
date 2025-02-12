@@ -420,9 +420,7 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
     # Set log scales
     
     if scale == 'loglog':
-        log_best_fit = np.log(fit_result.best_fit)
-        print(log_best_fit)
-        ax.plot(x_data, log_best_fit, label='Fitted curve', color='red', linewidth=2)
+        ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
         ax.set_yscale("log")
         ax.set_xscale("log")
     elif scale == 'semilog':

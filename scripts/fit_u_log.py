@@ -12,9 +12,13 @@ import simplicity.plots_manager as pm
 import simplicity.output_manager as om
 import argparse 
 
-import matplotlib
-matplotlib.use("Agg")
 
+def u_estimator(fit_result,e):
+    A = fit_result.params['A'].value
+    B = fit_result.params['B'].value
+    C = fit_result.params['C'].value
+    
+    return A * np.log(B * e + C)
 # Define the model
 def log_model(x, A, B, C):
     return A * np.log(B * x + C)
