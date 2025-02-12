@@ -426,7 +426,7 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
     plt.title('Logarithmic Fit to Data')
     file_path = os.path.join(config.get_experiment_dir(experiment_name),f'ue_fitting_{scale}.png')
     plt.savefig(file_path)
-    plt.close()
+    
 
 
 
