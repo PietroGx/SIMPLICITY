@@ -24,7 +24,7 @@ def fit_log_u(experiment_name):
     data = om.read_u_e_values(experiment_name)
     x_data = data['evolutionary_rate'] 
     y_data = data['u']  
-
+    weights = 1 / y_data
     # Create the Model
     model = Model(log_model)
     
@@ -37,7 +37,7 @@ def fit_log_u(experiment_name):
     params['C'].set(min=0.000001)
     
     # Fit the model to the data
-    fit_result = model.fit(y_data, params, x=x_data)
+    fit_result = model.fit(y_data, params, x=x_data, weights=weights)
     
     # Print the fit results
     print(fit_result.fit_report())
