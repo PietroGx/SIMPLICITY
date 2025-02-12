@@ -403,7 +403,7 @@ def plot_histograms(experiment_name, final_times_data_frames):
     plt.savefig(os.path.join(config.get_experiment_dir(experiment_name),
                              'simulations_lenght_histogram.png'))
 
-def plot_u_fit(experiment_name,fit_result,fign,scale:str):
+def plot_u_fit(experiment_name,fit_result,scale:str):
     if scale == 'loglog' or 'semilog':
         pass
     else:
