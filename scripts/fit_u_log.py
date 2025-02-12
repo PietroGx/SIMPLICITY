@@ -19,18 +19,22 @@ def u_estimator(fit_result,e):
     C = fit_result.params['C'].value
     
     return A * np.log(B * e + C)
+
 # Define the model
 def log_model(x, A, B, C):
     return A * np.log(B * x + C)
+
+def exp_model(x, A, B, C):
+    return A * x**B + C
 
 def fit_log_u(experiment_name):
     # Read data from CSV
     data = om.read_u_e_values(experiment_name)
     x_data = data['evolutionary_rate'] 
     y_data = data['u']  
-    weights = 1 / y_data
+    # weights = 1 / y_data
     # Create the Model
-    model = Model(log_model)
+    model = Model(exp_model)
     
     # Set initial parameter guesses 
     params = model.make_params(A=1, B=1, C=1)
