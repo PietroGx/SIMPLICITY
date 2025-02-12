@@ -419,12 +419,14 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
     plt.xscale("log")
     if scale == 'loglog':
         plt.yscale("log")
-    plt.ylim(0)
+    else:
+        plt.ylim(0)
     plt.ylabel('u')
     plt.legend()
     plt.title('Logarithmic Fit to Data')
     file_path = os.path.join(config.get_experiment_dir(experiment_name),f'ue_fitting_{scale}.png')
     plt.savefig(file_path)
+    plt.close()
 
 
 
