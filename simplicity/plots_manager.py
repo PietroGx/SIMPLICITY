@@ -429,6 +429,8 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
         ax.set_ylim(0)
     else:
         ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
+        ax.set_ylim(0,1)
+        ax.set_xlim(0,1)
     ax.set_xlabel('Evolutionary Rate')
     ax.set_ylabel('u')
     ax.legend()
