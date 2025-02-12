@@ -37,7 +37,7 @@ def fit_log_u(experiment_name):
     params['C'].set(min=0.000001)
     
     # Fit the model to the data
-    fit_result = model.fit(y_data, params, x=x_data, weights=weights)
+    fit_result = model.fit(y_data, params, x=x_data)#, weights=weights)
     
     # Print the fit results
     print(fit_result.fit_report())

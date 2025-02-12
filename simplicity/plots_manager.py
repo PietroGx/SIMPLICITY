@@ -404,7 +404,7 @@ def plot_histograms(experiment_name, final_times_data_frames):
                              'simulations_lenght_histogram.png'))
 
 def plot_u_fit(experiment_name,fit_result,scale:str):
-    if scale == 'loglog' or 'semilog':
+    if scale == 'loglog' or 'semilog' or 'lin':
         pass
     else:
         raise ValueError('invalid scale settigs.')
@@ -419,11 +419,15 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
     ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
     ax.set_xlabel('Evolutionary Rate')
     # Set log scales
-    ax.set_xscale("log")
+    
     if scale == 'loglog':
         ax.set_yscale("log")
-    else:
+        ax.set_xscale("log")
+    elif scale == 'semilog':
+        ax.set_xscale("log")
         ax.set_ylim(0)
+    else:
+        pass
     ax.set_ylabel('u')
     ax.legend()
     plt.title('Logarithmic Fit to Data')
