@@ -7,12 +7,11 @@ Created on Mon Feb 10 13:20:25 2025
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 from lmfit import Model
+import simplicity.plots_manager as pm 
 import simplicity.output_manager as om
 import argparse 
-import os 
-import simplicity.config as c 
+
 import matplotlib
 matplotlib.use("Agg")
 
@@ -38,22 +37,11 @@ def fit_log_u(experiment_name):
     params['C'].set(min=0.000001)
     
     # Fit the model to the data
-    result = model.fit(y_data, params, x=x_data)
+    fit_result = model.fit(y_data, params, x=x_data)
     
     # Print the fit results
-    print(result.fit_report())
-    
-    # Plot the original data and the fitted curve
-    plt.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    plt.plot(x_data, result.best_fit, label='Fitted curve', color='red', linewidth=2)
-    plt.xlabel('Evolutionary Rate')
-    plt.xscale("log")
-    plt.ylim(0)
-    plt.ylabel('u')
-    plt.legend()
-    plt.title('Logarithmic Fit to Data')
-    file_path = os.path.join(c.get_experiment_dir(experiment_name),'ue_fitting.png')
-    plt.savefig(file_path)
+    print(fit_result.fit_report())
+    return fit_result
 
 def main():
     # Set up the argument parser
@@ -61,7 +49,9 @@ def main():
     parser.add_argument('experiment_name', type=str, help="experiment name")
     args = parser.parse_args()
     # Run the script with the provided parameter
-    fit_log_u(args.experiment_name)
+    fit_result = fit_log_u(args.experiment_name)
+    pm.plot_u_fit(args.experiment_name,fit_result,scale='loglog')
+    pm.plot_u_fit(args.experiment_name,fit_result,scale='semilog')
     
 if __name__ == "__main__":
     main()

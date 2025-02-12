@@ -122,9 +122,16 @@
 	* updated host.py by making get_A_matrix function available outside of class
 	* updated kd_parametrization.py 
 	* added explore_R_k_d_parameter_space.py to scripts
-	* updated setup.py
+	* updated setup.py 
+
+2025-12-02 pietro gerletti
+
+	Version 0.3.5
 	
-	
+	* moved fitting plot to plot manager
+	* added option to plot fit on loglog or semilog scale
+	* added function to filters files for tempest regression by simulation lenght
+	* 
 	
 	
 	

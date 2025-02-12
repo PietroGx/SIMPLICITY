@@ -10,8 +10,29 @@ import sklearn.linear_model
 import os
 import glob
 
+def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
+    """
+    Filters sequencing files by keeping only the ones from simulation that 
+    lasted at least min_sim_lenght.
+    """
+    filtered_files = []
+    
+    for file in files:
+        directory = os.path.dirname(file)
+        csv_path = os.path.join(directory, 'final_time.csv')
+        
+        if os.path.exists(csv_path):
+            try:
+                with open(csv_path, 'r') as f:
+                    csv_value = f.read().strip()
+                    if csv_value == min_sim_lenght:
+                        filtered_files.append(file)
+            except Exception as e:
+                print(f"Error reading {csv_path}: {e}")
+    
+    return filtered_files
 
-def create_joint_sequencing_df(seeeded_simulations_output_directory):
+def create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght=0):
     '''
     seeeded_simulations_output_directory ==> path to subfolder of 
                                              experiment_name/04_Output/
@@ -24,9 +45,10 @@ def create_joint_sequencing_df(seeeded_simulations_output_directory):
     csv_files = glob.glob(os.path.join(target_folder,'**',
                                        'sequencing_data_regression.csv'),
                                         recursive=True)
+    filtered_csv_files = filter_sequencing_files_by_simulation_lenght(csv_files, min_sim_lenght)
     # List to store individual DataFrames
     data_frames = []
-    for csv_file in csv_files:
+    for csv_file in filtered_csv_files:
         # Read each CSV file into a DataFrame
         try:
             df = pd.read_csv(csv_file)

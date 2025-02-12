@@ -14,6 +14,7 @@ import os
 import numpy as np
 import json
 import simplicity.config as config
+import simplicity.output_manager as om
 import math
 from simplicity.tuning.evolutionary_rate import create_joint_sequencing_df
 from simplicity.tuning.evolutionary_rate import tempest_regression
@@ -401,6 +402,29 @@ def plot_histograms(experiment_name, final_times_data_frames):
     plt.tight_layout()
     plt.savefig(os.path.join(config.get_experiment_dir(experiment_name),
                              'simulations_lenght_histogram.png'))
+
+def plot_u_fit(experiment_name,fit_result,scale:str):
+    if scale == 'loglog' or 'semilog':
+        pass
+    else:
+        raise ValueError('invalid scale settigs.')
+        
+    data = om.read_u_e_values(experiment_name)
+    x_data = data['evolutionary_rate'] 
+    y_data = data['u']  
+
+    plt.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
+    plt.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
+    plt.xlabel('Evolutionary Rate')
+    plt.xscale("log")
+    if scale == 'loglog':
+        plt.yscale("log")
+    plt.ylim(0)
+    plt.ylabel('u')
+    plt.legend()
+    plt.title('Logarithmic Fit to Data')
+    file_path = os.path.join(config.get_experiment_dir(experiment_name),f'ue_fitting_{scale}.png')
+    plt.savefig(file_path)
 
 
 
