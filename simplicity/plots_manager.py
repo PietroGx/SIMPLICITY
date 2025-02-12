@@ -413,17 +413,19 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
     x_data = data['evolutionary_rate'] 
     y_data = data['u']  
     
-    plt.figure()
-    plt.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    plt.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
-    plt.xlabel('Evolutionary Rate')
-    plt.xscale("log")
+    # Create figure and axes
+    fig, ax = plt.subplots()
+    ax.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
+    ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
+    ax.set_xlabel('Evolutionary Rate')
+    # Set log scales
+    ax.set_xscale("log")
     if scale == 'loglog':
-        plt.yscale("log")
+        ax.set_yscale("log")
     else:
-        plt.ylim(0)
-    plt.ylabel('u')
-    plt.legend()
+        ax.set_ylim(0)
+    ax.set_ylabel('u')
+    ax.legend()
     plt.title('Logarithmic Fit to Data')
     file_path = os.path.join(config.get_experiment_dir(experiment_name),f'ue_fitting_{scale}.png')
     plt.savefig(file_path)
