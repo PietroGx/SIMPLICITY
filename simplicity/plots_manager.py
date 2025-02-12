@@ -416,18 +416,21 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
     # Create figure and axes
     fig, ax = plt.subplots()
     ax.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
-    ax.set_xlabel('Evolutionary Rate')
+   
     # Set log scales
     
     if scale == 'loglog':
+        log_best_fit = np.log(fit_result.best_fit)
+        ax.plot(x_data, log_best_fit, label='Fitted curve', color='red', linewidth=2)
         ax.set_yscale("log")
         ax.set_xscale("log")
     elif scale == 'semilog':
+        ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
         ax.set_xscale("log")
         ax.set_ylim(0)
     else:
-        pass
+        ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
+    ax.set_xlabel('Evolutionary Rate')
     ax.set_ylabel('u')
     ax.legend()
     plt.title('Logarithmic Fit to Data')
