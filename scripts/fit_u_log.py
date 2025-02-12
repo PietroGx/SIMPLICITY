@@ -50,7 +50,7 @@ def main():
     args = parser.parse_args()
     # Run the script with the provided parameter
     fit_result = fit_log_u(args.experiment_name)
-    pm.plot_u_fit(args.experiment_name,fit_result,scale='loglog')
+    # pm.plot_u_fit(args.experiment_name,fit_result,scale='loglog')
     pm.plot_u_fit(args.experiment_name,fit_result,scale='semilog')
     
 if __name__ == "__main__":
