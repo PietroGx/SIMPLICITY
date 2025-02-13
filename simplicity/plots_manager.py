@@ -416,7 +416,8 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
     # Create figure and axes
     fig, ax = plt.subplots()
     ax.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-   
+    print(y_data)
+    print(fit_result.best_fit)
     # Set log scales
     
     if scale == 'loglog':
