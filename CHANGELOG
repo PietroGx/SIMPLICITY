@@ -131,8 +131,8 @@
 	* moved fitting plot to plot manager
 	* added option to plot fit on loglog or semilog scale
 	* added function to filters files for tempest regression by simulation lenght
-	* studying u fit - trying exp function 
-	* 
+	* studying u fit - added scripts to explore u parameter behaviour
+
 	
 	
 	
