@@ -34,7 +34,7 @@ def fit_log_u(experiment_name):
     y_data = data['u']  
     # weights = 1 / y_data
     # Create the Model
-    model = Model(exp_model)
+    model = Model(log_model)
     
     # Set initial parameter guesses 
     params = model.make_params(A=1, B=1, C=1)
