@@ -9,8 +9,23 @@ import simplicity.plots_manager as pm
 import argparse
 
 def plot_regressions_and_export(experiment_name, min_sim_lenght):
+    print('##################################################################')
+    print('################## Plot combined regressions #####################')
+    print('##################################################################')
+    print('')
+    print('')
     pm.plot_combined_regressions(experiment_name, min_sim_lenght)
+    print('##################################################################')
+    print('################## Plot e vs u relationship ######################')
+    print('##################################################################')
+    print('')
+    print('')
     pm.plot_u_vs_parameter(experiment_name,'evolutionary_rate', min_sim_lenght)
+    print('##################################################################')
+    print('######## Exporting plots to Tempest Regression Folder ############')
+    print('##################################################################')
+    print('')
+    print('')
     pm.export_u_regression_plots(experiment_name)
 
 def main():
