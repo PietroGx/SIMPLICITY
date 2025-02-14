@@ -299,22 +299,25 @@ def plot_combined_regressions(experiment_name, min_sim_lenght=0):
     
     for i, subdir in enumerate(sorted_dirs):
         evo_rate = extract_rate(subdir)
-        combined_df, _ = create_joint_sequencing_df(subdir, min_sim_lenght)
-        u, model = tempest_regression(combined_df)
-        
-        x = combined_df['Sequencing_time'].values.reshape(-1, 1)
-        y_pred = model.predict(x)
-        
-        ax = axs[i // num_cols][i % num_cols]
-        combined_df.plot(kind='scatter', x='Sequencing_time', y='Distance_from_root', color='blue', ax=ax)
-        ax.plot(x, y_pred, color='red', linewidth=2, label=f'u = {u:.5f}')
-        ax.set_xlabel('Time [y]')
-        ax.set_ylabel('Distance from root [#S/site]')
-        ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
-        ax.set_title(f'Regression - Evolutionary_rate: {evo_rate}')
-        ax.grid(True)
-        ax.legend()
+        combined_df = create_joint_sequencing_df(subdir, min_sim_lenght)
+        if combined_df == None: 
+            pass
+        else:
+            u, model = tempest_regression(combined_df)
+            
+            x = combined_df['Sequencing_time'].values.reshape(-1, 1)
+            y_pred = model.predict(x)
+            
+            ax = axs[i // num_cols][i % num_cols]
+            combined_df.plot(kind='scatter', x='Sequencing_time', y='Distance_from_root', color='blue', ax=ax)
+            ax.plot(x, y_pred, color='red', linewidth=2, label=f'u = {u:.5f}')
+            ax.set_xlabel('Time [y]')
+            ax.set_ylabel('Distance from root [#S/site]')
+            ax.set_xlim(left=0)
+            ax.set_ylim(bottom=0)
+            ax.set_title(f'Regression - Evolutionary_rate: {evo_rate}')
+            ax.grid(True)
+            ax.legend()
 
     plt.tight_layout()
     plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
@@ -341,8 +344,8 @@ def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
         parameter_value = data.get(parameter)
         
         # Perform regression for the settings output folder
-        combined_df, _ = create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght)
-        u, _ = tempest_regression(combined_df)
+        combined_df = create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght)
+        u = tempest_regression(combined_df)
         
         results.append({str(parameter): parameter_value, 'u': u})
     # add results to df
