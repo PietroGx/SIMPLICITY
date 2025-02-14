@@ -299,7 +299,7 @@ def plot_combined_regressions(experiment_name):
     
     for i, subdir in enumerate(sorted_dirs):
         evo_rate = extract_rate(subdir)
-        combined_df, _ = create_joint_sequencing_df(subdir, min_sim_lenght =364)
+        combined_df, _ = create_joint_sequencing_df(subdir, min_sim_lenght =360)
         u, model = tempest_regression(combined_df)
         
         x = combined_df['Sequencing_time'].values.reshape(-1, 1)
@@ -341,7 +341,7 @@ def plot_u_vs_parameter(experiment_name, parameter):
         parameter_value = data.get(parameter)
         
         # Perform regression for the settings output folder
-        combined_df, _ = create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght= 364)
+        combined_df, _ = create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght= 360)
         u, _ = tempest_regression(combined_df)
         
         results.append({str(parameter): parameter_value, 'u': u})
