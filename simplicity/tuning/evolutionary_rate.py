@@ -58,10 +58,11 @@ def create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_len
     # Concatenate all DataFrames into one
     try:
         combined_df = pd.concat(data_frames, ignore_index=True)
+        return combined_df
     except:
-        raise ValueError('No sequencing data available to plot!')
-    return combined_df, csv_files
-
+        print('No sequencing data available to plot! Check filter settings!')
+        return None
+    
 def tempest_regression(df):
     '''
     perform TempEst regression on joint dataframe of sequencing data
