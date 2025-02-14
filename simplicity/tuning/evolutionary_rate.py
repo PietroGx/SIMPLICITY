@@ -23,7 +23,7 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
         print(csv_path)
         try:
             with open(csv_path, 'r') as f:
-                csv_value = f.read().strip()
+                csv_value = float(f.read().strip())
                 if csv_value >= min_sim_lenght:
                     filtered_files.append(file)
         except Exception as e:
