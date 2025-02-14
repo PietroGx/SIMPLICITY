@@ -139,6 +139,7 @@
 	
 	* moved experiments scripts in omonimous folder 
 	* added script to perform and plot u regression on experiment folder
+	* added min_sim_lenght arg to plot u regression functions and script
 	
 	
 	
