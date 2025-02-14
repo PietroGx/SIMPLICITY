@@ -262,7 +262,7 @@ def ideal_subplot_grid(num_plots):
     
     return num_rows, num_cols        
  
-def plot_combined_regressions(experiment_name):
+def plot_combined_regressions(experiment_name, min_sim_lenght=0):
     # Get experiment output dir
     experiment_output_dir = config.get_experiment_output_dir(experiment_name)
     # Get seeded simulations output subfolders
@@ -299,7 +299,7 @@ def plot_combined_regressions(experiment_name):
     
     for i, subdir in enumerate(sorted_dirs):
         evo_rate = extract_rate(subdir)
-        combined_df, _ = create_joint_sequencing_df(subdir, min_sim_lenght =360)
+        combined_df, _ = create_joint_sequencing_df(subdir, min_sim_lenght)
         u, model = tempest_regression(combined_df)
         
         x = combined_df['Sequencing_time'].values.reshape(-1, 1)
@@ -319,7 +319,7 @@ def plot_combined_regressions(experiment_name):
     plt.tight_layout()
     plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
 
-def plot_u_vs_parameter(experiment_name, parameter):
+def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
     ''' Plot observed evolutionary rate (tempest regression) against desired parameter values
     '''
     # get simulation parameter files for the selected experiment
@@ -341,7 +341,7 @@ def plot_u_vs_parameter(experiment_name, parameter):
         parameter_value = data.get(parameter)
         
         # Perform regression for the settings output folder
-        combined_df, _ = create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght= 360)
+        combined_df, _ = create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght)
         u, _ = tempest_regression(combined_df)
         
         results.append({str(parameter): parameter_value, 'u': u})
