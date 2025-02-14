@@ -20,7 +20,6 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
     for file in files:
         directory = os.path.dirname(file)
         csv_path = os.path.join(directory, 'final_time.csv')
-        print(csv_path)
         try:
             with open(csv_path, 'r') as f:
                 csv_value = float(f.read().strip())
@@ -29,10 +28,8 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
         except Exception as e:
             print(f"Error reading {csv_path}: {e}")
     print('')
-    print('')
     print('###########################################################################')
-    print(f'Keeping files with simulation lenght >= {min_sim_lenght}: {filtered_files}')
-    print('')
+    print(f'Keeping files with simulation lenght >= {min_sim_lenght}')
     print('')
     return filtered_files
 
