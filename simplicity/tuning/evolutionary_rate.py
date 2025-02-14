@@ -27,8 +27,6 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
                     filtered_files.append(file)
         except Exception as e:
             print(f"Error reading {csv_path}: {e}")
-    print('')
-    print('###########################################################################')
     print(f'Keeping files with simulation lenght >= {min_sim_lenght}')
     print('')
     return filtered_files
@@ -42,6 +40,7 @@ def create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_len
     seeded simulation runs (SAME PARAMETERS, different seeds) 
     in a single df and returns it (for tempest regression).
     '''
+    print('###############################################################################')
     print(f"processing simulation batch: {os.path.basename(seeeded_simulations_output_directory)}")
     csv_files = glob.glob(os.path.join(seeeded_simulations_output_directory,'**',
                                        'sequencing_data_regression.csv'),
