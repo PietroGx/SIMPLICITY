@@ -16,6 +16,7 @@ def plot_regressions_and_export(experiment_name):
 def main():
     # Set up the argument parser
     parser = argparse.ArgumentParser(description="Run script to perform and plot u regression")
+    parser.add_argument('experiment_name', type=str, help="experiment name")
     args = parser.parse_args()
     # Run the script with the provided parameter
     plot_regressions_and_export(args.experiment_name)
