@@ -24,7 +24,7 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
         try:
             with open(csv_path, 'r') as f:
                 csv_value = f.read().strip()
-                if csv_value == min_sim_lenght:
+                if csv_value >= min_sim_lenght:
                     filtered_files.append(file)
         except Exception as e:
             print(f"Error reading {csv_path}: {e}")
