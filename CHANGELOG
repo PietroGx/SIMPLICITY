@@ -133,6 +133,11 @@
 	* added function to filters files for tempest regression by simulation lenght
 	* studying u fit - added scripts to explore u parameter behaviour
 
+2025-14-02 pietro gerletti
+
+	Version 0.3.6
+	
+	* testing u regression filtered by sim_lenght
 	
 	
 	
