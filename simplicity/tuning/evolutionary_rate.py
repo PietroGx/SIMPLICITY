@@ -40,7 +40,7 @@ def create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_len
     seeded simulation runs (SAME PARAMETERS, different seeds) 
     in a single df and returns it (for tempest regression).
     '''
-    print('###############################################################################')
+    print('##################################################################')
     print(f"processing simulation batch: {os.path.basename(seeeded_simulations_output_directory)}")
     csv_files = glob.glob(os.path.join(seeeded_simulations_output_directory,'**',
                                        'sequencing_data_regression.csv'),

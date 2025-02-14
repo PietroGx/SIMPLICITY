@@ -349,7 +349,6 @@ def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
             pass
         else:
             u = tempest_regression(combined_df)
-            
             results.append({str(parameter): parameter_value, 'u': u})
     # add results to df
     results_df = pd.DataFrame(results)
