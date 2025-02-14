@@ -300,7 +300,7 @@ def plot_combined_regressions(experiment_name, min_sim_lenght=0):
     for i, subdir in enumerate(sorted_dirs):
         evo_rate = extract_rate(subdir)
         combined_df = create_joint_sequencing_df(subdir, min_sim_lenght)
-        if combined_df == None: 
+        if combined_df is None: 
             pass
         else:
             u, model = tempest_regression(combined_df)

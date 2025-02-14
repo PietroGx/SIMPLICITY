@@ -61,6 +61,7 @@ def create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_len
         return combined_df
     except:
         print('No sequencing data available to plot! Check filter settings!')
+        print('')
         return None
     
 def tempest_regression(df):
