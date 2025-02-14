@@ -16,7 +16,7 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
     lasted at least min_sim_lenght.
     """
     filtered_files = []
-    
+    print(files)
     for file in files:
         directory = os.path.dirname(file)
         csv_path = os.path.join(directory, 'final_time.csv')
