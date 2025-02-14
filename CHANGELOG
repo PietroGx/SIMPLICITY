@@ -137,7 +137,8 @@
 
 	Version 0.3.6
 	
-	* testing u regression filtered by sim_lenght
+	* moved experiments scripts in omonimous folder 
+	* added script to perform and plot u regression on experiment folder
 	
 	
 	
