@@ -21,14 +21,13 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
         directory = os.path.dirname(file)
         csv_path = os.path.join(directory, 'final_time.csv')
         
-        if os.path.exists(csv_path):
-            try:
-                with open(csv_path, 'r') as f:
-                    csv_value = f.read().strip()
-                    if csv_value == min_sim_lenght:
-                        filtered_files.append(file)
-            except Exception as e:
-                print(f"Error reading {csv_path}: {e}")
+        try:
+            with open(csv_path, 'r') as f:
+                csv_value = f.read().strip()
+                if csv_value == min_sim_lenght:
+                    filtered_files.append(file)
+        except Exception as e:
+            print(f"Error reading {csv_path}: {e}")
     print('')
     print('')
     print('###########################################################################')
