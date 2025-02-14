@@ -89,6 +89,7 @@ def explore_u_e_space(runner:str, experiment_number:int):
                        archive_experiment = False)
     except RuntimeError:
             warnings.warn(f'Experiment {experiment_name} already ran, proceeding to plotting')
+            print((f'WARNING: Experiment {experiment_name} already ran, proceeding to plotting'))
     except Exception as e:
         print(f'The simulation failed to run: {e}')
     plot_regressions_and_export(experiment_name)
@@ -108,4 +109,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # explore_u_e_space('serial',1)
+    
