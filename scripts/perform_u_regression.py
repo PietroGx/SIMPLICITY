@@ -9,6 +9,7 @@ import simplicity.plots_manager as pm
 import argparse
 
 def plot_regressions_and_export(experiment_name, min_sim_lenght):
+    print('')
     print('##################################################################')
     print('################## Plot combined regressions #####################')
     print('##################################################################')
