@@ -29,7 +29,7 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
                         filtered_files.append(file)
             except Exception as e:
                 print(f"Error reading {csv_path}: {e}")
-    
+    print(f'Keeping files with simulation lenght = {min_sim_lenght}: {filtered_files}')
     return filtered_files
 
 def create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght=0):
