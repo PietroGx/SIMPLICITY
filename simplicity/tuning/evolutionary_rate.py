@@ -29,7 +29,12 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
                         filtered_files.append(file)
             except Exception as e:
                 print(f"Error reading {csv_path}: {e}")
-    print(f'Keeping files with simulation lenght = {min_sim_lenght}: {filtered_files}')
+    print('')
+    print('')
+    print('###########################################################################')
+    print(f'Keeping files with simulation lenght >= {min_sim_lenght}: {filtered_files}')
+    print('')
+    print('')
     return filtered_files
 
 def create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght=0):
@@ -45,7 +50,7 @@ def create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_len
     csv_files = glob.glob(os.path.join(target_folder,'**',
                                        'sequencing_data_regression.csv'),
                                         recursive=True)
-    filtered_csv_files = filter_sequencing_files_by_simulation_lenght(csv_files, min_sim_lenght)
+    filtered_csv_files = csv_files #filter_sequencing_files_by_simulation_lenght(csv_files, min_sim_lenght)
     # List to store individual DataFrames
     data_frames = []
     for csv_file in filtered_csv_files:
