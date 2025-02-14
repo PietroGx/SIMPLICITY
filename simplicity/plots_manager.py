@@ -345,9 +345,12 @@ def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
         
         # Perform regression for the settings output folder
         combined_df = create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght)
-        u = tempest_regression(combined_df)
-        
-        results.append({str(parameter): parameter_value, 'u': u})
+        if combined_df is None: 
+            pass
+        else:
+            u = tempest_regression(combined_df)
+            
+            results.append({str(parameter): parameter_value, 'u': u})
     # add results to df
     results_df = pd.DataFrame(results)
     
