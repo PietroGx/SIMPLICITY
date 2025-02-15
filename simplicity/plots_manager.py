@@ -262,7 +262,7 @@ def ideal_subplot_grid(num_plots):
     
     return num_rows, num_cols        
  
-def plot_combined_regressions(experiment_name, min_sim_lenght=0):
+def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0):
     # Get experiment output dir
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     # Get seeded simulations output subfolders
@@ -270,20 +270,20 @@ def plot_combined_regressions(experiment_name, min_sim_lenght=0):
                                     f.name) for f in os.scandir(experiment_output_dir
                                                                 ) if f.is_dir()]
    
-    def extract_rate(seeeded_simulations_output_directory):
+    def extract_parameter(seeeded_simulations_output_directory,parameter):
         json_file = seeeded_simulations_output_directory.replace(
                     '04_Output','02_Simulation_parameters') +'.json'
         try:
             with open(json_file, 'r') as file:
                 data = json.load(file)
-                return data.get('evolutionary_rate')
+                return data.get(parameter)
         except Exception as e:
             print(f"Error reading JSON file: {e}")
             return None
         
     # Sort the subdirectories based on the evolutionary rate
     sorted_dirs = sorted(seeeded_simulations_output_directories, 
-                            key=extract_rate)
+                            key=extract_parameter)
     # Determine the number of rows and columns for subplots
     num_rows, num_cols = ideal_subplot_grid(len(seeeded_simulations_output_directories))
 
@@ -298,7 +298,7 @@ def plot_combined_regressions(experiment_name, min_sim_lenght=0):
         axs = axs
     
     for i, subdir in enumerate(sorted_dirs):
-        evo_rate = extract_rate(subdir)
+        param = extract_parameter(subdir)
         combined_df = create_joint_sequencing_df(subdir, min_sim_lenght)
         if combined_df is None: 
             pass
@@ -315,7 +315,7 @@ def plot_combined_regressions(experiment_name, min_sim_lenght=0):
             ax.set_ylabel('Distance from root [#S/site]')
             ax.set_xlim(left=0)
             ax.set_ylim(bottom=0)
-            ax.set_title(f'Regression - Evolutionary_rate: {evo_rate}')
+            ax.set_title(f'Regression - {parameter}: {param}')
             ax.grid(True)
             ax.legend()
 

@@ -1,6 +1,5 @@
 from setuptools import setup, find_packages
 
-
 with open('README.md') as f:
     readme = f.read()
 
@@ -9,7 +8,7 @@ with open('LICENSE') as f:
 
 setup(
     name='simplicity',
-    version='0.3.5',
+    version='0.4.0',
     description='Stochastic sIMulation of SARS-CoV-2 sPread and evoLutIon aCcountIng for within-hosT dYnamics (SIMPLICITY)',
     long_description=readme,
     author='Pietro Gerletti, Jean-Baptiste Escudié',
