@@ -149,6 +149,7 @@
 	* removed the setting.json file from the data flow (deprecated, new data flow does not need it) 
 	* renamed config.py to dir_manager.py and added functions there
 	* moved all the missing plots to plot_manager.py
+	* added experiment script for tau_3 / u relation 
 	
 	
 	

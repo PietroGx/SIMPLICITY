@@ -7,7 +7,8 @@
 STANDARD_VALUES for SIMPLICITY simulation: 
 
     "population_size": 1000,
-    "infected_individuals_at_start": 100,
+    "tau_3": 7.5,
+    "infected_individuals_at_start": 10,
     "R": 1.5,
     "diagnosis_rate": 0.0055,
     "IH_virus_emergence_rate": 0.0085,
@@ -41,7 +42,7 @@ import simplicity.plots_manager as pm
 import warnings
 import argparse
 
-R=3
+R=1
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
