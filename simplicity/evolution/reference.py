@@ -5,11 +5,11 @@
 @author: Pietro Gerletti
 """
 import os
-import simplicity.config as config
+import simplicity.dir_manager as dm
 
 def get_reference():
     
-    reference_filepath = os.path.join(config.get_data_dir(),'reference.txt')
+    reference_filepath = os.path.join(dm.get_data_dir(),'reference.txt')
     
     if not os.path.isfile(reference_filepath):
         from Bio import Entrez, SeqIO

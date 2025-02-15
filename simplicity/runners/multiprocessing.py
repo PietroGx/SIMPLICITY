@@ -4,7 +4,7 @@
 @author: jbescudie
 
 """
-import simplicity.settings_manager as sm
+import simplicity.dir_manager as dm
 import concurrent.futures
 
 
@@ -16,7 +16,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation, plot_trajecto
     import os
     SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS = int(os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"])
     
-    seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
+    seeded_simulation_parameters_paths = dm.get_seeded_simulation_parameters_paths(experiment_name)
     # run a Simplicity simulation for each seeded parameters
     with concurrent.futures.ProcessPoolExecutor(max_workers=SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS) as pool:
         # track status

@@ -27,7 +27,7 @@ def test_run_single_experiment(experiment_name,
     print('')
 
     # import simplicity
-    import simplicity.config           as config
+    import simplicity.dir_manager           as dm
     import simplicity.settings_manager as sm
     # import simplicity.output_manager   as om
     sr = simplicity_runner
@@ -36,7 +36,7 @@ def test_run_single_experiment(experiment_name,
     parameters, n_seeds = experiment_settings
     sm.write_settings(parameters, n_seeds)
     # setup experiment files directories
-    config.create_directories(experiment_name)
+    dm.create_directories(experiment_name)
     # Write experiment settings file
     sm.write_experiment_settings(experiment_name)
     # write simulation parameters files

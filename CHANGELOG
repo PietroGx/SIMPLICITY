@@ -140,7 +140,15 @@
 	* moved experiments scripts in omonimous folder 
 	* added script to perform and plot u regression on experiment folder
 	* added min_sim_lenght arg to plot u regression functions and script
+
+2025-13-02 pietro gerletti
+
+	Version 0.4.0
 	
+	* added tau_3 to paraneters file and implemented way to pass it to host class (now infection lenght can be set when running a simulation)
+	* removed the setting.json file from the data flow (deprecated, new data flow does not need it) 
+	* renamed config.py to dir_manager.py and added functions there
+	* moved all the missing plots to plot_manager.py
 	
 	
 	

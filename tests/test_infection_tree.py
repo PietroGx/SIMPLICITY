@@ -9,11 +9,11 @@ def test_run_single_seeded_simulation(experiment_name,
                                       experiment_settings):
     
     # import simplicity
-    import simplicity.config           as config
+    import simplicity.dir_manager           as dm
     import simplicity.settings_manager as sm
     import simplicity.runners.unit_run as run
     # setup experiment files directories
-    config.create_directories(experiment_name)
+    dm.create_directories(experiment_name)
     
     # set parameters 
     parameters, n_seeds = experiment_settings

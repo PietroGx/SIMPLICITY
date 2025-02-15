@@ -18,7 +18,7 @@ class Population:
     the data about every individual as well as their intra-host model.
     '''
     def __init__(self,
-                 size,I_0,
+                 size,I_0, tau_3,
                  rng3,rng4,rng5,rng6,
                  reservoir=100000):
         
@@ -86,7 +86,7 @@ class Population:
         
         # individuals
         self.individuals = {}              # store individuals data
-        self.host_model  = h.Host()        # intra host model for normal individuals 
+        self.host_model  = h.Host(tau_3)        # intra host model for normal individuals 
         
         self.reservoir_i = []    # list of indices of individuals in the reservoir
         self.susceptibles_i = [] # list of susceptible individuals indices  
@@ -585,6 +585,7 @@ def create_population(parameters):
     pop_size = parameters['population_size']
     I_0      = parameters['infected_individuals_at_start']
     seed     = parameters['seed']
+    tau_3    = parameters['tau_3']
     
     # create random number generators
     seeds_generator=randomgen(seed+10000) # add to the seed so that rng3 and 4 differ from rng1 and 2 in Simplicity class
@@ -595,7 +596,7 @@ def create_population(parameters):
     rng6 = randomgen(seeds_generator.integers(0,10000)) # for synthetic sequencing data
     
     # create population
-    pop = Population(pop_size, I_0, rng3,rng4,rng5,rng6)
+    pop = Population(pop_size, I_0, tau_3, rng3,rng4,rng5,rng6)
     return pop
         
         

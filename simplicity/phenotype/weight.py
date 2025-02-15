@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.optimize import fsolve
-import matplotlib.pyplot as plt
 
 t_max = 21
 
@@ -45,27 +44,3 @@ def weights(t,t_eval, k_e, k_a, t_max):
             np.exp(k_e * (t-t_eval)) - np.exp(k_a * ((t-t_eval)))) / (
             (np.exp(-k_e * t_max) - np.exp(-k_a * t_max))))
 
-def plot_w_t(t_eval):
-    # plot the weight function
-    
-    params = w_t_params()
-    
-    k_e = params[0]
-    k_a = params[1]
-    
-    # Time points 
-    t = np.linspace(0,300,1000)
-
-    # Calculate concentration for each time point
-    w_t = weights(t, t_eval, k_e, k_a, t_max)
-
-    # Plotting the concentration-time profile
-    plt.plot(t, w_t, label=f'w(t) at simulation time {t_eval}',color='black')
-    plt.xlabel('Time (days)',fontsize=20)
-    plt.ylabel('Normalized Antibody Concentration (weight)',fontsize=20)
-    plt.ylim(0,1.1)
-    plt.xlim(left=0)
-    plt.tick_params(axis='both', labelsize=20)
-    # plt.title('Concentration-Time Profile')
-    plt.legend(loc ='upper left',fontsize=20)
-    plt.show()

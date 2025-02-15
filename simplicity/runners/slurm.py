@@ -29,7 +29,7 @@ Kown bugs:
 
 """
 import typing, os, pathlib, subprocess, platform
-import simplicity.config as c
+import simplicity.dir_manager as dm
 
 class SimulationsStatus(typing.NamedTuple):
     total    : int
@@ -58,7 +58,7 @@ def submit_simulations(experiment_name: str,
     if run_seeded_simulation_module_qualname == "__main__":
         import simplicity.runners.slurm
         help(simplicity.runners.slurm)
-        raise Exception(f"run_seeded_simulation must be imported.")
+        raise Exception("run_seeded_simulation must be imported.")
     run_seeded_simulation_qualname = run_seeded_simulation_module_qualname + "." + fn_name
     
     # job is to run the same python to call this module main() (which in turn will call user's run_seeded_simulation function)
@@ -77,7 +77,7 @@ def submit_simulations(experiment_name: str,
     batch_end   = batch_start + batch_size - 1
    
     # Define the output and error file paths
-    slurm_output_dir = os.path.join(c.get_experiment_dir(experiment_name), 'slurm_logs')
+    slurm_output_dir = os.path.join(dm.get_experiment_dir(experiment_name), 'slurm_logs')
     os.makedirs(slurm_output_dir, exist_ok=True)
     
     output_file = f"{slurm_output_dir}/{experiment_name}_%A_%a.out"  # %A = job ID, %a = array index
@@ -103,8 +103,7 @@ def submit_simulations(experiment_name: str,
     assert slurm_process.returncode == 0, f"Slurm was called with the following arguments:\n{' '.join(args)}\n{env}\n=== stdin\n{stdin}\n=== /stdin"
     
     # ! python __getitem__ indexing is 0 based
-    import simplicity.settings_manager as sm
-    seeded_simulation_parameters = sm.get_seeded_simulation_parameters_paths(experiment_name)
+    seeded_simulation_parameters = dm.get_seeded_simulation_parameters_paths(experiment_name)
     for seeded_simulation_parameters_path in seeded_simulation_parameters[batch_start-1:batch_end]:
         signal_submitted_path   = seeded_simulation_parameters_path + ".submitted"
         pathlib.Path(signal_submitted_path).touch()

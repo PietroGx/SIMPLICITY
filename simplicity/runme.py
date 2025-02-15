@@ -31,7 +31,7 @@ Each simulation will be repeated n_seeds time with a different random seed.
 
 The set of all simulations is what we call an experiment.
 """
-import simplicity.config as config
+import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
 import simplicity.output_manager as om
 import simplicity.runners.serial 
@@ -55,16 +55,15 @@ def run_experiment(experiment_name: str,
     print('##########################################')
     print('')
     # setup experiment files directories
-    config.create_directories(experiment_name)
+    dm.create_directories(experiment_name)
     # set parameters 
     parameters, n_seeds = experiment_settings()
-    sm.write_settings(parameters, n_seeds)
     # Write experiment settings file
-    sm.write_experiment_settings(experiment_name)
+    sm.write_experiment_settings(experiment_name, parameters)
     # write simulation parameters files
     sm.read_settings_and_write_simulation_parameters(experiment_name)
     # write seeded simulation parameters files
-    sm.write_seeded_simulation_parameters(experiment_name)
+    sm.write_seeded_simulation_parameters(experiment_name, n_seeds)
     
     # let one of simplicity.runners run each seeded simulation
     simplicity_runner.run_seeded_simulations(experiment_name, 
