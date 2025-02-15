@@ -8,13 +8,14 @@ Created on Tue Aug 27 19:38:43 2024
 
 import os
 import json
-import simplicity.config as config
+import simplicity.dir_manager as dm
 
-_data_dir = config.get_data_dir()
+_data_dir = dm.get_data_dir()
 
 # Define the standard values
 STANDARD_VALUES = {
     "population_size": 1000,
+    "tau_3": 7.5,
     "infected_individuals_at_start": 10,
     "R": 1.5,
     "diagnosis_rate": 0.0055,          # k_d in theoretical model equations
@@ -33,47 +34,48 @@ def check_parameters_names(parameters_dic):
         if key not in STANDARD_VALUES.keys():
             raise ValueError(f'Parameter {key} is not a valid parameter')
 
-def write_settings(parameters: dict, 
-                   n_seeds: int,
-                   target_value=None) -> None:
-    """
-    Writes settings to a JSON file.
+# def write_settings(parameters: dict, 
+#                    n_seeds: int,
+#                    target_value=None) -> None:
+#     """
+#     Writes settings to a JSON file.
 
-    Args:
-        parameters (dict): A dictionary where keys are parameter names and values are lists 
-                           of possible values for those parameters. All lists must be of 
-                           the same length and contain at least one value.
-        n_seeds (int): Number of random seeds for the experiment.
-    """
+#     Args:
+#         parameters (dict): A dictionary where keys are parameter names and values are lists 
+#                            of possible values for those parameters. All lists must be of 
+#                            the same length and contain at least one value.
+#         n_seeds (int): Number of random seeds for the experiment.
+#     """
     
-    # Check if target_value is not None and parameters contain more than one entry
-    if target_value is not None:
-        if len(parameters) != 1 or len(parameters[list(parameters.keys())[0]]) != 1:
-            raise ValueError("If target_value is specified, parameters dict must contain exactly one entry with one value'.")
+#     # Check if target_value is not None and parameters contain more than one entry
+#     if target_value is not None:
+#         if len(parameters) != 1 or len(parameters[list(parameters.keys())[0]]) != 1:
+#             raise ValueError("If target_value is specified, parameters dict must contain exactly one entry with one value'.")
     
-    check_parameters_names(parameters)
+#     check_parameters_names(parameters)
     
-    settings = {
-        "parameters": parameters,
-        "n_seeds": n_seeds,
-        "target_value": target_value,
-        "learning_rate": 0.0003,
-        "error": None,
-        "experiment_number": 0
-    }
+#     settings = {
+#         "parameters": parameters,
+#         "n_seeds": n_seeds,
+#         "target_value": target_value,
+#         "learning_rate": 0.0003,
+#         "error": None,
+#         "experiment_number": 0
+#     }
 
-    with open(os.path.join(_data_dir,'settings.json'), 'w') as json_file:
-        json.dump(settings, json_file, indent=4)
+#     with open(os.path.join(_data_dir,'settings.json'), 'w') as json_file:
+#         json.dump(settings, json_file, indent=4)
 
-    print("Settings written to Data/settings.json")
-    
+#     print("Settings written to Data/settings.json")
+
+
 def read_experiment_settings(experiment_name):
-    experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
+    experiment_settings_file_path = dm.get_experiment_settings_file_path(experiment_name)
     with open(experiment_settings_file_path, 'r') as json_file:
         experiment_settings = json.load(json_file)
     return experiment_settings
     
-def write_experiment_settings(experiment_name):
+def write_experiment_settings(experiment_name:str, parameters: dict):
     """
     Generates and writes experiment settings to a JSON file.
 
@@ -103,10 +105,6 @@ def write_experiment_settings(experiment_name):
             '/data_dir/Experiment_1/01_Experiments_settings/Experiment_1_settings.json'
     
     """
-    # read settings and get the parameters dict
-    with open(os.path.join(_data_dir,'settings.json'), 'r') as json_file:
-        settings = json.load(json_file)
-    parameters = settings['parameters']
     
     # Validate that all lists have the same length
     list_lengths = [len(v) for v in parameters.values()]
@@ -125,21 +123,15 @@ def write_experiment_settings(experiment_name):
         all_experiment_settings.append(experiment_settings)
     
     # Write the generated configurations to a JSON file
-    experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
-    with open(experiment_settings_file_path, 'w') as config_file:
-        json.dump(all_experiment_settings, config_file, indent=4)
+    experiment_settings_file_path = dm.get_experiment_settings_file_path(experiment_name)
+    with open(experiment_settings_file_path, 'w') as settings_file:
+        json.dump(all_experiment_settings, settings_file, indent=4)
     
     print(f"Experiment settings file written to {experiment_settings_file_path}")
 
-def get_experiment_settings_file_path(experiment_name):
-    # Define the path to the output file
-    return os.path.join(_data_dir,
-                        f'{experiment_name}',
-                        '01_Experiments_settings', 
-                        f'{experiment_name}_settings.json')
-    
 def write_simulation_parameters(file_path,
                                 population_size, 
+                                tau_3,
                                 infected_individuals_at_start, 
                                 R,
                                 diagnosis_rate,
@@ -154,6 +146,7 @@ def write_simulation_parameters(file_path,
                                 ):
     settings = {
         "population_size": population_size,
+        "tau_3": tau_3,
         "infected_individuals_at_start": infected_individuals_at_start,
         "R": R,
         "diagnosis_rate": diagnosis_rate, 
@@ -187,14 +180,11 @@ def read_settings_and_write_simulation_parameters(experiment_name):
     """
     
     # Define the path to the experiment settings file
-    experiment_settings_file_path = os.path.join(_data_dir,
-                                                 f'{experiment_name}',
-                                                 '01_Experiments_settings', 
-                                                 f'{experiment_name}_settings.json')
+    experiment_settings_file_path = dm.get_experiment_settings_file_path(experiment_name)
     
     # Read the experiment settings file
-    with open(experiment_settings_file_path, 'r') as config_file:
-        all_experiment_settings = json.load(config_file)
+    with open(experiment_settings_file_path, 'r') as settings_file:
+        all_experiment_settings = json.load(settings_file)
     # handle case of no changes from standard values
     if all_experiment_settings == []:
         # Create a filename
@@ -209,6 +199,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
         # Write the simulation parameters to a JSON file
         write_simulation_parameters(simulation_parameters_file_path, 
                                     STANDARD_VALUES["population_size"],
+                                    STANDARD_VALUES["tau_3"],
                                     STANDARD_VALUES["infected_individuals_at_start"],
                                     STANDARD_VALUES["R"],
                                     STANDARD_VALUES["diagnosis_rate"],
@@ -247,6 +238,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
             # Write the simulation parameters to a JSON file
             write_simulation_parameters(simulation_parameters_file_path, 
                                         settings["population_size"],
+                                        settings["tau_3"],
                                         settings["infected_individuals_at_start"],
                                         settings["R"],
                                         settings["diagnosis_rate"],
@@ -262,7 +254,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
 
     print(f"Simulation parameters written to directory: {simulation_parameters_file_path}")
 
-def write_seeded_simulation_parameters(experiment_name):
+def write_seeded_simulation_parameters(experiment_name, n_seeds: int):
     """
     Generates multiple JSON files with different seeds for each simulation parameter file 
     within a specified experiment. The function reads the original simulation parameter 
@@ -315,11 +307,6 @@ def write_seeded_simulation_parameters(experiment_name):
         subdir_path = os.path.join(seeded_simulation_parameters_dir, subdir_name)
         os.makedirs(subdir_path, exist_ok=True)
         
-        # read settings file and get n_seeds
-        with open(os.path.join(_data_dir,'settings.json'), 'r') as json_file:
-            settings = json.load(json_file)
-        n_seeds = settings['n_seeds']
-        
         # Generate multiple files with different seeds
         for i in range(n_seeds):
             # seed = random.randint(0, 1000000)
@@ -330,48 +317,6 @@ def write_seeded_simulation_parameters(experiment_name):
             # Write the new JSON file with the added seed
             with open(seeded_file_path, 'w') as seeded_file:
                 json.dump(simulation_parameters, seeded_file, indent=4)
-
-def get_seeded_simulation_parameters_paths(experiment_name):
-    """
-    Retrieves all seeded simulation parameter file paths for a given experiment.
-
-    This function searches through the directory structure of the provided
-    experiment name, looking for all JSON seeded simulation parameters files. 
-    It returns a list of full paths to these files.
-
-    Args:
-        experiment_name (str): The name of the experiment for which seeded simulation 
-                               parameter paths are to be retrieved.
-
-    Returns:
-        list of str: A list of file paths, each pointing to a JSON file containing
-                     seeded simulation parameters.
-
-    Example:
-        If `experiment_name` is 'Experiment_1', and the directory structure contains
-        multiple JSON files under:
-            '/data_dir/Experiment_1/03_Seeded_simulation_parameters',
-        the function will return a list like:
-            [
-                '/data_dir/Experiment_1/03_Seeded_simulation_parameters/subdir/file1.json',
-                '/data_dir/Experiment_1/03_Seeded_simulation_parameters/subdir/file2.json'
-            ]
-    """
-    # Define the base path for the simulation parameters
-    base_dir = os.path.join(_data_dir, experiment_name, "03_Seeded_simulation_parameters")
-    
-    # List to store all seed file paths
-    seeded_simulation_parameters_paths = []
-    
-    # Walk through the directory structure to find all .json files
-    for root, dirs, files in os.walk(base_dir):
-        for file in files:
-            if file.endswith(".json"):
-                # Construct the full path to the file and add it to the list
-                file_path = os.path.join(root, file)
-                seeded_simulation_parameters_paths.append(file_path)
-    
-    return seeded_simulation_parameters_paths
 
 def read_seeded_simulation_parameters(experiment_name, seeded_simulation_parameters_path):
     with open(seeded_simulation_parameters_path, 'r') as seeded_file:

@@ -13,7 +13,7 @@ import pandas as pd
 import os
 import numpy as np
 import json
-import simplicity.config as config
+import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import math
 from simplicity.tuning.evolutionary_rate import create_joint_sequencing_df
@@ -264,7 +264,7 @@ def ideal_subplot_grid(num_plots):
  
 def plot_combined_regressions(experiment_name, min_sim_lenght=0):
     # Get experiment output dir
-    experiment_output_dir = config.get_experiment_output_dir(experiment_name)
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     # Get seeded simulations output subfolders
     seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
                                     f.name) for f in os.scandir(experiment_output_dir
@@ -326,10 +326,10 @@ def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
     ''' Plot observed evolutionary rate (tempest regression) against desired parameter values
     '''
     # get simulation parameter files for the selected experiment
-    simulation_parameters_dir = config.get_simulation_parameters_dir(experiment_name)
+    simulation_parameters_dir = dm.get_simulation_parameters_dir(experiment_name)
     simulation_parameters_files = glob.glob(os.path.join(simulation_parameters_dir, '*.json'))
     # get output directory
-    experiment_output_dir     = config.get_experiment_output_dir(experiment_name)
+    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
     # Get seeded simulations output subfolders
     seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
                                     f.name) for f in os.scandir(experiment_output_dir
@@ -380,11 +380,11 @@ def export_u_regression_plots(experiment_name):
     ''' move tempest regression plots from experiment folder to plots folder
     '''
     # get experiment output dir
-    experiment_output_dir = config.get_experiment_output_dir(experiment_name)
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     # get plots directories
     plots = glob.glob(os.path.join(experiment_output_dir, '*.png'))
     # create target directories to move the plots to
-    plots_folder_dir = os.path.join(config.get_data_dir(), '00_Tempest_regression_plots')
+    plots_folder_dir = os.path.join(dm.get_data_dir(), '00_Tempest_regression_plots')
     os.makedirs(plots_folder_dir,exist_ok=True)
     # get plots filenames
     plot_filenames = [os.path.basename(plot) for plot in plots]
@@ -405,7 +405,7 @@ def plot_histograms(experiment_name, final_times_data_frames):
         ax.set_ylabel('Frequency')
     
     plt.tight_layout()
-    plt.savefig(os.path.join(config.get_experiment_dir(experiment_name),
+    plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name),
                              'simulations_lenght_histogram.png'))
 
 def plot_u_fit(experiment_name,fit_result,scale:str):
@@ -421,9 +421,9 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
     # Create figure and axes
     fig, ax = plt.subplots()
     ax.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    print(x_data)
-    print(y_data)
-    print(fit_result.best_fit)
+    # print(x_data)
+    # print(y_data)
+    # print(fit_result.best_fit)
     # Set log scales
     
     if scale == 'loglog':
@@ -442,13 +442,123 @@ def plot_u_fit(experiment_name,fit_result,scale:str):
     ax.set_ylabel('u')
     ax.legend()
     plt.title('Logarithmic Fit to Data')
-    file_path = os.path.join(config.get_experiment_dir(experiment_name),f'ue_fitting_{scale}.png')
+    file_path = os.path.join(dm.get_experiment_dir(experiment_name),f'ue_fitting_{scale}.png')
     plt.savefig(file_path)
+ 
+###############################################################################
+###############################################################################   
+def plot_w_t(weights, t_max, params, t_eval): # plot weights of phenotype model
+    '''plot the weight function
+    from weight.py file in phenotype:
+    # params = w_t_params() 
+    # w_t = weights(t, t_eval, k_e, k_a, t_max)
+    '''
+    k_e = params[0]
+    k_a = params[1]
     
+    # Time points 
+    t = np.linspace(0,300,1000)
 
+    # Calculate concentration for each time point
+    w_t = weights(t, t_eval, k_e, k_a, t_max)
 
+    # Plotting the concentration-time profile
+    plt.plot(t, w_t, label=f'w(t) at simulation time {t_eval}',color='black')
+    plt.xlabel('Time (days)',fontsize=20)
+    plt.ylabel('Normalized Antibody Concentration (weight)',fontsize=20)
+    plt.ylim(0,1.1)
+    plt.xlim(left=0)
+    plt.tick_params(axis='both', labelsize=20)
+    # plt.title('Concentration-Time Profile')
+    plt.legend(loc ='upper left',fontsize=20)
+    plt.show()
+    
+###############################################################################
+###############################################################################
+def plot_intra_host(intra_host_model,time,step):
+    '''
+    Plot intra-host model solutions.
 
+    Parameters
+    ----------
+    time : float
+        Time for the intra-host model solution
 
+    Returns
+    -------
+    Plot p_inf/p_dia/p_rec.
+
+    '''
+    import matplotlib.colors as mcolors
+    from matplotlib import cm
+    matplotlib.rcParams.update({'font.size': 22})
+
+    t = np.arange(0,time,step)
+    states = np.arange(0,21,1) #[0] # 
+    # setup the normalization and the colormap
+    normalize = mcolors.Normalize(vmin=min(states), vmax=max(states))
+    colormap = cm.brg
+    
+    # plot curve for each starting state
+    for state in states:
+        plt.plot(t,intra_host_model._data_plot_model(state,time,step), 
+                 color = colormap(normalize(state)))
+        
+    # setup the colorbar
+    scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
+    scalarmappaple.set_array(states)
+    cb = plt.colorbar(scalarmappaple)
+    cb.set_ticks(np.arange(0,21,1))
+    plt.text(300.5,1.1,'Initial state')
+   
+    # show the figure
+    plt.xlabel('Time (d)')
+    plt.ylabel('Probability of being inf after t days')
+    plt.xlim(0,time)
+    plt.ylim(0)
+    plt.show()    
+    
+def plot_comparison_intra_host_models(intra_host_model):
+    '''
+    Plot intra-host model probability of being infectious after t days for
+    normal and long shedders individuals
+
+    Parameters
+    ----------
+    time : float
+        Time for the intra-host model solution
+
+    Returns
+    -------
+    Plot p_inf
+
+    '''
+    import scipy
+    
+    matplotlib.rcParams.update({'font.size': 22})
+
+    t = np.arange(0,50,0.1)
+
+    plt.plot(t,intra_host_model._data_plot_model(0,50,.1), color = 'orange', 
+             label = 'normal')
+    
+    # setup intra-host model matrix and calculate matrix exponential
+    intra_host_model.A = intra_host_model._matrix(133.5)
+    intra_host_model.A_ex = scipy.linalg.expm(intra_host_model.A)
+    
+    t = np.arange(0,300,1)
+    plt.plot(t,intra_host_model._data_plot_model(0,300,1), color = 'blue', 
+             label = 'immunocompromised')
+    # show the figure
+    plt.xlabel('Time (d)')
+    plt.ylabel('Probability of being inf. after t days')
+    plt.xlim(0,300)
+    plt.ylim(0)
+    plt.legend()
+    plt.show()    
+    
+###############################################################################
+###############################################################################
 
 
 

@@ -34,7 +34,7 @@ Each simulation will be repeated n_seeds time with a different random seed.
 The set of all simulations is what we call an experiment.
 """
 from simplicity.runme import run_experiment
-from simplicity.config import get_experiment_output_dir
+from simplicity.dir_manager import get_experiment_output_dir
 import simplicity.runners.serial
 import simplicity.runners.multiprocessing
 import os
@@ -110,5 +110,5 @@ def test_experiment_local(runner:str, test_number:int):
 ##### </actual test>
 
 if __name__ == "__main__":
-    # test_experiment_local('serial',1)
-    test_experiment_local('multiprocessing',6)
+    test_experiment_local('serial',4)
+    # test_experiment_local('multiprocessing',9)

@@ -6,7 +6,7 @@ Created on Thu Aug 29 13:56:20 2024
 @author: pietro
 """
 
-import simplicity.config as config
+import simplicity.dir_manager as dm
 import os
 import shutil
 import tarfile
@@ -46,7 +46,7 @@ def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
     # Get the seed file name without the extension
     seed_file_name = os.path.splitext(path_components[-1])[0]  
     # Construct the output directory path
-    output_dir = os.path.join(config.get_experiment_output_dir(experiment_name), 
+    output_dir = os.path.join(dm.get_experiment_output_dir(experiment_name), 
                               root_folder_of_seed_file, 
                               seed_file_name)
     try:
@@ -71,8 +71,8 @@ def archive_experiment(experiment_name):
     Raises:
         FileNotFoundError: If the experiment folder does not exist.
     """
-    # Get the data directory from the config
-    data_dir = config.get_data_dir()
+    # Get the data directory from the dm
+    data_dir = dm.get_data_dir()
 
     # Define the path to the experiment folder
     experiment_folder_path = os.path.join(data_dir, experiment_name)
@@ -210,10 +210,10 @@ def extract_u_e_values(experiment_name):
     import json
     from simplicity.tuning.evolutionary_rate import tempest_regression, create_joint_sequencing_df
     # get simulation parameter files for the selected experiment
-    simulation_parameters_dir = config.get_simulation_parameters_dir(experiment_name)
+    simulation_parameters_dir = dm.get_simulation_parameters_dir(experiment_name)
     simulation_parameters_files = glob.glob(os.path.join(simulation_parameters_dir, '*.json'))
     # get output directory
-    experiment_output_dir     = config.get_experiment_output_dir(experiment_name)
+    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
     # Get seeded simulations output subfolders
     seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
                                     f.name) for f in os.scandir(experiment_output_dir
@@ -244,7 +244,7 @@ def extract_u_e_values(experiment_name):
     results_df.to_csv(csv_file_path, index=False)
 
 def read_u_e_values(experiment_name):
-    experiment_output_dir     = config.get_experiment_output_dir(experiment_name)
+    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
     csv_file_path = os.path.join(experiment_output_dir, 
                                  f'{experiment_name}_u_vs_evolutionary_rate_values.csv')
     data = pd.read_csv(csv_file_path)

@@ -2,7 +2,7 @@ import os
 import shutil
 import pandas as pd
 import random 
-import simplicity.config as config 
+import simplicity.dir_manager as dm 
 
 def process_experiment_folder(experiment_name):
     """
@@ -13,7 +13,7 @@ def process_experiment_folder(experiment_name):
         experiment_name (str): The name of the experiment whose files are to be processed.
     """
     # Set up paths
-    data_dir = config.get_data_dir()
+    data_dir = dm.get_data_dir()
     experiment_dir = os.path.join(data_dir, experiment_name)
     summary_dir = os.path.join(experiment_dir, '05_summary')
 
@@ -43,7 +43,7 @@ def process_trajectory_files(experiment_name):
         experiment_name (str): The name of the experiment whose trajectory files are to be processed.
     """
     # Set up paths
-    data_dir = config.get_data_dir()
+    data_dir = dm.get_data_dir()
     experiment_dir = os.path.join(data_dir, experiment_name)
     output_dir = os.path.join(experiment_dir,'04_Output')
     summary_dir = os.path.join(experiment_dir, '05_summary')

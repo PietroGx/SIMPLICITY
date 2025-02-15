@@ -61,7 +61,7 @@ cd path/to/my/folder/simplicity
 Now you are ready to start using SIMPLICITY! If you want to run simulations from a Python interpreter, you will need to either use one of the provided runme.py files or to create your own. Below is an example file you can use as reference when setting up your simulation:
 
 ```python
-import simplicity.config as config
+import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
 import simplicity.output_manager as om
 import simplicity.runners.serial 
@@ -81,7 +81,7 @@ def run_experiment(experiment_name,
     print('##########################################')
     print('')
     # setup experiment files directories
-    config.create_directories(experiment_name)
+    dm.create_directories(experiment_name)
     # set parameters 
     sm.write_settings(parameters, n_seeds)
     # Write experiment settings file

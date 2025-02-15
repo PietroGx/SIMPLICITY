@@ -8,13 +8,13 @@ Created on Thu Feb  6 13:28:55 2025
 import os
 import glob
 import pandas as pd
-import simplicity.config as c
+import simplicity.dir_manager as dm
 import argparse
 import simplicity.plots_manager as pm
 
 def load_data(experiment_name):
     
-    experiment_output_dir = c.get_experiment_output_dir(experiment_name)
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     dic = {}
     
     seeded_simulations_folders = glob.glob(os.path.join(experiment_output_dir, '*/'))
