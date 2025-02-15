@@ -26,7 +26,7 @@ def test_run_single_seeded_simulation(experiment_name,
     sm.write_seeded_simulation_parameters(experiment_name)
     
     # get seeded simulation parameters paths and take only the first entry
-    seeded_simulation_parameters_path = sm.get_seeded_simulation_parameters_paths(experiment_name)[0]
+    seeded_simulation_parameters_path = dm.get_seeded_simulation_parameters_paths(experiment_name)[0]
     
     # run single seeded simulation 
     run.run_seeded_simulation(seeded_simulation_parameters_path, experiment_name)
