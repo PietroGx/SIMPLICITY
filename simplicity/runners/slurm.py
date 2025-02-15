@@ -111,8 +111,7 @@ def submit_simulations(experiment_name: str,
     
 def poll_simulations_status(experiment_name):
     # get the seeded simulation parameters files paths
-    import simplicity.settings_manager as sm
-    seeded_simulation_parameters = sm.get_seeded_simulation_parameters_paths(experiment_name)
+    seeded_simulation_parameters = dm.get_seeded_simulation_parameters_paths(experiment_name)
     total = len(seeded_simulation_parameters)
     # read signals written by this script
     submitted = 0
@@ -146,8 +145,7 @@ def poll_simulations_status(experiment_name):
 
 def release_simulations(experiment_name, n: int):
     # get the seeded simulation parameters files paths
-    import simplicity.settings_manager as sm
-    seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
+    seeded_simulation_parameters_paths = dm.get_seeded_simulation_parameters_paths(experiment_name)
     
     # use signals to find up to n submitted but not released simulations
     i_th_seeds = {}
@@ -243,8 +241,7 @@ def job():
     i_th_seeded_simulation = int(os.environ["SLURM_ARRAY_TASK_ID"]) - int(os.environ["SLURM_ARRAY_TASK_MIN"])
     
     # resolve seeded_simulation_parameters_path
-    import simplicity.settings_manager as sm
-    seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
+    seeded_simulation_parameters_paths = dm.get_seeded_simulation_parameters_paths(experiment_name)
     seeded_simulation_parameters_path  = seeded_simulation_parameters_paths[i_th_seeded_simulation]
 
     # define signals 

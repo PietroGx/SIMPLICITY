@@ -34,41 +34,6 @@ def check_parameters_names(parameters_dic):
         if key not in STANDARD_VALUES.keys():
             raise ValueError(f'Parameter {key} is not a valid parameter')
 
-# def write_settings(parameters: dict, 
-#                    n_seeds: int,
-#                    target_value=None) -> None:
-#     """
-#     Writes settings to a JSON file.
-
-#     Args:
-#         parameters (dict): A dictionary where keys are parameter names and values are lists 
-#                            of possible values for those parameters. All lists must be of 
-#                            the same length and contain at least one value.
-#         n_seeds (int): Number of random seeds for the experiment.
-#     """
-    
-#     # Check if target_value is not None and parameters contain more than one entry
-#     if target_value is not None:
-#         if len(parameters) != 1 or len(parameters[list(parameters.keys())[0]]) != 1:
-#             raise ValueError("If target_value is specified, parameters dict must contain exactly one entry with one value'.")
-    
-#     check_parameters_names(parameters)
-    
-#     settings = {
-#         "parameters": parameters,
-#         "n_seeds": n_seeds,
-#         "target_value": target_value,
-#         "learning_rate": 0.0003,
-#         "error": None,
-#         "experiment_number": 0
-#     }
-
-#     with open(os.path.join(_data_dir,'settings.json'), 'w') as json_file:
-#         json.dump(settings, json_file, indent=4)
-
-#     print("Settings written to Data/settings.json")
-
-
 def read_experiment_settings(experiment_name):
     experiment_settings_file_path = dm.get_experiment_settings_file_path(experiment_name)
     with open(experiment_settings_file_path, 'r') as json_file:
