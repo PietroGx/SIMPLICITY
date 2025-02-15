@@ -7,7 +7,8 @@
 STANDARD_VALUES for SIMPLICITY simulation: 
 
     "population_size": 1000,
-    "infected_individuals_at_start": 100,
+    "tau_3": 7.5,
+    "infected_individuals_at_start": 10,
     "R": 1.5,
     "diagnosis_rate": 0.0055,
     "IH_virus_emergence_rate": 0.0085,
@@ -41,23 +42,16 @@ import simplicity.plots_manager as pm
 import warnings
 import argparse
 
-R=1
-
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
     
-    parameters      = {'evolutionary_rate': [0.00001, 
-                                             0.0001, 
-                                             0.001, 
-                                             0.01, 
-                                             0.1, 
-                                             1, 
-                                             10, 
-                                             100, 
-                                             1000],
-                       
-                       'final_time':[365] * 9,
-                       "R": [R]*9
+    parameters      = {'tau_3':[3.25, 
+                                7.5,
+                                15,
+                                30,
+                                60,
+                                120
+                                ]
                        }
     n_seeds = 300
 
@@ -68,7 +62,7 @@ def plot_regressions_and_export(experiment_name):
     pm.plot_u_vs_parameter(experiment_name,'evolutionary_rate')
     pm.export_u_regression_plots(experiment_name)
 
-def explore_R_impact_on_u(runner:str, experiment_number:int):
+def explore_tau_3_impact_on_u(runner:str, experiment_number:int):
     if runner == 'serial':
         runner_module = simplicity.runners.serial
     elif runner == 'multiprocessing':
@@ -82,7 +76,7 @@ def explore_R_impact_on_u(runner:str, experiment_number:int):
     print('testing parameter space for e/u regression')
     print('##########################################')
     print('')
-    experiment_name = f'explore_R={R}_impact_on_u_#{experiment_number}'
+    experiment_name = f'explore_tau_3_impact_on_u_#{experiment_number}'
     try:
         run_experiment(experiment_name, 
                        fixture_experiment_settings,             
@@ -101,12 +95,12 @@ def explore_R_impact_on_u(runner:str, experiment_number:int):
  
 def main():
     # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run script to explore u/e parameter space")
+    parser = argparse.ArgumentParser(description="Run script to explore tau_3 effects on u")
     parser.add_argument('runner', type=str, help="runner")
     parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()
     # Run the script with the provided parameter
-    explore_R_impact_on_u(args.runner,args.experiment_number)
+    explore_tau_3_impact_on_u(args.runner,args.experiment_number)
 
 if __name__ == "__main__":
     main()
