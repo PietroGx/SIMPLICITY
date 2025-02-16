@@ -283,7 +283,7 @@ def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0):
         
     # Sort the subdirectories based on the evolutionary rate
     sorted_dirs = sorted(seeeded_simulations_output_directories, 
-                            key=extract_parameter)
+                     key=lambda dir: extract_parameter(dir, parameter))
     # Determine the number of rows and columns for subplots
     num_rows, num_cols = ideal_subplot_grid(len(seeeded_simulations_output_directories))
 
