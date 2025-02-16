@@ -298,7 +298,7 @@ def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0):
         axs = axs
     
     for i, subdir in enumerate(sorted_dirs):
-        param = extract_parameter(subdir)
+        param = extract_parameter(subdir, parameter)
         combined_df = create_joint_sequencing_df(subdir, min_sim_lenght)
         if combined_df is None: 
             pass
