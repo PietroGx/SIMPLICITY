@@ -145,13 +145,18 @@
 
 	Version 0.4.0
 	
-	* added tau_3 to paraneters file and implemented way to pass it to host class (now infection lenght can be set when running a simulation)
+	* added tau_3 to parameters file and implemented way to pass it to host class (now infection lenght can be set when running a simulation)
 	* removed the setting.json file from the data flow (deprecated, new data flow does not need it) 
 	* renamed config.py to dir_manager.py and added functions there
 	* moved all the missing plots to plot_manager.py
 	* added experiment script for tau_3 / u relation 
 	* updated combined regression plot to accept any parameter (to plot effect of tau_3 on u)
+
+2025-17-02 pietro gerletti
+
+	Version 0.4.1
 	
+	* combined regression plot has same ylim values for subplots
 	
 	
 	
