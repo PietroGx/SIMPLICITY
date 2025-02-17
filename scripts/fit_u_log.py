@@ -27,6 +27,12 @@ def log_model(x, A, B, C):
 def exp_model(x, A, B, C):
     return A * x**B + C
 
+def double_log_model(x, A, B, C, D, E, F):
+    return A * np.log(B * x + C) + D * np.log(E * x + F)
+
+def tan_model(x, A, B, C, D):
+    return A * np.tan(B * x - C) + D
+
 def fit_log_u(experiment_name):
     # Read data from CSV
     data = om.read_u_e_values(experiment_name)
@@ -34,7 +40,7 @@ def fit_log_u(experiment_name):
     y_data = data['u']  
     # weights = 1 / y_data
     # Create the Model
-    model = Model(log_model)
+    model = Model(double_log_model)
     
     # Set initial parameter guesses 
     params = model.make_params(A=1, B=1, C=1)
@@ -43,6 +49,9 @@ def fit_log_u(experiment_name):
     params['A'].set(min=0)  
     params['B'].set(min=0.000001)  
     params['C'].set(min=0.000001)
+    params['D'].set(min=0)  
+    params['E'].set(min=0.000001)  
+    params['F'].set(min=0.000001)
     
     # Fit the model to the data
     fit_result = model.fit(y_data, params, x=x_data)#, weights=weights)
