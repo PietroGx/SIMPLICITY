@@ -13,29 +13,29 @@ import os
 
 def plot_regressions_and_export(experiment_name, parameter, min_sim_lenght):
     print('')
+    print('')
+    print('##################################################################')
+    print('################## Plot e vs u relationship ######################')
+    print('##################################################################')
+    print('')
+   
+    pm.plot_u_vs_parameter(experiment_name,parameter, min_sim_lenght)
+    print('')
     print('##################################################################')
     print('################## Plot combined regressions #####################')
     print('##################################################################')
     print('')
-    print('')
+    csv_with_u_values = os.path.join(dm.get_experiment_output_dir(experiment_name),
+                                     f'{experiment_name}_u_vs_{parameter}_values.csv')
     
-    pm.plot_u_vs_parameter(experiment_name,parameter, min_sim_lenght)
+    y_axis_max = max(pd.read_csv(csv_with_u_values)['u'])*1.2
+    pm.plot_combined_regressions(experiment_name, parameter, min_sim_lenght, y_axis_max)
+    print('')
     print('##################################################################')
     print('######## Exporting plots to Tempest Regression Folder ############')
     print('##################################################################')
     print('')
     print('')
-    csv_with_u_values = os.path.join(dm.get_experiment_output_dir(experiment_name),
-                                     f'{experiment_name}_u_vs_{parameter}_values.csv')
-    
-    y_axis_max = max(pd.read_csv(csv_with_u_values)[parameter])*1.2
-    pm.plot_combined_regressions(experiment_name, parameter, min_sim_lenght, y_axis_max)
-    print('##################################################################')
-    print('################## Plot e vs u relationship ######################')
-    print('##################################################################')
-    print('')
-    print('')
-    
     pm.export_u_regression_plots(experiment_name)
 
 def main():
