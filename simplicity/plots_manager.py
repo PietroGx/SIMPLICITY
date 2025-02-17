@@ -262,7 +262,7 @@ def ideal_subplot_grid(num_plots):
     
     return num_rows, num_cols        
  
-def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0):
+def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0, y_axis_max=0.1):
     # Get experiment output dir
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     # Get seeded simulations output subfolders
@@ -314,7 +314,7 @@ def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0):
             ax.set_xlabel('Time [y]')
             ax.set_ylabel('Distance from root [#S/site]')
             ax.set_xlim(left=0)
-            ax.set_ylim(bottom=0)
+            ax.set_ylim(0, y_axis_max)
             ax.set_title(f'Regression - {parameter}: {param}')
             ax.grid(True)
             ax.legend()
@@ -376,6 +376,7 @@ def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
     plt.legend()
     plt.savefig(os.path.join(experiment_output_dir, 
                              f"{experiment_name}_{parameter}_vs_u.png"))
+    
 def export_u_regression_plots(experiment_name): 
     ''' move tempest regression plots from experiment folder to plots folder
     '''
