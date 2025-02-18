@@ -63,6 +63,7 @@ def main():
             print('')
             print('##########################################')
             print(f'In {folder}:    something went wrong.')
+            print(e)
             print('##########################################')
             print('')
     
