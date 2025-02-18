@@ -66,7 +66,7 @@ def main():
     job_errors, error_types = parse_slurm_error_files(args.experiment_name)
     
     if not job_errors:
-        print("The experiment: {args.experiment_name} ran without errors.")
+        print(f"The experiment: {args.experiment_name} ran SUCCESSFULLY without errors.")
     
     else:
         # Print summary
