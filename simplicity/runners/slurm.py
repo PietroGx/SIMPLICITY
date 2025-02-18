@@ -77,7 +77,7 @@ def submit_simulations(experiment_name: str,
     batch_end   = batch_start + batch_size - 1
    
     # Define the output and error file paths
-    slurm_output_dir = os.path.join(dm.get_experiment_dir(experiment_name), 'slurm_logs')
+    slurm_output_dir = os.path.join(dm.get_experiment_dir(experiment_name), 'slurm','slurm_logs' )
     os.makedirs(slurm_output_dir, exist_ok=True)
     
     output_file = f"{slurm_output_dir}/{experiment_name}_%A_%a.out"  # %A = job ID, %a = array index
@@ -243,7 +243,15 @@ def job():
     # resolve seeded_simulation_parameters_path
     seeded_simulation_parameters_paths = dm.get_seeded_simulation_parameters_paths(experiment_name)
     seeded_simulation_parameters_path  = seeded_simulation_parameters_paths[i_th_seeded_simulation]
-
+    
+    # save the mapping from slurm job to seeded simulation number
+    slurm_map_dir  = os.path.join(dm.get_experiment_dir(experiment_name), 'slurm','job_id_mapping' )
+    os.makedirs(slurm_map_dir , exist_ok=True)
+    
+    map_file = f"{slurm_map_dir }/{experiment_name}_%A_%a.csv"  # %A = job ID, %a = array index
+    with open(map_file, mode='w', newline='') as file:
+        file.write(seeded_simulation_parameters_path)
+        
     # define signals 
     signal_started_path   = seeded_simulation_parameters_path + ".started"
     signal_failed_path    = seeded_simulation_parameters_path + ".failed"

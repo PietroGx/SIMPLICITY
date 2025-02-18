@@ -167,6 +167,11 @@
 	* added script to count how many simulation ran successfully in an experiment
 	* updated setup.py
 	
+2025-18-02 pietro gerletti
+
+	Version 0.5.1
+	
+	* updated slurm runner to save mapping of job id to seeded simulation path
 	
 	
 	
