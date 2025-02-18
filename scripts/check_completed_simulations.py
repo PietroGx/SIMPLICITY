@@ -34,12 +34,16 @@ def check_seeded_simulation_output(seeded_simulation_output_directory):
         return False 
 
 def count_completed_simulations(experiment_name):
-    
+    print('')
+    print('##########################################')
+    print(f'Simulation summary of {experiment_name}:')
+    print('')
     n_seeds = sm.read_n_seeds_file(experiment_name)['n_seeds']
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    counter = 0
+    
     # loop over each simulation output folder
     for folder in os.listdir(experiment_output_dir):
+        counter = 0
         simulation_directory = os.path.join(experiment_output_dir,folder)
         # loop over each seeded simulation output folder
         for subfolder in os.listdir(simulation_directory):
@@ -47,9 +51,7 @@ def count_completed_simulations(experiment_name):
             if check_seeded_simulation_output(seeded_simulation_output_directory):
                 counter += 1
         
-        print('')
-        print('##########################################')
-        print(f'In {experiment_name}/{folder}:    {counter}/{n_seeds} simulations were run successfully.')
+        print(f'In {folder}:    {counter}/{n_seeds} simulations were run successfully.')
         print('##########################################')
 
 def main():
