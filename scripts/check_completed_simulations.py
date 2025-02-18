@@ -58,11 +58,11 @@ def main():
     for folder in list_experiment_folders():
         try:
             count_completed_simulations(folder)
-        except:
+        except Exception as e:
             print('')
             print('')
             print('##########################################')
-            print(f'In {folder}:    The experiment FAILED.')
+            print(f'In {folder}:    something went wrong.')
             print('##########################################')
             print('')
     
