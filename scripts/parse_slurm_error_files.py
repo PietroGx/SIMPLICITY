@@ -14,7 +14,7 @@ import argparse
 
 def parse_slurm_error_files(experiment_name):
     
-    folder_path = dm.get_slurm_logs(experiment_name)
+    folder_path = dm.get_slurm_logs_dir(experiment_name)
     
     # Dictionary to store job_id and corresponding error type
     job_errors = {}
