@@ -52,7 +52,7 @@ def count_completed_simulations(experiment_name):
                 counter += 1
         
         print(f'In {folder}:    {counter}/{n_seeds} simulations were run successfully.')
-        print('##########################################')
+    print('##########################################')
 
 def main():
     for folder in list_experiment_folders():
