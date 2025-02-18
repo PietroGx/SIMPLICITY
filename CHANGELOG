@@ -175,7 +175,8 @@
 	* added slurm logs and maps folders to directory manager
 	* updated slurm runner 
 	* added script to parse slurm errors 
-	
+	* updated script/experiments  to correct for new functions signatures
+	* added backlog file
 	
 	
 	
