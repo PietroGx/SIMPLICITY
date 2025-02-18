@@ -4,7 +4,7 @@
 
 	* refactoring decoupled core modules from managers (simulation.Simplicity has still a dependency to output_manager)
 	* added runners API + 3 impementations (serial, multiproccessing, slurm)
-	* added test suite (currently only for single-experiment)
+        * added test suite (currently only for single-experiment)
 
 2025-01-17 pietro gerletti
 
@@ -20,26 +20,26 @@
 	* fixed bug causing plot not to be saved 
 	* moved plots to plots_manager
 	* renamed output variable names for more consistency
-    * renamed variant_inf_count (in population) to lineage_frequency
+        * renamed variant_inf_count (in population) to lineage_frequency
  	* moved all the output files writing responsibilities to output_manager
-    * implemented plotting from saved data files 
-    * tested and debugged new plot
-    * updated simulation class
-    * fixed naming in output manager.save_sequencing_dataset
-    * fixed bug causing dataset for regression to be saved wrongly
-    * added genome decoder
+        * implemented plotting from saved data files 
+        * tested and debugged new plot
+        * updated simulation class
+        * fixed naming in output manager.save_sequencing_dataset
+        * fixed bug causing dataset for regression to be saved wrongly
+        * added genome decoder
    	* fixed bugs on infection tree - now it works again
    	* infection tree does not store the full sequence anymore but one can get it from individuals_data.csv
    	* Wrote test for infection tree
    	* updated nexus tree export function
-    * Wrote test for phylogenetic tree
+        * Wrote test for phylogenetic tree
    	* updated phylogenetic tree function (now tree built from phylogenetic_data.csv)
    	* updated simulation.run for verbose output
    	* fixed import bug in phylogenetic_data that caused an error in the tree building
    	* fixed fasta file writing - now is written correctly
    	* fixed genome decoder - now all mutations are introduced in the reference genome when decoding
    	* implemented tree-builder module (updating old infection tree and phylogenetic tree files)
-    * created tests for trees
+        * created tests for trees
    	* fixed variable name conflict causing bug in tree rendering
    	* created and tested new runme for local machines
 
@@ -74,14 +74,14 @@
 	* testing parameter space for e/u regression - created test file 
 	* sklearn added to dependencies
 	* changed value of runtime_max in settings manager (3600)
-    * added exception handling to config.get_output_directory
-    * added exception handling to config.get_simulation_parameters_dir	
-    * updated standard values dictionary and fixed parameter names conflicts
-    * rewrote and updated tempest regression funcs and plots 
-    * moved tempest regression plots to plot_manager
-    * added script to extract plots to Data/00_Tempest_regression_plots
-    * updated test_parameter_space - now parameter space exploration routine running locally
-    * created script explore_u_parameter_space
+        * added exception handling to config.get_output_directory
+    	* added exception handling to config.get_simulation_parameters_dir	
+    	* updated standard values dictionary and fixed parameter names conflicts
+  	* rewrote and updated tempest regression funcs and plots 
+        * moved tempest regression plots to plot_manager
+  	* added script to extract plots to Data/00_Tempest_regression_plots
+        * updated test_parameter_space - now parameter space exploration routine running locally
+	* created script explore_u_parameter_space
 	
 2025-05-02 pietro gerletti
 
@@ -96,14 +96,14 @@
 	
 	* fixed bug caused by storing bool as string in env var (slurm runner)
 	* updated test_parameter_space and explore_u_parameter_space
-    * added exception handling to plot_combined_regressions
-    * fixed subplot order in plot_manager.plot_combined_regressions
-    * added config.get_experiment_dir
-    * added statistics_simulations_lenght.py script 
-    * removed parameter_search.py - working on new tuning routine 
-    * fixed subplot titles in plot_manager.plot_combined_regressions
-    * updated slurm runner to save log files in correct folder
-    * updated setup.py
+   	* added exception handling to plot_combined_regressions
+    	* fixed subplot order in plot_manager.plot_combined_regressions
+    	* added config.get_experiment_dir
+    	* added statistics_simulations_lenght.py script 
+    	* removed parameter_search.py - working on new tuning routine 
+    	* fixed subplot titles in plot_manager.plot_combined_regressions
+    	* updated slurm runner to save log files in correct folder
+    	* updated setup.py
     
 2025-11-02 pietro gerletti
 
@@ -158,6 +158,14 @@
 	
 	* combined regression plot has same ylim values for subplots
 	
+2025-18-02 pietro gerletti
+
+	Version 0.5.0
+	
+	* updated setting and dir manager. now n_seeds is saved to a file (01_exp_settings/)
+	* updated runme accordingly 
+	* added script to count how many simulation ran successfully in an experiment
+	* updated setup.py
 	
 	
 	

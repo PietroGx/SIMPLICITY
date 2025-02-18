@@ -42,6 +42,30 @@ def create_directories(experiment_name):
         path = os.path.join(experiment_dir, subdir)
         os.makedirs(path, exist_ok=True)
 
+def get_experiment_dir(experiment_name):
+    """Get the experiment_name directory path."""
+    experiment_dir = os.path.join(_data_dir,experiment_name)
+    if os.path.isdir(experiment_dir):
+        return experiment_dir
+    else:
+        raise ValueError('No experiment with that name!')
+
+def get_simulation_parameters_dir(experiment_name):
+    """Get the experiment_name simulation parameters directory path."""
+    experiment_dir = os.path.join(_data_dir,experiment_name)
+    if os.path.isdir(experiment_dir):
+        return os.path.join(experiment_dir, '02_Simulation_parameters')
+    else:
+         raise ValueError('No experiment with that name!')
+         
+def get_seeded_simulation_parameters_dir(experiment_name):
+    """Get the experiment_name seeded simulation parameters directory path."""
+    experiment_dir = os.path.join(_data_dir,experiment_name)
+    if os.path.isdir(experiment_dir):
+        return os.path.join(experiment_dir, '03_Seeded_simulation_parameters')
+    else:
+         raise ValueError('No experiment with that name!')
+         
 def get_experiment_output_dir(experiment_name):
     """Get the experiment_name output directory path."""
     experiment_dir = os.path.join(_data_dir,experiment_name)
@@ -50,28 +74,18 @@ def get_experiment_output_dir(experiment_name):
     else:
          raise ValueError('No experiment with that name!')
 
-def get_simulation_parameters_dir(experiment_name):
-    """Get the experiment_name output directory path."""
-    experiment_dir = os.path.join(_data_dir,experiment_name)
-    if os.path.isdir(experiment_dir):
-        return os.path.join(experiment_dir, '02_Simulation_parameters')
-    else:
-         raise ValueError('No experiment with that name!')
-         
-def get_experiment_dir(experiment_name):
-    """Get the experiment_name output directory path."""
-    experiment_dir = os.path.join(_data_dir,experiment_name)
-    if os.path.isdir(experiment_dir):
-        return experiment_dir
-    else:
-        raise ValueError('No experiment with that name!')
         
 def get_experiment_settings_file_path(experiment_name):
-    # Define the path to the output file
     return os.path.join(_data_dir,
                         f'{experiment_name}',
                         '01_Experiments_settings', 
                         f'{experiment_name}_settings.json')
+
+def get_n_seeds_file_path(experiment_name):
+    return os.path.join(_data_dir,
+                        f'{experiment_name}',
+                        '01_Experiments_settings', 
+                        f'{experiment_name}_n_seeds.json')
 
 def get_seeded_simulation_parameters_paths(experiment_name):
     """

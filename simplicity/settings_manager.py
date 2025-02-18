@@ -39,8 +39,14 @@ def read_experiment_settings(experiment_name):
     with open(experiment_settings_file_path, 'r') as json_file:
         experiment_settings = json.load(json_file)
     return experiment_settings
-    
-def write_experiment_settings(experiment_name:str, parameters: dict):
+
+def read_n_seeds_file(experiment_name):
+    n_seeds_file_path = dm.get_n_seeds_file_path(experiment_name)
+    with open(n_seeds_file_path, 'r') as json_file:
+        n_seeds_dic = json.load(json_file)
+    return n_seeds_dic
+
+def write_experiment_settings(experiment_name:str, parameters: dict, n_seeds: int):
     """
     Generates and writes experiment settings to a JSON file.
 
@@ -89,8 +95,12 @@ def write_experiment_settings(experiment_name:str, parameters: dict):
     
     # Write the generated configurations to a JSON file
     experiment_settings_file_path = dm.get_experiment_settings_file_path(experiment_name)
+    n_seeds_file_path = dm.get_n_seeds_file_path(experiment_name)
+    
     with open(experiment_settings_file_path, 'w') as settings_file:
         json.dump(all_experiment_settings, settings_file, indent=4)
+    with open(n_seeds_file_path, 'w') as n_seeds_file:
+        json.dump({'n_seeds':n_seeds}, n_seeds_file, indent=4)
     
     print(f"Experiment settings file written to {experiment_settings_file_path}")
 
@@ -152,13 +162,9 @@ def read_settings_and_write_simulation_parameters(experiment_name):
         all_experiment_settings = json.load(settings_file)
     # handle case of no changes from standard values
     if all_experiment_settings == []:
-        # Create a filename
         file_name = 'standard_values.json'
-        
-        # Ensure the directory for simulation parameters exists
-        simulation_parameters_file_path = os.path.join(_data_dir,
-                                                 f'{experiment_name}',
-                                                 '02_Simulation_parameters', 
+        simulation_parameters_file_path = os.path.join(
+                       dm.get_simulation_parameters_dir(experiment_name), 
                                                  file_name)
         
         # Write the simulation parameters to a JSON file
@@ -191,11 +197,10 @@ def read_settings_and_write_simulation_parameters(experiment_name):
             file_name_parts = [f"{param}_{value}" for param, value in zip(modified_params, modified_values)]
             file_name = "_".join(file_name_parts) + '.json'
             
-            # Ensure the directory for simulation parameters exists
-            simulation_parameters_file_path = os.path.join(_data_dir,
-                                                     f'{experiment_name}',
-                                                     '02_Simulation_parameters', 
+            simulation_parameters_file_path = os.path.join(
+                           dm.get_simulation_parameters_dir(experiment_name), 
                                                      file_name)
+            
             
             # Merge the standard values with the current experiment settings
             settings = {**STANDARD_VALUES, **experiment_settings}
@@ -219,7 +224,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
 
     print(f"Simulation parameters written to directory: {simulation_parameters_file_path}")
 
-def write_seeded_simulation_parameters(experiment_name, n_seeds: int):
+def write_seeded_simulation_parameters(experiment_name: str):
     """
     Generates multiple JSON files with different seeds for each simulation parameter file 
     within a specified experiment. The function reads the original simulation parameter 
@@ -254,10 +259,8 @@ def write_seeded_simulation_parameters(experiment_name, n_seeds: int):
             │   └── ...
             └── ...
     """
-    # Define paths
-    base_dir = os.path.join(_data_dir, f"{experiment_name}")
-    simulation_parameters_dir = os.path.join(base_dir, "02_Simulation_parameters")
-    seeded_simulation_parameters_dir = os.path.join(base_dir, "03_Seeded_simulation_parameters")
+    simulation_parameters_dir = dm.get_simulation_parameters_dir(experiment_name)
+    seeded_simulation_parameters_dir = dm.get_seeded_simulation_parameters_dir(experiment_name)
 
     # Iterate over all files in the simulation parameters directory
     for filename in os.listdir(simulation_parameters_dir):
@@ -273,6 +276,7 @@ def write_seeded_simulation_parameters(experiment_name, n_seeds: int):
         os.makedirs(subdir_path, exist_ok=True)
         
         # Generate multiple files with different seeds
+        n_seeds = read_n_seeds_file(experiment_name)['n_seeds']
         for i in range(n_seeds):
             # seed = random.randint(0, 1000000)
             simulation_parameters['seed'] = i
@@ -285,11 +289,6 @@ def write_seeded_simulation_parameters(experiment_name, n_seeds: int):
 
 def read_seeded_simulation_parameters(experiment_name, seeded_simulation_parameters_path):
     with open(seeded_simulation_parameters_path, 'r') as seeded_file:
-        seeded_simulation_parameters = json.load(seeded_file)
-    return seeded_simulation_parameters
-    base_dir = os.path.join(_data_dir, experiment_name, "03_Seeded_simulation_parameters")
-    seeded_simulation_parameters_full_path = os.path.join(base_dir, seeded_simulation_parameters_path)
-    with open(seeded_simulation_parameters_full_path, 'r') as seeded_file:
         seeded_simulation_parameters = json.load(seeded_file)
     return seeded_simulation_parameters
     
