@@ -247,8 +247,9 @@ def job():
     # save the mapping from slurm job to seeded simulation number
     slurm_map_dir  = os.path.join(dm.get_experiment_dir(experiment_name), 'slurm','job_id_mapping' )
     os.makedirs(slurm_map_dir , exist_ok=True)
-    
-    map_file = f"{slurm_map_dir }/{experiment_name}_%A_%a.csv"  # %A = job ID, %a = array index
+    slurm_array_job_id = os.getenv('SLURM_ARRAY_JOB_ID')
+    slurm_array_task_id = os.getenv('SLURM_ARRAY_TASK_ID')
+    map_file = f"{slurm_map_dir }/{experiment_name}_{slurm_array_job_id}_{slurm_array_task_id}.csv"  
     with open(map_file, mode='w', newline='') as file:
         file.write(seeded_simulation_parameters_path)
         
