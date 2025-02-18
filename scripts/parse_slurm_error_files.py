@@ -67,6 +67,7 @@ def main():
     
     # Print summary
     print("Failed Job Summary:")
+    print(job_errors.items())
     for job_id, error_type in job_errors.items():
         print(f"Job ID: {job_id}, Error: {error_type}")
     

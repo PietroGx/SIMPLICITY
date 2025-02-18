@@ -60,7 +60,7 @@ def fixture_experiment_settings():
 def plot_regressions_and_export(experiment_name):
     pm.plot_combined_regressions(experiment_name)
     pm.plot_u_vs_parameter(experiment_name,'evolutionary_rate')
-    pm.export_u_regression_plots(experiment_name)
+    pm.export_u_regression_plots(experiment_name, 'evolutionary_rate')
 
 def explore_tau_3_impact_on_u(runner:str, experiment_number:int):
     if runner == 'serial':
