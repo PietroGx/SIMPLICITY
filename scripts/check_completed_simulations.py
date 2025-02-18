@@ -60,9 +60,11 @@ def main():
             count_completed_simulations(folder)
         except:
             print('')
+            print('')
             print('##########################################')
             print(f'In {folder}:    The experiment FAILED.')
             print('##########################################')
+            print('')
     
 if __name__ == "__main__":
     main()
