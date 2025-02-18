@@ -45,13 +45,14 @@ def count_completed_simulations(experiment_name):
     for folder in os.listdir(experiment_output_dir):
         counter = 0
         simulation_directory = os.path.join(experiment_output_dir,folder)
-        # loop over each seeded simulation output folder
-        for subfolder in os.listdir(simulation_directory):
-            seeded_simulation_output_directory = os.path.join(simulation_directory,subfolder)
-            if check_seeded_simulation_output(seeded_simulation_output_directory):
-                counter += 1
-        
-        print(f'In {folder}:    {counter}/{n_seeds} simulations were run successfully.')
+        if os.path.isdir(simulation_directory):
+            # loop over each seeded simulation output folder
+            for subfolder in os.listdir(simulation_directory):
+                seeded_simulation_output_directory = os.path.join(simulation_directory,subfolder)
+                if check_seeded_simulation_output(seeded_simulation_output_directory):
+                    counter += 1
+            
+            print(f'In {folder}:    {counter}/{n_seeds} simulations were run successfully.')
     print('##########################################')
 
 def main():
