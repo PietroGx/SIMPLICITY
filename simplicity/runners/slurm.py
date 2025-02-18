@@ -77,11 +77,10 @@ def submit_simulations(experiment_name: str,
     batch_end   = batch_start + batch_size - 1
    
     # Define the output and error file paths
-    slurm_output_dir = os.path.join(dm.get_experiment_dir(experiment_name), 'slurm','slurm_logs' )
-    os.makedirs(slurm_output_dir, exist_ok=True)
+    slurm_logs_dir = dm.get_slurm_logs_dir(experiment_name)
     
-    output_file = f"{slurm_output_dir}/{experiment_name}_%A_%a.out"  # %A = job ID, %a = array index
-    error_file  = f"{slurm_output_dir}/{experiment_name}_%A_%a.err"  # %A = job ID, %a = array index
+    output_file = f"{slurm_logs_dir}/{experiment_name}-%A_%a.out"  # %A = job ID, %a = array index
+    error_file  = f"{slurm_logs_dir}/{experiment_name}-%A_%a.err"  # %A = job ID, %a = array index
     
     # submit the job
     slurm_process = subprocess.run((args:=[
@@ -245,11 +244,10 @@ def job():
     seeded_simulation_parameters_path  = seeded_simulation_parameters_paths[i_th_seeded_simulation]
     
     # save the mapping from slurm job to seeded simulation number
-    slurm_map_dir  = os.path.join(dm.get_experiment_dir(experiment_name), 'slurm','job_id_mapping' )
-    os.makedirs(slurm_map_dir , exist_ok=True)
+    slurm_id_map_dir  = dm.get_slurm_id_map_dir(experiment_name)
     slurm_array_job_id = os.getenv('SLURM_ARRAY_JOB_ID')
     slurm_array_task_id = os.getenv('SLURM_ARRAY_TASK_ID')
-    map_file = f"{slurm_map_dir }/{experiment_name}_{slurm_array_job_id}_{slurm_array_task_id}.csv"  
+    map_file = f"{slurm_id_map_dir}/{experiment_name}_{slurm_array_job_id}_{slurm_array_task_id}.csv"  
     with open(map_file, mode='w', newline='') as file:
         file.write(seeded_simulation_parameters_path)
         

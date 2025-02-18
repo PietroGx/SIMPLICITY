@@ -128,3 +128,26 @@ def get_seeded_simulation_parameters_paths(experiment_name):
                 seeded_simulation_parameters_paths.append(file_path)
     
     return seeded_simulation_parameters_paths
+
+def get_slurm_logs_dir(experiment_name):
+    slurm_logs_dir = os.path.join(get_experiment_dir(experiment_name), 'slurm','slurm_logs')
+    os.makedirs(slurm_logs_dir, exist_ok=True)
+    return slurm_logs_dir
+
+def get_slurm_id_map_dir(experiment_name):
+    slurm_id_map_dir  = os.path.join(get_experiment_dir(experiment_name), 'slurm','job_id_mapping')
+    os.makedirs(slurm_id_map_dir , exist_ok=True)
+    return slurm_id_map_dir
+
+
+
+
+
+
+
+
+
+
+
+
+
