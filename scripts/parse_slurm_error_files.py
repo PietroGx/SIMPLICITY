@@ -65,15 +65,19 @@ def main():
     
     job_errors, error_types = parse_slurm_error_files(args.experiment_name)
     
-    # Print summary
-    print("Failed Job Summary:")
-    print(job_errors.items())
-    for job_id, error_type in job_errors.items():
-        print(f"Job ID: {job_id}, Error: {error_type}")
+    if not job_errors:
+        print("The experiment: {args.experiment_name} ran without errors.")
     
-    print("\nError Type Summary:")
-    for error_type, count in error_types.items():
-        print(f"{error_type}: {count}")
+    else:
+        # Print summary
+        print("Failed Job Summary:")
+        print(job_errors.items())
+        for job_id, error_type in job_errors.items():
+            print(f"Job ID: {job_id}, Error: {error_type}")
+        
+        print("\nError Type Summary:")
+        for error_type, count in error_types.items():
+            print(f"{error_type}: {count}")
 
 if __name__ == "__main__":
     main()
