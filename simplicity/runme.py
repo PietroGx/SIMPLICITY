@@ -59,11 +59,11 @@ def run_experiment(experiment_name: str,
     # set parameters 
     parameters, n_seeds = experiment_settings()
     # Write experiment settings file
-    sm.write_experiment_settings(experiment_name, parameters)
+    sm.write_experiment_settings(experiment_name, parameters, n_seeds)
     # write simulation parameters files
     sm.read_settings_and_write_simulation_parameters(experiment_name)
     # write seeded simulation parameters files
-    sm.write_seeded_simulation_parameters(experiment_name, n_seeds)
+    sm.write_seeded_simulation_parameters(experiment_name)
     
     # let one of simplicity.runners run each seeded simulation
     simplicity_runner.run_seeded_simulations(experiment_name, 
