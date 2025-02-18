@@ -178,6 +178,7 @@
 	* updated script/experiments  to correct for new functions signatures
 	* added backlog file
 	* updated parse_slurm_error_files script
+	* updating check_completed_simulation
 	
 	
 	
