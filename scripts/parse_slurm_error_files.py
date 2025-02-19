@@ -22,6 +22,7 @@ def parse_slurm_error_files(experiment_name):
 
     # Iterate over all .err files in the specified folder
     for filename in os.listdir(folder_path):
+        print(filename)
         if filename.endswith(".err"):
             file_path = os.path.join(folder_path, filename)
 
