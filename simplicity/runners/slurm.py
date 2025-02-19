@@ -79,8 +79,10 @@ def submit_simulations(experiment_name: str,
     # Define the output and error file paths
     slurm_logs_dir = dm.get_slurm_logs_dir(experiment_name)
     
-    output_file = f"{slurm_logs_dir}/{experiment_name}-%A_%a.out"  # %A = job ID, %a = array index
-    error_file  = f"{slurm_logs_dir}/{experiment_name}-%A_%a.err"  # %A = job ID, %a = array index
+    output_file = f"{slurm_logs_dir}/{experiment_name}-%A_%t.out"  # %A = job ID, %t = task ID
+    error_file  = f"{slurm_logs_dir}/{experiment_name}-%A_%t.err"  # %A = job ID, %t = task ID
+    
+    max_runtime = "1-00:00:00"  # 1 day max runtime
     
     # submit the job
     slurm_process = subprocess.run((args:=[
@@ -89,6 +91,7 @@ def submit_simulations(experiment_name: str,
         # to create the job array on hold 
         f"--array={batch_start}-{batch_end}", 
         "--hold",
+        f"--time={max_runtime}",
         # with a name (used later for lookup)
         f"--job-name={experiment_name}",
         f"--output={output_file}",  # Specify the output file path
