@@ -29,28 +29,27 @@ def parse_slurm_error_files(experiment_name):
                 print(file_path)
                 # Extract the slurm job ID from the filename
                 match = re.match(r"(.+)-(\d+)_(\d+)\.out", filename)
-                if match:
-                    job_id = match.group(2)  # The job ID (numeric value after the '-')
-                    task_id = match.group(3)  # The task ID (numeric value after the '_')
-                    slurm_job_id = f"{job_id}_{task_id}"  # Combined job identifier
-                    
-                    # Read the content of the error file
-                    with open(file_path, 'r') as f:
-                        content = f.read()
+                job_id = match.group(2)  # The job ID (numeric value after the '-')
+                task_id = match.group(3)  # The task ID (numeric value after the '_')
+                slurm_job_id = f"{job_id}_{task_id}"  # Combined job identifier
+                
+                # Read the content of the error file
+                with open(file_path, 'r') as f:
+                    content = f.read()
 
-                    # Check if the job failed (this can be adjusted depending on the content format)
-                    if "error" in content.lower() or "failed" in content.lower():
-                        # Determine the error type (simplified, adjust based on actual content format)
-                        if "OOM Killed" in content:
-                            error_type = "Out of Memory"
-                        elif "DUE TO TIME LIMIT" in content:
-                            error_type = "Timeout"
-                        else:
-                            error_type = "Other"
-                        
-                        # Update the job_errors dictionary
-                        job_errors[slurm_job_id] = error_type
-                        error_types[error_type] += 1
+                # Check if the job failed 
+                if "error" in content.lower():
+                    # Determine the error type 
+                    if "OOM Killed" in content:
+                        error_type = "Out of Memory"
+                    elif "DUE TO TIME LIMIT" in content:
+                        error_type = "Timeout"
+                    else:
+                        error_type = "Other"
+                    
+                    # Update the job_errors dictionary
+                    job_errors[slurm_job_id] = error_type
+                    error_types[error_type] += 1
 
     # Return a summary of failed jobs and error types
     return job_errors, error_types
