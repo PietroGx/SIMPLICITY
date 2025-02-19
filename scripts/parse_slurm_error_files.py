@@ -24,10 +24,9 @@ def parse_slurm_error_files(experiment_name):
     for filename in os.listdir(folder_path):
         if filename.endswith(".err"):
             file_path = os.path.join(folder_path, filename)
-            print(file_path)
-
             # Only process non-empty files
             if os.path.getsize(file_path) > 0:
+                print(file_path)
                 # Extract the slurm job ID from the filename
                 match = re.match(r"(.+)-(\d+)_(\d+)\.out", filename)
                 if match:
