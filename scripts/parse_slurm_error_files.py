@@ -41,11 +41,9 @@ def parse_slurm_error_files(experiment_name):
                     # Check if the job failed (this can be adjusted depending on the content format)
                     if "error" in content.lower() or "failed" in content.lower():
                         # Determine the error type (simplified, adjust based on actual content format)
-                        if "out of memory" in content.lower():
+                        if "OOM Killd" in content:
                             error_type = "Out of Memory"
-                        elif "segmentation fault" in content.lower():
-                            error_type = "Segmentation Fault"
-                        elif "timeout" in content.lower():
+                        elif "DUE TO TIME LIMIT" in content:
                             error_type = "Timeout"
                         else:
                             error_type = "Other"
