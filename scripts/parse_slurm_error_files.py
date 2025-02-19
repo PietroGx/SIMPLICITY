@@ -28,7 +28,7 @@ def parse_slurm_error_files(experiment_name):
             if os.path.getsize(file_path) > 0:
                 print(file_path)
                 # Extract the slurm job ID from the filename
-                match = re.match(r"(.+)-(\d+)_(\d+)\.out", filename)
+                match = re.match(r"(.+)-(\d+)_(\d+)\.err", filename)
                 job_id = match.group(2)  # The job ID (numeric value after the '-')
                 task_id = match.group(3)  # The task ID (numeric value after the '_')
                 slurm_job_id = f"{job_id}_{task_id}"  # Combined job identifier
