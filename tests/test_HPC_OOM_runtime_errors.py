@@ -38,7 +38,7 @@ from scripts.check_completed_simulations import count_completed_simulations
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {"evolutionary_rate": 100}
+    parameters      = {"evolutionary_rate": [100]}
     n_seeds         = 100
     return (parameters, n_seeds)
 
