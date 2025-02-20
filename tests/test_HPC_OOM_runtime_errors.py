@@ -35,7 +35,7 @@ import simplicity.runners.slurm
 import argparse
 from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summary
 from scripts.check_completed_simulations import count_completed_simulations
-import cProfile
+
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
@@ -78,4 +78,4 @@ def main():
     
 
 if __name__ == "__main__":
-    cProfile.run('main()')
+    main()
