@@ -8,7 +8,7 @@ with open('LICENSE') as f:
 
 setup(
     name='simplicity',
-    version='0.5.0',
+    version='0.5.2',
     description='Stochastic sIMulation of SARS-CoV-2 sPread and evoLutIon aCcountIng for within-hosT dYnamics (SIMPLICITY)',
     long_description=readme,
     author='Pietro Gerletti, Jean-Baptiste Escudié',
