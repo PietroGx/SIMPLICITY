@@ -83,7 +83,7 @@ def explore_R_impact_on_u(runner:str, experiment_number:int):
     print('testing parameter space for e/u regression')
     print('##########################################')
     print('')
-    experiment_name = f'explore_R={R}_impact_on_u_#{experiment_number}'
+    experiment_name = f'explore_R_{R}_impact_on_u_#{experiment_number}'
     try:
         run_experiment(experiment_name, 
                        fixture_experiment_settings,             

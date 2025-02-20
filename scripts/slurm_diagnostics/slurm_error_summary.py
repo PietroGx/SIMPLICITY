@@ -53,16 +53,11 @@ def parse_slurm_error_files(experiment_name):
     # Return a summary of failed jobs and error types
     return job_errors, error_types
 
-def main():
-    # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run script to get summary of slurm errors")
-    parser.add_argument('experiment_name', type=str, help="experiment name")
-    args = parser.parse_args()
-    
-    job_errors, error_types = parse_slurm_error_files(args.experiment_name)
+def print_slurm_error_summary(experiment_name):
+    job_errors, error_types = parse_slurm_error_files(experiment_name)
     
     if not job_errors:
-        print(f"Experiment {args.experiment_name}: error log's are emtpy.")
+        print(f"Experiment {experiment_name}: error log's are emtpy.")
     
     else:
         # Print summary
@@ -75,6 +70,13 @@ def main():
         for error_type, count in error_types.items():
             print(f"{error_type}: {count}")
 
+def main():
+    # Set up the argument parser
+    parser = argparse.ArgumentParser(description="Run script to get summary of slurm errors")
+    parser.add_argument('experiment_name', type=str, help="experiment name")
+    args = parser.parse_args()
+    print_slurm_error_summary(args.experiment_name)
+    
 if __name__ == "__main__":
     main()
     
