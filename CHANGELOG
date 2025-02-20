@@ -189,7 +189,12 @@
 	* moved parse_slurm_error_files.py to slurm_diagnostics and renamed it to slurm_error_summary.py
 	* updated slurm_error_summary.py 
 	* added test for HPC OOM errors
-	* added profiler to HPC OOM test
+	* updated slurm runner asking 20gb for jobs
+	* renamed OOM script to diagnosis_OOM_errors and changed runner to local
+	* updated dir_manager env var to only run 150 simulations in parallel
+	* updated explore_popsize_impact_on_u
+	* updated backlog
+	
 	
 	
 	

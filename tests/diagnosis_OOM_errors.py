@@ -34,9 +34,9 @@ from simplicity.runme import run_experiment
 # import simplicity.runners.slurm
 import simplicity.runners.serial
 import argparse
-from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summary
+# from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summary
 from scripts.check_completed_simulations import count_completed_simulations
-from memory_profiler import profile
+
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
@@ -47,9 +47,8 @@ def fixture_experiment_settings():
     return (parameters, n_seeds)
 
 ##### <actual test>
-profiled_run_experiment = profile(run_experiment)
 
-def test_HPC_OOM_run(test_number:int):
+def diagnosis_OOM_errors(test_number:int):
 
     print('')
     print('##########################################')
@@ -57,7 +56,7 @@ def test_HPC_OOM_run(test_number:int):
     print('##########################################')
     experiment_name = f'test_HPC_OOM_run_#{test_number}'
     try:
-        profiled_run_experiment(experiment_name, 
+        run_experiment(experiment_name, 
                            fixture_experiment_settings,             
                            simplicity_runner  = simplicity.runners.serial,
                            plot_trajectory = True,
@@ -69,16 +68,15 @@ def test_HPC_OOM_run(test_number:int):
 
 def main():
     # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run test experiment on HPC")
+    parser = argparse.ArgumentParser(description="Run test to check OOM relation to evolutionary rate")
     parser.add_argument('test_number', type=int, help="Test number")
     args = parser.parse_args()
     # Run the test 
-    experiment_name = test_HPC_OOM_run(args.test_number)
+    experiment_name = diagnosis_OOM_errors(args.test_number)
     # count completed simulations
     count_completed_simulations(experiment_name)
-    # print summary of slurm errors 
-    print_slurm_error_summary(experiment_name)
+    # # print summary of slurm errors 
+    # print_slurm_error_summary(experiment_name)
     
-
 if __name__ == "__main__":
     main()
