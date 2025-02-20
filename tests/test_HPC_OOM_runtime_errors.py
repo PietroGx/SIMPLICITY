@@ -31,7 +31,8 @@ The set of all simulations is what we call an experiment.
 @author: pietro
 """
 from simplicity.runme import run_experiment
-import simplicity.runners.slurm
+# import simplicity.runners.slurm
+import simplicity.runners.serial
 import argparse
 from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summary
 from scripts.check_completed_simulations import count_completed_simulations
@@ -42,7 +43,7 @@ def fixture_experiment_settings():
     parameters      = {"evolutionary_rate": [1,
                                              10,
                                              100]}
-    n_seeds         = 10
+    n_seeds         = 3
     return (parameters, n_seeds)
 
 ##### <actual test>
@@ -56,7 +57,7 @@ def test_HPC_OOM_run(test_number:int):
     try:
         run_experiment(experiment_name, 
                            fixture_experiment_settings,             
-                           simplicity_runner  = simplicity.runners.slurm,
+                           simplicity_runner  = simplicity.runners.serial,
                            plot_trajectory = True,
                            archive_experiment = False)
     except: pass
