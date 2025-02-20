@@ -47,7 +47,8 @@ def fixture_experiment_settings():
     return (parameters, n_seeds)
 
 ##### <actual test>
-@profile
+profiled_run_experiment = profile(run_experiment)
+
 def test_HPC_OOM_run(test_number:int):
 
     print('')
@@ -56,7 +57,7 @@ def test_HPC_OOM_run(test_number:int):
     print('##########################################')
     experiment_name = f'test_HPC_OOM_run_#{test_number}'
     try:
-        (run_experiment)(experiment_name, 
+        profiled_run_experiment(experiment_name, 
                            fixture_experiment_settings,             
                            simplicity_runner  = simplicity.runners.serial,
                            plot_trajectory = True,
