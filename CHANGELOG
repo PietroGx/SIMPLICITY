@@ -188,7 +188,8 @@
 	* updated slurm runner to correct err and out files signatures
 	* moved parse_slurm_error_files.py to slurm_diagnostics and renamed it to slurm_error_summary.py
 	* updated slurm_error_summary.py 
-	* added test for HPC OOM an runtime errors
+	* added test for HPC OOM errors
+	* added profiler to HPC OOM test
 	
 	
 	
