@@ -36,7 +36,7 @@ import simplicity.runners.serial
 import argparse
 from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summary
 from scripts.check_completed_simulations import count_completed_simulations
-
+from memory_profiler import profile
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
@@ -55,7 +55,7 @@ def test_HPC_OOM_run(test_number:int):
     print('##########################################')
     experiment_name = f'test_HPC_OOM_run_#{test_number}'
     try:
-        run_experiment(experiment_name, 
+        profile(run_experiment)(experiment_name, 
                            fixture_experiment_settings,             
                            simplicity_runner  = simplicity.runners.serial,
                            plot_trajectory = True,
