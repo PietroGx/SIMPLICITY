@@ -40,7 +40,7 @@ import simplicity.runners.slurm
 import simplicity.plots_manager as pm
 import warnings
 import argparse
-
+from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summary
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
@@ -89,15 +89,17 @@ def explore_u_e_space_pop10k(runner:str, experiment_number:int):
                        simplicity_runner  = runner_module,
                        plot_trajectory = False,
                        archive_experiment = False)
-    except RuntimeError:
-            warnings.warn(f'Experiment {experiment_name} already ran, proceeding to plotting')
-    except Exception as e:
-        print(f'The simulation failed to run: {e}')
+    # except RuntimeError:
+    #         warnings.warn(f'Experiment {experiment_name} already ran, proceeding to plotting')
+    # except Exception as e:
+    #     print(f'The simulation failed to run: {e}')
+    except: pass
     plot_regressions_and_export(experiment_name)
         
     print('')
     print(f'EXPLORATION OF E/U PARAM SPACE #{experiment_number} -- COMPLETED.')
     print('##########################################')
+    return experiment_name
  
 def main():
     # Set up the argument parser
@@ -106,8 +108,10 @@ def main():
     parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()
     # Run the script with the provided parameter
-    explore_u_e_space_pop10k(args.runner,args.experiment_number)
-
+    experiment_name = explore_u_e_space_pop10k(args.runner,args.experiment_number)
+    # # print summary of slurm errors 
+    print_slurm_error_summary(experiment_name)
+    
 if __name__ == "__main__":
     main()
     

@@ -17,7 +17,7 @@ _data_dir = DEFAULT_DATA_DIR
 
 # set env variables 
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(15)
-os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(300)
+os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(150)
 
 def set_data_dir(path):
     """Set the data directory path."""
