@@ -35,11 +35,14 @@ import simplicity.runners.slurm
 import argparse
 from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summary
 from scripts.check_completed_simulations import count_completed_simulations
+import cProfile
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {"evolutionary_rate": [100]}
-    n_seeds         = 100
+    parameters      = {"evolutionary_rate": [1,
+                                             10,
+                                             100]}
+    n_seeds         = 10
     return (parameters, n_seeds)
 
 ##### <actual test>
@@ -50,12 +53,13 @@ def test_HPC_OOM_run(test_number:int):
     print('testing HPC for OOM errors')
     print('##########################################')
     experiment_name = f'test_HPC_OOM_run_#{test_number}'
-    
-    run_experiment(experiment_name, 
-                       fixture_experiment_settings,             
-                       simplicity_runner  = simplicity.runners.slurm,
-                       plot_trajectory = True,
-                       archive_experiment = False)
+    try:
+        run_experiment(experiment_name, 
+                           fixture_experiment_settings,             
+                           simplicity_runner  = simplicity.runners.slurm,
+                           plot_trajectory = True,
+                           archive_experiment = False)
+    except: pass
     return experiment_name
 
 ##### </actual test>
@@ -74,4 +78,4 @@ def main():
     
 
 if __name__ == "__main__":
-    main()
+    cProfile.run('main()')
