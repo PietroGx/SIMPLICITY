@@ -10,7 +10,7 @@ import numpy as np
 import simplicity.phenotype.consensus as c
 import simplicity.phenotype.update as pheno
 import simplicity.evolution.reference as ref
-import pandas as pd
+from memory_profiler import profile
     
 def extrande_factory(phenotype_model, parameters,
                      rng1, rng2, path):
@@ -62,6 +62,7 @@ def extrande_factory(phenotype_model, parameters,
     seq_rate = parameters["sequencing_rate"]
 
     # extrande with simple phenotype model
+    @profile
     def extrande_0(population):
         # count number of infectious and detectables individuals
         population.update_inf_det()
@@ -82,11 +83,18 @@ def extrande_factory(phenotype_model, parameters,
         # store times of infections and diagnosis reaction (benchmarking)
         # store_inf_t  = []
         # store_dia_t  = []
-        
+        last_printed_progress = 0 
         ###########################################################################
         # repeat (EXTRANDE loop)
         while t<final_time:
             
+            # Calculate progress as a fraction of t_final
+            progress = t / final_time
+            if progress >= last_printed_progress + 0.1:  # 10% increments
+                print(f"Progress: {progress*100:.0f}% (t/final_time = {t:.2f}/{final_time} d)")
+                last_printed_progress = progress  # Update the last printed progress
+            
+            # look ahead time horizon
             L = L0/population.infected
             
             # compute upper bound 
@@ -99,6 +107,8 @@ def extrande_factory(phenotype_model, parameters,
             # compute delta_t from tau_1 (equivalent of exp distributed delta_t)
             delta_t = -1/B * np.log(tau_1)
             
+            
+                
             # time leap
             #######################################################################
             if delta_t > L: 
@@ -204,6 +214,7 @@ def extrande_factory(phenotype_model, parameters,
         return population # population after simulation is called simulation_output
     
     # extrande with immune-waning phenotype model
+    @profile
     def extrande_1(population):
         # count number of infectious and detectables individuals
         population.update_inf_det()
@@ -227,11 +238,18 @@ def extrande_factory(phenotype_model, parameters,
         # store times of infections and diagnosis reaction (benchmarking)
         # store_inf_t  = []
         # store_dia_t  = []
-        
+        pop_size_runtime_plot_coord = []
+        last_printed_progress = 0 
         ###########################################################################
         # repeat (EXTRANDE loop)
         while t<final_time:
             
+            # Calculate progress as a fraction of t_final
+            progress = t / final_time
+            if progress >= last_printed_progress + 0.1:  # 10% increments
+                print(f"Progress: {progress*100:.0f}% (t/final_time = {t:.2f}/{final_time} d)")
+                last_printed_progress = progress  # Update the last printed progress
+           
             L  = L0/population.infected
            
             # compute upper bound 
@@ -269,7 +287,6 @@ def extrande_factory(phenotype_model, parameters,
                 # update the number of detectable and infectious individuals
                 population.update_inf_det()
                 ###############################################################
-                
                 
                 # calculate consensus sequence every 10 days
                 if np.floor(t) > t_snapshot:
@@ -316,7 +333,10 @@ def extrande_factory(phenotype_model, parameters,
                         # store_inf_t.append(t)
                     # save the system state at time t
                     population.update_trajectory()
-                    
+                
+                
+                pop_size_runtime_plot_coord.append((time.time()-start00, population.infected))
+                
                 # update count of lineages frequency
                 if math.floor(t) > t_day: # only count once per day
                     t_day += 1    
@@ -359,7 +379,11 @@ def extrande_factory(phenotype_model, parameters,
         # with open(path+'/infection_times.csv', 'w') as f:
         #     for item in store_inf_t:
         #         f.write(f"{item}\n")
-      
+        import csv
+        with open('extrande_pop_runtime.csv', mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(pop_size_runtime_plot_coord)
+            
         return population # population after simulation is called simulation_output
     
     if phenotype_model == 'distance from wt':

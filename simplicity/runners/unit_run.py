@@ -27,5 +27,4 @@ def run_seeded_simulation(seeded_simulation_parameters_path: str,
     if plot_trajectory:    
         simulation.plot()
     
-    print(f"""</run_seeded_simulation experiment_name="{experiment_name}" path={seeded_simulation_parameters_path}>""")
-
+    print(f"run_seeded_simulation: experiment_name={experiment_name}")
