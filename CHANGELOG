@@ -194,7 +194,18 @@
 	* updated dir_manager env var to only run 150 simulations in parallel
 	* updated explore_popsize_impact_on_u
 	* updated backlog
+
+2025-21-02 pietro gerletti
+
+	Version 0.5.3
 	
+	* updated OOMM error script for memory profiling with mprof
+	* updatted extrande to give periodic updates on simulation status 
+	* added profiler to extrande
+	* updated explore_popsize_impact_on_u script (for memory profiling experiment)
+	* added fetch_error_seeded_simulation_parameters.py
+	* updated extrande to save info of infected vs runtime
+	* added plot to plot infected vs runtime 
 	
 	
 	

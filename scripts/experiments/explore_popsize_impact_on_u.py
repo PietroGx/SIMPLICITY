@@ -45,21 +45,18 @@ from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summ
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
     
-    parameters      = {'evolutionary_rate': [0.00001, 
-                                             0.0001, 
-                                             0.001, 
-                                             0.01, 
-                                             0.1, 
-                                             1, 
-                                             10, 
-                                             100, 
-                                             1000],
+    parameters      = {'evolutionary_rate': [ #0.00001, 
+                                             # 0.0001, 
+                                             # 0.001, 
+                                             # 0.01, 
+                                             # 0.1, 
+                                             0.001],
                        
-                       'final_time':[365] * 9,
-                       'population_size': [10000]* 9,
-                       'infected_individuals_at_start': [100]*9
+                       'final_time':[365],# * 6,
+                       'population_size': [10000],#* 6,
+                       'infected_individuals_at_start': [100],#*6
                        }
-    n_seeds = 300
+    n_seeds =  1
 
     return (parameters, n_seeds)
 

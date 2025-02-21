@@ -31,22 +31,20 @@ The set of all simulations is what we call an experiment.
 @author: pietro
 """
 from simplicity.runme import run_experiment
-# import simplicity.runners.slurm
 import simplicity.runners.serial
 import argparse
-# from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summary
 from scripts.check_completed_simulations import count_completed_simulations
 
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {"evolutionary_rate": [1,
-                                             10,
-                                             100]}
-    n_seeds         = 3
+    parameters      = {"evolutionary_rate": [0.0001,
+                                             0.001,
+                                             0.01,
+                                             0.1,
+                                             1]}
+    n_seeds         = 1
     return (parameters, n_seeds)
-
-##### <actual test>
 
 def diagnosis_OOM_errors(test_number:int):
 
@@ -64,19 +62,31 @@ def diagnosis_OOM_errors(test_number:int):
     except: pass
     return experiment_name
 
-##### </actual test>
-
 def main():
     # Set up the argument parser
     parser = argparse.ArgumentParser(description="Run test to check OOM relation to evolutionary rate")
     parser.add_argument('test_number', type=int, help="Test number")
     args = parser.parse_args()
-    # Run the test 
-    experiment_name = diagnosis_OOM_errors(args.test_number)
+    # Run 
+    experiment_name = diagnosis_OOM_errors(args.test_number) 
     # count completed simulations
     count_completed_simulations(experiment_name)
-    # # print summary of slurm errors 
-    # print_slurm_error_summary(experiment_name)
     
 if __name__ == "__main__":
     main()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

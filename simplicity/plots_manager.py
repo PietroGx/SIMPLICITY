@@ -561,7 +561,27 @@ def plot_comparison_intra_host_models(intra_host_model):
 ###############################################################################
 ###############################################################################
 
-
+def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
+    import csv
+    # Read the CSV file
+    x_values = []
+    y_values = []
+    
+    with open(extrande_pop_runtime_csv, mode='r') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            x, y = map(float, row)  
+            x_values.append(x)
+            y_values.append(y)
+    
+    # Plotting the data
+    plt.plot(x_values, y_values) 
+    plt.xlabel('Runtime (s)')
+    plt.ylabel('Infected number')
+    plt.title('Plot infected number over simulation runtime')
+    plt.grid(True)
+    plt.savefig('extrande_pop_runtime.png')
+    plt.close()
 
 
 
