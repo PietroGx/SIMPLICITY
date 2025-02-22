@@ -92,7 +92,7 @@ def submit_simulations(experiment_name: str,
         f"--array={batch_start}-{batch_end}", 
         "--hold",
         f"--time={max_runtime}",
-        "--mem=20G",
+        "--mem=8G",
         # with a name (used later for lookup)
         f"--job-name={experiment_name}",
         f"--output={output_file}",  # Specify the output file path
