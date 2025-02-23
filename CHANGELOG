@@ -207,7 +207,26 @@
 	* updated extrande to save info of infected vs runtime
 	* added plot to plot infected vs runtime 
 	
+2025-21-02 pietro gerletti
+
+	Version 0.5.4
 	
+	* updated check completed simulations with new functions from dir_manager
+	* payed off technical debt with dir_manager
+	* updated backlog
+	* removed extrande profiling plot
+	* added results folder to repo
+	* saved memory profiling plots and data to results
+
+2025-21-02 pietro gerletti
+
+	Version 0.6.0
+	
+	* now diagnosis rate in parameters is passed as percentual (0-1)
+	* renamed k_d parametrization to diagnosis_rate.py and updated functions
+	* added get_simulation_parameters_of_simulation_output_dir to dir_manager
+	* added get_effective_diagnosis_rate and get_diagnosis_rates to diagnosis_rate.py 
+	* updated and renamed explore_R_diagnosis_rate_parameter_space.py
 	
 	
 	

@@ -10,6 +10,7 @@ import numpy as np
 import simplicity.phenotype.consensus as c
 import simplicity.phenotype.update as pheno
 import simplicity.evolution.reference as ref
+import simplicity.tuning.diagnosis_rate as dr
 from memory_profiler import profile
     
 def extrande_factory(phenotype_model, parameters,
@@ -49,7 +50,7 @@ def extrande_factory(phenotype_model, parameters,
     # average infectious time for individuals infected with SARS-CoV-2
     avg_infectious_time_normal = 11.41
     # diagnosis rate
-    k_d = parameters["diagnosis_rate"]
+    k_d = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate"])
     # multiple variants rate
     k_v = parameters["IH_virus_emergence_rate"]
     # per site per year SPIKE substitution rate
@@ -238,7 +239,7 @@ def extrande_factory(phenotype_model, parameters,
         # store times of infections and diagnosis reaction (benchmarking)
         # store_inf_t  = []
         # store_dia_t  = []
-        pop_size_runtime_plot_coord = []
+        # pop_size_runtime_plot_coord = []
         last_printed_progress = 0 
         ###########################################################################
         # repeat (EXTRANDE loop)
@@ -335,7 +336,7 @@ def extrande_factory(phenotype_model, parameters,
                     population.update_trajectory()
                 
                 
-                pop_size_runtime_plot_coord.append((time.time()-start00, population.infected))
+                # pop_size_runtime_plot_coord.append((time.time()-start00, population.infected))
                 
                 # update count of lineages frequency
                 if math.floor(t) > t_day: # only count once per day
@@ -379,10 +380,11 @@ def extrande_factory(phenotype_model, parameters,
         # with open(path+'/infection_times.csv', 'w') as f:
         #     for item in store_inf_t:
         #         f.write(f"{item}\n")
-        import csv
-        with open('extrande_pop_runtime.csv', mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(pop_size_runtime_plot_coord)
+       
+        # import csv
+        # with open('extrande_pop_runtime.csv', mode='w', newline='') as file:
+        #     writer = csv.writer(file)
+        #     writer.writerows(pop_size_runtime_plot_coord)
             
         return population # population after simulation is called simulation_output
     

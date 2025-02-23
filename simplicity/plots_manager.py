@@ -7,7 +7,7 @@ Created on Tue Jan  7 10:00:16 2025
 """
 
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
@@ -573,7 +573,9 @@ def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
             x, y = map(float, row)  
             x_values.append(x)
             y_values.append(y)
-    
+            
+    # Sort based on x_values 
+    x_values, y_values = zip(*sorted(zip(x_values, y_values)))
     # Plotting the data
     plt.plot(x_values, y_values) 
     plt.xlabel('Runtime (s)')
@@ -581,7 +583,7 @@ def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
     plt.title('Plot infected number over simulation runtime')
     plt.grid(True)
     plt.savefig('extrande_pop_runtime.png')
-    plt.close()
+    plt.show()
 
 
 

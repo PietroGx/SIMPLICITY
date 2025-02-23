@@ -110,5 +110,5 @@ def test_experiment_local(runner:str, test_number:int):
 ##### </actual test>
 
 if __name__ == "__main__":
-    test_experiment_local('serial',3)
+    test_experiment_local('serial',4)
     # test_experiment_local('multiprocessing',9)

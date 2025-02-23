@@ -7,6 +7,7 @@ Created on Fri Jul 29 13:26:33 2022
 """
 import numpy as np
 import scipy 
+import simplicity.dir_manager as dm
 
 def get_B(k_i,tau_3 = 7.5):
         '''
@@ -77,18 +78,17 @@ def get_diagnosis_rate_in_percent(k_d,tau_3 = 7.5):
     prob_t = np.matmul(Bt,p_t0) 
     return prob_t[-1]    
 
-def get_k_d(target_diagnosis_rate_in_percent, start, step, tau_3 = 7.5, max_iter=10000):
+def get_k_d_from_diagnosis_rate(target_diagnosis_rate_in_percent, tau_3 = 7.5):
     """
     linear search to find k_d value that correspond to desired diagnosis rate 
     in percent (0.00-1)
 
     :param diagnosis_rate_percent: Target value
-    :param start: Starting input value
-    :param step: Step size to adjust the input
-    :param max_iter: Maximum number of iterations
     :return: value of k_d corresponding to diagnosis_rate_in_percent
     """
-    k_d = start 
+    max_iter=10000
+    step = 0.0001
+    k_d = 0.0001
     diagnosis_rate_in_percent = get_diagnosis_rate_in_percent(k_d)
     iter_count = 0
 
@@ -103,7 +103,7 @@ def get_k_d(target_diagnosis_rate_in_percent, start, step, tau_3 = 7.5, max_iter
         diagnosis_rate_in_percent = get_diagnosis_rate_in_percent(k_d,tau_3)
         iter_count += 1
 
-    return k_d
+    return round(k_d,4)
 
 def diagnosis_rate_table(diagnosis_rates):
     '''
@@ -125,7 +125,7 @@ def diagnosis_rate_table(diagnosis_rates):
     dic = {}
     for diagnosis_rate in diagnosis_rates:
         
-        k_d = get_k_d(diagnosis_rate, 0.0001, 0.0001)
+        k_d = get_k_d_from_diagnosis_rate(diagnosis_rate)
     
         dic[diagnosis_rate] = k_d
     
@@ -133,7 +133,61 @@ def diagnosis_rate_table(diagnosis_rates):
     
     return df
 
+def get_effective_diagnosis_rate(simulation_output_dir):
+    import os 
+    import pandas as pd 
+    import simplicity.dir_manager as dm
+    effective_diagnosis_rates = []
+    for seeded_simulation_output_dir in dm.get_seeded_simulation_output_dirs(simulation_output_dir):
+        simulation_trajectory = os.path.join(seeded_simulation_output_dir, 'simulation_trajectory.csv')
+    
+        trajectory_data = pd.read_csv(simulation_trajectory)
+        # Get the last entry 
+        last_entry = trajectory_data.iloc[-1]
+    
+        diagnosed = last_entry['diagnosed']
+        deceased = last_entry['deceased']
+        recovered = last_entry['recovered']
+    
+        # Calculate the effective diagnosis rate 
+        total = recovered + diagnosed
+        if total > 0:
+            effective_rate = (diagnosed + deceased) / total
+            effective_diagnosis_rates.append(effective_rate)
+    
+    return np.mean(effective_diagnosis_rates), np.std(effective_diagnosis_rates)
+
+def get_diagnosis_rates(simulation_output_dir):
+    
+    effective_rate = get_effective_diagnosis_rate(simulation_output_dir)
+    theoretical_rate = dm.get_simulation_parameters_of_simulation_output_dir(
+                       simulation_output_dir)['diagnosis_rate']
+    
+    return theoretical_rate, effective_rate
 
 
-diagnosis_rates = np.arange(0,0.21,0.01).tolist()
-diagnosis_rate_table(diagnosis_rates)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

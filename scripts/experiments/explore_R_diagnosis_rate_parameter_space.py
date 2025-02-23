@@ -45,24 +45,27 @@ import simplicity.runners.multiprocessing
 import simplicity.runners.slurm
 import argparse
 import itertools
+import numpy as np 
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
     # Given lists
-    R_values       = [0.9,1.1,1.3,1.5,2]
-    diagnosis_rates = [0,0.0027,0.0055]
+    # R_values       = [0.9,1.1,1.3,1.5,2]
+    diagnosis_rates = [round(num, 2) for num in np.arange(0.01,0.11,0.01)]
     
-    # Repeat the elements in `a` according to the length of `b`
-    R_for_params = list(itertools.chain.from_iterable(
-                               [[x] * len(diagnosis_rates) for x in R_values]))
+    # # Repeat the elements in `a` according to the length of `b`
+    # R_for_params = list(itertools.chain.from_iterable(
+    #                            [[x] * len(diagnosis_rates) for x in R_values]))
     
-    # Repeat the elements in `b` for each element in `a`
-    k_d_for_params = list(itertools.chain.from_iterable([diagnosis_rates] * len(R_values)))
+    # # Repeat the elements in `b` for each element in `a`
+    # k_d_for_params = list(itertools.chain.from_iterable([diagnosis_rates] * len(R_values)))
     
-    parameters      = {'R': R_for_params,
-                       'diagnosis_rate':k_d_for_params
-                       }
-    n_seeds = 300
+    # parameters      = {'R': R_for_params,
+    #                    'diagnosis_rate':k_d_for_params
+    #                    }
+    
+    parameters = {'diagnosis_rate': diagnosis_rates}
+    n_seeds = 10
 
     return (parameters, n_seeds)
 
@@ -77,10 +80,10 @@ def explore_R_k_d_space(runner:str, experiment_number:int):
         raise ValueError('Runner must be either "serial" or "multiprocessing" or "slurm"')
     print('')
     print('##########################################')
-    print('testing parameter space for k_d parametrization')
+    print('testing parameter space for diagnosis rate tuning')
     print('##########################################')
     print('')
-    experiment_name = f'explore_R_k_d_space_#{experiment_number}'
+    experiment_name = f'test_d_rates_#{experiment_number}'
     try:
         run_experiment(experiment_name, 
                        fixture_experiment_settings,             
