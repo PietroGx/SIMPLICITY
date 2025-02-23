@@ -139,11 +139,34 @@ def get_slurm_id_map_dir(experiment_name):
     os.makedirs(slurm_id_map_dir , exist_ok=True)
     return slurm_id_map_dir
 
+def get_simulation_output_dirs(experiment_name):
+    simulation_output_dirs = []
+    experiment_output_dir = get_experiment_output_dir(experiment_name)
+    for folder in os.listdir(experiment_output_dir):
+        simulation_output_dir = os.path.join(experiment_output_dir,folder)
+        if os.path.isdir(simulation_output_dir):
+            simulation_output_dirs.append(simulation_output_dir)
+    return simulation_output_dirs
 
+def get_seeded_simulation_output_dirs(simulation_output_dir):
+    seeded_simulation_output_dirs = []
+    for subfolder in os.listdir(simulation_output_dir):
+        seeded_simulation_output_dir = os.path.join(simulation_output_dir,subfolder)
+        seeded_simulation_output_dirs.append(seeded_simulation_output_dir)
+    return seeded_simulation_output_dirs
 
+def get_simulation_parameters_of_simulation_output_dir(simulation_output_dir):
+    from pathlib import Path
+    simulation_output_dir_path = Path(simulation_output_dir)
+    parts = simulation_output_dir_path.parts
+    experiment_name = parts[-3]
+    simulation_output_folder_name = parts[-1]
+    # get simulation parameters dir for that experiment
+    simulation_parameters_dir = get_simulation_parameters_dir(experiment_name)
+    simulation_parameters_file_path = os.path.join(simulation_parameters_dir,
+                                              simulation_output_folder_name +'.json')
 
-
-
+    return simulation_parameters_file_path
 
 
 

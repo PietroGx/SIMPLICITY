@@ -7,9 +7,10 @@ Created on Tue Feb 18 22:01:47 2025
 """
 
 ## Backlog
+- [x] function in dir_manager to list all simulation output folders (hardcoded into check_simulations.py)
 
 ### Bug Fixes
-- [ ] memory and runtime options need to be added to slurm runner to avoid Runtime and OOM errors
+- [x] memory and runtime options need to be added to slurm runner to avoid Runtime and OOM errors
 
 ### Features
 - [ ] 
@@ -17,5 +18,4 @@ Created on Tue Feb 18 22:01:47 2025
 ### Technical Debt
 - [ ] plot_trajectory should be passed to runners with partial function (not changing the function's signature)
 - [ ] memory and runtime requests to slurm hardcoded into runner
-- [ ] function in dir_manager to list all simulation output folders (hardcoded into check_simulations.py)
 - [ ] env variables set in dir_manager (should be set somewhere else or rename dir_manager)
