@@ -19,3 +19,4 @@ Created on Tue Feb 18 22:01:47 2025
 - [ ] plot_trajectory should be passed to runners with partial function (not changing the function's signature)
 - [ ] memory and runtime requests to slurm hardcoded into runner
 - [ ] env variables set in dir_manager (should be set somewhere else or rename dir_manager)
+- [ ] tau_2 value hard coded into extrande. it should be passed and read from parameters, as maybe should all the other tau's values 

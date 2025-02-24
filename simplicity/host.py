@@ -41,14 +41,14 @@ def _get_A_matrix(tau_3):
     
     # subphases number for each phase 
     n_1 = 5   # pre-detection
-    n_2 = 1   # pre-symptomatic
+    n_2 = 1   # pre-symptomatic 
     n_3 = 13  # infectious
     n_4 = 1   # post-infectious
     # last state is recovered
     
     # parameters for each sub-phase
     tau_1 = 2.86 # pre-detection
-    tau_2 = 3.91 # pre-symptomatic
+    tau_2 = 3.91 # pre-symptomatic (infectious)
     #tau_3 = 7.5  # infectious
     tau_4 = 8    # post-infectious
     

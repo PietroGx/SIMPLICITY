@@ -36,25 +36,25 @@ The set of all simulations is what we call an experiment.
 from simplicity.scripts.experiment.experiment_script_runner import run_experiment_script
 import argparse
 
-experiment_name = 'explore_tau_3_impact_on_u'
+experiment_name =  'generate_data_IH_lineages'
 
+## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
     
-    parameters      = {'tau_3':[3.25, 
-                                7.5,
-                                15,
-                                30,
-                                60,
-                                120
+    parameters      = {'k_v':[0, 
+                              0.0001, #  0.0085
+                              0.001,
+                              0.01,
+                              0.1
                                 ]
                        }
-    n_seeds = 300
+    n_seeds = 20
 
     return (parameters, n_seeds)
 
 def main():
     # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run script to explore tau_3 impact on u")
+    parser = argparse.ArgumentParser(description="Run script to generate IH lineages data")
     parser.add_argument('runner', type=str, help="runner")
     parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()
@@ -63,7 +63,7 @@ def main():
                           args.experiment_number, 
                           fixture_experiment_settings,
                           experiment_name)
-    
+
 if __name__ == "__main__":
     main()
     

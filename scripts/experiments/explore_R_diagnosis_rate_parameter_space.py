@@ -1,24 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Feb 11 15:23:13 2025
-
-@author: pietro
-"""
-
-"""
 
 @author: pietro
 
 STANDARD_VALUES for SIMPLICITY simulation: 
 
-STANDARD_VALUES = {
     "population_size": 1000,
     "tau_3": 7.5,
     "infected_individuals_at_start": 10,
     "R": 1.5,
     "diagnosis_rate": 0.1,             # in percentage, will be converted to in model 
-    "IH_virus_emergence_rate": 0.0085, # k_v in theoretical model equations
+    "IH_virus_emergence_rate": 0     , # k_v in theoretical model equations
     "evolutionary_rate": 0.0017,       # e in theoretical model equations
     "final_time": 365,
     "max_runtime": 259200, 
@@ -26,8 +19,7 @@ STANDARD_VALUES = {
     "sequencing_rate": 0.05,
     "seed": None,
     "F": 1.25
-}
-
+    
 If you want to change any, you can specify them in the parameters dictionary below. 
 For each parameter, specify a list of values that you would like to use for the 
 simulation. If you want to change more than one parameter at the time, consider 
@@ -41,13 +33,12 @@ Each simulation will be repeated n_seeds time with a different random seed.
 
 The set of all simulations is what we call an experiment.
 """
-from simplicity.runme import run_experiment
-import simplicity.runners.serial
-import simplicity.runners.multiprocessing
-import simplicity.runners.slurm
+from simplicity.scripts.experiment.experiment_script_runner import run_experiment_script
 import argparse
 import itertools
 import numpy as np 
+
+experiment_name = 'explore_R_diagnosis_rate_parameter_space'
 
 def fixture_experiment_settings():
 
@@ -69,43 +60,17 @@ def fixture_experiment_settings():
 
     return (parameters, n_seeds)
 
-def explore_R_diagnosis_rate_relationship(runner:str, experiment_number:int):
-    if runner == 'serial':
-        runner_module = simplicity.runners.serial
-    elif runner == 'multiprocessing':
-        runner_module = simplicity.runners.multiprocessing
-    elif runner == 'slurm':
-        runner_module = simplicity.runners.slurm
-    else:
-        raise ValueError('Runner must be either "serial" or "multiprocessing" or "slurm"')
-    print('')
-    print('##########################################')
-    print('explore R diagnosis rate relationship for diagnosis rate tuning')
-    print('##########################################')
-    print('')
-    experiment_name = f'explore_R_diagnosis_rate_relationship_#{experiment_number}'
-    try:
-        run_experiment(experiment_name, 
-                       fixture_experiment_settings,             
-                       simplicity_runner  = runner_module,
-                       plot_trajectory = False,
-                       archive_experiment = False)
-
-    except Exception as e:
-        print(f'The simulation failed to run: {e}')
-        
-    print('')
-    print(f'EXPLORATION OF R/diagnosis rate RELATIONSHIP #{experiment_number} -- COMPLETED.')
-    print('##########################################')
- 
 def main():
     # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run script to explore R/k_d parameter space")
+    parser = argparse.ArgumentParser(description="Run script to generate IH lineages data")
     parser.add_argument('runner', type=str, help="runner")
     parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()
-    # Run the script with the provided parameter
-    explore_R_diagnosis_rate_relationship(args.runner,args.experiment_number)
+    # Run the script 
+    run_experiment_script(args.runner, 
+                          args.experiment_number, 
+                          fixture_experiment_settings,
+                          experiment_name)
 
 if __name__ == "__main__":
     main()

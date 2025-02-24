@@ -236,6 +236,9 @@
 	* added plot - heatmap of R vs diagnosis rate (mapping accuracy score for diagnosis rate)
 	* updated setup.py 
 	* updated yml file (added seaborn)
+	* updated extrande - now tau_inf is calculated from tau parameter values. This way the upperbound keeps being correct if tau_3 is changed
+	* created script to generate IH lineage data for testing model
+	* updated and standardized experiment scripts structure
 	
 	
 	
