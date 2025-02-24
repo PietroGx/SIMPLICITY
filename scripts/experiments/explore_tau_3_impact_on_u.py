@@ -11,7 +11,7 @@ STANDARD_VALUES for SIMPLICITY simulation:
     "infected_individuals_at_start": 10,
     "R": 1.5,
     "diagnosis_rate": 0.1,             # in percentage, will be converted to in model 
-    "IH_virus_emergence_rate": 0.0085, # k_v in theoretical model equations
+    "IH_virus_emergence_rate": 0       # k_v in theoretical model equations
     "evolutionary_rate": 0.0017,       # e in theoretical model equations
     "final_time": 365,
     "max_runtime": 259200, 
@@ -33,13 +33,11 @@ Each simulation will be repeated n_seeds time with a different random seed.
 
 The set of all simulations is what we call an experiment.
 """
-from simplicity.runme import run_experiment
-import simplicity.runners.serial
-import simplicity.runners.multiprocessing
-import simplicity.runners.slurm
+from simplicity.scripts.experiment.experiment_script_runner import run_experiment_script
 import argparse
 
-## fixture  experiment settings (sm.write_settings arguments)
+experiment_name = 'explore_tau_3_impact_on_u'
+
 def fixture_experiment_settings():
     
     parameters      = {'tau_3':[3.25, 
@@ -54,43 +52,18 @@ def fixture_experiment_settings():
 
     return (parameters, n_seeds)
 
-def explore_tau_3_impact_on_u(runner:str, experiment_number:int):
-    if runner == 'serial':
-        runner_module = simplicity.runners.serial
-    elif runner == 'multiprocessing':
-        runner_module = simplicity.runners.multiprocessing
-    elif runner == 'slurm':
-        runner_module = simplicity.runners.slurm
-    else:
-        raise ValueError('Runner must be either "serial" or "multiprocessing" or "slurm"')
-    print('')
-    print('##########################################')
-    print('testing parameter space for e/u regression')
-    print('##########################################')
-    print('')
-    experiment_name = f'explore_tau_3_impact_on_u_#{experiment_number}'
-    try:
-        run_experiment(experiment_name, 
-                       fixture_experiment_settings,             
-                       simplicity_runner  = runner_module,
-                       plot_trajectory = False,
-                       archive_experiment = False)
-    except Exception as e:
-        print(f'The simulation failed to run: {e}')
-        
-    print('')
-    print(f'EXPLORATION OF E/U PARAM SPACE #{experiment_number} -- COMPLETED.')
-    print('##########################################')
- 
 def main():
     # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run script to explore tau_3 effects on u")
+    parser = argparse.ArgumentParser(description="Run script to explore tau_3 impact on u")
     parser.add_argument('runner', type=str, help="runner")
     parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()
-    # Run the script with the provided parameter
-    explore_tau_3_impact_on_u(args.runner,args.experiment_number)
-
+    # Run the script 
+    run_experiment_script(args.runner, 
+                          args.experiment_number, 
+                          fixture_experiment_settings,
+                          experiment_name)
+    
 if __name__ == "__main__":
     main()
     

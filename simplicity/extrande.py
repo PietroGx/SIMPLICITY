@@ -46,9 +46,10 @@ def extrande_factory(phenotype_model, parameters,
     # starting value for look-ahead time horizon
     L0 = 1
     # virus reproduction number for individuals in the population
-    R_normal = parameters["R"]
+    R = parameters["R"]
     # average infectious time for individuals infected with SARS-CoV-2
-    avg_infectious_time_normal = 11.41
+    tau_2 = 3.91
+    tau_inf = parameters['tau_3'] + tau_2
     # diagnosis rate
     k_d = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate"])
     # multiple variants rate
@@ -76,7 +77,7 @@ def extrande_factory(phenotype_model, parameters,
         # thinning = 0
         # leap = 0
         # compute beta
-        b = beta(R_normal,avg_infectious_time_normal)
+        b = beta(R,tau_inf)
         
         # counter to update lineages count
         t_day = 0 # only count lineages frequency once per day
@@ -229,7 +230,7 @@ def extrande_factory(phenotype_model, parameters,
         # thinning = 0
         # leap = 0
         # compute beta
-        beta_normal = beta(R_normal,avg_infectious_time_normal)
+        beta_normal = beta(R,tau_inf)
         # counter to update lineages count
         t_day = 0 # only count lineages frequency once per day
         

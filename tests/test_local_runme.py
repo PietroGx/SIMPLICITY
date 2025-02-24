@@ -7,19 +7,7 @@ Created on Sat Jan 25 11:07:15 2025
 
 STANDARD_VALUES for SIMPLICITY simulation: 
 
-    "population_size": 1000,
-    "infected_individuals_at_start": 100,
-    "R": 1.5,
-    "diagnosis_rate": 0.0055,
-    "IH_virus_emergence_rate": 0.0085,
-    "evolutionary_rate": 0.0017,
-    "final_time": 365*3 ,
-    "max_runtime": 100000000, 
-    "phenotype_model": 'immune waning',  # or 'distance from wt'
-    "sequencing_rate": 0.05,
-    "seed": None,
-    "F": 1.25
-
+ 
 If you want to change any, you can specify them in the parameters dictionary below. 
 For each parameter, specify a list of values that you would like to use for the 
 simulation. If you want to change more than one parameter at the time, consider 
@@ -41,7 +29,7 @@ import os
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {'max_runtime': [60]}
+    parameters      = {'final_time': [100]}
     n_seeds         = 3
     return (parameters, n_seeds)
 
@@ -110,5 +98,5 @@ def test_experiment_local(runner:str, test_number:int):
 ##### </actual test>
 
 if __name__ == "__main__":
-    test_experiment_local('serial',4)
+    test_experiment_local('serial',1)
     # test_experiment_local('multiprocessing',9)
