@@ -585,8 +585,90 @@ def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
     plt.savefig('extrande_pop_runtime.png')
     plt.show()
 
+def plot_effective_theoretical_diagnosis_rate(experiment_name):
+    import simplicity.tuning.diagnosis_rate as dr
+    from sklearn.linear_model import LinearRegression
+    # get theoretical and effective diagnosis rates 
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name) 
+    diagnosis_rates_coord = []
+    std_effective_rates = []
+    for simulation_output_dir in simulation_output_dirs:
+        diagnosis_rates, std_effective_rate = dr.get_diagnosis_rates(simulation_output_dir)
+        diagnosis_rates_coord.append(diagnosis_rates) 
+        std_effective_rates.append(std_effective_rate)
+        
+    x, y = zip(*diagnosis_rates_coord) # x is theoretical rate, y is effective
+    
+    # Convert x and y to numpy arrays for compatibility with sklearn
+    x = np.array(x).reshape(-1, 1)  # Reshape for sklearn
+    y = np.array(y)
+    
+    # Fit linear regression
+    model = LinearRegression()
+    model.fit(x, y)
+    
+    y_pred = model.predict(x)
+    
+    # Get the regression slope and intercept
+    slope = model.coef_[0]
+    intercept = model.intercept_
 
+    # Creating the scatter plot
+    plt.scatter(x, y)
+    # Plot the regression line
+    plt.plot(x, y_pred, color='red', 
+             label=f'Regression Line: y = {slope:.2f}x + {intercept:.2f}')
+    # Plot the standard deviation as vertical lines
+    for i in range(len(x)):
+        plt.errorbar(x[i], y[i], yerr=std_effective_rate, fmt='o', color='black', capsize=5)
+   
+    # Adding labels
+    plt.title('Linear regression: theoretical vs effective diagnosis rate')
+    plt.xlabel('Theoretical diagnosis rate')
+    plt.xlim(0,max(x)*1.1)
+    plt.ylabel('Effective diagnosis rate')
+    plt.ylim(0,max(x)*1.1)
+    plt.legend()
+    # Display the plot
+    plt.show()
 
+def plot_heatmap_R_diagnosis_rate(experiment_name):
+    
+    import simplicity.tuning.diagnosis_rate as dr
+    import simplicity.settings_manager as sm
+    import seaborn as sns
+    # get theoretical and effective diagnosis rates 
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name) 
+    # create df
+    heatmap_data = pd.DataFrame()
+    # get data
+    theoretical_diagnosis_rates = []
+    R_values = []
+    diagnosis_rate_scores = [] 
+    for simulation_output_dir in simulation_output_dirs:
+        diagnosis_rates, _ = dr.get_diagnosis_rates(simulation_output_dir)
+        
+        theoretical_diagnosis_rates.append(sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir,
+                                                                             'diagnosis_rate'))
+        R_values.append(sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir,
+                                                                             'R'))
+        diagnosis_rate_scores.append(diagnosis_rates[1]/diagnosis_rates[0])
+    # fill the df iteratively
+    for diagnosis_rate, R, score in zip(theoretical_diagnosis_rates, 
+                                        R_values, 
+                                        diagnosis_rate_scores):
+        heatmap_data.loc[diagnosis_rate, R] = score
+    # sort the df by labels values
+    heatmap_data = heatmap_data.sort_index(axis=1)
+    heatmap_data = heatmap_data.sort_index(axis=0)
+    # pivot df 
+    heatmap_data = heatmap_data.T
+    # Plot the heatmap
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(heatmap_data, annot=True, fmt=".2f", cmap='viridis')
+    plt.title('Heatmap of diagnosis rates vs R')
+    plt.ylabel('R')
+    plt.xlabel('Diagnosis rates')
 
 
 

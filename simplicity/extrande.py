@@ -11,7 +11,7 @@ import simplicity.phenotype.consensus as c
 import simplicity.phenotype.update as pheno
 import simplicity.evolution.reference as ref
 import simplicity.tuning.diagnosis_rate as dr
-from memory_profiler import profile
+# from memory_profiler import profile
     
 def extrande_factory(phenotype_model, parameters,
                      rng1, rng2, path):
@@ -63,7 +63,7 @@ def extrande_factory(phenotype_model, parameters,
     seq_rate = parameters["sequencing_rate"]
 
     # extrande with simple phenotype model
-    @profile
+    # @profile
     def extrande_0(population):
         # count number of infectious and detectables individuals
         population.update_inf_det()
@@ -215,7 +215,7 @@ def extrande_factory(phenotype_model, parameters,
         return population # population after simulation is called simulation_output
     
     # extrande with immune-waning phenotype model
-    @profile
+    # @profile
     def extrande_1(population):
         # count number of infectious and detectables individuals
         population.update_inf_det()

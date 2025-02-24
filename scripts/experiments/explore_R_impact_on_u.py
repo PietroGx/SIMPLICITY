@@ -38,36 +38,26 @@ from simplicity.runme import run_experiment
 import simplicity.runners.serial
 import simplicity.runners.multiprocessing
 import simplicity.runners.slurm
-import simplicity.plots_manager as pm
-import warnings
 import argparse
 
-R=1
 
-## fixture  experiment settings (sm.write_settings arguments)
+R = 1
 def fixture_experiment_settings():
+
+    R_values       = [R]*6
+    evolutionary_rates = [0.00001, 
+                        0.0001, 
+                        0.001, 
+                        0.01, 
+                        0.1, 
+                        1]
     
-    parameters      = {'evolutionary_rate': [0.00001, 
-                                             0.0001, 
-                                             0.001, 
-                                             0.01, 
-                                             0.1, 
-                                             1, 
-                                             10, 
-                                             100, 
-                                             1000],
-                       
-                       'final_time':[365] * 9,
-                       "R": [R]*9
+    parameters      = {'R': R_values,
+                       'evolutionary_rate': evolutionary_rates
                        }
-    n_seeds = 300
+    n_seeds = 100
 
     return (parameters, n_seeds)
-
-def plot_regressions_and_export(experiment_name):
-    pm.plot_combined_regressions(experiment_name, 'evolutionary_rate')
-    pm.plot_u_vs_parameter(experiment_name,'evolutionary_rate')
-    pm.export_u_regression_plots(experiment_name)
 
 def explore_R_impact_on_u(runner:str, experiment_number:int):
     if runner == 'serial':
@@ -83,26 +73,23 @@ def explore_R_impact_on_u(runner:str, experiment_number:int):
     print('testing parameter space for e/u regression')
     print('##########################################')
     print('')
-    experiment_name = f'explore_R_{R}_impact_on_u_#{experiment_number}'
+    experiment_name = f'explore_R{R}_impact_on_u_#{experiment_number}'
     try:
         run_experiment(experiment_name, 
                        fixture_experiment_settings,             
                        simplicity_runner  = runner_module,
                        plot_trajectory = False,
                        archive_experiment = False)
-    except RuntimeError:
-            warnings.warn(f'Experiment {experiment_name} already ran, proceeding to plotting')
     except Exception as e:
         print(f'The simulation failed to run: {e}')
-    plot_regressions_and_export(experiment_name)
         
     print('')
-    print(f'EXPLORATION OF E/U PARAM SPACE #{experiment_number} -- COMPLETED.')
+    print(f'EXPLORATION OF R/e PARAM SPACE #{experiment_number} -- COMPLETED.')
     print('##########################################')
  
 def main():
     # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run script to explore u/e parameter space")
+    parser = argparse.ArgumentParser(description="Run script to explore R/e parameter space")
     parser.add_argument('runner', type=str, help="runner")
     parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()

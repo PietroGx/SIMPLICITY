@@ -10,16 +10,15 @@ STANDARD_VALUES for SIMPLICITY simulation:
     "tau_3": 7.5,
     "infected_individuals_at_start": 10,
     "R": 1.5,
-    "diagnosis_rate": 0.0055,
-    "IH_virus_emergence_rate": 0.0085,
-    "evolutionary_rate": 0.0017,
-    "final_time": 365*3 ,
-    "max_runtime": 100000000, 
+    "diagnosis_rate": 0.1,             # in percentage, will be converted to in model 
+    "IH_virus_emergence_rate": 0.0085, # k_v in theoretical model equations
+    "evolutionary_rate": 0.0017,       # e in theoretical model equations
+    "final_time": 365,
+    "max_runtime": 259200, 
     "phenotype_model": 'immune waning',  # or 'distance from wt'
     "sequencing_rate": 0.05,
     "seed": None,
     "F": 1.25
-
     
 If you want to change any, you can specify them in the parameters dictionary below. 
 For each parameter, specify a list of values that you would like to use for the 
@@ -38,8 +37,6 @@ from simplicity.runme import run_experiment
 import simplicity.runners.serial
 import simplicity.runners.multiprocessing
 import simplicity.runners.slurm
-import simplicity.plots_manager as pm
-import warnings
 import argparse
 
 ## fixture  experiment settings (sm.write_settings arguments)
@@ -56,11 +53,6 @@ def fixture_experiment_settings():
     n_seeds = 300
 
     return (parameters, n_seeds)
-
-def plot_regressions_and_export(experiment_name):
-    pm.plot_combined_regressions(experiment_name, 'evolutionary_rate')
-    pm.plot_u_vs_parameter(experiment_name,'evolutionary_rate')
-    pm.export_u_regression_plots(experiment_name)
 
 def explore_tau_3_impact_on_u(runner:str, experiment_number:int):
     if runner == 'serial':
@@ -83,11 +75,8 @@ def explore_tau_3_impact_on_u(runner:str, experiment_number:int):
                        simplicity_runner  = runner_module,
                        plot_trajectory = False,
                        archive_experiment = False)
-    except RuntimeError:
-            warnings.warn(f'Experiment {experiment_name} already ran, proceeding to plotting')
     except Exception as e:
         print(f'The simulation failed to run: {e}')
-    plot_regressions_and_export(experiment_name)
         
     print('')
     print(f'EXPLORATION OF E/U PARAM SPACE #{experiment_number} -- COMPLETED.')
