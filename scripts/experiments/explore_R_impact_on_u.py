@@ -33,7 +33,7 @@ Each simulation will be repeated n_seeds time with a different random seed.
 
 The set of all simulations is what we call an experiment.
 """
-from simplicity.scripts.experiment.experiment_script_runner import run_experiment_script
+from experiment_script_runner import run_experiment_script
 import argparse
 
 R = 1

@@ -250,11 +250,15 @@ def read_u_e_values(experiment_name):
     data = pd.read_csv(csv_file_path)
     return data
     
+def get_all_individuals_data_for_simulation_output_dir(simulation_output_dir):
+    seeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
+    all_individuals_data = pd.DataFrame()
+    for seeded_simulation_output_dir in seeded_simulation_output_dirs:
+        individuals_data = os.path.join(seeded_simulation_output_dir,'individuals_data.csv')
+        df = pd.read_csv(individuals_data, index_col=0)
+        all_individuals_data = pd.concat([all_individuals_data, df], axis=0)
     
-    
-            
-    
-    
+    return all_individuals_data
     
     
     

@@ -29,19 +29,31 @@ STANDARD_VALUES = {
     "F": 1.25
 }
 
+def get_experiment_settings_file_path(experiment_name):
+    return os.path.join(_data_dir,
+                        f'{experiment_name}',
+                        '01_Experiments_settings', 
+                        f'{experiment_name}_settings.json')
+
+def get_n_seeds_file_path(experiment_name):
+    return os.path.join(_data_dir,
+                        f'{experiment_name}',
+                        '01_Experiments_settings', 
+                        f'{experiment_name}_n_seeds.json')
+
 def check_parameters_names(parameters_dic):
     for key in parameters_dic.keys():
         if key not in STANDARD_VALUES.keys():
             raise ValueError(f'Parameter {key} is not a valid parameter')
 
 def read_experiment_settings(experiment_name):
-    experiment_settings_file_path = dm.get_experiment_settings_file_path(experiment_name)
+    experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
     with open(experiment_settings_file_path, 'r') as json_file:
         experiment_settings = json.load(json_file)
     return experiment_settings
 
 def read_n_seeds_file(experiment_name):
-    n_seeds_file_path = dm.get_n_seeds_file_path(experiment_name)
+    n_seeds_file_path = get_n_seeds_file_path(experiment_name)
     with open(n_seeds_file_path, 'r') as json_file:
         n_seeds_dic = json.load(json_file)
     return n_seeds_dic
@@ -76,7 +88,7 @@ def write_experiment_settings(experiment_name:str, parameters: dict, n_seeds: in
             '/data_dir/Experiment_1/01_Experiments_settings/Experiment_1_settings.json'
     
     """
-    
+    check_parameters_names(parameters)
     # Validate that all lists have the same length
     list_lengths = [len(v) for v in parameters.values()]
     if any(length == 0 for length in list_lengths):
@@ -94,8 +106,8 @@ def write_experiment_settings(experiment_name:str, parameters: dict, n_seeds: in
         all_experiment_settings.append(experiment_settings)
     
     # Write the generated configurations to a JSON file
-    experiment_settings_file_path = dm.get_experiment_settings_file_path(experiment_name)
-    n_seeds_file_path = dm.get_n_seeds_file_path(experiment_name)
+    experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
+    n_seeds_file_path = get_n_seeds_file_path(experiment_name)
     
     with open(experiment_settings_file_path, 'w') as settings_file:
         json.dump(all_experiment_settings, settings_file, indent=4)
@@ -155,7 +167,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
     """
     
     # Define the path to the experiment settings file
-    experiment_settings_file_path = dm.get_experiment_settings_file_path(experiment_name)
+    experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
     
     # Read the experiment settings file
     with open(experiment_settings_file_path, 'r') as settings_file:
@@ -287,16 +299,97 @@ def write_seeded_simulation_parameters(experiment_name: str):
             with open(seeded_file_path, 'w') as seeded_file:
                 json.dump(simulation_parameters, seeded_file, indent=4)
 
+
+def get_seeded_simulation_parameters_paths(experiment_name):
+    """
+    Retrieves all seeded simulation parameter file paths for a given experiment.
+
+    This function searches through the directory structure of the provided
+    experiment name, looking for all JSON seeded simulation parameters files. 
+    It returns a list of full paths to these files.
+
+    Args:
+        experiment_name (str): The name of the experiment for which seeded simulation 
+                               parameter paths are to be retrieved.
+
+    Returns:
+        list of str: A list of file paths, each pointing to a JSON file containing
+                     seeded simulation parameters.
+
+    Example:
+        If `experiment_name` is 'Experiment_1', and the directory structure contains
+        multiple JSON files under:
+            '/data_dir/Experiment_1/03_Seeded_simulation_parameters',
+        the function will return a list like:
+            [
+                '/data_dir/Experiment_1/03_Seeded_simulation_parameters/subdir/file1.json',
+                '/data_dir/Experiment_1/03_Seeded_simulation_parameters/subdir/file2.json'
+            ]
+    """
+    # Define the base path for the simulation parameters
+    base_dir = os.path.join(_data_dir, experiment_name, "03_Seeded_simulation_parameters")
+    
+    # List to store all seed file paths
+    seeded_simulation_parameters_paths = []
+    
+    # Walk through the directory structure to find all .json files
+    for root, dirs, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith(".json"):
+                # Construct the full path to the file and add it to the list
+                file_path = os.path.join(root, file)
+                seeded_simulation_parameters_paths.append(file_path)
+    
+    return seeded_simulation_parameters_paths
+
 def read_seeded_simulation_parameters(experiment_name, seeded_simulation_parameters_path):
     with open(seeded_simulation_parameters_path, 'r') as seeded_file:
         seeded_simulation_parameters = json.load(seeded_file)
     return seeded_simulation_parameters
-    
+
+def get_simulation_parameters_filepath_of_simulation_output_dir(simulation_output_dir):
+    # get filepath of simulation parameters file from which the simulation_output_dir was generated
+    from pathlib import Path
+    simulation_output_dir_path = Path(simulation_output_dir)
+    parts = simulation_output_dir_path.parts
+    experiment_name = parts[-3]
+    simulation_output_folder_name = parts[-1]
+    # get simulation parameters dir for that experiment
+    simulation_parameters_dir = dm.get_simulation_parameters_dir(experiment_name)
+    simulation_parameters_file_path = os.path.join(simulation_parameters_dir,
+                                              simulation_output_folder_name +'.json')
+
+    return simulation_parameters_file_path
+
 def get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter):
     # read and return desired parameter value for specific simulation output directory
-    simulation_parameters_file_path = dm.get_simulation_parameters_of_simulation_output_dir(
+    simulation_parameters_file_path = get_simulation_parameters_filepath_of_simulation_output_dir(
                        simulation_output_dir)
     with open(simulation_parameters_file_path, 'r') as file:
         parameters_dict = json.load(file)
     
     return parameters_dict[parameter]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

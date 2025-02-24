@@ -30,6 +30,7 @@ Kown bugs:
 """
 import typing, os, pathlib, subprocess, platform
 import simplicity.dir_manager as dm
+import simplicity.settings_manager as sm
 
 class SimulationsStatus(typing.NamedTuple):
     total    : int
@@ -106,7 +107,7 @@ def submit_simulations(experiment_name: str,
     assert slurm_process.returncode == 0, f"Slurm was called with the following arguments:\n{' '.join(args)}\n{env}\n=== stdin\n{stdin}\n=== /stdin"
     
     # ! python __getitem__ indexing is 0 based
-    seeded_simulation_parameters = dm.get_seeded_simulation_parameters_paths(experiment_name)
+    seeded_simulation_parameters = sm.get_seeded_simulation_parameters_paths(experiment_name)
     for seeded_simulation_parameters_path in seeded_simulation_parameters[batch_start-1:batch_end]:
         signal_submitted_path   = seeded_simulation_parameters_path + ".submitted"
         pathlib.Path(signal_submitted_path).touch()
@@ -114,7 +115,7 @@ def submit_simulations(experiment_name: str,
     
 def poll_simulations_status(experiment_name):
     # get the seeded simulation parameters files paths
-    seeded_simulation_parameters = dm.get_seeded_simulation_parameters_paths(experiment_name)
+    seeded_simulation_parameters = sm.get_seeded_simulation_parameters_paths(experiment_name)
     total = len(seeded_simulation_parameters)
     # read signals written by this script
     submitted = 0
@@ -148,7 +149,7 @@ def poll_simulations_status(experiment_name):
 
 def release_simulations(experiment_name, n: int):
     # get the seeded simulation parameters files paths
-    seeded_simulation_parameters_paths = dm.get_seeded_simulation_parameters_paths(experiment_name)
+    seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
     
     # use signals to find up to n submitted but not released simulations
     i_th_seeds = {}
@@ -244,7 +245,7 @@ def job():
     i_th_seeded_simulation = int(os.environ["SLURM_ARRAY_TASK_ID"]) - int(os.environ["SLURM_ARRAY_TASK_MIN"])
     
     # resolve seeded_simulation_parameters_path
-    seeded_simulation_parameters_paths = dm.get_seeded_simulation_parameters_paths(experiment_name)
+    seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
     seeded_simulation_parameters_path  = seeded_simulation_parameters_paths[i_th_seeded_simulation]
     
     # save the mapping from slurm job to seeded simulation number
