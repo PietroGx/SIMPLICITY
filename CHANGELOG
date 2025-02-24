@@ -218,7 +218,7 @@
 	* added results folder to repo
 	* saved memory profiling plots and data to results
 
-2025-21-02 pietro gerletti
+2025-23-02 pietro gerletti
 
 	Version 0.6.0
 	
@@ -227,6 +227,49 @@
 	* added get_simulation_parameters_of_simulation_output_dir to dir_manager
 	* added get_effective_diagnosis_rate and get_diagnosis_rates to diagnosis_rate.py 
 	* updated and renamed explore_R_diagnosis_rate_parameter_space.py
+	
+2025-24-02 pietro gerletti
+
+	Version 0.6.1
+	
+	* added plot - regression theoretical vs effective diagnosis rate
+	* added plot - heatmap of R vs diagnosis rate (mapping accuracy score for diagnosis rate)
+	* updated setup.py 
+	* updated yml file (added seaborn)
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	

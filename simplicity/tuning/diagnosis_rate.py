@@ -8,6 +8,9 @@ Created on Fri Jul 29 13:26:33 2022
 import numpy as np
 import scipy 
 import simplicity.dir_manager as dm
+import simplicity.settings_manager as sm
+import os 
+import pandas as pd 
 
 def get_B(k_i,tau_3 = 7.5):
         '''
@@ -134,9 +137,6 @@ def diagnosis_rate_table(diagnosis_rates):
     return df
 
 def get_effective_diagnosis_rate(simulation_output_dir):
-    import os 
-    import pandas as pd 
-    import simplicity.dir_manager as dm
     effective_diagnosis_rates = []
     for seeded_simulation_output_dir in dm.get_seeded_simulation_output_dirs(simulation_output_dir):
         simulation_trajectory = os.path.join(seeded_simulation_output_dir, 'simulation_trajectory.csv')
@@ -158,12 +158,13 @@ def get_effective_diagnosis_rate(simulation_output_dir):
     return np.mean(effective_diagnosis_rates), np.std(effective_diagnosis_rates)
 
 def get_diagnosis_rates(simulation_output_dir):
-    
-    effective_rate = get_effective_diagnosis_rate(simulation_output_dir)
-    theoretical_rate = dm.get_simulation_parameters_of_simulation_output_dir(
-                       simulation_output_dir)['diagnosis_rate']
-    
-    return theoretical_rate, effective_rate
+    ''' get theoretical and effective diagnosis rates
+    '''
+    effective_rate, std_effective_rate = get_effective_diagnosis_rate(simulation_output_dir)
+    theoretical_rate = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir,
+                                                                         'diagnosis_rate')
+
+    return (theoretical_rate, effective_rate), std_effective_rate
 
 
 

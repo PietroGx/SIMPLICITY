@@ -21,8 +21,8 @@ STANDARD_VALUES = {
     "diagnosis_rate": 0.1,             # in percentage, will be converted to in model 
     "IH_virus_emergence_rate": 0.0085, # k_v in theoretical model equations
     "evolutionary_rate": 0.0017,       # e in theoretical model equations
-    "final_time": 365*3 ,
-    "max_runtime": 100000000, 
+    "final_time": 365,
+    "max_runtime": 259200, 
     "phenotype_model": 'immune waning',  # or 'distance from wt'
     "sequencing_rate": 0.05,
     "seed": None,
@@ -292,4 +292,11 @@ def read_seeded_simulation_parameters(experiment_name, seeded_simulation_paramet
         seeded_simulation_parameters = json.load(seeded_file)
     return seeded_simulation_parameters
     
-
+def get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter):
+    # read and return desired parameter value for specific simulation output directory
+    simulation_parameters_file_path = dm.get_simulation_parameters_of_simulation_output_dir(
+                       simulation_output_dir)
+    with open(simulation_parameters_file_path, 'r') as file:
+        parameters_dict = json.load(file)
+    
+    return parameters_dict[parameter]
