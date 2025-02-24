@@ -19,6 +19,10 @@ import math
 from simplicity.tuning.evolutionary_rate import create_joint_sequencing_df
 from simplicity.tuning.evolutionary_rate import tempest_regression
 import glob
+import simplicity.tuning.diagnosis_rate as dr
+import simplicity.settings_manager as sm
+import seaborn as sns
+
 
 
 def plot_fitness(simulation_output):
@@ -396,6 +400,9 @@ def export_u_regression_plots(experiment_name):
 ###############################################################################
 ###############################################################################
 def plot_histograms(experiment_name, final_times_data_frames):
+    ''' plot histograms of simulation final times.
+    Called from statistics_simulation_lenght.py
+    '''
     num_folders = len(final_times_data_frames.columns)
     fig, axes = plt.subplots(num_folders, 1, figsize=(10, 5 * num_folders), squeeze=False)
     
@@ -410,6 +417,8 @@ def plot_histograms(experiment_name, final_times_data_frames):
                              'simulations_lenght_histogram.png'))
 
 def plot_u_fit(experiment_name,fit_result,scale:str):
+    ''' plot fit of evolutionary rate / observed evolutionary rate curve
+    '''
     if scale == 'loglog' or 'semilog' or 'lin':
         pass
     else:
@@ -562,6 +571,9 @@ def plot_comparison_intra_host_models(intra_host_model):
 ###############################################################################
 
 def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
+    ''' Plots infected number vs simulation RUNTIME.
+    extrande_pop_runtime_csv is generated in extrande for memory profiling (commented out)
+    '''
     import csv
     # Read the CSV file
     x_values = []
@@ -586,6 +598,8 @@ def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
     plt.show()
 
 def plot_effective_theoretical_diagnosis_rate(experiment_name):
+    ''' plot scatter and regression line of effective vs theoretical diagnosis rate
+    '''
     import simplicity.tuning.diagnosis_rate as dr
     from sklearn.linear_model import LinearRegression
     # get theoretical and effective diagnosis rates 
@@ -633,10 +647,11 @@ def plot_effective_theoretical_diagnosis_rate(experiment_name):
     plt.show()
 
 def plot_heatmap_R_diagnosis_rate(experiment_name):
-    
-    import simplicity.tuning.diagnosis_rate as dr
-    import simplicity.settings_manager as sm
-    import seaborn as sns
+    ''' Plot heatnmap to see relationship of R and diagnosis rate.  
+    y axis is R 
+    x axis is theoretical diagnosis rate (user input)
+    score for heatmap is effective/theoretical diagnosis rate
+    '''
     # get theoretical and effective diagnosis rates 
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name) 
     # create df
@@ -668,14 +683,40 @@ def plot_heatmap_R_diagnosis_rate(experiment_name):
     sns.heatmap(heatmap_data, annot=True, fmt=".2f", cmap='viridis')
     plt.title('Heatmap of diagnosis rates vs R')
     plt.ylabel('R')
-    plt.xlabel('Diagnosis rates')
+    plt.xlabel('Theoretical (user input) diagnosis rates')
+
+def plot_IH_lineage_distribution(simulation_output_dir):
+    
+    df = om.get_all_individuals_data_for_simulation_output_dir(simulation_output_dir)
+    
+    df = df[['IH_virus_number', 'lineages_number']]
+
+    # Calculate the counts of each value for each type
+    ih_value_counts = df.groupby(['IH_virus_number']).size().reset_index(name='counts')
+    lineage_value_counts = df.groupby(['lineages_number']).size().reset_index(name='counts')
+    
+    # Normalize counts by the total count
+    ih_value_counts['counts'] = ih_value_counts['counts'] / ih_value_counts['counts'].sum()
+    lineage_value_counts['counts'] = lineage_value_counts['counts'] / lineage_value_counts['counts'].sum()
 
 
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
+    
+    sns.barplot(x='IH_virus_number', y='counts', data=ih_value_counts, ax=axes[0])
+    sns.barplot(x='lineages_number', y='counts', data=lineage_value_counts, ax=axes[1])
+    
+    axes[0].set_title('Count of IH_virus_number')
+    axes[0].set_xlabel('IH_virus_number')
+    axes[0].set_ylabel('Count')
 
-
-
-
-
+    axes[1].set_title('Count of lineages_number')
+    axes[1].set_xlabel('lineages_number')
+    axes[1].set_ylabel('Count')
+    
+    plt.suptitle('Histogram of IH virus and lineage distribution')
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    fig_path = os.path.join(simulation_output_dir,'IH variability plot.png')
+    plt.savefig(fig_path)
 
 
 

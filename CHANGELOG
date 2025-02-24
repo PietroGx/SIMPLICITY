@@ -239,7 +239,13 @@
 	* updated extrande - now tau_inf is calculated from tau parameter values. This way the upperbound keeps being correct if tau_3 is changed
 	* created script to generate IH lineage data for testing model
 	* updated and standardized experiment scripts structure
-	
+	* moved get_simulation_parameters_of_simulation_output_dir to settings manager
+	* moved get_seeded_simulation_parameters_paths back to settings manager 
+	* moved get_experiment_settings_file_path to settings manager
+	* moved get_n_seeds_file_path to settings manager
+	* added get_all_individuals_data_for_simulation_output_dir to output manager
+	* added plot_IH_lineage_distribution to plot manager
+	* updated settings manager to fix silent bug (code would work with invalid named parameters)
 	
 	
 	

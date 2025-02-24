@@ -33,7 +33,7 @@ Each simulation will be repeated n_seeds time with a different random seed.
 
 The set of all simulations is what we call an experiment.
 """
-from simplicity.scripts.experiment.experiment_script_runner import run_experiment_script
+from experiment_script_runner import run_experiment_script
 import argparse
 
 experiment_name =  'generate_data_IH_lineages'
@@ -41,14 +41,14 @@ experiment_name =  'generate_data_IH_lineages'
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
     
-    parameters      = {'k_v':[0, 
+    parameters      = {'IH_virus_emergence_rate':[0, 
                               0.0001, #  0.0085
                               0.001,
                               0.01,
                               0.1
                                 ]
                        }
-    n_seeds = 20
+    n_seeds = 50
 
     return (parameters, n_seeds)
 

@@ -48,8 +48,8 @@ def extrande_factory(phenotype_model, parameters,
     # virus reproduction number for individuals in the population
     R = parameters["R"]
     # average infectious time for individuals infected with SARS-CoV-2
-    tau_2 = 3.91
-    tau_inf = parameters['tau_3'] + tau_2
+    ih_tau_2 = 3.91
+    tau_inf = parameters['tau_3'] + ih_tau_2
     # diagnosis rate
     k_d = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate"])
     # multiple variants rate
