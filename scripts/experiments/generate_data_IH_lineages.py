@@ -41,14 +41,13 @@ experiment_name =  'generate_data_IH_lineages'
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
     
-    parameters      = {'IH_virus_emergence_rate':[0, 
-                              0.0001, #  0.0085
-                              0.001,
-                              0.01,
-                              0.1
+    parameters      = {'IH_virus_emergence_rate':[0,
+                                                  0.01,
+                                                  0.1,
+                                                  1
                                 ]
                        }
-    n_seeds = 50
+    n_seeds = 100
 
     return (parameters, n_seeds)
 

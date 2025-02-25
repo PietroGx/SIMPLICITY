@@ -29,7 +29,8 @@ import os
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {'final_time': [100]}
+    parameters      = {'final_time': [100],
+                       "infected_individuals_at_start": [100]}
     n_seeds         = 3
     return (parameters, n_seeds)
 
