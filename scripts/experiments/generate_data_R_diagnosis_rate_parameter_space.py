@@ -38,7 +38,7 @@ import argparse
 import itertools
 import numpy as np 
 
-experiment_name = 'explore_R_diagnosis_rate_parameter_space'
+experiment_name = 'generate_data_R_diagnosis_rate_parameter_space'
 
 def fixture_experiment_settings():
 

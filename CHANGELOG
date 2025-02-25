@@ -247,8 +247,18 @@
 	* added plot_IH_lineage_distribution to plot manager
 	* updated settings manager to fix silent bug (code would work with invalid named parameters)
 	
+2025-25-02 pietro gerletti
+
+	Version 0.7.0
 	
-	
+	* moved scripts for plots into scripts/plots
+	* added read_simulation_trajectory to output manager
+	* changed output_path to seeded_simulation_output_dir in output manager
+	* added get_IH_lineages_data_experiment and get_IH_lineages_data_simulation to output manager
+	* updated plot_IH_lineage_distribution in plot manager
+	* updated population and output manager to save susceptibles in trajectory
+	* updated plot_trajectory in plot manager
+	* created psedocode of fetch_seeded_simulation_parameters_from_job_id
 	
 	
 	

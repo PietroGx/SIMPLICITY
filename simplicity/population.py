@@ -78,7 +78,8 @@ class Population:
                            self.recovered,
                            self.deceased,
                            self.infectious_normal,
-                           self.detectables
+                           self.detectables,
+                           self.susceptibles
                            ]]
         
         self.fitness_trajectory = [[0,[0,0]]]  
@@ -419,7 +420,8 @@ class Population:
                            self.recovered,
                            self.deceased,
                            self.infectious_normal,
-                           self.detectables
+                           self.detectables,
+                           self.susceptibles
                            ])
     
     def add_variant(self):

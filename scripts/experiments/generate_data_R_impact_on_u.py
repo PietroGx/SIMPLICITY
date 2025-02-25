@@ -36,25 +36,29 @@ The set of all simulations is what we call an experiment.
 from experiment_script_runner import run_experiment_script
 import argparse
 
-experiment_name = 'explore_tau_3_impact_on_u'
+R = 1
+experiment_name = f'generate_data_R{R}_impact_on_u'
 
 def fixture_experiment_settings():
+
+    R_values       = [R]*6
+    evolutionary_rates = [0.00001, 
+                        0.0001, 
+                        0.001, 
+                        0.01, 
+                        0.1, 
+                        1]
     
-    parameters      = {'tau_3':[3.25, 
-                                7.5,
-                                15,
-                                30,
-                                60,
-                                120
-                                ]
+    parameters      = {'R': R_values,
+                       'evolutionary_rate': evolutionary_rates
                        }
-    n_seeds = 300
+    n_seeds = 100
 
     return (parameters, n_seeds)
-
+ 
 def main():
     # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run script to explore tau_3 impact on u")
+    parser = argparse.ArgumentParser(description="Run script to explore R impact on u")
     parser.add_argument('runner', type=str, help="runner")
     parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()

@@ -7,6 +7,7 @@ Created on Thu Aug 29 13:56:20 2024
 """
 
 import simplicity.dir_manager as dm
+import simplicity.settings_manager as sm
 import os
 import shutil
 import tarfile
@@ -162,42 +163,48 @@ def save_sequencing_dataset(simulation_output, output_path):
             else: 
                 raise ValueError('There is something wrong with the sequencing data')
         
-def save_simulation_trajectory(simulation_output, output_path):
+def save_simulation_trajectory(simulation_output, seeded_simulation_output_dir):
     df = pd.DataFrame(simulation_output.trajectory, columns= 
                       ['time','infected','diagnosed','recovered','deceased',
-                       'infectious_normal','detectables'])
-    trajectory_file_path = os.path.join(output_path,
+                       'infectious_normal','detectables','susceptibles'])
+    trajectory_file_path = os.path.join(seeded_simulation_output_dir,
                                         "simulation_trajectory.csv")
     df.to_csv(trajectory_file_path, index=False)
+
+def read_simulation_trajectory(seeded_simulation_output_dir):
+    trajectory_file_path = os.path.join(seeded_simulation_output_dir,
+                                        "simulation_trajectory.csv")
+    df = pd.read_csv(trajectory_file_path)
+    return df
     
-def save_lineage_frequency(simulation_output, output_path):
+def save_lineage_frequency(simulation_output, seeded_simulation_output_dir):
     df = pd.DataFrame(simulation_output.lineage_frequency)
-    lineage_frequency_file_path = os.path.join(output_path,
+    lineage_frequency_file_path = os.path.join(seeded_simulation_output_dir,
                                                "lineage_frequency.csv")
     df.to_csv(lineage_frequency_file_path, index=False)
         
-def save_individuals_data(simulation_output, output_path):
+def save_individuals_data(simulation_output, seeded_simulation_output_dir):
     individuals_data = simulation_output.data()
     individuals_data.drop('model',axis=1,inplace=True)
-    individuals_data_file_path = os.path.join(output_path,
+    individuals_data_file_path = os.path.join(seeded_simulation_output_dir,
                                                "individuals_data.csv")
     individuals_data.to_csv(individuals_data_file_path)
 
-def save_phylogenetic_data(simulation_output, output_path):
+def save_phylogenetic_data(simulation_output, seeded_simulation_output_dir):
     phylogenetic_data = simulation_output.phylogeny()
-    phylogenetic_data_file_path = os.path.join(output_path,
+    phylogenetic_data_file_path = os.path.join(seeded_simulation_output_dir,
                                                "phylogenetic_data.csv")
     phylogenetic_data.to_csv(phylogenetic_data_file_path)
     
-def save_fitness_trajectory(simulation_output, output_path):
+def save_fitness_trajectory(simulation_output, seeded_simulation_output_dir):
     fitness_trajectory = simulation_output.fitness_trajectory_to_df()
-    fitness_trajectory_file_path = os.path.join(output_path,
+    fitness_trajectory_file_path = os.path.join(seeded_simulation_output_dir,
                                                "fitness_trajectory.csv")
     fitness_trajectory.to_csv(fitness_trajectory_file_path)
     
-def save_final_time(simulation_output, output_path):
+def save_final_time(simulation_output, seeded_simulation_output_dir):
     final_time = simulation_output.time
-    final_time_file_path = os.path.join(output_path,
+    final_time_file_path = os.path.join(seeded_simulation_output_dir,
                                                "final_time.csv")
     with open(final_time_file_path, mode='w', newline='') as file:
         writer = csv.writer(file)
@@ -259,8 +266,54 @@ def get_all_individuals_data_for_simulation_output_dir(simulation_output_dir):
         all_individuals_data = pd.concat([all_individuals_data, df], axis=0)
     
     return all_individuals_data
+
+def get_IH_lineages_data_simulation(simulation_output_dir):
+    # get individuals dataframe 
+    data = get_all_individuals_data_for_simulation_output_dir(simulation_output_dir)
+    # keep only needed columns
+    data = data[['IH_virus_number', 'lineages_number']]
+
+    # DataFrames with all possible IH_virus_number and lineages_numbervalues (1 to 5)
+    IH_virus_number_values = pd.DataFrame({'IH_virus_number': [1, 2, 3, 4, 5]})
+    lineages_number_values = pd.DataFrame({'lineages_number': [1, 2, 3, 4, 5]})
+
+    # Calculate the counts of each value for each type
+    ih_virus_count = data.groupby(['IH_virus_number']).size().reset_index(name='ih_virus_count')
+    ih_lineage_count = data.groupby(['lineages_number']).size().reset_index(name='ih_lineage_count')
+
+    # Merge with the IH_virus_number_values DataFrame, filling NaNs with 0
+    ih_virus_count = pd.merge(IH_virus_number_values, ih_virus_count, on='IH_virus_number', how='left').fillna({'ih_virus_count': 0})
+    ih_lineage_count = pd.merge(lineages_number_values, ih_lineage_count, on='lineages_number', how='left').fillna({'ih_lineage_count': 0})
+
+    # Normalize counts by the total count
+    ih_virus_count['ih_virus_count'] = ih_virus_count['ih_virus_count'] / ih_virus_count['ih_virus_count'].sum()
+    ih_lineage_count['ih_lineage_count'] = ih_lineage_count['ih_lineage_count'] / ih_lineage_count['ih_lineage_count'].sum()
     
-    
-    
-    
+    df = pd.concat([ih_virus_count,ih_lineage_count],axis=1)
+    # add hue column to df - hue is IH_lineage_emergence_rate
+    df['IH_virus_emergence_rate'] = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, 'IH_virus_emergence_rate')
+
+    return df
+ 
+def get_IH_lineages_data_experiment(experiment_name):
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    df = pd.DataFrame()
+    for simulation_output_dir in simulation_output_dirs:
+        new_df = get_IH_lineages_data_simulation(simulation_output_dir)
+        df = pd.concat([df,new_df],axis=0)
+    return df
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     

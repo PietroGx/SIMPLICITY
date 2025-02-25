@@ -57,41 +57,39 @@ def plot_fitness(simulation_output):
     # plt.savefig(figpath)
     plt.close()
     
-def plot_trajectory(simulation_output):
+def plot_trajectory(seeded_simulation_output_dir):
     '''
     Plots the simulation trajectory and the evolution of infectivity
-    during the simulation.
+    during the simulation. (In paper Figure 2B)
 
     '''
-    time       = [i[0] for i in simulation_output.trajectory]
-    infected   = [i[1] for i in simulation_output.trajectory]
-    diagnosed  = [i[2] for i in simulation_output.trajectory]
-    recovered  = [i[3] for i in simulation_output.trajectory]
-    
+    simulation_trajectory = om.read_simulation_trajectory(seeded_simulation_output_dir)
+    time       = simulation_trajectory['time'].tolist()
+    infected   = simulation_trajectory['infected']
+    diagnosed  = simulation_trajectory['diagnosed']
+    susceptibles  = simulation_trajectory['susceptibles'] 
+
     fig = plt.figure(0,figsize=(16, 9))
     plt.title('Simulation of SARS-CoV-2 outbreak')
     
-    ax = fig.add_subplot(1,1,1)
     
-    
-    ax.plot(time,recovered,
-        label='Recovered (cumulative)', 
+    plt.plot(time,susceptibles,
+        label='Susceptibles', 
         color= 'black')
-    ax.plot(time,infected,
+    plt.plot(time,infected,
             label='Infected individuals', 
             color= 'red')
-    ax.plot(time,diagnosed,
+    plt.plot(time,diagnosed,
             label='Diagnosed individuals (cumulative)', 
             color= 'green')
     
-    ax.set_xlabel('Time - days')
-    ax.set_ylabel('Number of individuals in compartment')
-    ax.set_xlim(0,time[-1])
-    ax.set_ylim(0)
+    plt.xlabel('Time - days')
+    plt.ylabel('Number of individuals in compartment')
+    plt.xlim(0,time[-1])
+    plt.ylim(0)
     plt.tight_layout()
     plt.legend()
     
-    plt.close()
 
 def plot_lineage_frequency(simulation_output,threshold):
     '''
@@ -132,7 +130,7 @@ def plot_lineage_frequency(simulation_output,threshold):
     ax.tick_params(axis='both', labelsize=20)
     plt.show()
     
-def plot_simulation(output_directory, threshold):
+def plot_simulation(seeded_simulation_output_dir, threshold):
     '''
     joins plots of population trajectory and lineages frequency in a single 
     plot
@@ -165,8 +163,7 @@ def plot_simulation(output_directory, threshold):
     
     # system trajectory subplot
     ######################################################################
-    trajectory_file_path = os.path.join(output_directory, 'simulation_trajectory.csv')
-    trajectory_df = pd.read_csv(trajectory_file_path)
+    trajectory_df = om.read_simulation_trajectory(seeded_simulation_output_dir)
     
     time = trajectory_df['time'].tolist()
     infected   = trajectory_df['infected'].tolist()
@@ -182,7 +179,7 @@ def plot_simulation(output_directory, threshold):
     
     ######################################################################
     # variants frequency subplot
-    lineage_frequency_file_path = os.path.join(output_directory, 'lineage_frequency.csv')
+    lineage_frequency_file_path = os.path.join(seeded_simulation_output_dir, 'lineage_frequency.csv')
     lineage_frequency_df = pd.read_csv(lineage_frequency_file_path)
     
     lineage_frequency_df.fillna(0,inplace=True)
@@ -197,7 +194,7 @@ def plot_simulation(output_directory, threshold):
     # Plot with transparency
     df_cut_reversed.plot(kind='area', stacked=True, colormap='gist_rainbow',
                          alpha=0.5, ax=ax1)
-    time_file_path = os.path.join(output_directory, 'final_time.csv')
+    time_file_path = os.path.join(seeded_simulation_output_dir, 'final_time.csv')
     time_final = pd.read_csv(time_file_path, header=None).iloc[0, 0]
     ax1.set_xlim([0,time_final])
     # Define custom formatter function
@@ -213,7 +210,7 @@ def plot_simulation(output_directory, threshold):
     
     #######################################################################
     # fitness subplot
-    fitness_trajectory_file_path = os.path.join(output_directory, 'fitness_trajectory.csv')
+    fitness_trajectory_file_path = os.path.join(seeded_simulation_output_dir, 'fitness_trajectory.csv')
     fitness_trajectory_df = pd.read_csv(fitness_trajectory_file_path)
     
     # Extract time, mean, and standard deviation data
@@ -246,10 +243,9 @@ def plot_simulation(output_directory, threshold):
     # Align the y-axis labels
     fig.align_ylabels([ax2, ax3])
     plt.tight_layout()
-    figure_output_path = os.path.join(output_directory,"simulation_trajectory.png")
+    figure_output_path = os.path.join(seeded_simulation_output_dir,"simulation_trajectory.png")
     plt.savefig(figure_output_path)
     plt.close()
-    # fig.show()
 
 ###############################################################################
 ###############################################################################
@@ -685,25 +681,29 @@ def plot_heatmap_R_diagnosis_rate(experiment_name):
     plt.ylabel('R')
     plt.xlabel('Theoretical (user input) diagnosis rates')
 
-def plot_IH_lineage_distribution(simulation_output_dir):
+def plot_IH_lineage_distribution(experiment_name):
+    fig, axes  = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
+    df = om.get_IH_lineages_data_experiment(experiment_name)
     
-    df = om.get_all_individuals_data_for_simulation_output_dir(simulation_output_dir)
+    ax0 = sns.barplot(x='IH_virus_number', y='ih_virus_count', data=df, hue='IH_virus_emergence_rate', 
+                ax=axes[0], dodge=True, palette="Set2", alpha=0.7)
+    ax1 = sns.barplot(x='lineages_number', y='ih_lineage_count', data=df, hue='IH_virus_emergence_rate',
+                ax=axes[1], dodge=True, palette="Set2",alpha=0.7)
     
-    df = df[['IH_virus_number', 'lineages_number']]
-
-    # Calculate the counts of each value for each type
-    ih_value_counts = df.groupby(['IH_virus_number']).size().reset_index(name='counts')
-    lineage_value_counts = df.groupby(['lineages_number']).size().reset_index(name='counts')
-    
-    # Normalize counts by the total count
-    ih_value_counts['counts'] = ih_value_counts['counts'] / ih_value_counts['counts'].sum()
-    lineage_value_counts['counts'] = lineage_value_counts['counts'] / lineage_value_counts['counts'].sum()
-
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
-    
-    sns.barplot(x='IH_virus_number', y='counts', data=ih_value_counts, ax=axes[0])
-    sns.barplot(x='lineages_number', y='counts', data=lineage_value_counts, ax=axes[1])
+    # Loop through each bar and set the edgecolor to match the bar color
+    for patch in ax0.patches:
+        # Get the color of the bar
+        color = patch.get_facecolor()
+        # Set the edgecolor to the same as the facecolor
+        patch.set_edgecolor(color)
+        patch.set_linewidth(1)
+        
+    for patch in ax1.patches:
+        # Get the color of the bar
+        color = patch.get_facecolor()
+        # Set the edgecolor to the same as the facecolor
+        patch.set_edgecolor(color)
+        patch.set_linewidth(1)
     
     axes[0].set_title('Count of IH_virus_number')
     axes[0].set_xlabel('IH_virus_number')
@@ -713,10 +713,13 @@ def plot_IH_lineage_distribution(simulation_output_dir):
     axes[1].set_xlabel('lineages_number')
     axes[1].set_ylabel('Count')
     
+    
     plt.suptitle('Histogram of IH virus and lineage distribution')
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    fig_path = os.path.join(simulation_output_dir,'IH variability plot.png')
-    plt.savefig(fig_path)
+    # fig_path = os.path.join(simulation_output_dir,'IH variability plot.png')
+    # plt.savefig(fig_path)
+    
+   
 
 
 
