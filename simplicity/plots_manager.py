@@ -7,7 +7,7 @@ Created on Tue Jan  7 10:00:16 2025
 """
 
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
@@ -716,8 +716,9 @@ def plot_IH_lineage_distribution(experiment_name):
     
     plt.suptitle('Histogram of IH virus and lineage distribution')
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    # fig_path = os.path.join(simulation_output_dir,'IH variability plot.png')
-    # plt.savefig(fig_path)
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    fig_path = os.path.join(experiment_output_dir,'IH variability plot.png')
+    plt.savefig(fig_path)
     
    
 
