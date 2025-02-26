@@ -260,7 +260,12 @@
 	* updated plot_trajectory in plot manager
 	* created psedocode of fetch_seeded_simulation_parameters_from_job_id
 	
+2025-25-02 pietro gerletti
+
+	Version 0.7.1
 	
+	* updated standard parameters values 
+	* 
 	
 	
 	
