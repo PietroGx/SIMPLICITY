@@ -29,9 +29,8 @@ import os
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {'final_time': [100],
-                       "infected_individuals_at_start": [100]}
-    n_seeds         = 3
+    parameters      = {}
+    n_seeds         = 10
     return (parameters, n_seeds)
 
 def check_output_file(directory, filename): 
@@ -99,5 +98,5 @@ def test_experiment_local(runner:str, test_number:int):
 ##### </actual test>
 
 if __name__ == "__main__":
-    test_experiment_local('serial',1)
+    test_experiment_local('serial',4)
     # test_experiment_local('multiprocessing',9)

@@ -24,7 +24,7 @@ def run_experiment_script(runner:str,
         raise ValueError('Runner must be either "serial" or "multiprocessing" or "slurm"')
     print('')
     print('##########################################')
-    print('Running {experiment_name}')
+    print(f'Running {experiment_name}')
     print('##########################################')
     print('')
     try:
