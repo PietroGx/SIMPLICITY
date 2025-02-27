@@ -438,7 +438,7 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     # ax[0].set_ylabel('Observed evolutionary rate (site/year) (u)')
     ax[0].legend()
     # semilog scale
-    ax[1].plot(x_data, fit_result.best_fit, 
+    ax[1].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve',
                color='red', linewidth=2)
     ax[1].set_xscale("log")
     ax[1].set_ylim(0)
@@ -446,7 +446,7 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     ax[1].set_ylabel('Observed evolutionary rate (site/year) (u)')
     ax[1].legend()
     # loglog scale
-    ax[2].plot(x_data, fit_result.best_fit, 
+    ax[2].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve',
                color='red', linewidth=2)
     ax[2].set_yscale("log")
     ax[2].set_xscale("log")
