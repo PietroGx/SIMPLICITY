@@ -423,38 +423,41 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     y_data = data['u']  
     
     # Create figure and axes
-    fig, ax = plt.subplots(1,3)
+    fig, ax = plt.subplots(3,1)
     # scatterplot data (u)
     ax[0].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    ax[1].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    ax[2].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
+    ax[1].scatter(x_data, y_data, color='blue', alpha=0.5)
+    ax[2].scatter(x_data, y_data, color='blue', alpha=0.5)
     
     # linear scale
-    ax[0].plot(x_data, fit_result.best_fit, label='Fitted {model_type} curve', 
+    ax[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color='red', linewidth=2)
     ax[0].set_ylim(0)
     ax[0].set_xlim(0)
     ax[0].set_xlabel('Substitution Rate (site/year) (e)')
     ax[0].set_ylabel('Observed evolutionary rate (site/year) (u)')
-    ax[0].legend()
+    # ax[0].legend()
     # semilog scale
-    ax[1].plot(x_data, fit_result.best_fit, label='Fitted {model_type} curve', 
+    ax[1].plot(x_data, fit_result.best_fit, 
                color='red', linewidth=2)
     ax[1].set_xscale("log")
     ax[1].set_ylim(0)
     ax[1].set_xlabel('Substitution Rate (site/year) (e)')
     ax[1].set_ylabel('Observed evolutionary rate (site/year) (u)')
-    ax[1].legend()
+    # ax[1].legend()
     # loglog scale
-    ax[2].plot(x_data, fit_result.best_fit, label='Fitted {model_type} curve', 
+    ax[2].plot(x_data, fit_result.best_fit, 
                color='red', linewidth=2)
     ax[2].set_yscale("log")
     ax[2].set_xscale("log")
     ax[2].set_xlabel('Substitution Rate (site/year) (e)')
     ax[2].set_ylabel('Observed evolutionary rate (site/year) (u)')
-    ax[2].legend()
+    # ax[2].legend()
+    
+    fig.legend(loc="upper center", ncol=2, fontsize=10)
     
     plt.title('')
+    plt.tight_layout()
     file_path = os.path.join(dm.get_experiment_dir(experiment_name),
                              f'observed_evolutionary_rate_{model_type}_fit.png')
     plt.savefig(file_path)
