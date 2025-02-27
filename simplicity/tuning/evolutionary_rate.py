@@ -163,7 +163,7 @@ def factory_model(model_type: str):
         model = Model(spline_model)
         # Define initial guesses for the knots and their corresponding values
         # Initial guess for knots
-        initial_knots = np.linspace(0.0001, 1, 10)  
+        initial_knots = np.linspace(0.0001, 1, 3)  
         # Initial guess for the spline values at the knots
         initial_values = np.sin(2 * np.pi * initial_knots)  
         params = model.make_params(x_knots=initial_knots, y_knots=initial_values)
