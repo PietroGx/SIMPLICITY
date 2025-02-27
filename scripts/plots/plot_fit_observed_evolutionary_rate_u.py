@@ -27,7 +27,7 @@ def main():
                    'exp',
                    'double_log',
                    'tan']
-    
+    aic_models = {}
     for model_type in model_types:
         print('')
         print('###############################################################')
@@ -37,6 +37,7 @@ def main():
         print('###############################################################')
         print('')
         fit_result = er.fit_observed_evolutionary_rate(args.experiment_name, model_type)
+        aic_models[model_type] = fit_result.aic
         print(f'saving plot in {args.experiment_name}/04_Output/')
         pm.plot_observed_evolutionary_rate_fit(args.experiment_name, 
                                                fit_result, 
@@ -44,6 +45,9 @@ def main():
         print('')
         print('###############################################################')
         print('')
+        
+    print('Comparison of fits with Akaike Information Criterion')
+    print(aic_models)
     
 if __name__ == "__main__":
     main()
