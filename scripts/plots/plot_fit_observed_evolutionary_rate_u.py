@@ -22,11 +22,16 @@ def main():
     parser.add_argument('experiment_name', type=str, help="experiment name")
     args = parser.parse_args()
     
-    model_types = ['linear',
-                   'log',
-                   'exp',
-                   'double_log',
-                   'tan','spline']
+    # model_types = ['linear',
+    #                'log',
+    #                'exp',
+    #                'double_log',
+    #                'tan',
+    #                'spline']
+    
+    model_types = [
+                   'spline']
+    
     aic_models = {}
     for model_type in model_types:
         print('')
@@ -43,8 +48,9 @@ def main():
             pm.plot_observed_evolutionary_rate_fit(args.experiment_name, 
                                                    fit_result, 
                                                    model_type)
-        except:
-            print(f'model {model_type} could not be fit, too few data points!')
+        except Exception as e:
+            print(e)
+            # print(f'model {model_type} could not be fit, too few data points!')
         print('')
         print('###############################################################')
         print('')
