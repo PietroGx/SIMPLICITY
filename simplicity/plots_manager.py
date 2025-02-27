@@ -423,7 +423,7 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     y_data = data['u']  
     
     # Create figure and axes
-    fig, ax = plt.subplots(3,1, figsize=(4, 12))
+    fig, ax = plt.subplots(3,1, figsize=(8, 10))
     # scatterplot data (u)
     ax[0].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
     ax[1].scatter(x_data, y_data, color='blue', alpha=0.5)
@@ -457,6 +457,7 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     fig.legend(loc="upper center", ncol=2, fontsize=10)
     
     plt.title('')
+    plt.subplots_adjust(top=0.85)
     plt.tight_layout()
     file_path = os.path.join(dm.get_experiment_dir(experiment_name),
                              f'observed_evolutionary_rate_{model_type}_fit.png')
