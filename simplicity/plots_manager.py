@@ -436,7 +436,7 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     ax[0].set_xlim(0)
     # ax[0].set_xlabel('Substitution Rate (site/year) (e)')
     # ax[0].set_ylabel('Observed evolutionary rate (site/year) (u)')
-    # ax[0].legend()
+    ax[0].legend()
     # semilog scale
     ax[1].plot(x_data, fit_result.best_fit, 
                color='red', linewidth=2)
@@ -454,10 +454,10 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     # ax[2].set_ylabel('Observed evolutionary rate (site/year) (u)')
     # ax[2].legend()
     
-    fig.legend(loc="upper center", ncol=2, fontsize=10)
+    # fig.legend(loc="upper center", ncol=2, fontsize=10)
     
     plt.title('')
-    plt.subplots_adjust(top=0.6)
+    # plt.subplots_adjust(top=0.6)
     plt.tight_layout()
     file_path = os.path.join(dm.get_experiment_dir(experiment_name),
                              f'observed_evolutionary_rate_{model_type}_fit.png')
