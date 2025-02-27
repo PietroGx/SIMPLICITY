@@ -91,6 +91,7 @@ def tempest_regression(df):
     u = model.coef_[0]
     return u, model
 
+from scipy.interpolate import CubicSpline
 def factory_model(model_type: str):
     
     # Define the models
@@ -108,6 +109,11 @@ def factory_model(model_type: str):
 
     def tan_model(x, A, B, C, D):
         return A * np.tan(B * x - C) + D
+    
+    def spline_model(x, x_knots, y_knots):
+        # Create a cubic spline interpolation using given knots
+        cs = CubicSpline(x_knots, y_knots, bc_type='natural')
+        return cs(x)
     
     # select the model, assign parameters and return it
     if model_type == 'linear':
@@ -153,6 +159,17 @@ def factory_model(model_type: str):
         
         return model, params 
     
+    if model_type == 'spline':
+        model = Model(spline_model)
+        # Define initial guesses for the knots and their corresponding values
+        # Initial guess for knots
+        initial_knots = np.linspace(0.0001, 1, 10)  
+        # Initial guess for the spline values at the knots
+        initial_values = np.sin(2 * np.pi * initial_knots)  
+        params = model.make_params(x_knots=initial_knots, y_knots=initial_values)
+        
+        return model, params 
+    
     else: raise ValueError('Invalid model selection')
 
 def fit_observed_evolutionary_rate(experiment_name, model_type):
@@ -160,12 +177,12 @@ def fit_observed_evolutionary_rate(experiment_name, model_type):
     data = om.read_u_e_values(experiment_name)
     x_data = data['evolutionary_rate'] 
     y_data = data['u']  
-    # weights = 1 / y_data
+    weights = np.ones_like(y_data)
     # Create the Model
     model, params = factory_model(model_type)
     
     # Fit the model to the data
-    fit_result = model.fit(y_data, params, x=x_data)#, weights=weights)
+    fit_result = model.fit(y_data, params, x=x_data, weights=weights)
     
     # Print the fit results
     print(fit_result.fit_report())
