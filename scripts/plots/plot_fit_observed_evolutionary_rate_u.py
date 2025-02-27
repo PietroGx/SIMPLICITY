@@ -36,12 +36,15 @@ def main():
         print('')
         print('###############################################################')
         print('')
-        fit_result = er.fit_observed_evolutionary_rate(args.experiment_name, model_type)
-        aic_models[model_type] = fit_result.aic
-        print(f'saving plot in {args.experiment_name}/04_Output/')
-        pm.plot_observed_evolutionary_rate_fit(args.experiment_name, 
-                                               fit_result, 
-                                               model_type)
+        try:
+            fit_result = er.fit_observed_evolutionary_rate(args.experiment_name, model_type)
+            aic_models[model_type] = fit_result.aic
+            print(f'saving plot in {args.experiment_name}/04_Output/')
+            pm.plot_observed_evolutionary_rate_fit(args.experiment_name, 
+                                                   fit_result, 
+                                                   model_type)
+        except:
+            print(f'model {model_type} could not be fit, too few data points!')
         print('')
         print('###############################################################')
         print('')

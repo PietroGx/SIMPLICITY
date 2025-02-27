@@ -444,7 +444,7 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     ax[1].set_ylim(0)
     # ax[1].set_xlabel('Substitution Rate (site/year) (e)')
     ax[1].set_ylabel('Observed evolutionary rate (site/year) (u)')
-    # ax[1].legend()
+    ax[1].legend()
     # loglog scale
     ax[2].plot(x_data, fit_result.best_fit, 
                color='red', linewidth=2)
@@ -452,7 +452,7 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     ax[2].set_xscale("log")
     ax[2].set_xlabel('Substitution Rate (site/year) (e)')
     # ax[2].set_ylabel('Observed evolutionary rate (site/year) (u)')
-    # ax[2].legend()
+    ax[2].legend()
     
     # fig.legend(loc="upper center", ncol=2, fontsize=10)
     
