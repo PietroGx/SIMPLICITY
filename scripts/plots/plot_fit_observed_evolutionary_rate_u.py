@@ -46,8 +46,12 @@ def main():
         print('###############################################################')
         print('')
         
+    # print AIC for each model fit
+    sorted_aics = sorted(aic_models.items(), key=lambda item: item[1])
     print('Comparison of fits with Akaike Information Criterion')
-    print(aic_models)
+    print("Key    Value")
+    for key, value in sorted_aics:
+        print(f"{key}      {value}")
     
 if __name__ == "__main__":
     main()
