@@ -457,7 +457,7 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     fig.legend(loc="upper center", ncol=2, fontsize=10)
     
     plt.title('')
-    plt.subplots_adjust(top=0.85)
+    plt.subplots_adjust(top=0.6)
     plt.tight_layout()
     file_path = os.path.join(dm.get_experiment_dir(experiment_name),
                              f'observed_evolutionary_rate_{model_type}_fit.png')
