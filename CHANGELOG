@@ -265,6 +265,7 @@
 	Version 0.7.1
 	
 	* updated standard parameters values 
+	* updated plot_IH_lineage_distribution to save figure
 	* 
 	
 	
