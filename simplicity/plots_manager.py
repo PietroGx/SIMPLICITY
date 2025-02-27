@@ -412,43 +412,49 @@ def plot_histograms(experiment_name, final_times_data_frames):
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name),
                              'simulations_lenght_histogram.png'))
 
-def plot_u_fit(experiment_name,fit_result,scale:str):
+###############################################################################
+###############################################################################
+def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type):
     ''' plot fit of evolutionary rate / observed evolutionary rate curve
     '''
-    if scale == 'loglog' or 'semilog' or 'lin':
-        pass
-    else:
-        raise ValueError('invalid scale settigs.')
-        
+
     data = om.read_u_e_values(experiment_name)
     x_data = data['evolutionary_rate'] 
     y_data = data['u']  
     
     # Create figure and axes
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(1,3)
     ax.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
     # print(x_data)
-    # print(y_data)
-    # print(fit_result.best_fit)
-    # Set log scales
     
-    if scale == 'loglog':
-        ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
-        ax.set_yscale("log")
-        ax.set_xscale("log")
-    elif scale == 'semilog':
-        ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
-        ax.set_xscale("log")
-        ax.set_ylim(0)
-    else:
-        ax.plot(x_data, fit_result.best_fit, label='Fitted curve', color='red', linewidth=2)
-        ax.set_ylim(0)
-        ax.set_xlim(0)
-    ax.set_xlabel('Evolutionary Rate')
-    ax.set_ylabel('u')
-    ax.legend()
-    plt.title('Logarithmic Fit to Data')
-    file_path = os.path.join(dm.get_experiment_dir(experiment_name),f'ue_fitting_{scale}.png')
+    # linear scale
+    ax[0].plot(x_data, fit_result.best_fit, label='Fitted {model_type} curve', 
+               color='red', linewidth=2)
+    ax[0].set_ylim(0)
+    ax[0].set_xlim(0)
+    ax[0].set_xlabel('Substitution Rate (site/year) (e)')
+    ax[0].set_ylabel('Observed evolutionary rate (site/year) (u)')
+    ax[0].legend()
+    # semilog scale
+    ax[1].plot(x_data, fit_result.best_fit, label='Fitted {model_type} curve', 
+               color='red', linewidth=2)
+    ax[1].set_xscale("log")
+    ax[1].set_ylim(0)
+    ax[1].set_xlabel('Substitution Rate (site/year) (e)')
+    ax[1].set_ylabel('Observed evolutionary rate (site/year) (u)')
+    ax[1].legend()
+    # loglog scale
+    ax[2].plot(x_data, fit_result.best_fit, label='Fitted {model_type} curve', 
+               color='red', linewidth=2)
+    ax[2].set_yscale("log")
+    ax[2].set_xscale("log")
+    ax[2].set_xlabel('Substitution Rate (site/year) (e)')
+    ax[2].set_ylabel('Observed evolutionary rate (site/year) (u)')
+    ax[2].legend()
+    
+    plt.title('')
+    file_path = os.path.join(dm.get_experiment_dir(experiment_name),
+                             f'observed_evolutionary_rate_{model_type}_fit.png')
     plt.savefig(file_path)
  
 ###############################################################################
@@ -592,6 +598,9 @@ def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
     plt.grid(True)
     plt.savefig('extrande_pop_runtime.png')
     plt.show()
+    
+###############################################################################
+###############################################################################
 
 def plot_effective_theoretical_diagnosis_rate(experiment_name):
     ''' plot scatter and regression line of effective vs theoretical diagnosis rate
@@ -680,6 +689,9 @@ def plot_heatmap_R_diagnosis_rate(experiment_name):
     plt.title('Heatmap of diagnosis rates vs R')
     plt.ylabel('R')
     plt.xlabel('Theoretical (user input) diagnosis rates')
+    
+###############################################################################
+###############################################################################
 
 def plot_IH_lineage_distribution(experiment_name):
     fig, axes  = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
