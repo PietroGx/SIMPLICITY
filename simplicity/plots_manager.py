@@ -424,8 +424,10 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     
     # Create figure and axes
     fig, ax = plt.subplots(1,3)
-    ax.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    # print(x_data)
+    # scatterplot data (u)
+    ax[0].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
+    ax[1].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
+    ax[2].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
     
     # linear scale
     ax[0].plot(x_data, fit_result.best_fit, label='Fitted {model_type} curve', 
