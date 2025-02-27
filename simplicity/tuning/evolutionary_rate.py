@@ -9,6 +9,9 @@ import pandas as pd
 import sklearn.linear_model 
 import os
 import glob
+import numpy as np
+from lmfit import Model
+import simplicity.output_manager as om
 
 def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
     """
@@ -87,3 +90,83 @@ def tempest_regression(df):
     model.fit(x, y)
     u = model.coef_[0]
     return u, model
+
+def factory_model(model_type: str):
+    
+    # Define the models
+    def linear_model(x, A, B):
+        return A*x + B
+
+    def log_model(x, A, B, C):
+        return A * np.log(B * x + C)
+
+    def exp_model(x, A, B, C):
+        return A * x**B + C
+
+    def double_log_model(x, A, B, C, D, E, F):
+        return A * np.log(B * x + C) + D * np.log(E * x + F)
+
+    def tan_model(x, A, B, C, D):
+        return A * np.tan(B * x - C) + D
+    
+    # select the model, assign parameters and return it
+    if model_type == 'linear':
+        model = Model(linear_model)
+        # Set initial parameter guesses 
+        params = model.make_params(A=1, B=0)
+        
+        return model, params 
+    
+    elif model_type == 'log':
+        model = Model(log_model)
+        # Set initial parameter guesses 
+        params = model.make_params(A=1, B=1, C=0)
+        # Set boundaries for parameters
+        params['B'].set(min=0.000001)  
+        params['C'].set(min=0.000001)
+        
+        return model, params 
+    
+    elif model_type == 'exp':
+        model = Model(exp_model)
+        # Set initial parameter guesses 
+        params = model.make_params(A=1, B=1, C=0)
+        
+        return model, params 
+    
+    elif model_type == 'double_log':
+        model = Model(double_log_model)
+        # Set initial parameter guesses 
+        params = model.make_params(A=1, B=1, C=0, D=1, E=1, F=0)
+        # Set boundaries for parameters
+        params['B'].set(min=0.000001)  
+        params['C'].set(min=0.000001)
+        params['E'].set(min=0.000001)  
+        params['F'].set(min=0.000001)
+        
+        return model, params 
+    
+    elif model_type == 'tan':
+        model = Model(tan_model)
+        # Set initial parameter guesses 
+        params = model.make_params(A=1, B=1, C=0, D=0)
+        
+        return model, params 
+    
+    else: raise ValueError('Invalid model selection')
+
+def fit_observed_evolutionary_rate(experiment_name, model_type):
+    # Read data from CSV
+    data = om.read_u_e_values(experiment_name)
+    x_data = data['evolutionary_rate'] 
+    y_data = data['u']  
+    # weights = 1 / y_data
+    # Create the Model
+    model, params = factory_model(model_type)
+    
+    # Fit the model to the data
+    fit_result = model.fit(y_data, params, x=x_data)#, weights=weights)
+    
+    # Print the fit results
+    print(fit_result.fit_report())
+    return fit_result
