@@ -26,7 +26,7 @@ def main():
                    'log',
                    'exp',
                    'double_log',
-                   'tan']#,'spline']
+                   'tan','spline']
     aic_models = {}
     for model_type in model_types:
         print('')
