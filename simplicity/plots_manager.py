@@ -352,7 +352,7 @@ def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
         if combined_df is None: 
             pass
         else:
-            u, _ = tempest_regression(combined_df)
+            u = tempest_regression(combined_df).coef_[0] # substitution rate per site per year
             results.append({str(parameter): parameter_value, 'u': u})
     # add results to df
     results_df = pd.DataFrame(results)
