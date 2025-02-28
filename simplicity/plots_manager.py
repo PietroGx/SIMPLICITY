@@ -261,31 +261,25 @@ def ideal_subplot_grid(num_plots):
     num_rows = math.ceil(num_plots / num_cols)
     
     return num_rows, num_cols        
+
+def plot_tempest_regression():
+    pass
+    
  
 def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0, y_axis_max=0.1):
     # Get experiment output dir
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    # Get seeded simulations output subfolders
-    seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
-                                    f.name) for f in os.scandir(experiment_output_dir
-                                                                ) if f.is_dir()]
-   
-    def extract_parameter(seeeded_simulations_output_directory,parameter):
-        json_file = seeeded_simulations_output_directory.replace(
-                    '04_Output','02_Simulation_parameters') +'.json'
-        try:
-            with open(json_file, 'r') as file:
-                data = json.load(file)
-                return data.get(parameter)
-        except Exception as e:
-            print(f"Error reading JSON file: {e}")
-            return None
-        
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    # for simulation_output_dir in simulation_output_dirs:
+    #     # Get seeded simulations output subfolders
+    #     seeeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
+  
     # Sort the subdirectories based on the evolutionary rate
-    sorted_dirs = sorted(seeeded_simulations_output_directories, 
-                     key=lambda dir: extract_parameter(dir, parameter))
+    sorted_simulation_output_dirs = sorted(simulation_output_dirs, 
+                     key=lambda dir: sm.get_parameter_value_from_simulation_output_dir(dir, parameter))
+    
     # Determine the number of rows and columns for subplots
-    num_rows, num_cols = ideal_subplot_grid(len(seeeded_simulations_output_directories))
+    num_rows, num_cols = ideal_subplot_grid(len(sorted_simulation_output_dirs))
 
     fig, axs = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows))
     
@@ -297,8 +291,8 @@ def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0, y_ax
     else:
         axs = axs
     
-    for i, subdir in enumerate(sorted_dirs):
-        param = extract_parameter(subdir, parameter)
+    for i, subdir in enumerate(sorted_simulation_output_dirs):
+        param = sm.get_parameter_value_from_simulation_output_dir(dir, parameter)
         combined_df = create_joint_sequencing_df(subdir, min_sim_lenght)
         if combined_df is None: 
             pass

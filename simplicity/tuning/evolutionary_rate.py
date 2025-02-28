@@ -11,6 +11,7 @@ import os
 import glob
 import numpy as np
 from lmfit import Model
+from lmfit.models import SplineModel
 import simplicity.output_manager as om
 
 def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
@@ -67,9 +68,9 @@ def create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_len
         print('')
         return None
     
-def tempest_regression(df):
+def tempest_regression(sequencing_data_df):
     '''
-    perform TempEst regression on joint dataframe of sequencing data
+    perform TempEst regression on dataframe of sequencing data
 
     Parameters
     ----------
@@ -84,14 +85,13 @@ def tempest_regression(df):
         fitted model (sklearn linear regression(.
 
     '''
-    x = df['Sequencing_time'].values.reshape(-1, 1)
-    y = df['Distance_from_root'].values
+    x = sequencing_data_df['Sequencing_time'].values.reshape(-1, 1)
+    y = sequencing_data_df['Distance_from_root'].values
     model = sklearn.linear_model.LinearRegression(fit_intercept=False)
     model.fit(x, y)
-    u = model.coef_[0]
-    return u, model
+    observed_evolutionary_rate = model.coef_[0] # substitution rate per site per year
+    return observed_evolutionary_rate, model
 
-from lmfit.models import SplineModel
 def factory_model(model_type: str):
     
     # Define the models

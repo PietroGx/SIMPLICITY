@@ -391,5 +391,3 @@ def get_parameter_value_from_simulation_output_dir(simulation_output_dir, parame
 
 
 
-
-
