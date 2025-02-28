@@ -156,7 +156,7 @@ def factory_model(model_type: str):
     
     if model_type == 'spline':
         # Define knot positions for the spline ensuring they are within range and well spaced
-        knots = np.logspace(-3, 0, 10)  
+        knots = np.logspace(-3, 0, 5)  
         
         # Initialize the SplineModel with the defined knots
         model = SplineModel(prefix='spline_', xknots=knots)
