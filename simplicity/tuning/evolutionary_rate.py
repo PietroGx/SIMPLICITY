@@ -87,10 +87,10 @@ def tempest_regression(sequencing_data_df):
     '''
     x = sequencing_data_df['Sequencing_time'].values.reshape(-1, 1)
     y = sequencing_data_df['Distance_from_root'].values
-    model = sklearn.linear_model.LinearRegression(fit_intercept=False)
-    model.fit(x, y)
-    observed_evolutionary_rate = model.coef_[0] # substitution rate per site per year
-    return observed_evolutionary_rate, model
+    tempest_regression = sklearn.linear_model.LinearRegression(fit_intercept=False)
+    fitted_tempest_regression = tempest_regression.fit(x, y)
+    
+    return fitted_tempest_regression
 
 def factory_model(model_type: str):
     
