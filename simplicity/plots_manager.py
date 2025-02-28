@@ -281,13 +281,11 @@ def plot_tempest_regression(sequencing_data_df,
     ax.set_xlabel('Time [y]')
     ax.set_ylabel('Distance from root [#S/site]')
     ax.set_xlim(left=0)
-    y_axis_max=0.1
-    ax.set_ylim(0, y_axis_max)
     ax.grid(True)
     ax.legend()
     
  
-def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0):
+def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0,y_axis_max=0.1):
     # Get sorted simulation output directories for experiment
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
@@ -321,6 +319,7 @@ def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0):
                                        ax)
             param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
             ax.set_title(f'Regression - {parameter}: {param}')
+            ax.set_ylim(0, y_axis_max)
             
 
     plt.tight_layout()
