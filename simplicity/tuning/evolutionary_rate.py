@@ -91,7 +91,7 @@ def tempest_regression(df):
     u = model.coef_[0]
     return u, model
 
-from scipy.interpolate import CubicSpline
+from lmfit.models import SplineModel
 def factory_model(model_type: str):
     
     # Define the models
@@ -109,11 +109,6 @@ def factory_model(model_type: str):
 
     def tan_model(x, A, B, C, D):
         return A * np.tan(B * x - C) + D
-    
-    def spline_model(x, x_knots, y_knots):
-        # Create a cubic spline interpolation using given knots
-        cs = CubicSpline(x_knots, y_knots, bc_type='natural')
-        return cs(x)
     
     # select the model, assign parameters and return it
     if model_type == 'linear':
@@ -160,14 +155,16 @@ def factory_model(model_type: str):
         return model, params 
     
     if model_type == 'spline':
-        model = Model(spline_model)
-        # Define initial guesses for the knots and their corresponding values
-        # Initial guess for knots
-        initial_knots = np.linspace(0.0001, 1, 10)  
-        # Initial guess for the spline values at the knots
-        initial_values = np.sin(2 * np.pi * initial_knots)  
-        params = model.make_params(x_knots=initial_knots, y_knots=initial_values)
+        # Define knot positions for the spline ensuring they are within range and well spaced
+        knots = np.linspace(0.00001, 1, 6)  
         
+        # Initialize the SplineModel with the defined knots
+        spline_model = SplineModel(prefix='spline_', xknots=knots)
+        
+        # Create parameters with initial guesses and set boundaries to avoid instability
+        params = spline_model.make_params()
+        # for param in params:
+        #     params[param].set(min=-2, max=2)  
         return model, params 
     
     else: raise ValueError('Invalid model selection')
