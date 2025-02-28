@@ -292,7 +292,7 @@ def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0, y_ax
         axs = axs
     
     for i, subdir in enumerate(sorted_simulation_output_dirs):
-        param = sm.get_parameter_value_from_simulation_output_dir(dir, parameter)
+        param = sm.get_parameter_value_from_simulation_output_dir(subdir, parameter)
         combined_df = create_joint_sequencing_df(subdir, min_sim_lenght)
         if combined_df is None: 
             pass
