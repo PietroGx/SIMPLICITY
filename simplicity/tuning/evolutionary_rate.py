@@ -174,12 +174,14 @@ def fit_observed_evolutionary_rate(experiment_name, model_type):
     data = om.read_u_e_values(experiment_name)
     x_data = data['evolutionary_rate'] 
     y_data = data['u']  
-    # weights = np.ones_like(y_data)
+    
+    weights = 1/y_data
+    
     # Create the Model
     model, params = factory_model(model_type)
     
     # Fit the model to the data
-    fit_result = model.fit(y_data, params, x=x_data)#, weights=weights)
+    fit_result = model.fit(y_data, params, x=x_data, weights=weights)
     
     # Print the fit results
     print(fit_result.fit_report())
