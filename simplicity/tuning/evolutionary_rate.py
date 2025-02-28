@@ -159,10 +159,10 @@ def factory_model(model_type: str):
         knots = np.linspace(0.00001, 1, 6)  
         
         # Initialize the SplineModel with the defined knots
-        spline_model = SplineModel(prefix='spline_', xknots=knots)
+        model = SplineModel(prefix='spline_', xknots=knots)
         
         # Create parameters with initial guesses and set boundaries to avoid instability
-        params = spline_model.make_params()
+        params = model.make_params()
         # for param in params:
         #     params[param].set(min=-2, max=2)  
         return model, params 
