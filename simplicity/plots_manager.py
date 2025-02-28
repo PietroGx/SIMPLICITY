@@ -262,19 +262,36 @@ def ideal_subplot_grid(num_plots):
     
     return num_rows, num_cols        
 
-def plot_tempest_regression():
-    pass
+def plot_tempest_regression(sequencing_data_df,
+                            fitted_tempest_regression,
+                            ax):
+    
+    x = sequencing_data_df['Sequencing_time'].values.reshape(-1, 1)
+    y_pred = fitted_tempest_regression.predict(x)
+    
+    
+    observed_evolutionary_rate = fitted_tempest_regression.coef_[0] # substitution rate per site per year
+    
+    sequencing_data_df.plot(kind='scatter', x='Sequencing_time', y='Distance_from_root', color='blue', ax=ax)
+    
+    
+    
+    ax.plot(x, y_pred, color='red', linewidth=2, 
+            label=f'observed_evolutionary_rate = {observed_evolutionary_rate:.5f}')
+    ax.set_xlabel('Time [y]')
+    ax.set_ylabel('Distance from root [#S/site]')
+    ax.set_xlim(left=0)
+    y_axis_max=0.1
+    ax.set_ylim(0, y_axis_max)
+    ax.grid(True)
+    ax.legend()
     
  
-def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0, y_axis_max=0.1):
-    # Get experiment output dir
+def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0):
+    # Get sorted simulation output directories for experiment
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
-    # for simulation_output_dir in simulation_output_dirs:
-    #     # Get seeded simulations output subfolders
-    #     seeeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
   
-    # Sort the subdirectories based on the evolutionary rate
     sorted_simulation_output_dirs = sorted(simulation_output_dirs, 
                      key=lambda dir: sm.get_parameter_value_from_simulation_output_dir(dir, parameter))
     
@@ -291,27 +308,20 @@ def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0, y_ax
     else:
         axs = axs
     
-    for i, subdir in enumerate(sorted_simulation_output_dirs):
-        param = sm.get_parameter_value_from_simulation_output_dir(subdir, parameter)
-        combined_df = create_joint_sequencing_df(subdir, min_sim_lenght)
-        if combined_df is None: 
+    for i, simulation_output_dir in enumerate(sorted_simulation_output_dirs):
+        param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
+        sequencing_data_df = create_joint_sequencing_df(simulation_output_dir, min_sim_lenght)
+        if sequencing_data_df is None: 
             pass
         else:
-            u, model = tempest_regression(combined_df)
-            
-            x = combined_df['Sequencing_time'].values.reshape(-1, 1)
-            y_pred = model.predict(x)
-            
+            fitted_tempest_regression = tempest_regression(sequencing_data_df)
             ax = axs[i // num_cols][i % num_cols]
-            combined_df.plot(kind='scatter', x='Sequencing_time', y='Distance_from_root', color='blue', ax=ax)
-            ax.plot(x, y_pred, color='red', linewidth=2, label=f'u = {u:.5f}')
-            ax.set_xlabel('Time [y]')
-            ax.set_ylabel('Distance from root [#S/site]')
-            ax.set_xlim(left=0)
-            ax.set_ylim(0, y_axis_max)
+            plot_tempest_regression(sequencing_data_df,
+                                       fitted_tempest_regression,
+                                       ax)
+            param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
             ax.set_title(f'Regression - {parameter}: {param}')
-            ax.grid(True)
-            ax.legend()
+            
 
     plt.tight_layout()
     plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
@@ -387,27 +397,7 @@ def export_u_regression_plots(experiment_name):
     for plot,plot_filename in zip(plots,plot_filenames):
         os.replace(plot, os.path.join(plots_folder_dir,plot_filename))
         
-###############################################################################
-###############################################################################
-def plot_histograms(experiment_name, final_times_data_frames):
-    ''' plot histograms of simulation final times.
-    Called from statistics_simulation_lenght.py
-    '''
-    num_folders = len(final_times_data_frames.columns)
-    fig, axes = plt.subplots(num_folders, 1, figsize=(10, 5 * num_folders), squeeze=False)
-    
-    for ax, (folder_name, data) in zip(axes.flatten(), final_times_data_frames.items()):
-        ax.hist(data, bins=30, edgecolor='black')
-        ax.set_title(f'Histogram for {folder_name}')
-        ax.set_xlabel('Last Time Value')
-        ax.set_ylabel('Frequency')
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name),
-                             'simulations_lenght_histogram.png'))
 
-###############################################################################
-###############################################################################
 def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type):
     ''' plot fit of evolutionary rate / observed evolutionary rate curve
     '''
@@ -731,7 +721,25 @@ def plot_IH_lineage_distribution(experiment_name):
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     fig_path = os.path.join(experiment_output_dir,'IH variability plot.png')
     plt.savefig(fig_path)
+
+###############################################################################
+###############################################################################
+def plot_histograms(experiment_name, final_times_data_frames):
+    ''' plot histograms of simulation final times.
+    Called from statistics_simulation_lenght.py
+    '''
+    num_folders = len(final_times_data_frames.columns)
+    fig, axes = plt.subplots(num_folders, 1, figsize=(10, 5 * num_folders), squeeze=False)
     
+    for ax, (folder_name, data) in zip(axes.flatten(), final_times_data_frames.items()):
+        ax.hist(data, bins=30, edgecolor='black')
+        ax.set_title(f'Histogram for {folder_name}')
+        ax.set_xlabel('Last Time Value')
+        ax.set_ylabel('Frequency')
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name),
+                             'simulations_lenght_histogram.png'))
    
 
 
