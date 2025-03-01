@@ -281,7 +281,7 @@ def plot_tempest_regression(sequencing_data_df,
     ax.grid(True)
     ax.legend()
  
-def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0, y_axis_max=0.1):
+def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght=0, y_axis_max=0.1):
     # Get sorted simulation output directories for experiment
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
@@ -319,11 +319,11 @@ def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0, y_ax
     plt.tight_layout()
     plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
 
-def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
+def plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
     ''' Plot observed evolutionary rate (tempest regression) against desired parameter values
     '''
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    df_csv_path = om.get_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
+    df_csv_path = om.get_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
                                                        parameter, 
                                                        min_sim_lenght)
     df = pd.read_csv(df_csv_path)
@@ -343,7 +343,7 @@ def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
     plt.savefig(os.path.join(experiment_output_dir, 
                              f"{experiment_name}_{parameter}_vs_observed_evolutionary_rate.png"))
     
-def export_u_regression_plots(experiment_name): 
+def export_tempest_regression_plots(experiment_name): 
     ''' move tempest regression plots from experiment folder to plots folder
     '''
     # get experiment output dir
