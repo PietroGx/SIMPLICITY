@@ -7,12 +7,11 @@ Created on Tue Jan  7 10:00:16 2025
 """
 
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import numpy as np
-import json
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import math
@@ -323,10 +322,11 @@ def plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name, param
     ''' Plot observed evolutionary rate (tempest regression) against desired parameter values
     '''
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    df_csv_path = om.get_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
+    # build combined dataframe, filtered by min simulation lenght
+    om.build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
                                                        parameter, 
                                                        min_sim_lenght)
-    df = pd.read_csv(df_csv_path)
+    df = om.read_combined_observed_evolutionary_rate_csv(experiment_name, parameter)
     # Plot target parameter vs u as a line plot with points
     plt.figure(figsize=(10, 6))
     plt.plot(df[parameter],  df['observed_evolutionary_rate'], 
@@ -343,18 +343,45 @@ def plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name, param
     plt.savefig(os.path.join(experiment_output_dir, 
                              f"{experiment_name}_{parameter}_vs_observed_evolutionary_rate.png"))
 
-def plot_observed_evolutionary_rates_vs_parameter_violin(experiment_name, parameter, min_sim_lenght=0):
+def plot_observed_evolutionary_rates_vs_parameter_scatter(experiment_name, parameter, min_sim_lenght=0):
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    df_csv_path = om.get_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
+    # build combined dataframe, filtered by min simulation lenght
+    om.build_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
                                                        parameter, 
                                                        min_sim_lenght)
-    df = pd.read_csv(df_csv_path)
-    df['Category'] = df[parameter].astype(str)
-    # Create a violin plot
-    plt.figure(figsize=(8, 5))
-    sns.violinplot(x='Category', y='Values', data=df)
+    observed_evolutionary_rate_vs_parameter_df = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
+    # Create figure and axes
+    fig, ax = plt.subplots(3,1, figsize=(8, 10))
+    # First scatter plot
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
+                    color='blue', alpha=0.5, ax=ax[0],
+                    data=observed_evolutionary_rate_vs_parameter_df)
+    ax[0].set_xlabel(f'{parameter}')
+    ax[0].set_ylabel('Observed Evolutionary Rate')
+    
+    # Second scatter plot
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
+                    color='blue', alpha=0.5, ax=ax[1],
+                    data=observed_evolutionary_rate_vs_parameter_df)
+    ax[1].set_xlabel(f'{parameter}')
+    ax[1].set_ylabel('Observed Evolutionary Rate')
+    ax[1].set_xscale('log')
+    
+    # Third scatter plot 
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
+                    color='blue', alpha=0.5, ax=ax[2],
+                    data=observed_evolutionary_rate_vs_parameter_df)
+    ax[2].set_xlabel(f'{parameter}')
+    ax[2].set_ylabel('Observed Evolutionary Rate')
+    ax[2].set_xscale('log')
+    ax[2].set_yscale('log')
+    
+    plt.tight_layout()
     plt.savefig(os.path.join(experiment_output_dir, 
-            f"{experiment_name}_{parameter}_vs_observed_evolutionary_rates_violin.png"))
+            f"{experiment_name}_{parameter}_vs_observed_evolutionary_rate_scatter.png"))
+    
+    plt.xticks(rotation=45)
+    plt.savefig(os.path.join(experiment_output_dir,))
     
 def export_tempest_regression_plots(experiment_name): 
     ''' move tempest regression plots from experiment folder to plots folder
@@ -377,7 +404,7 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     ''' plot fit of evolutionary rate / observed evolutionary rate curve
     '''
 
-    data = om.read_u_e_values(experiment_name)
+    data = om.read_combined_observed_evolutionary_rates_csv(experiment_name, 'evolutionary_rate')
     x_data = data['evolutionary_rate'] 
     y_data = data['u']  
     

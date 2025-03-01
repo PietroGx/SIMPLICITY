@@ -169,19 +169,19 @@ def factory_model(model_type: str):
     
     else: raise ValueError('Invalid model selection')
 
-def fit_observed_evolutionary_rate(experiment_name, model_type):
-    # Read data from CSV
-    data = om.read_u_e_values(experiment_name)
-    x_data = data['evolutionary_rate'] 
-    y_data = data['u']  
+def fit_observed_evolutionary_rate_regressor(df, model_type, weights=None):
     
-    weights = 1/y_data
+    x_data = df['evolutionary_rate'] 
+    y_data = df['observed_evolutionary_rate']  
     
     # Create the Model
     model, params = factory_model(model_type)
     
     # Fit the model to the data
-    fit_result = model.fit(y_data, params, x=x_data, weights=weights)
+    if weights is None:
+        fit_result = model.fit(y_data, params, x=x_data)
+    else:
+        fit_result = model.fit(y_data, params, x=x_data, weights=weights)
     
     # Print the fit results
     print(fit_result.fit_report())
