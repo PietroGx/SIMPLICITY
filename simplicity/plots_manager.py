@@ -457,6 +457,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
     
+    
     # First plot (linear scale)
     ax[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color='red', linewidth=2)
@@ -506,7 +507,8 @@ def plot_confidence_interval_fit(model_type, fit_result, x, ax):
         
         params_lower[param] = ci_lower
         params_upper[param] = ci_upper
-    
+    print(params_lower)
+    print(params_upper)
     # Create the upper and lower bound curves for confidence intervals
     upper_curve = er.evaluate_model(model_type, params_upper, x)
     lower_curve = er.evaluate_model(model_type, params_lower, x)
