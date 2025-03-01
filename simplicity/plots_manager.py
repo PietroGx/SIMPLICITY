@@ -19,10 +19,9 @@ from simplicity.tuning.evolutionary_rate import create_joint_sequencing_df
 from simplicity.tuning.evolutionary_rate import tempest_regression
 import glob
 import simplicity.tuning.diagnosis_rate as dr
+import simplicity.tuning.evolutionary_rate as er
 import simplicity.settings_manager as sm
 import seaborn as sns
-
-
 
 def plot_fitness(simulation_output):
     """
@@ -448,7 +447,7 @@ def plot_combined_observed_evolutionary_rate_fit(experiment_name, fit_result, mo
     file_path = os.path.join(dm.get_experiment_dir(experiment_name),
      f'{experiment_name}_combined_observed_evolutionary_rate_{model_type}_fit.png')
     plt.savefig(file_path)
-    
+
 def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type):
     ''' plot fit of evolutionary rate / observed evolutionary rates curve
     '''
@@ -457,12 +456,14 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     x_data = data['evolutionary_rate'] 
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
+    
     # First plot (linear scale)
     ax[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color='red', linewidth=2)
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[0],
                     data=data)
+    plot_confidence_interval_fit(model_type, fit_result, x_data, ax[0])
     ax[0].set_xlabel(f'{parameter}')
     ax[0].set_ylabel('Observed Evolutionary Rate')
     
@@ -472,6 +473,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[1],
                     data=data)
+    plot_confidence_interval_fit(model_type, fit_result, x_data, ax[1])
     ax[1].set_xlabel(f'{parameter}')
     ax[1].set_ylabel('Observed Evolutionary Rate')
     ax[1].set_xscale('log')
@@ -482,6 +484,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[2],
                     data=data)
+    plot_confidence_interval_fit(model_type, fit_result, x_data, ax[2])
     ax[2].set_xlabel(f'{parameter}')
     ax[2].set_ylabel('Observed Evolutionary Rate')
     ax[2].set_xscale('log')
@@ -490,6 +493,26 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     plt.tight_layout()
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
         f"{experiment_name}_observed_evolutionary_rates_{model_type}_fit.png"))
+    
+def plot_confidence_interval_fit(model_type, fit_result, x, ax):
+    params_lower = {}
+    params_upper = {}
+    
+    for param in fit_result.params:
+        param_value = fit_result.params[param].value
+        param_stderr = fit_result.params[param].stderr if fit_result.params[param].stderr else 0
+        ci_lower = param_value - 1.96 * param_stderr
+        ci_upper = param_value + 1.96 * param_stderr
+        
+        params_lower[param] = ci_lower
+        params_upper[param] = ci_upper
+    
+    # Create the upper and lower bound curves for confidence intervals
+    upper_curve = er.evaluate_model(model_type, params_upper, x)
+    lower_curve = er.evaluate_model(model_type, params_lower, x)
+    
+    # Fill between the upper and lower curves for the confidence interval region
+    ax.fill_between(x, lower_curve, upper_curve, color='gray', alpha=0.3, label='95% Confidence Interval')
  
 ###############################################################################
 ###############################################################################   
