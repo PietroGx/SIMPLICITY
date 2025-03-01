@@ -163,6 +163,12 @@ def save_sequencing_dataset(simulation_output, output_path):
                 print('')
             else: 
                 raise ValueError('There is something wrong with the sequencing data')
+
+def read_sequencing_data(seeded_simulation_output_dir):
+    sequencing_data_file_path = os.path.join(seeded_simulation_output_dir,
+                                        "sequencing_data_regression.csv")
+    df = pd.read_csv(sequencing_data_file_path)
+    return df
         
 def save_simulation_trajectory(simulation_output, seeded_simulation_output_dir):
     df = pd.DataFrame(simulation_output.trajectory, columns= 
@@ -304,8 +310,8 @@ def get_IH_lineages_data_experiment(experiment_name):
         df = pd.concat([df,new_df],axis=0)
     return df
 
-def get_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
-    ''' Create df of observed evolutionary rate (tempest regression) and parameter values
+def get_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
+    ''' Create df of observed evolutionary rate (tempest regression on joint data) and parameter values
     '''
     # get experiment_output directory
     experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
@@ -334,8 +340,45 @@ def get_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, m
     
     # Save the results to a CSV file
     csv_file_path = os.path.join(experiment_output_dir, 
-      f'{experiment_name}_observed_evolutionary_rate_vs_{parameter}_values.csv')
+      f'{experiment_name}_combined_observed_evolutionary_rate_vs_{parameter}_values.csv')
     results_df.to_csv(csv_file_path, index=False)
+    return csv_file_path
+
+def get_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
+    ''' Create df of observed evolutionary rate (tempest regression) and parameter values
+    '''
+    # get experiment_output directory
+    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
+    # Get seeded simulations output subfolders
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+ 
+    results = []
+    for simulation_output_dir in simulation_output_dirs:
+        # Read the parameter from the settings file
+        parameter_value = sm.get_parameter_value_from_simulation_output_dir(
+                                              simulation_output_dir, parameter)
+        seeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
+        
+        for seeded_simulation_output_dir in seeded_simulation_output_dirs:
+            # Perform regression for each sequencing file
+            try:
+                sequencing_data = read_sequencing_data(seeded_simulation_output_dir)
+                observed_evolutionary_rate = er.tempest_regression(sequencing_data).coef_[0] # substitution rate per site per year
+                results.append({parameter: parameter_value, 
+                            'observed_evolutionary_rate': observed_evolutionary_rate})
+            except: pass # only add files that are present
+    
+    # add fit results to df
+    df = pd.DataFrame(results)
+    
+    # Sort the df by the 'parameter' values
+    df = df.sort_values(by=str(parameter))
+    
+    # Save to a CSV file
+    csv_file_path = os.path.join(experiment_output_dir, 
+      f'{experiment_name}_observed_evolutionary_rate_vs_{parameter}_values.csv')
+    df.to_csv(csv_file_path, index=False)
+    print(df)
     return csv_file_path
 
 

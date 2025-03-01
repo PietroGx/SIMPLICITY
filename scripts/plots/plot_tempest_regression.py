@@ -7,6 +7,7 @@ Created on Fri Feb 14 15:08:05 2025
 """
 import simplicity.plots_manager as pm
 import simplicity.dir_manager as dm
+import simplicity.output_manager as om
 import argparse
 import pandas as pd 
 import os 
@@ -19,7 +20,7 @@ def plot_regressions_and_export(experiment_name, parameter, min_sim_lenght):
     print('##################################################################')
     print('')
    
-    pm.plot_u_vs_parameter(experiment_name,parameter, min_sim_lenght)
+    pm.plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name,parameter, min_sim_lenght)
     print('')
     print('##################################################################')
     print('################## Plot combined regressions #####################')
@@ -29,14 +30,15 @@ def plot_regressions_and_export(experiment_name, parameter, min_sim_lenght):
                                      f'{experiment_name}_u_vs_{parameter}_values.csv')
     
     y_axis_max = max(pd.read_csv(csv_with_u_values)['u'])*1.2
-    pm.plot_combined_regressions(experiment_name, parameter, min_sim_lenght, y_axis_max)
+    pm.plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght, y_axis_max)
     print('')
     print('##################################################################')
     print('######## Exporting plots to Tempest Regression Folder ############')
     print('##################################################################')
     print('')
     print('')
-    pm.export_u_regression_plots(experiment_name)
+    pm.export_tempest_regression_plots(experiment_name)
+    om.get_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0)
 
 def main():
     # Set up the argument parser
