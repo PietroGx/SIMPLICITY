@@ -400,7 +400,7 @@ def export_tempest_regression_plots(experiment_name):
         os.replace(plot, os.path.join(plots_folder_dir,plot_filename))
         
 
-def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type):
+def plot_combined_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type):
     ''' plot fit of evolutionary rate / observed evolutionary rate curve
     '''
 
@@ -446,8 +446,50 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     # plt.subplots_adjust(top=0.6)
     plt.tight_layout()
     file_path = os.path.join(dm.get_experiment_dir(experiment_name),
-                             f'observed_evolutionary_rate_{model_type}_fit.png')
+     f'{experiment_name}_combined_observed_evolutionary_rate_{model_type}_fit.png')
     plt.savefig(file_path)
+    
+def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type):
+    ''' plot fit of evolutionary rate / observed evolutionary rates curve
+    '''
+    parameter = 'evolutionary_rate'
+    data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
+    x_data = data['evolutionary_rate'] 
+    # Create figure and axes
+    fig, ax = plt.subplots(3,1, figsize=(8, 10))
+    # First plot (linear scale)
+    ax[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
+               color='red', linewidth=2)
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
+                    color='blue', alpha=0.5, ax=ax[0],
+                    data=data)
+    ax[0].set_xlabel(f'{parameter}')
+    ax[0].set_ylabel('Observed Evolutionary Rate')
+    
+    # Second plot (semilog scale)
+    ax[1].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
+               color='red', linewidth=2)
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
+                    color='blue', alpha=0.5, ax=ax[1],
+                    data=data)
+    ax[1].set_xlabel(f'{parameter}')
+    ax[1].set_ylabel('Observed Evolutionary Rate')
+    ax[1].set_xscale('log')
+    
+    # Third plot (log log scale)
+    ax[2].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
+               color='red', linewidth=2)
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
+                    color='blue', alpha=0.5, ax=ax[2],
+                    data=data)
+    ax[2].set_xlabel(f'{parameter}')
+    ax[2].set_ylabel('Observed Evolutionary Rate')
+    ax[2].set_xscale('log')
+    ax[2].set_yscale('log')
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(dm.get_experiment_output_dir(experiment_name), 
+        f"{experiment_name}_observed_evolutionary_rates_{model_type}_fit.png"))
  
 ###############################################################################
 ###############################################################################   

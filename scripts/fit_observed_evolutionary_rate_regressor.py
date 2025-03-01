@@ -22,7 +22,7 @@ def fit_models(experiment_name, model_types, data_type):
          # import the df needed for the fit
         df = om.read_combined_observed_evolutionary_rate_csv(experiment_name, parameter)
         # select plot function
-        plot_fit = pm.plot_observed_evolutionary_rate_fit
+        plot_fit = pm.plot_combined_observed_evolutionary_rate_fit
         
     elif data_type == 'single_rates':
         # build the dataframe needed for the fit
@@ -32,7 +32,7 @@ def fit_models(experiment_name, model_types, data_type):
          # import the df needed for the fit
         df = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
         # select plot function
-        plot_fit = pm.plot_observed_evolutionary_rates_vs_parameter_scatter
+        plot_fit = pm.plot_observed_evolutionary_rates_fit
     else:
         raise ValueError('invalid data_type, check data_type sintax!')
         
@@ -76,7 +76,7 @@ def main():
                    'tan',
                    'spline']
     
-    data_type = 'single_rates'
+    data_type = 'combined_rate'
     
     aic_models = fit_models(args.experiment_name, model_types, data_type)
         
