@@ -467,6 +467,8 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
                     data=data)
     # Fill between the upper and lower curves for the confidence interval region
     ax[0].fill_between(x, lower_curve, upper_curve, color='gray', alpha=0.3, label='95% Confidence Interval')
+    ax[0].scatter(x, lower_curve, color='green')
+    ax[0].scatter(x, upper_curve, color='green')
     ax[0].set_xlabel(f'{parameter}')
     ax[0].set_ylabel('Observed Evolutionary Rate')
     
