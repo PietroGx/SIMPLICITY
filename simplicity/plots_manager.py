@@ -452,12 +452,26 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     ''' plot fit of evolutionary rate / observed evolutionary rates curve
     '''
     parameter = 'evolutionary_rate'
-    data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
-    x_data = data['evolutionary_rate']
-    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
+    
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
     
+    # import combined regression data
+    combined_data = om.read_combined_observed_evolutionary_rate_csv(experiment_name, parameter)
+    combined_x_data = combined_data['evolutionary_rate'] 
+    combined_y_data = combined_data['observed_evolutionary_rate']  
+    
+    # scatterplot combined regression points (as comparison)
+    for a in ax:
+        a.scatter(
+            combined_x_data, combined_y_data, 
+            label='Combined tempest regression estimate of OER', 
+            color='#DE8F05', marker='X')
+ 
+    
+    data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
+    x_data = data['evolutionary_rate']
+    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
     
     # First plot (linear scale)
     ax[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
