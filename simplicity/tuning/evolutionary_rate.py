@@ -93,37 +93,19 @@ def tempest_regression(sequencing_data_df):
     
 def factory_model_func(model_type: str):
     # Define the models
-    def linear_model(x, params):
-        A = params['A'].value if hasattr(params['A'], 'value') else params['A']
-        B = params['B'].value if hasattr(params['B'], 'value') else params['B']
+    def linear_model(x, A, B):
         return A * x + B
 
-    def log_model(x, params):
-        A = params['A'].value if hasattr(params['A'], 'value') else params['A']
-        B = params['B'].value if hasattr(params['B'], 'value') else params['B']
-        C = params['C'].value if hasattr(params['C'], 'value') else params['C']
+    def log_model(x, A, B, C):
         return A * np.log(B * x + C)
 
-    def exp_model(x, params):
-        A = params['A'].value if hasattr(params['A'], 'value') else params['A']
-        B = params['B'].value if hasattr(params['B'], 'value') else params['B']
-        C = params['C'].value if hasattr(params['C'], 'value') else params['C']
+    def exp_model(x, A, B, C):
         return A * x**B + C
 
-    def double_log_model(x, params):
-        A = params['A'].value if hasattr(params['A'], 'value') else params['A']
-        B = params['B'].value if hasattr(params['B'], 'value') else params['B']
-        C = params['C'].value if hasattr(params['C'], 'value') else params['C']
-        D = params['D'].value if hasattr(params['D'], 'value') else params['D']
-        E = params['E'].value if hasattr(params['E'], 'value') else params['E']
-        F = params['F'].value if hasattr(params['F'], 'value') else params['F']
-        return (A * np.log(B * x + C) + D * np.log(E * x + F))
+    def double_log_model(x, A, B, C, D, E, F):
+        return A * np.log(B * x + C) + D * np.log(E * x + F)
 
-    def tan_model(x, params):
-        A = params['A'].value if hasattr(params['A'], 'value') else params['A']
-        B = params['B'].value if hasattr(params['B'], 'value') else params['B']
-        C = params['C'].value if hasattr(params['C'], 'value') else params['C']
-        D = params['D'].value if hasattr(params['D'], 'value') else params['D']
+    def tan_model(x, A, B, C, D):
         return A * np.tan(B * x - C) + D
     
     # Model selection dictionary
@@ -138,7 +120,17 @@ def factory_model_func(model_type: str):
     if model_type not in models:
         raise ValueError(f"Unknown model type: {model_type}")
     
-    return models[model_type]
+    base_model = models[model_type]
+    
+    # Wrapper to support both lmfit and dictionary-based calls
+    def model_wrapper(x, params):
+        if isinstance(params, dict):
+            return base_model(x, **params)
+        else:
+            param_values = {name: getattr(params[name], 'value', params[name]) for name in params}
+            return base_model(x, **param_values)
+    
+    return model_wrapper
 
 
 def factory_model_lmfit(model_type: str):
