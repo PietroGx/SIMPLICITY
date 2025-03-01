@@ -515,9 +515,11 @@ def plot_confidence_interval_fit(model_type, fit_result, x, ax):
     def remove_duplicates(x):
         _, idx = np.unique(x, return_index=True)
         return x[np.sort(idx)]
-    
+    print('')
+    print('x: ', x)
     x = remove_duplicates(x)
-    
+    print('')
+    print('x_nodup: ', x)
     # Create the upper and lower bound curves for confidence intervals
     upper_curve = er.evaluate_model(model_type, params_upper, x)
     lower_curve = er.evaluate_model(model_type, params_lower, x)
