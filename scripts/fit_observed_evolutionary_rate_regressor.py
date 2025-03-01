@@ -74,18 +74,27 @@ def main():
                    'exp',
                    'double_log',
                    'tan',
-                   'spline']
+                   'spline'] 
     
-    data_type = 'single_rates'
+    aic_models_combined = fit_models(args.experiment_name, model_types, 'combined_rate')
+    aic_models = fit_models(args.experiment_name, model_types, 'single_rates')
     
-    aic_models = fit_models(args.experiment_name, model_types, data_type)
-        
+    # print AIC for each model fit
+    sorted_aics_combined = sorted(aic_models_combined.items(), key=lambda item: item[1])
+    print('Comparison of combined rates fits with Akaike Information Criterion')
+    print("Key    Value")
+    for key, value in sorted_aics_combined:
+        print(f"{key}      {value}")
+    
     # print AIC for each model fit
     sorted_aics = sorted(aic_models.items(), key=lambda item: item[1])
-    print('Comparison of combined rates fits with Akaike Information Criterion')
+    print('Comparison of rates fits with Akaike Information Criterion')
     print("Key    Value")
     for key, value in sorted_aics:
         print(f"{key}      {value}")
+        
+    
+    
     
 if __name__ == "__main__":
     main()
