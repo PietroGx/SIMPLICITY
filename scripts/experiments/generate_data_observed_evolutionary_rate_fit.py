@@ -26,7 +26,7 @@ experiment_name =  'generate_data_u_e_fit'
 def fixture_experiment_settings():
 
     # number of values for evolutionary rate
-    evolutionary_rate_num_values = 15
+    evolutionary_rate_num_values = 20
     
     # Generate values spaced logarithmically between 10^-5 and 1
     values = np.logspace(np.log10(0.00001), np.log10(1), 
@@ -34,8 +34,7 @@ def fixture_experiment_settings():
     evolutionary_rate_values = values.tolist()
 
     
-    parameters      = {'evolutionary_rate': evolutionary_rate_values,
-                       'final_time':[365] * evolutionary_rate_num_values
+    parameters      = {'evolutionary_rate': evolutionary_rate_values
                        }
     n_seeds = 300
 
