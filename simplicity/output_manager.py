@@ -346,7 +346,7 @@ def get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,par
       f'{experiment_name}_observed_evolutionary_rate_vs_{parameter}_values.csv')
     return csv_file_path
 
-def build_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
+def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
     ''' Create df of observed evolutionary rate (tempest regression) and parameter values
     '''
     # Get seeded simulations output subfolders

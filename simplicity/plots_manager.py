@@ -346,7 +346,7 @@ def plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name, param
 def plot_observed_evolutionary_rates_vs_parameter_scatter(experiment_name, parameter, min_sim_lenght=0):
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     # build combined dataframe, filtered by min simulation lenght
-    om.build_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
+    om.build_observed_evolutionary_rates_vs_parameter_df(experiment_name, 
                                                        parameter, 
                                                        min_sim_lenght)
     observed_evolutionary_rate_vs_parameter_df = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
