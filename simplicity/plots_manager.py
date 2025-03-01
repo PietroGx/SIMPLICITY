@@ -404,9 +404,9 @@ def plot_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type)
     ''' plot fit of evolutionary rate / observed evolutionary rate curve
     '''
 
-    data = om.read_combined_observed_evolutionary_rates_csv(experiment_name, 'evolutionary_rate')
+    data = om.read_combined_observed_evolutionary_rate_csv(experiment_name, 'evolutionary_rate')
     x_data = data['evolutionary_rate'] 
-    y_data = data['u']  
+    y_data = data['observed_evolutionary_rate']  
     
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
