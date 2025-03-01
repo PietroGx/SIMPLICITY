@@ -69,12 +69,12 @@ def main():
     args = parser.parse_args()
     
     # define model types for the fit
-    model_types = ['linear',
-                   'log',
-                   'exp',
-                   'double_log',
-                   'tan',
-                   'spline']
+    model_types = ['linear']
+                   # 'log',
+                   # 'exp',
+                   # 'double_log',
+                   # 'tan',
+                   # 'spline']
     
     data_type = 'single_rates'
     
