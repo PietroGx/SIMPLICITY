@@ -454,7 +454,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     parameter = 'evolutionary_rate'
     data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
     x_data = data['evolutionary_rate']
-    x_data_array = data['evolutionary_rate'].to_numpy()
+    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
     
@@ -465,7 +465,8 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[0],
                     data=data)
-    plot_confidence_interval_fit(model_type, fit_result, x_data_array, ax[0])
+    # Fill between the upper and lower curves for the confidence interval region
+    ax[0].fill_between(x, lower_curve, upper_curve, color='gray', alpha=0.3, label='95% Confidence Interval')
     ax[0].set_xlabel(f'{parameter}')
     ax[0].set_ylabel('Observed Evolutionary Rate')
     
@@ -475,7 +476,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[1],
                     data=data)
-    plot_confidence_interval_fit(model_type, fit_result, x_data_array, ax[1])
+    
     ax[1].set_xlabel(f'{parameter}')
     ax[1].set_ylabel('Observed Evolutionary Rate')
     ax[1].set_xscale('log')
@@ -486,7 +487,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[2],
                     data=data)
-    plot_confidence_interval_fit(model_type, fit_result, x_data_array, ax[2])
+
     ax[2].set_xlabel(f'{parameter}')
     ax[2].set_ylabel('Observed Evolutionary Rate')
     ax[2].set_xscale('log')
@@ -496,7 +497,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
         f"{experiment_name}_observed_evolutionary_rates_{model_type}_fit.png"))
     
-def plot_confidence_interval_fit(model_type, fit_result, x, ax):
+def confidence_interval_fit(model_type, fit_result, x):
     params_lower = {}
     params_upper = {}
     
@@ -508,26 +509,17 @@ def plot_confidence_interval_fit(model_type, fit_result, x, ax):
         
         params_lower[param] = ci_lower
         params_upper[param] = ci_upper
-    print('')
-    print('XXXXXXXXXXX')
-    print(params_lower)
-    print(params_upper)
-    
+        
     def remove_duplicates_array(arr):
         _, idx = np.unique(arr, return_index=True)
         return arr[np.sort(idx)]
 
     x = remove_duplicates_array(x)
-    print('')
-    print('x_nodup: ', x)
+
     # Create the upper and lower bound curves for confidence intervals
     upper_curve = er.evaluate_model(model_type, params_upper, x)
     lower_curve = er.evaluate_model(model_type, params_lower, x)
-    print('')
-    print(upper_curve)
-    print(lower_curve)
-    # Fill between the upper and lower curves for the confidence interval region
-    ax.fill_between(x, lower_curve, upper_curve, color='gray', alpha=0.3, label='95% Confidence Interval')
+    return x, lower_curve, upper_curve
  
 ###############################################################################
 ###############################################################################   
