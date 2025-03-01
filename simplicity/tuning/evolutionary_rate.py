@@ -120,17 +120,7 @@ def factory_model_func(model_type: str):
     if model_type not in models:
         raise ValueError(f"Unknown model type: {model_type}")
     
-    base_model = models[model_type]
-    
-    # Wrapper to support both lmfit and dictionary-based calls
-    def model_wrapper(x, params):
-        if isinstance(params, dict):
-            return base_model(x, **params)
-        else:
-            param_values = {name: getattr(params[name], 'value', params[name]) for name in params}
-            return base_model(x, **param_values)
-    
-    return model_wrapper
+    return models[model_type]
 
 
 def factory_model_lmfit(model_type: str):
