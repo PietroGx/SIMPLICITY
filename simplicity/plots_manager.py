@@ -7,7 +7,7 @@ Created on Tue Jan  7 10:00:16 2025
 """
 
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
