@@ -59,7 +59,8 @@ def fit_models(experiment_name, model_types, data_type):
         print('')
         print('###############################################################')
         print('')
-        return aic_models
+    
+    return aic_models
 
 def main():
     # Set up the argument parser
