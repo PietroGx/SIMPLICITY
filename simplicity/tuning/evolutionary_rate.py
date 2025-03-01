@@ -109,7 +109,7 @@ def factory_model_func(model_type: str):
         return A * np.tan(B * x - C) + D
     
     # Define knot positions for the spline 
-    knots = np.logspace(-3, 0, 6)
+    knots = np.logspace(-3, 0, 5)
     spline_model = SplineModel(prefix='spline_', xknots=knots)
     
     # Model selection dictionary
