@@ -455,7 +455,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     
     line_color = '#DE8F05' # orange
     scatter_color = '#0173B2' # blue
-    extra_marker_color = '#D55E00'# red
+    extra_marker_color = 'black'
     
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
@@ -494,7 +494,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     ax[1].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color=line_color, linewidth=2, zorder=1)
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
-                    color=scatter_color, alpha=0.5, ax=ax[0],
+                    color=scatter_color, alpha=0.5, ax=ax[1],
                     data=data, zorder=0)
     ax[2].fill_between(x, lower_curve, upper_curve, 
                        color=line_color, alpha=0.3, label='95% Confidence Interval'
@@ -507,7 +507,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     ax[2].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color=line_color, linewidth=2, zorder=1)
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
-                    color=scatter_color, alpha=0.5, ax=ax[0],
+                    color=scatter_color, alpha=0.5, ax=ax[2],
                     data=data, zorder=0)
     ax[2].fill_between(x, lower_curve, upper_curve, 
                        color=line_color, alpha=0.3, label='95% Confidence Interval'
