@@ -108,6 +108,10 @@ def factory_model_func(model_type: str):
     def tan_model(x, A, B, C, D):
         return A * np.tan(B * x - C) + D
     
+    # Define knot positions for the spline 
+    knots = np.logspace(-3, 0, 5)
+    spline_model = SplineModel(prefix='spline_', xknots=knots)
+    
     # Model selection dictionary
     models = {
         "linear": linear_model,
@@ -115,13 +119,15 @@ def factory_model_func(model_type: str):
         "exp": exp_model,
         "double_log": double_log_model,
         "tan": tan_model,
+        "spline": spline_model,
     }
     
     if model_type not in models:
         raise ValueError(f"Unknown model type: {model_type}")
     
     return models[model_type]
-
+    
+    return models[model_type]
 
 def factory_model_lmfit(model_type: str):
     
@@ -130,7 +136,6 @@ def factory_model_lmfit(model_type: str):
         model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=0)
-        
         return model, params 
     
     elif model_type == 'log':
@@ -140,14 +145,12 @@ def factory_model_lmfit(model_type: str):
         # Set boundaries for parameters
         params['B'].set(min=0.000001)  
         params['C'].set(min=0.000001)
-        
         return model, params 
     
     elif model_type == 'exp':
         model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=0)
-        
         return model, params 
     
     elif model_type == 'double_log':
@@ -159,27 +162,18 @@ def factory_model_lmfit(model_type: str):
         params['C'].set(min=0.000001)
         params['E'].set(min=0.000001)  
         params['F'].set(min=0.000001)
-        
         return model, params 
     
     elif model_type == 'tan':
         model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=0, D=0)
-        
         return model, params 
     
     if model_type == 'spline':
-        # Define knot positions for the spline ensuring they are within range and well spaced
-        knots = np.logspace(-3, 0, 5)  
-        
-        # Initialize the SplineModel with the defined knots
-        model = SplineModel(prefix='spline_', xknots=knots)
-        
-        # Create parameters with initial guesses and set boundaries to avoid instability
+        model = factory_model_func(model_type)
+        # Create parameters 
         params = model.make_params()
-        # for param in params:
-        #     params[param].set(min=-2, max=2)  
         return model, params 
     
     else: raise ValueError('Invalid model selection')
@@ -201,3 +195,15 @@ def fit_observed_evolutionary_rate_regressor(df, model_type, weights=None):
     # Print the fit results
     print(fit_result.fit_report())
     return fit_result
+
+def evaluate_model(model_type, params, x):
+    model = factory_model_func(model_type)
+    if isinstance(model, SplineModel):
+        # Create initial parameters for lmfit
+        param_obj = model.make_params()
+        for key in param_obj.keys():
+            if key in params:
+                param_obj[key].set(value=params[key])
+        return model.eval(params=param_obj, x=x)
+    return model(x, **params)
+
