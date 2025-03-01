@@ -256,13 +256,6 @@ def extract_u_e_values(experiment_name):
     csv_file_path = os.path.join(experiment_output_dir, 
                                  f'{experiment_name}_u_vs_evolutionary_rate_values.csv')
     results_df.to_csv(csv_file_path, index=False)
-
-def read_u_e_values(experiment_name):
-    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
-    csv_file_path = os.path.join(experiment_output_dir, 
-                                 f'{experiment_name}_u_vs_evolutionary_rate_values.csv')
-    data = pd.read_csv(csv_file_path)
-    return data
     
 def get_all_individuals_data_for_simulation_output_dir(simulation_output_dir):
     seeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
@@ -312,11 +305,11 @@ def get_IH_lineages_data_experiment(experiment_name):
 
 def get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter):
     experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
-    path = os.path.join(experiment_output_dir, 
+    csv_file_path = os.path.join(experiment_output_dir, 
       f'{experiment_name}_combined_observed_evolutionary_rate_vs_{parameter}_values.csv')
-    return path
+    return csv_file_path
 
-def get_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
+def build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
     ''' Create df of observed evolutionary rate (tempest regression on joint data) and parameter values
     '''
     
@@ -346,15 +339,14 @@ def get_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, par
     # Save the results to a CSV file
     csv_file_path = get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name, parameter)
     results_df.to_csv(csv_file_path, index=False)
-    return csv_file_path
 
 def get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter):
     experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
-    path = os.path.join(experiment_output_dir, 
+    csv_file_path = os.path.join(experiment_output_dir, 
       f'{experiment_name}_observed_evolutionary_rate_vs_{parameter}_values.csv')
-    return path
+    return csv_file_path
 
-def get_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
+def build_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
     ''' Create df of observed evolutionary rate (tempest regression) and parameter values
     '''
     # Get seeded simulations output subfolders
@@ -385,11 +377,16 @@ def get_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, m
     # Save to a CSV file
     csv_file_path = get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter)
     df.to_csv(csv_file_path, index=False)
-    return csv_file_path
 
+def read_observed_evolutionary_rates_csv(experiment_name, parameter):
+    csv_file_path = get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter)
+    observed_evolutionary_rates_df = pd.read_csv(csv_file_path)
+    return observed_evolutionary_rates_df
 
-
-
+def read_combined_observed_evolutionary_rate_csv(experiment_name, parameter):
+    csv_file_path = get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter)
+    combined_observed_evolutionary_rates_df = pd.read_csv(csv_file_path)
+    return combined_observed_evolutionary_rates_df
 
 
 
