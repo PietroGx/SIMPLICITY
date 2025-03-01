@@ -289,7 +289,11 @@
 	
 	* updated tempest regression, plots and fit logic and dataflow 
 	* added scatterplot for tempest regression observed evolutionary rate values for single seeded simulations output
-	* working on fitting curve to observed evolutionary rates ensamble (1 estimate per simulation, NSEEDs points per parameter value for the fit)
+	* added fit curve to observed evolutionary rates ensamble (1 estimate per simulation, NSEEDs points per parameter value for the fit)
+	* added plot for fit to observed evolutionary rates ensamble
+	* added read_final_time to output_manager
+	* added functionality to filter by min_sim_lenght in build_observed_evolutionary_rates_vs_parameter_df
+	
 	 
 	
 	
