@@ -454,7 +454,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     parameter = 'evolutionary_rate'
     data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
     x_data = data['evolutionary_rate']
-    x_data_list = data['evolutionary_rate'].tolist()
+    x_data_array = data['evolutionary_rate'].to_numpy()
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
     
@@ -465,7 +465,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[0],
                     data=data)
-    plot_confidence_interval_fit(model_type, fit_result, x_data_list, ax[0])
+    plot_confidence_interval_fit(model_type, fit_result, x_data_array, ax[0])
     ax[0].set_xlabel(f'{parameter}')
     ax[0].set_ylabel('Observed Evolutionary Rate')
     
@@ -475,7 +475,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[1],
                     data=data)
-    plot_confidence_interval_fit(model_type, fit_result, x_data_list, ax[1])
+    plot_confidence_interval_fit(model_type, fit_result, x_data_array, ax[1])
     ax[1].set_xlabel(f'{parameter}')
     ax[1].set_ylabel('Observed Evolutionary Rate')
     ax[1].set_xscale('log')
@@ -486,7 +486,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[2],
                     data=data)
-    plot_confidence_interval_fit(model_type, fit_result, x_data_list, ax[2])
+    plot_confidence_interval_fit(model_type, fit_result, x_data_array, ax[2])
     ax[2].set_xlabel(f'{parameter}')
     ax[2].set_ylabel('Observed Evolutionary Rate')
     ax[2].set_xscale('log')
@@ -513,11 +513,11 @@ def plot_confidence_interval_fit(model_type, fit_result, x, ax):
     print(params_lower)
     print(params_upper)
     
-    def remove_duplicates(lst):
-        seen = set()
-        return [x for x in lst if not (x in seen or seen.add(x))]
+    def remove_duplicates_array(arr):
+        _, idx = np.unique(arr, return_index=True)
+        return arr[np.sort(idx)]
 
-    x = remove_duplicates(x)
+    x = remove_duplicates_array(x)
     print('')
     print('x_nodup: ', x)
     # Create the upper and lower bound curves for confidence intervals
