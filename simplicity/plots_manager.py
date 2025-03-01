@@ -349,7 +349,7 @@ def plot_observed_evolutionary_rates_vs_parameter_violin(experiment_name, parame
                                                        parameter, 
                                                        min_sim_lenght)
     df = pd.read_csv(df_csv_path)
-
+    df['Category'] = df[parameter].astype(str)
     # Create a violin plot
     plt.figure(figsize=(8, 5))
     sns.violinplot(x='Category', y='Values', data=df)
