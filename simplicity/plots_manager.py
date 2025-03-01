@@ -342,6 +342,19 @@ def plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name, param
     plt.legend()
     plt.savefig(os.path.join(experiment_output_dir, 
                              f"{experiment_name}_{parameter}_vs_observed_evolutionary_rate.png"))
+
+def plot_observed_evolutionary_rates_vs_parameter_violin(experiment_name, parameter, min_sim_lenght=0):
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    df_csv_path = om.get_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
+                                                       parameter, 
+                                                       min_sim_lenght)
+    df = pd.read_csv(df_csv_path)
+
+    # Create a violin plot
+    plt.figure(figsize=(8, 5))
+    sns.violinplot(x='Category', y='Values', data=df)
+    plt.savefig(os.path.join(experiment_output_dir, 
+            f"{experiment_name}_{parameter}_vs_observed_evolutionary_rates_violin.png"))
     
 def export_tempest_regression_plots(experiment_name): 
     ''' move tempest regression plots from experiment folder to plots folder

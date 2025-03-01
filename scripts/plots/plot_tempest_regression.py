@@ -38,7 +38,7 @@ def plot_regressions_and_export(experiment_name, parameter, min_sim_lenght):
     print('')
     print('')
     pm.export_tempest_regression_plots(experiment_name)
-    om.get_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0)
+    pm.plot_observed_evolutionary_rates_vs_parameter_violin(experiment_name, parameter, min_sim_lenght)
 
 def main():
     # Set up the argument parser
