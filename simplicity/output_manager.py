@@ -378,7 +378,6 @@ def get_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, m
     csv_file_path = os.path.join(experiment_output_dir, 
       f'{experiment_name}_observed_evolutionary_rate_vs_{parameter}_values.csv')
     df.to_csv(csv_file_path, index=False)
-    print(df)
     return csv_file_path
 
 
