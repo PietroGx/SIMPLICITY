@@ -28,7 +28,7 @@ def fit_models(experiment_name, model_types, data_type):
         # build the dataframe needed for the fit
         om.build_observed_evolutionary_rates_vs_parameter_df(experiment_name, 
                                                                     parameter, 
-                                                                    min_sim_lenght=0)
+                                                                    min_sim_lenght=90)
          # import the df needed for the fit
         df = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
         # select plot function
