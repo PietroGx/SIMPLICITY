@@ -513,11 +513,10 @@ def plot_confidence_interval_fit(model_type, fit_result, x, ax):
     print(params_lower)
     print(params_upper)
     
-    def remove_duplicates(x):
-        _, idx = np.unique(x, return_index=True)
-        return x[np.sort(idx)]
-    print('')
-    print('x: ', x)
+    def remove_duplicates(lst):
+        seen = set()
+        return [x for x in lst if not (x in seen or seen.add(x))]
+
     x = remove_duplicates(x)
     print('')
     print('x_nodup: ', x)
