@@ -73,7 +73,8 @@ def main():
                    'log',
                    'exp',
                    'double_log',
-                   'tan']
+                   'tan',
+                   'spline']
     
     data_type = 'combined_rate'
     
