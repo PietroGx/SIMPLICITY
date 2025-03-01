@@ -216,7 +216,14 @@ def save_final_time(simulation_output, seeded_simulation_output_dir):
     with open(final_time_file_path, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow([final_time]) 
-                          
+        
+def read_final_time(seeded_simulation_output_dir):
+    final_time_file_path = os.path.join(seeded_simulation_output_dir,
+                                               "final_time.csv")
+    with open(final_time_file_path, 'r') as f:
+        final_time = float(f.read().strip())
+    return final_time
+
 def extract_u_e_values(experiment_name):
     ''' Perform tempest regression (get u) and saves the values vs evolutionary rate
     '''
@@ -366,13 +373,15 @@ def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter
             seeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
             
             for seeded_simulation_output_dir in seeded_simulation_output_dirs:
-                # Perform regression for each sequencing file
-                try:
-                    sequencing_data = read_sequencing_data(seeded_simulation_output_dir)
-                    observed_evolutionary_rate = er.tempest_regression(sequencing_data).coef_[0] # substitution rate per site per year
-                    results.append({parameter: parameter_value, 
-                                'observed_evolutionary_rate': observed_evolutionary_rate})
-                except: pass # only add files that are present
+                final_time = read_final_time(seeded_simulation_output_dir)
+                if final_time >= min_sim_lenght:
+                    # Perform regression for each sequencing file
+                    try:
+                        sequencing_data = read_sequencing_data(seeded_simulation_output_dir)
+                        observed_evolutionary_rate = er.tempest_regression(sequencing_data).coef_[0] # substitution rate per site per year
+                        results.append({parameter: parameter_value, 
+                                    'observed_evolutionary_rate': observed_evolutionary_rate})
+                    except: pass # only add files that are present
         
         # add fit results to df
         df = pd.DataFrame(results)
