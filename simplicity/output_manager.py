@@ -15,6 +15,7 @@ import csv
 from simplicity.evolution.decoder import decode_genome
 import simplicity.phenotype.distance  as dis
 import pandas as pd
+import simplicity.tuning.evolutionary_rate as er
 
 def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
     """
@@ -303,8 +304,39 @@ def get_IH_lineages_data_experiment(experiment_name):
         df = pd.concat([df,new_df],axis=0)
     return df
 
-
-
+def get_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
+    ''' Create df of observed evolutionary rate (tempest regression) and parameter values
+    '''
+    # get experiment_output directory
+    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
+    # Get seeded simulations output subfolders
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+ 
+    results = []
+    for simulation_output_dir in simulation_output_dirs:
+        # Read the parameter from the settings file
+        parameter_value = sm.get_parameter_value_from_simulation_output_dir(
+                                              simulation_output_dir, parameter)
+        
+        # Perform regression for the settings output folder
+        combined_df = er.create_joint_sequencing_df(simulation_output_dir, min_sim_lenght)
+        if combined_df is None: 
+            pass
+        else:
+            observed_evolutionary_rate = er.tempest_regression(combined_df).coef_[0] # substitution rate per site per year
+            results.append({str(parameter): parameter_value, 
+                            'observed_evolutionary_rate': observed_evolutionary_rate})
+    # add results to df
+    results_df = pd.DataFrame(results)
+    
+    # Sort the results by the 'parameter' values
+    results_df = results_df.sort_values(by=str(parameter))
+    
+    # Save the results to a CSV file
+    csv_file_path = os.path.join(experiment_output_dir, 
+      f'{experiment_name}_observed_evolutionary_rate_vs_{parameter}_values.csv')
+    results_df.to_csv(csv_file_path, index=False)
+    return csv_file_path
 
 
 

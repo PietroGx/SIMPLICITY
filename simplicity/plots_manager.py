@@ -265,17 +265,14 @@ def ideal_subplot_grid(num_plots):
 def plot_tempest_regression(sequencing_data_df,
                             fitted_tempest_regression,
                             ax):
-    
+    # get linear regression points
     x = sequencing_data_df['Sequencing_time'].values.reshape(-1, 1)
     y_pred = fitted_tempest_regression.predict(x)
-    
-    
+    # get observed_evolutionary_rate value
     observed_evolutionary_rate = fitted_tempest_regression.coef_[0] # substitution rate per site per year
-    
+    # plot data points
     sequencing_data_df.plot(kind='scatter', x='Sequencing_time', y='Distance_from_root', color='blue', ax=ax)
-    
-    
-    
+    # plot linear regression
     ax.plot(x, y_pred, color='red', linewidth=2, 
             label=f'observed_evolutionary_rate = {observed_evolutionary_rate:.5f}')
     ax.set_xlabel('Time [y]')
@@ -283,9 +280,8 @@ def plot_tempest_regression(sequencing_data_df,
     ax.set_xlim(left=0)
     ax.grid(True)
     ax.legend()
-    
  
-def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0,y_axis_max=0.1):
+def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0, y_axis_max=0.1):
     # Get sorted simulation output directories for experiment
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
@@ -317,68 +313,35 @@ def plot_combined_regressions(experiment_name, parameter, min_sim_lenght=0,y_axi
             plot_tempest_regression(sequencing_data_df,
                                        fitted_tempest_regression,
                                        ax)
-            param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
             ax.set_title(f'Regression - {parameter}: {param}')
             ax.set_ylim(0, y_axis_max)
-            
-
+    
     plt.tight_layout()
     plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
 
 def plot_u_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
     ''' Plot observed evolutionary rate (tempest regression) against desired parameter values
     '''
-    # get simulation parameter files for the selected experiment
-    simulation_parameters_dir = dm.get_simulation_parameters_dir(experiment_name)
-    simulation_parameters_files = glob.glob(os.path.join(simulation_parameters_dir, '*.json'))
-    # get output directory
-    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
-    # Get seeded simulations output subfolders
-    seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
-                                    f.name) for f in os.scandir(experiment_output_dir
-                                                                ) if f.is_dir()]
-    # for each simulation set in the experiment perfom the tempest regression
-    results = []
-    for simulation_parameters_file, seeeded_simulations_output_directory in zip(
-            simulation_parameters_files,seeeded_simulations_output_directories):
-        # Read the parameter from the settings file
-        with open(simulation_parameters_file, 'r') as file:
-            data = json.load(file)
-        parameter_value = data.get(parameter)
-        
-        # Perform regression for the settings output folder
-        combined_df = create_joint_sequencing_df(seeeded_simulations_output_directory, min_sim_lenght)
-        if combined_df is None: 
-            pass
-        else:
-            u = tempest_regression(combined_df).coef_[0] # substitution rate per site per year
-            results.append({str(parameter): parameter_value, 'u': u})
-    # add results to df
-    results_df = pd.DataFrame(results)
-    
-    # Sort the results by the 'parameter' values
-    results_df = results_df.sort_values(by=str(parameter))
-    
-    # Save the results to a CSV file
-    csv_file_path = os.path.join(experiment_output_dir, 
-                                 f'{experiment_name}_u_vs_{parameter}_values.csv')
-    results_df.to_csv(csv_file_path, index=False)
-    
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    df_csv_path = om.get_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
+                                                       parameter, 
+                                                       min_sim_lenght)
+    df = pd.read_csv(df_csv_path)
     # Plot target parameter vs u as a line plot with points
     plt.figure(figsize=(10, 6))
-    plt.plot(results_df[str(parameter)], results_df['u'], 
+    plt.plot(df[parameter],  df['observed_evolutionary_rate'], 
              marker='o', 
              color='black', 
              linestyle='-', 
-             label=f'{experiment_name}_{parameter} vs u')
+             label=f'{experiment_name}_{parameter} vs observed_evolutionary_rate')
     plt.xlabel(parameter)
     plt.ylabel('u')
-    plt.title(f'{parameter} vs u')
+    plt.title(f'{parameter} vs observed_evolutionary_rate')
     plt.grid(True)
     plt.tight_layout()
     plt.legend()
     plt.savefig(os.path.join(experiment_output_dir, 
-                             f"{experiment_name}_{parameter}_vs_u.png"))
+                             f"{experiment_name}_{parameter}_vs_observed_evolutionary_rate.png"))
     
 def export_u_regression_plots(experiment_name): 
     ''' move tempest regression plots from experiment folder to plots folder
