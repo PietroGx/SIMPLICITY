@@ -196,6 +196,10 @@ def fit_observed_evolutionary_rate_regressor(df, model_type, weights=None):
     print(fit_result.fit_report())
     return fit_result
 
+def fit_weight(y_data):
+    weights = 1/y_data
+    return weights
+
 def evaluate_model(model_type, params, x):
     model = factory_model_func(model_type)
     if isinstance(model, SplineModel):

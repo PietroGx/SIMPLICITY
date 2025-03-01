@@ -48,6 +48,8 @@ def fit_models(experiment_name, model_types, data_type):
         print('###############################################################')
         print('')
         try:
+            y_data = df['observed_evolutionary_rate']
+            er.fit_weight(y_data)
             fit_result = er.fit_observed_evolutionary_rate_regressor(df, model_type, weights=None)
             aic_models[model_type] = fit_result.aic
             print(f'saving plot in {experiment_name}/.')
