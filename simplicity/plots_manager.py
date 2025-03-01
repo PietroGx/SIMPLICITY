@@ -466,9 +466,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
                     color='blue', alpha=0.5, ax=ax[0],
                     data=data)
     # Fill between the upper and lower curves for the confidence interval region
-    ax[0].fill_between(x, lower_curve, upper_curve, color='gray', alpha=0.3, label='95% Confidence Interval')
-    ax[0].scatter(x, lower_curve, color='green')
-    ax[0].scatter(x, upper_curve, color='green')
+    ax[0].fill_between(x, lower_curve, upper_curve, color='green', alpha=0.5, label='95% Confidence Interval')
     ax[0].set_xlabel(f'{parameter}')
     ax[0].set_ylabel('Observed Evolutionary Rate')
     
@@ -478,7 +476,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[1],
                     data=data)
-    
+    ax[2].fill_between(x, lower_curve, upper_curve, color='green', alpha=0.5, label='95% Confidence Interval')
     ax[1].set_xlabel(f'{parameter}')
     ax[1].set_ylabel('Observed Evolutionary Rate')
     ax[1].set_xscale('log')
@@ -489,7 +487,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color='blue', alpha=0.5, ax=ax[2],
                     data=data)
-
+    ax[2].fill_between(x, lower_curve, upper_curve, color='green', alpha=0.5, label='95% Confidence Interval')
     ax[2].set_xlabel(f'{parameter}')
     ax[2].set_ylabel('Observed Evolutionary Rate')
     ax[2].set_xscale('log')
