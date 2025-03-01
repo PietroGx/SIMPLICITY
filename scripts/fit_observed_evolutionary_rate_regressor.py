@@ -76,7 +76,7 @@ def main():
                    'tan',
                    'spline']
     
-    data_type = 'combined_rate'
+    data_type = 'single_rates'
     
     aic_models = fit_models(args.experiment_name, model_types, data_type)
         
