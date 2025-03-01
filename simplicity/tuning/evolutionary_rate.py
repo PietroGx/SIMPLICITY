@@ -12,7 +12,6 @@ import glob
 import numpy as np
 from lmfit import Model
 from lmfit.models import SplineModel
-import simplicity.output_manager as om
 
 def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
     """
@@ -91,35 +90,51 @@ def tempest_regression(sequencing_data_df):
     fitted_tempest_regression = tempest_regression.fit(x, y)
     
     return fitted_tempest_regression
-
-def factory_model(model_type: str):
     
+def factory_model_func(model_type: str):
     # Define the models
-    def linear_model(x, A, B):
-        return A*x + B
+    def linear_model(x, params):
+        return params['A'] * x + params['B']
 
-    def log_model(x, A, B, C):
-        return A * np.log(B * x + C)
+    def log_model(x, params):
+        return params['A'] * np.log(params['B'] * x + params['C'])
 
-    def exp_model(x, A, B, C):
-        return A * x**B + C
+    def exp_model(x, params):
+        return params['A'] * x**params['B'] + params['C']
 
-    def double_log_model(x, A, B, C, D, E, F):
-        return A * np.log(B * x + C) + D * np.log(E * x + F)
+    def double_log_model(x, params):
+        return (params['A'] * np.log(params['B'] * x + params['C']) +
+                params['D'] * np.log(params['E'] * x + params['F']))
 
-    def tan_model(x, A, B, C, D):
-        return A * np.tan(B * x - C) + D
+    def tan_model(x, params):
+        return params['A'] * np.tan(params['B'] * x - params['C']) + params['D']
+    
+    # Model selection dictionary
+    models = {
+        "linear": linear_model,
+        "log": log_model,
+        "exp": exp_model,
+        "double_log": double_log_model,
+        "tan": tan_model,
+    }
+    
+    if model_type not in models:
+        raise ValueError(f"Unknown model type: {model_type}")
+    
+    return models[model_type]
+
+def factory_model_lmfit(model_type: str):
     
     # select the model, assign parameters and return it
     if model_type == 'linear':
-        model = Model(linear_model)
+        model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=0)
         
         return model, params 
     
     elif model_type == 'log':
-        model = Model(log_model)
+        model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=0)
         # Set boundaries for parameters
@@ -129,14 +144,14 @@ def factory_model(model_type: str):
         return model, params 
     
     elif model_type == 'exp':
-        model = Model(exp_model)
+        model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=0)
         
         return model, params 
     
     elif model_type == 'double_log':
-        model = Model(double_log_model)
+        model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=0, D=1, E=1, F=0)
         # Set boundaries for parameters
@@ -148,7 +163,7 @@ def factory_model(model_type: str):
         return model, params 
     
     elif model_type == 'tan':
-        model = Model(tan_model)
+        model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=0, D=0)
         
@@ -175,7 +190,7 @@ def fit_observed_evolutionary_rate_regressor(df, model_type, weights=None):
     y_data = df['observed_evolutionary_rate']  
     
     # Create the Model
-    model, params = factory_model(model_type)
+    model, params = factory_model_lmfit(model_type)
     
     # Fit the model to the data
     if weights is None:

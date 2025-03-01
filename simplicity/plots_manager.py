@@ -488,7 +488,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     ax[2].set_yscale('log')
     
     plt.tight_layout()
-    plt.savefig(os.path.join(dm.get_experiment_output_dir(experiment_name), 
+    plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
         f"{experiment_name}_observed_evolutionary_rates_{model_type}_fit.png"))
  
 ###############################################################################
