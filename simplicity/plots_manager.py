@@ -523,6 +523,7 @@ def plot_confidence_interval_fit(model_type, fit_result, x, ax):
     lower_curve = er.evaluate_model(model_type, params_lower, x)
     print('')
     print(upper_curve)
+    print(lower_curve)
     # Fill between the upper and lower curves for the confidence interval region
     ax.fill_between(x, lower_curve, upper_curve, color='gray', alpha=0.3, label='95% Confidence Interval')
  
