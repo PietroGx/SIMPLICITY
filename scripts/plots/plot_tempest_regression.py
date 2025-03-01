@@ -6,11 +6,9 @@ Created on Fri Feb 14 15:08:05 2025
 @author: pietro
 """
 import simplicity.plots_manager as pm
-import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import argparse
 import pandas as pd 
-import os 
 
 def plot_regressions_and_export(experiment_name, parameter, min_sim_lenght):
     print('')
@@ -26,10 +24,9 @@ def plot_regressions_and_export(experiment_name, parameter, min_sim_lenght):
     print('################## Plot combined regressions #####################')
     print('##################################################################')
     print('')
-    csv_with_u_values = os.path.join(dm.get_experiment_output_dir(experiment_name),
-                                     f'{experiment_name}_u_vs_{parameter}_values.csv')
+    csv_with_values = om.get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter)
     
-    y_axis_max = max(pd.read_csv(csv_with_u_values)['u'])*1.2
+    y_axis_max = max(pd.read_csv(csv_with_values)['observed_evolutionary_rate'])*1.2
     pm.plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght, y_axis_max)
     print('')
     print('##################################################################')
