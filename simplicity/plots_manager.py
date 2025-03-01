@@ -455,7 +455,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     
     line_color = '#DE8F05' # orange
     scatter_color = '#0173B2' # blue
-    extra_marker_color = 'black'
+    extra_marker_color = '#E64B9D' #pink
     
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
