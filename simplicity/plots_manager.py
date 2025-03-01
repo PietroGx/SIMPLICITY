@@ -453,6 +453,10 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     '''
     parameter = 'evolutionary_rate'
     
+    line_color = '#DE8F05' # orange
+    scatter_color = '#0173B2' # blue
+    extra_marker_color = '#D55E00'# red
+    
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
     
@@ -466,7 +470,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
         a.scatter(
             combined_x_data, combined_y_data, 
             label='Combined tempest regression estimate of OER', 
-            color='#DE8F05', marker='X')
+            color=extra_marker_color, marker='X',zorder=2)
  
     
     data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
@@ -475,33 +479,39 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     
     # First plot (linear scale)
     ax[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
-               color='red', linewidth=2)
+               color=line_color, linewidth=2, zorder=1)
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
-                    color='blue', alpha=0.5, ax=ax[0],
-                    data=data)
+                    color=scatter_color, alpha=0.5, ax=ax[0],
+                    data=data, zorder=0)
     # Fill between the upper and lower curves for the confidence interval region
-    ax[0].fill_between(x, lower_curve, upper_curve, color='green', alpha=0.5, label='95% Confidence Interval')
+    ax[0].fill_between(x, lower_curve, upper_curve, 
+                       color=line_color, alpha=0.3, label='95% Confidence Interval'
+                       , zorder=-1)
     ax[0].set_xlabel(f'{parameter}')
     ax[0].set_ylabel('Observed Evolutionary Rate')
     
     # Second plot (semilog scale)
     ax[1].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
-               color='red', linewidth=2)
+               color=line_color, linewidth=2, zorder=1)
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
-                    color='blue', alpha=0.5, ax=ax[1],
-                    data=data)
-    ax[2].fill_between(x, lower_curve, upper_curve, color='green', alpha=0.5, label='95% Confidence Interval')
+                    color=scatter_color, alpha=0.5, ax=ax[0],
+                    data=data, zorder=0)
+    ax[2].fill_between(x, lower_curve, upper_curve, 
+                       color=line_color, alpha=0.3, label='95% Confidence Interval'
+                       , zorder=-1)
     ax[1].set_xlabel(f'{parameter}')
     ax[1].set_ylabel('Observed Evolutionary Rate')
     ax[1].set_xscale('log')
     
     # Third plot (log log scale)
     ax[2].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
-               color='red', linewidth=2)
+               color=line_color, linewidth=2, zorder=1)
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
-                    color='blue', alpha=0.5, ax=ax[2],
-                    data=data)
-    ax[2].fill_between(x, lower_curve, upper_curve, color='green', alpha=0.5, label='95% Confidence Interval')
+                    color=scatter_color, alpha=0.5, ax=ax[0],
+                    data=data, zorder=0)
+    ax[2].fill_between(x, lower_curve, upper_curve, 
+                       color=line_color, alpha=0.3, label='95% Confidence Interval'
+                       , zorder=-1)
     ax[2].set_xlabel(f'{parameter}')
     ax[2].set_ylabel('Observed Evolutionary Rate')
     ax[2].set_xscale('log')
