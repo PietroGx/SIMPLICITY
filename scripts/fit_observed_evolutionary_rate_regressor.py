@@ -50,7 +50,7 @@ def fit_models(experiment_name, model_types, data_type):
         try:
             fit_result = er.fit_observed_evolutionary_rate_regressor(df, model_type, weights=None)
             aic_models[model_type] = fit_result.aic
-            print(f'saving plot in {experiment_name}/04_Output/')
+            print(f'saving plot in {experiment_name}/.')
             
             plot_fit(experiment_name, fit_result, model_type)
         except Exception as e:
@@ -73,10 +73,9 @@ def main():
                    'log',
                    'exp',
                    'double_log',
-                   'tan',
-                   'spline']
+                   'tan']
     
-    data_type = 'single_rates'
+    data_type = 'combined_rate'
     
     aic_models = fit_models(args.experiment_name, model_types, data_type)
         
