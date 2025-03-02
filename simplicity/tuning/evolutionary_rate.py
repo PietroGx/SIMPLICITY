@@ -39,8 +39,8 @@ def factory_model_func(model_type: str):
     def linear_model(x, A, B):
         return A * x + B
 
-    def log_model(x, A, B, C):
-        return A * np.log(B * x + C)
+    def log_model(x, A, B, C, D):
+        return A * np.log(B * x + C) + D
 
     def exp_model(x, A, B, C):
         return A * x**B + C
@@ -78,13 +78,13 @@ def factory_model_lmfit(model_type: str):
     if model_type == 'linear':
         model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
-        params = model.make_params(A=1, B=0)
+        params = model.make_params(A=0.01, B=0)
         return model, params 
     
     elif model_type == 'log':
         model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
-        params = model.make_params(A=1, B=1, C=0)
+        params = model.make_params(A=0.01, B=0.01, C=0.01, D=0)
         # Set boundaries for parameters
         params['B'].set(min=0.000001)  
         params['C'].set(min=0.000001)
@@ -93,7 +93,7 @@ def factory_model_lmfit(model_type: str):
     elif model_type == 'exp':
         model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
-        params = model.make_params(A=1, B=1, C=0)
+        params = model.make_params(A=0.01, B=0.01, C=0)
         return model, params 
     
     elif model_type == 'double_log':
@@ -110,7 +110,7 @@ def factory_model_lmfit(model_type: str):
     elif model_type == 'tan':
         model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
-        params = model.make_params(A=1, B=1, C=0, D=0)
+        params = model.make_params(A=0.01, B=0.01, C=0, D=0)
         return model, params 
     
     if model_type == 'spline':
