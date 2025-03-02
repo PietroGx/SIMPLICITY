@@ -455,7 +455,8 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     
     line_color = '#DE8F05' # orange
     scatter_color = '#0173B2' # blue
-    extra_marker_color = '#E64B9D' #pink
+    extra_marker_color = '#E64B9D' # pink
+    scatter_color_2 = '#029E73' # green
     
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
@@ -472,15 +473,21 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
             label='Combined tempest regression estimate of OER', 
             color=extra_marker_color, marker='X',zorder=2)
  
-    
+    # import single simulations regression data
     data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
-
+    
+    # Group by evolutionary_rate and compute mean and standard deviation for OER
+    data_mean_std = data.groupby('evolutionary_rate')['observed_evolutionary_rate'].agg(['mean', 'std']).reset_index()
+    
+    # get lower and upper confidence interval for fit results
     x_data = data['evolutionary_rate']
     x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
     
-    # First plot (linear scale)
+    # First plot (linear scale) -----------------------------------------------
+    # plot fitted curve
     ax[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color=line_color, linewidth=2, zorder=1)
+    # plot data
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color=scatter_color, alpha=0.5, ax=ax[0],
                     data=data, zorder=0)
@@ -488,10 +495,14 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     ax[0].fill_between(x, lower_curve, upper_curve, 
                        color=line_color, alpha=0.3, label='95% Confidence Interval'
                        , zorder=-1)
+    # plot mean of observed_evolutionary_rate from data_mean_std
+    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = 'd',
+                    color=scatter_color_2, alpha=0.5, ax=ax[0],
+                    data=data_mean_std, zorder=3)
     ax[0].set_xlabel(f'{parameter}')
     ax[0].set_ylabel('Observed Evolutionary Rate')
     
-    # Second plot (semilog scale)
+    # Second plot (semilog scale) -----------------------------------------------
     ax[1].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color=line_color, linewidth=2, zorder=1)
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
@@ -504,7 +515,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     ax[1].set_ylabel('Observed Evolutionary Rate')
     ax[1].set_xscale('log')
     
-    # Third plot (log log scale)
+    # Third plot (log log scale) -----------------------------------------------
     ax[2].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color=line_color, linewidth=2, zorder=1)
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
