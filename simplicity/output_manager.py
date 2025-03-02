@@ -330,19 +330,25 @@ def create_combined_sequencing_df(seeeded_simulations_output_directory,
         print('')
         return None
 
-def get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter,min_sim_lenght):
+def get_combined_OER_vs_parameter_csv_file_path(experiment_name,
+                                                parameter,
+                                                min_seq_number,
+                                                min_sim_lenght):
     experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
     csv_file_path = os.path.join(experiment_output_dir, 
-      f'{experiment_name}_combined_observed_evolutionary_rate_vs_{parameter}_values_min_sim_lenght_{min_sim_lenght}.csv')
+      f'{experiment_name}_combined_OER_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}.csv')
     return csv_file_path
 
-def write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
-                                                              parameter, 
-                                                              min_seq_number=0,
-                                                              min_sim_lenght=0):
+def write_combined_OER_vs_parameter_csv(experiment_name, 
+                                        parameter, 
+                                        min_seq_number=0,
+                                        min_sim_lenght=0):
     ''' Create df of observed evolutionary rate (tempest regression on joint data) and parameter values
     '''
-    csv_file_path = get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name, parameter, min_sim_lenght)
+    csv_file_path = get_combined_OER_vs_parameter_csv_file_path(experiment_name, 
+                                                                parameter, 
+                                                                min_seq_number,
+                                                                min_sim_lenght)
     if os.path.exists(csv_file_path):
         # print(f'{csv_file_path} already exists, continuing...')
         pass
@@ -374,20 +380,37 @@ def write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name,
         
         # Save the results to a CSV file
         results_df.to_csv(csv_file_path, index=False)
+        
+def read_combined_OER_vs_parameter_csv(experiment_name, 
+                                       parameter,
+                                       min_seq_number,
+                                       min_sim_lenght):
+    csv_file_path = get_combined_OER_vs_parameter_csv_file_path(experiment_name,
+                                                                parameter,
+                                                                min_seq_number,
+                                                                min_sim_lenght)
+    combined_observed_evolutionary_rates_df = pd.read_csv(csv_file_path)
+    return combined_observed_evolutionary_rates_df
 
-def get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter,min_sim_lenght):
+def get_OER_vs_parameter_csv_file_path(experiment_name,
+                                        parameter,
+                                        min_seq_number,
+                                        min_sim_lenght):
     experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
     csv_file_path = os.path.join(experiment_output_dir, 
-      f'{experiment_name}_observed_evolutionary_rate_vs_{parameter}_values_min_sim_lenght_{min_sim_lenght}.csv')
+      f'{experiment_name}_OER_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}.csv')
     return csv_file_path
     
-def write_observed_evolutionary_rates_vs_parameter_csv(experiment_name, 
-                                                      parameter, 
-                                                      min_seq_number=0,
-                                                      min_sim_lenght=0):
+def write_OER_vs_parameter_csv(experiment_name, 
+                                parameter, 
+                                min_seq_number=0,
+                                min_sim_lenght=0):
     ''' Create df of observed evolutionary rate (tempest regression) and parameter values
     '''
-    csv_file_path = get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter,min_sim_lenght)
+    csv_file_path = get_OER_vs_parameter_csv_file_path(experiment_name,
+                                                      parameter,
+                                                      min_seq_number,
+                                                      min_sim_lenght)
     # if the file exists already, does nothing
     if os.path.exists(csv_file_path):
         # print(f'{csv_file_path} already exists, continuing...')
@@ -411,7 +434,6 @@ def write_observed_evolutionary_rates_vs_parameter_csv(experiment_name,
                     # read sequencing_data
                     sequencing_data = read_sequencing_data(seeded_simulation_output_dir)
                     seq_number = len(sequencing_data)
-                    print(seq_number)
                     # filter by simulation lenght and seq_number
                     if final_time >= min_sim_lenght and seq_number >= min_seq_number:
                         # Perform regression for each sequencing file
@@ -432,21 +454,32 @@ def write_observed_evolutionary_rates_vs_parameter_csv(experiment_name,
         # Save to a CSV file
         df.to_csv(csv_file_path, index=False)
 
-def get_mean_std_observed_evolutionary_rates(experiment_name,parameter,min_seq_number,min_sim_lenght):
-    write_observed_evolutionary_rates_vs_parameter_csv(experiment_name, parameter, min_seq_number, min_sim_lenght)
-    df = read_observed_evolutionary_rates_csv(experiment_name,parameter,min_sim_lenght)
-    df_mean_std = df.groupby(parameter)['observed_evolutionary_rate'].agg(['mean','std']).reset_index()
-    return df_mean_std
-
-def read_observed_evolutionary_rates_csv(experiment_name, parameter,min_sim_lenght):
-    csv_file_path = get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter,min_sim_lenght)
+def read_OER_vs_parameter_csv(experiment_name, 
+                              parameter,
+                              min_seq_number,
+                              min_sim_lenght):
+    csv_file_path = get_OER_vs_parameter_csv_file_path(experiment_name,
+                                                      parameter,
+                                                      min_seq_number,
+                                                      min_sim_lenght)
     observed_evolutionary_rates_df = pd.read_csv(csv_file_path)
     return observed_evolutionary_rates_df
 
-def read_combined_observed_evolutionary_rate_csv(experiment_name, parameter,min_sim_lenght):
-    csv_file_path = get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter,min_sim_lenght)
-    combined_observed_evolutionary_rates_df = pd.read_csv(csv_file_path)
-    return combined_observed_evolutionary_rates_df
+def get_mean_std_OER(experiment_name,
+                     parameter,
+                     min_seq_number,
+                     min_sim_lenght):
+    write_OER_vs_parameter_csv(experiment_name, 
+                               parameter, 
+                               min_seq_number, 
+                               min_sim_lenght)
+    df = read_OER_vs_parameter_csv(experiment_name,
+                                   parameter,
+                                   min_seq_number,
+                                   min_sim_lenght)
+    df_mean_std = df.groupby(parameter)['observed_evolutionary_rate'].agg(['mean','std']).reset_index()
+    return df_mean_std
+
 
 
 
