@@ -299,6 +299,9 @@
 	Version 0.8.1
 	
 	* added mean scatter plot on plot_observed_evolutionary_rates_fit
+	* updated om (for saving observed_evolutionary_rates_csv with different names if filtered by sim_lenght)
+	* updated plot_observed_evolutionary_rates_fit to accomodate new signature 
+	* updated plot_observed_evolutionary_rates_fit to use seaboarn consistently
 	 
 	
 	
