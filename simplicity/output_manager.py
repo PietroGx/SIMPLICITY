@@ -379,8 +379,12 @@ def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter
                     try:
                         sequencing_data = read_sequencing_data(seeded_simulation_output_dir)
                         observed_evolutionary_rate = er.tempest_regression(sequencing_data).coef_[0] # substitution rate per site per year
-                        results.append({parameter: parameter_value, 
-                                    'observed_evolutionary_rate': observed_evolutionary_rate})
+                        results.append({
+                            parameter: parameter_value, 
+                            'observed_evolutionary_rate': observed_evolutionary_rate,
+                            'simulation_final_time':read_final_time(seeded_simulation_output_dir),
+                            'settings_final_time': sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, 'final_time')
+                                       })
                     except: pass # only add files that are present
         
         # add fit results to df
@@ -388,8 +392,6 @@ def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter
         
         # Sort the df by the 'parameter' values
         df = df.sort_values(by=str(parameter))
-        # drop 0s 
-        # df = df[df['observed_evolutionary_rate'] != 0]
         # Save to a CSV file
         df.to_csv(csv_file_path, index=False)
 
