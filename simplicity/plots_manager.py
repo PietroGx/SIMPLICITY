@@ -15,7 +15,6 @@ import numpy as np
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import math
-from simplicity.tuning.evolutionary_rate import create_joint_sequencing_df
 from simplicity.tuning.evolutionary_rate import tempest_regression
 import glob
 import simplicity.tuning.diagnosis_rate as dr
@@ -302,7 +301,7 @@ def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght
     
     for i, simulation_output_dir in enumerate(sorted_simulation_output_dirs):
         param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
-        sequencing_data_df = create_joint_sequencing_df(simulation_output_dir, min_sim_lenght)
+        sequencing_data_df = om.create_combined_sequencing_df(simulation_output_dir, min_sim_lenght)
         if sequencing_data_df is None: 
             pass
         else:
@@ -317,13 +316,17 @@ def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght
     plt.tight_layout()
     plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
 
-def plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name, parameter, min_sim_lenght=0):
+def plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name, 
+                                                          parameter,  
+                                                          min_seq_number=0,
+                                                          min_sim_lenght=0):
     ''' Plot observed evolutionary rate (tempest regression) against desired parameter values
     '''
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     # build combined dataframe, filtered by min simulation lenght
-    om.build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
+    om.write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
                                                        parameter, 
+                                                       min_seq_number,
                                                        min_sim_lenght)
     df = om.read_combined_observed_evolutionary_rate_csv(experiment_name, parameter,min_sim_lenght)
     # Plot target parameter vs u as a line plot with points
@@ -341,48 +344,6 @@ def plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name, param
     plt.legend()
     plt.savefig(os.path.join(experiment_output_dir, 
                              f"{experiment_name}_{parameter}_vs_observed_evolutionary_rate.png"))
-
-def plot_observed_evolutionary_rates_vs_parameter_scatter(experiment_name, parameter, min_sim_lenght=0):
-    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    # build combined dataframe, filtered by min simulation lenght
-    om.build_observed_evolutionary_rates_vs_parameter_df(experiment_name, 
-                                                       parameter, 
-                                                       min_sim_lenght)
-    observed_evolutionary_rate_vs_parameter_df = om.read_observed_evolutionary_rates_csv(experiment_name, 
-                                                                                         parameter,
-                                                                                         min_sim_lenght)
-    # Create figure and axes
-    fig, ax = plt.subplots(3,1, figsize=(8, 10))
-    # First scatter plot
-    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
-                    color='blue', alpha=0.5, ax=ax[0],
-                    data=observed_evolutionary_rate_vs_parameter_df)
-    ax[0].set_xlabel(f'{parameter}')
-    ax[0].set_ylabel('Observed Evolutionary Rate')
-    
-    # Second scatter plot
-    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
-                    color='blue', alpha=0.5, ax=ax[1],
-                    data=observed_evolutionary_rate_vs_parameter_df)
-    ax[1].set_xlabel(f'{parameter}')
-    ax[1].set_ylabel('Observed Evolutionary Rate')
-    ax[1].set_xscale('log')
-    
-    # Third scatter plot 
-    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
-                    color='blue', alpha=0.5, ax=ax[2],
-                    data=observed_evolutionary_rate_vs_parameter_df)
-    ax[2].set_xlabel(f'{parameter}')
-    ax[2].set_ylabel('Observed Evolutionary Rate')
-    ax[2].set_xscale('log')
-    ax[2].set_yscale('log')
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(experiment_output_dir, 
-            f"{experiment_name}_{parameter}_vs_observed_evolutionary_rate_scatter.png"))
-    
-    plt.xticks(rotation=45)
-    plt.savefig(os.path.join(experiment_output_dir,))
     
 def export_tempest_regression_plots(experiment_name): 
     ''' move tempest regression plots from experiment folder to plots folder
@@ -450,7 +411,11 @@ def plot_combined_observed_evolutionary_rate_fit(experiment_name, fit_result, mo
      f'{experiment_name}_combined_observed_evolutionary_rate_{model_type}_fit.png')
     plt.savefig(file_path)
 
-def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type,min_sim_lenght):
+def plot_observed_evolutionary_rates_fit(experiment_name, 
+                                         fit_result, 
+                                         model_type,
+                                         min_seq_number,
+                                         min_sim_lenght):
     ''' plot fit of evolutionary rate / observed evolutionary rates curve
     '''
     parameter = 'evolutionary_rate'
@@ -469,7 +434,10 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     # import single simulations regression data
     data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter,min_sim_lenght)
     # Group by evolutionary_rate and compute mean and standard deviation for OER
-    data_mean_df = om.get_mean_std_observed_evolutionary_rates(experiment_name,parameter,min_sim_lenght)
+    data_mean_df = om.get_mean_std_observed_evolutionary_rates(experiment_name,
+                                                               parameter,
+                                                               min_seq_number,
+                                                               min_sim_lenght)
     # get lower and upper confidence interval for fit results
     x_data = data['evolutionary_rate']
     x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
@@ -504,7 +472,10 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
         # minsimlenghts = [0,100,200,300]
         # palette = sns.color_palette("tab10", len(minsimlenghts))
         # for i, minsimlenght in enumerate(minsimlenghts):
-        #     df = om.get_mean_std_observed_evolutionary_rates(experiment_name,parameter,minsimlenght)
+        #     df = om.get_mean_std_observed_evolutionary_rates(experiment_name,
+                                                                # parameter,
+                                                                # min_seq_number,
+                                                                # minsimlenght)
         #     # plot mean of observed_evolutionary_rate from data_mean_std
         #     sns.scatterplot(x=parameter, y='mean', marker = 'X',
         #                     label=f'Mean of estimated OER - min {minsimlenght} d', data=df,

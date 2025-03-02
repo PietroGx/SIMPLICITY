@@ -13,12 +13,13 @@ import argparse
 def fit_models(experiment_name, model_types, data_type):
     
     parameter = 'evolutionary_rate'
-    
+    min_seq_number = 20
     if data_type == 'combined_rate':
         min_sim_lenght=0
         # build the dataframe needed for the fit
-        om.build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
-                                                                    parameter, 
+        om.write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
+                                                                    parameter,
+                                                                    min_seq_number,
                                                                     min_sim_lenght)
          # import the df needed for the fit
         df = om.read_combined_observed_evolutionary_rate_csv(experiment_name, parameter)
@@ -29,14 +30,19 @@ def fit_models(experiment_name, model_types, data_type):
     elif data_type == 'single_rates':
         min_sim_lenght=0
         # build the dataframe needed for the fit
-        om.build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
+        om.write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
                                                                     parameter, 
+                                                                    min_seq_number,
                                                                     min_sim_lenght)
-        om.build_observed_evolutionary_rates_vs_parameter_df(experiment_name, 
+        om.write_observed_evolutionary_rates_vs_parameter_csv(experiment_name, 
                                                                     parameter, 
+                                                                    min_seq_number,
                                                                     min_sim_lenght)
          # import the df needed for the fit
-        df = om.read_observed_evolutionary_rates_csv(experiment_name, parameter, min_sim_lenght)
+        df = om.read_observed_evolutionary_rates_csv(experiment_name, 
+                                                     parameter, 
+                                                     min_seq_number,
+                                                     min_sim_lenght)
         weights = None
         # select plot function
         plot_fit = pm.plot_observed_evolutionary_rates_fit

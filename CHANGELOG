@@ -302,7 +302,10 @@
 	* updated om (for saving observed_evolutionary_rates_csv with different names if filtered by sim_lenght)
 	* updated plot_observed_evolutionary_rates_fit to accomodate new signature 
 	* updated plot_observed_evolutionary_rates_fit to use seaboarn consistently
-	 
+    * updated evolutionary_rate.py - now functions that are responsibility of output_manager are moved 
+    * deleted obsolete functions from evolutionary_rate.py and plot_manager
+    * finished refactoring of tempest regression results csv writing and reading 
+    * added option to filter sequencing data for tempest regression by number of sequences present in the file 
 	
 	
 	
