@@ -14,8 +14,9 @@ def fit_models(experiment_name, model_types, data_type):
     
     parameter = 'evolutionary_rate'
     min_seq_number = 20
+    min_sim_lenght = 0
+    
     if data_type == 'combined_rate':
-        min_sim_lenght=0
         # build the dataframe needed for the fit
         om.write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
                                                                     parameter,
@@ -26,9 +27,9 @@ def fit_models(experiment_name, model_types, data_type):
         weights = None
         # select plot function
         plot_fit = pm.plot_combined_observed_evolutionary_rate_fit
+        kwargs = {"min_sim_lenght": min_sim_lenght}
         
     elif data_type == 'single_rates':
-        min_sim_lenght=0
         # build the dataframe needed for the fit
         om.write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
                                                                     parameter, 
@@ -45,6 +46,8 @@ def fit_models(experiment_name, model_types, data_type):
         weights = None
         # select plot function
         plot_fit = pm.plot_observed_evolutionary_rates_fit
+        kwargs = {"min_seq_number": min_seq_number, "min_sim_lenght": min_sim_lenght}
+        
     else:
         raise ValueError('invalid data_type, check data_type sintax!')
         
@@ -63,8 +66,7 @@ def fit_models(experiment_name, model_types, data_type):
             fit_result = er.fit_observed_evolutionary_rate_regressor(df, model_type, weights)
             aic_models[model_type] = fit_result.aic
             print(f'saving plot in {experiment_name}/.')
-            
-            plot_fit(experiment_name, fit_result, model_type, min_sim_lenght)
+            plot_fit(experiment_name, fit_result, model_type, **kwargs)
         except Exception as e:
             print(e)
             
