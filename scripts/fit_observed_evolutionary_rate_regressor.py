@@ -87,22 +87,22 @@ def main():
     args = parser.parse_args()
     
     # define model types for the fit
-    model_types = ['linear']
-                   # 'log',
-                   # 'exp',
-                   # 'double_log',
-                   # 'tan',
-                   # 'spline'] 
+    model_types = ['linear',
+                   'log',
+                   'exp',
+                   'double_log',
+                   'tan',
+                   'spline'] 
     
-    # aic_models_combined = fit_models(args.experiment_name, model_types, 'combined_rate')
+    aic_models_combined, df_len_combined = fit_models(args.experiment_name, model_types, 'combined_rate')
     aic_models, df_len = fit_models(args.experiment_name, model_types, 'single_rates')
     
-    # # print AIC for each model fit
-    # sorted_aics_combined = sorted(aic_models_combined.items(), key=lambda item: item[1])
-    # print('Comparison of combined rates fits with Akaike Information Criterion')
-    # print("Key    Value")
-    # for key, value in sorted_aics_combined:
-    #     print(f"{key}      {value}")
+    # print AIC for each model fit
+    sorted_aics_combined = sorted(aic_models_combined.items(), key=lambda item: item[1])
+    print('Comparison of combined rates fits with Akaike Information Criterion')
+    print("Key    Value")
+    for key, value in sorted_aics_combined:
+        print(f"{key}      {value}")
     
     # print AIC for each model fit
     sorted_aics = sorted(aic_models.items(), key=lambda item: item[1])
@@ -112,9 +112,12 @@ def main():
         print(f"{key}      {value}")
     
     print('')
+    print('df lenght OER:')
     print(df_len)
     
-    
+    print('')
+    print('df lenght combined OER:')
+    print(df_len_combined)
     
 if __name__ == "__main__":
     main()
