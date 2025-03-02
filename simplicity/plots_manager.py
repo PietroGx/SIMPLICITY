@@ -461,7 +461,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     scatter_color_2 = '#0173B2' # blue '#029E73' # green
     
     # Create figure and axes
-    fig, ax = plt.subplots(3,1, figsize=(8, 10))
+    fig, ax = plt.subplots(3,1, figsize=(8, 12))
     
     # import combined regression data
     combined_data = om.read_combined_observed_evolutionary_rate_csv(experiment_name,parameter,min_sim_lenght)
@@ -508,8 +508,8 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
             # plot mean of observed_evolutionary_rate from data_mean_std
             sns.scatterplot(x=parameter, y='mean', marker = 'X',
                             label=f'Mean of estimated OER - min {minsimlenght} d', data=df,
-                            color=palette[i], alpha=0.8, ax=a,
-                            zorder=1)
+                            color=palette[i], alpha=0.5, ax=a,
+                            zorder=4)
 
     # First plot (linear scale) -----------------------------------------------
     ax[0].set_xlabel(f'{parameter}')
