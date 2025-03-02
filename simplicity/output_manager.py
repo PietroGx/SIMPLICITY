@@ -411,6 +411,7 @@ def write_observed_evolutionary_rates_vs_parameter_csv(experiment_name,
                     # read sequencing_data
                     sequencing_data = read_sequencing_data(seeded_simulation_output_dir)
                     seq_number = len(sequencing_data)
+                    print(seq_number)
                     # filter by simulation lenght and seq_number
                     if final_time >= min_sim_lenght and seq_number >= min_seq_number:
                         # Perform regression for each sequencing file
