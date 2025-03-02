@@ -83,12 +83,12 @@ def main():
     args = parser.parse_args()
     
     # define model types for the fit
-    model_types = ['linear',
-                   'log',
-                   'exp',
-                   'double_log',
-                   'tan',
-                   'spline'] 
+    model_types = ['linear']
+                   # 'log',
+                   # 'exp',
+                   # 'double_log',
+                   # 'tan',
+                   # 'spline'] 
     
     # aic_models_combined = fit_models(args.experiment_name, model_types, 'combined_rate')
     aic_models, df_len = fit_models(args.experiment_name, model_types, 'single_rates')
