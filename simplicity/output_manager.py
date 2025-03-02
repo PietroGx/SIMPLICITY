@@ -395,7 +395,7 @@ def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter
 
 def get_mean_std_observed_evolutionary_rates(experiment_name,parameter,min_sim_lenght):
     build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter, min_sim_lenght)
-    df = read_combined_observed_evolutionary_rate_csv(experiment_name,parameter,min_sim_lenght)
+    df = read_observed_evolutionary_rates_csv(experiment_name,parameter,min_sim_lenght)
     df_mean_std = df.groupby(parameter)['observed_evolutionary_rate'].agg(['mean','std']).reset_index()
     return df_mean_std
 
