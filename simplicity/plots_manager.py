@@ -456,7 +456,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     line_color = '#DE8F05' # orange
     scatter_color = '#0173B2' # blue
     extra_marker_color = '#E64B9D' # pink
-    scatter_color_2 = 'black' #'#029E73' # green
+    scatter_color_2 = '#029E73' # green
     
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
@@ -488,7 +488,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     ax[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color=line_color, linewidth=2, zorder=1)
     # plot data
-    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='OER - single simulation', 
                     color=scatter_color, alpha=0.5, ax=ax[0],
                     data=data, zorder=0)
     # Fill between the upper and lower curves for the confidence interval region
@@ -496,7 +496,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
                        color=line_color, alpha=0.3, label='95% Confidence Interval'
                        , zorder=-1)
     # plot mean of observed_evolutionary_rate from data_mean_std
-    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = '+',
+    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = 'X',
                     color=scatter_color_2, alpha=1, ax=ax[0],
                     data=data_mean_std, zorder=3)
     ax[0].set_xlabel(f'{parameter}')
@@ -505,7 +505,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     # Second plot (semilog scale) -----------------------------------------------
     ax[1].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color=line_color, linewidth=2, zorder=1)
-    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='OER - single simulation', 
                     color=scatter_color, alpha=0.5, ax=ax[1],
                     data=data, zorder=0)
     # Fill between the upper and lower curves for the confidence interval region
@@ -514,7 +514,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
                        color=line_color, alpha=0.3, label='95% Confidence Interval'
                        , zorder=-1)
     # plot mean of observed_evolutionary_rate from data_mean_std
-    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = '+',
+    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = 'X',
                     color=scatter_color_2, alpha=1, ax=ax[1],
                     data=data_mean_std, zorder=3)
     ax[1].set_xlabel(f'{parameter}')
@@ -524,7 +524,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     # Third plot (log log scale) -----------------------------------------------
     ax[2].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
                color=line_color, linewidth=2, zorder=1)
-    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='OER - single simulation', 
                     color=scatter_color, alpha=0.5, ax=ax[2],
                     data=data, zorder=0)
     # Fill between the upper and lower curves for the confidence interval region
@@ -532,7 +532,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
                        color=line_color, alpha=0.3, label='95% Confidence Interval'
                        , zorder=-1)
     # plot mean of observed_evolutionary_rate from data_mean_std
-    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = '+',
+    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = 'X',
                     color=scatter_color_2, alpha=1, ax=ax[2],
                     data=data_mean_std, zorder=3)
     ax[2].set_xlabel(f'{parameter}')
