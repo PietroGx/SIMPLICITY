@@ -454,9 +454,9 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     parameter = 'evolutionary_rate'
     
     line_color = '#DE8F05' # orange
-    scatter_color = '#0173B2' # blue
-    extra_marker_color = '#E64B9D' # pink
-    scatter_color_2 = '#029E73' # green
+    scatter_color = '#DE8F05'# orange
+    combined_OER_marker_color = '#E64B9D' # pink
+    scatter_color_2 = '#0173B2' # blue '#029E73' # green
     
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
@@ -471,7 +471,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
         a.scatter(
             combined_x_data, combined_y_data, 
             label='Combined tempest regression estimate of OER', 
-            color=extra_marker_color, marker='X',zorder=2)
+            color=combined_OER_marker_color, marker='X',zorder=2)
  
     # import single simulations regression data
     data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
