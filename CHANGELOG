@@ -293,7 +293,12 @@
 	* added plot for fit to observed evolutionary rates ensamble
 	* added read_final_time to output_manager
 	* added functionality to filter by min_sim_lenght in build_observed_evolutionary_rates_vs_parameter_df
+
+2026-02-03 pietro gerletti
+
+	Version 0.8.1
 	
+	* added mean scatter plot on plot_observed_evolutionary_rates_fit
 	 
 	
 	
