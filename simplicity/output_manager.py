@@ -354,7 +354,7 @@ def get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,par
     csv_file_path = os.path.join(experiment_output_dir, 
       f'{experiment_name}_observed_evolutionary_rate_vs_{parameter}_values.csv')
     return csv_file_path
-
+    
 def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
     ''' Create df of observed evolutionary rate (tempest regression) and parameter values
     '''
@@ -390,6 +390,7 @@ def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter
         df = df.sort_values(by=str(parameter))
         # drop 0s 
         df = df[df['observed_evolutionary_rate'] != 0]
+        print(df)
         # Save to a CSV file
         df.to_csv(csv_file_path, index=False)
 
