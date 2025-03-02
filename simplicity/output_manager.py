@@ -388,7 +388,8 @@ def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter
         
         # Sort the df by the 'parameter' values
         df = df.sort_values(by=str(parameter))
-        
+        # drop 0s 
+        df = df[df['observed_evolutionary_rate'] != 0]
         # Save to a CSV file
         df.to_csv(csv_file_path, index=False)
 

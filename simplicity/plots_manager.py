@@ -474,6 +474,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
  
     
     data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
+
     x_data = data['evolutionary_rate']
     x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
     
