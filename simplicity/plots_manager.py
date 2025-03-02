@@ -456,7 +456,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     line_color = '#DE8F05' # orange
     scatter_color = '#0173B2' # blue
     extra_marker_color = '#E64B9D' # pink
-    scatter_color_2 = '#029E73' # green
+    scatter_color_2 = 'black' #'#029E73' # green
     
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
@@ -496,8 +496,8 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
                        color=line_color, alpha=0.3, label='95% Confidence Interval'
                        , zorder=-1)
     # plot mean of observed_evolutionary_rate from data_mean_std
-    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = 'd',
-                    color=scatter_color_2, alpha=0.5, ax=ax[0],
+    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = '+',
+                    color=scatter_color_2, alpha=1, ax=ax[0],
                     data=data_mean_std, zorder=3)
     ax[0].set_xlabel(f'{parameter}')
     ax[0].set_ylabel('Observed Evolutionary Rate')
@@ -508,9 +508,15 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color=scatter_color, alpha=0.5, ax=ax[1],
                     data=data, zorder=0)
-    ax[2].fill_between(x, lower_curve, upper_curve, 
+    # Fill between the upper and lower curves for the confidence interval region
+
+    ax[1].fill_between(x, lower_curve, upper_curve, 
                        color=line_color, alpha=0.3, label='95% Confidence Interval'
                        , zorder=-1)
+    # plot mean of observed_evolutionary_rate from data_mean_std
+    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = '+',
+                    color=scatter_color_2, alpha=1, ax=ax[1],
+                    data=data_mean_std, zorder=3)
     ax[1].set_xlabel(f'{parameter}')
     ax[1].set_ylabel('Observed Evolutionary Rate')
     ax[1].set_xscale('log')
@@ -521,9 +527,14 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     sns.scatterplot(x=parameter, y='observed_evolutionary_rate', label='Data', 
                     color=scatter_color, alpha=0.5, ax=ax[2],
                     data=data, zorder=0)
+    # Fill between the upper and lower curves for the confidence interval region
     ax[2].fill_between(x, lower_curve, upper_curve, 
                        color=line_color, alpha=0.3, label='95% Confidence Interval'
                        , zorder=-1)
+    # plot mean of observed_evolutionary_rate from data_mean_std
+    sns.scatterplot(x=parameter, y='mean', label='Mean OER', marker = '+',
+                    color=scatter_color_2, alpha=1, ax=ax[2],
+                    data=data_mean_std, zorder=3)
     ax[2].set_xlabel(f'{parameter}')
     ax[2].set_ylabel('Observed Evolutionary Rate')
     ax[2].set_xscale('log')
