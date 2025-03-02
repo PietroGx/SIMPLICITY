@@ -40,8 +40,7 @@ def fit_models(experiment_name, model_types, data_type):
                                                                     min_sim_lenght)
          # import the df needed for the fit
         df = om.read_observed_evolutionary_rates_csv(experiment_name, 
-                                                     parameter, 
-                                                     min_seq_number,
+                                                     parameter,
                                                      min_sim_lenght)
         weights = None
         # select plot function
