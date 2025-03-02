@@ -13,7 +13,7 @@ import argparse
 def fit_models(experiment_name, model_types, data_type):
     
     parameter = 'evolutionary_rate'
-    min_seq_number = 50
+    min_seq_number = 10
     min_sim_lenght = 0
     
     if data_type == 'combined_rate':
@@ -30,7 +30,7 @@ def fit_models(experiment_name, model_types, data_type):
         weights = None
         # select plot function
         plot_fit = pm.plot_combined_OER_fit
-        kwargs = {"min_sim_lenght": min_sim_lenght}
+        kwargs = {"min_seq_number": min_seq_number, "min_sim_lenght": min_sim_lenght}
         
     elif data_type == 'single_rates':
         # build the dataframe needed for the fit
@@ -78,7 +78,7 @@ def fit_models(experiment_name, model_types, data_type):
         print('###############################################################')
         print('')
     
-    return aic_models, len(df)
+    return aic_models, df
 
 def main():
     # Set up the argument parser
@@ -87,15 +87,12 @@ def main():
     args = parser.parse_args()
     
     # define model types for the fit
-    model_types = ['linear',
-                   'log',
+    model_types = ['log',
                    'exp',
-                   'double_log',
-                   'tan',
-                   'spline'] 
+                   'tan'] 
     
-    aic_models_combined, df_len_combined = fit_models(args.experiment_name, model_types, 'combined_rate')
-    aic_models, df_len = fit_models(args.experiment_name, model_types, 'single_rates')
+    aic_models_combined, _ = fit_models(args.experiment_name, model_types, 'combined_rate')
+    aic_models, df = fit_models(args.experiment_name, model_types, 'single_rates')
     
     # print AIC for each model fit
     sorted_aics_combined = sorted(aic_models_combined.items(), key=lambda item: item[1])
@@ -112,12 +109,10 @@ def main():
         print(f"{key}      {value}")
     
     print('')
-    print('df lenght OER:')
-    print(df_len)
-    
-    print('')
-    print('df lenght combined OER:')
-    print(df_len_combined)
+    print('df OER:')
+    df_counts = df['evolutionary_rate'].value_counts().reset_index()
+    df_counts.columns = ['evolutionary_rate_value', 'count']
+    print(df_counts)
     
 if __name__ == "__main__":
     main()
