@@ -520,12 +520,14 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     ax[1].set_xlabel(f'{parameter}')
     ax[1].set_ylabel('Observed Evolutionary Rate')
     ax[1].set_xscale('log')
+    ax[1].legend_.remove()
     
     # Third plot (log log scale) -----------------------------------------------
     ax[2].set_xlabel(f'{parameter}')
     ax[2].set_ylabel('Observed Evolutionary Rate')
     ax[2].set_xscale('log')
     ax[2].set_yscale('log')
+    ax[2].legend_.remove()
     
     plt.tight_layout()
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
