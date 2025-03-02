@@ -15,7 +15,7 @@ def fit_models(experiment_name, model_types, data_type):
     parameter = 'evolutionary_rate'
     
     if data_type == 'combined_rate':
-        min_sim_lenght=120
+        min_sim_lenght=0
         # build the dataframe needed for the fit
         om.build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
                                                                     parameter, 
@@ -26,7 +26,7 @@ def fit_models(experiment_name, model_types, data_type):
         plot_fit = pm.plot_combined_observed_evolutionary_rate_fit
         
     elif data_type == 'single_rates':
-        min_sim_lenght=120
+        min_sim_lenght=0
         # build the dataframe needed for the fit
         om.build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, 
                                                                     parameter, 
