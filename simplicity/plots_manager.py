@@ -362,7 +362,10 @@ def export_tempest_regression_plots(experiment_name):
         os.replace(plot, os.path.join(plots_folder_dir,plot_filename))
         
 
-def plot_combined_observed_evolutionary_rate_fit(experiment_name, fit_result, model_type, min_sim_lenght):
+def plot_combined_observed_evolutionary_rate_fit(experiment_name, 
+                                                 fit_result, 
+                                                 model_type, 
+                                                 min_sim_lenght):
     ''' plot fit of evolutionary rate / observed evolutionary rate curve
     '''
 
