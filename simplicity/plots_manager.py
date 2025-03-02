@@ -453,7 +453,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     '''
     parameter = 'evolutionary_rate'
     
-    line_color = '#DE8F05' # orange
+    line_color = 'black' #'#DE8F05' # orange
     scatter_color = '#DE8F05'# orange
     combined_OER_marker_color = '#E64B9D' # pink
     scatter_color_2 = '#0173B2' # blue '#029E73' # green
