@@ -29,7 +29,7 @@ def fit_models(experiment_name, model_types, data_type):
                                                    min_sim_lenght)
         weights = None
         # select plot function
-        plot_fit = pm.plot_combined_observed_evolutionary_rate_fit
+        plot_fit = pm.plot_combined_OER_fit
         kwargs = {"min_sim_lenght": min_sim_lenght}
         
     elif data_type == 'single_rates':
@@ -49,7 +49,7 @@ def fit_models(experiment_name, model_types, data_type):
                                              min_sim_lenght)
         weights = None
         # select plot function
-        plot_fit = pm.plot_observed_evolutionary_rates_fit
+        plot_fit = pm.plot_OER_fit
         kwargs = {"min_seq_number": min_seq_number, "min_sim_lenght": min_sim_lenght}
         
     else:
