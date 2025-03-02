@@ -54,7 +54,7 @@ def fit_models(experiment_name, model_types, data_type):
         print('###############################################################')
         print('')
         try:
-            y_data = df['observed_evolutionary_rate']
+            # y_data = df['observed_evolutionary_rate']
             weights = None # er.fit_weight(y_data)
             fit_result = er.fit_observed_evolutionary_rate_regressor(df, model_type, weights)
             aic_models[model_type] = fit_result.aic
