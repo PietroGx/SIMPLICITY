@@ -321,7 +321,8 @@ def build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, p
     '''
     csv_file_path = get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name, parameter, min_sim_lenght)
     if os.path.exists(csv_file_path):
-        print(f'{csv_file_path} already exists, continuing...')
+        # print(f'{csv_file_path} already exists, continuing...')
+        pass
     else:
         # Get seeded simulations output subfolders
         simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
@@ -360,7 +361,8 @@ def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter
     '''
     csv_file_path = get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter,min_sim_lenght)
     if os.path.exists(csv_file_path):
-        print(f'{csv_file_path} already exists, continuing...')
+        # print(f'{csv_file_path} already exists, continuing...')
+        pass
     else:
         # Get seeded simulations output subfolders
         simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
