@@ -501,15 +501,15 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
                         color=scatter_color_2, alpha=1, ax=a,
                         zorder=3)
         
-        # minsimlenghts = [0]
-        # palette = sns.color_palette("tab10", len(minsimlenghts))
-        # for i, minsimlenght in enumerate(minsimlenghts):
-        #     df = om.get_mean_std_observed_evolutionary_rates(experiment_name,parameter,minsimlenght)
-        #     # plot mean of observed_evolutionary_rate from data_mean_std
-        #     sns.scatterplot(x=parameter, y='mean', marker = 'X',
-        #                     label=f'Mean of estimated OER - min {minsimlenght} d', data=df,
-        #                     color=palette[i], alpha=0.8, ax=a,
-        #                     zorder=4)
+        minsimlenghts = [0,100,200,300]
+        palette = sns.color_palette("tab10", len(minsimlenghts))
+        for i, minsimlenght in enumerate(minsimlenghts):
+            df = om.get_mean_std_observed_evolutionary_rates(experiment_name,parameter,minsimlenght)
+            # plot mean of observed_evolutionary_rate from data_mean_std
+            sns.scatterplot(x=parameter, y='mean', marker = 'X',
+                            label=f'Mean of estimated OER - min {minsimlenght} d', data=df,
+                            color=palette[i], alpha=0.8, ax=a,
+                            zorder=4)
 
     # First plot (linear scale) -----------------------------------------------
     ax[0].set_xlabel(f'{parameter}')

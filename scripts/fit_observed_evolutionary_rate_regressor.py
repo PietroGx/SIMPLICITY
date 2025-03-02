@@ -22,6 +22,7 @@ def fit_models(experiment_name, model_types, data_type):
                                                                     min_sim_lenght)
          # import the df needed for the fit
         df = om.read_combined_observed_evolutionary_rate_csv(experiment_name, parameter)
+        weights = None
         # select plot function
         plot_fit = pm.plot_combined_observed_evolutionary_rate_fit
         
@@ -36,7 +37,7 @@ def fit_models(experiment_name, model_types, data_type):
                                                                     min_sim_lenght)
          # import the df needed for the fit
         df = om.read_observed_evolutionary_rates_csv(experiment_name, parameter, min_sim_lenght)
-    
+        weights = None # er.fit_weight(df)
         # select plot function
         plot_fit = pm.plot_observed_evolutionary_rates_fit
     else:
@@ -54,8 +55,6 @@ def fit_models(experiment_name, model_types, data_type):
         print('###############################################################')
         print('')
         try:
-            # y_data = df['observed_evolutionary_rate']
-            weights = None # er.fit_weight(y_data)
             fit_result = er.fit_observed_evolutionary_rate_regressor(df, model_type, weights)
             aic_models[model_type] = fit_result.aic
             print(f'saving plot in {experiment_name}/.')
