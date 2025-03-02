@@ -467,7 +467,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
     combined_data = om.read_combined_observed_evolutionary_rate_csv(experiment_name,parameter,min_sim_lenght)
     
     # import single simulations regression data
-    data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
+    data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter,min_sim_lenght)
     # Group by evolutionary_rate and compute mean and standard deviation for OER
     data_mean_df = om.get_mean_std_observed_evolutionary_rates(experiment_name,parameter,min_sim_lenght)
     # get lower and upper confidence interval for fit results
