@@ -31,6 +31,7 @@ def fit_models(experiment_name, model_types, data_type):
                                                                     min_sim_lenght=120)
          # import the df needed for the fit
         df = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
+        print(df)
         # select plot function
         plot_fit = pm.plot_observed_evolutionary_rates_fit
     else:
@@ -78,15 +79,15 @@ def main():
                    'tan',
                    'spline'] 
     
-    aic_models_combined = fit_models(args.experiment_name, model_types, 'combined_rate')
+    # aic_models_combined = fit_models(args.experiment_name, model_types, 'combined_rate')
     aic_models = fit_models(args.experiment_name, model_types, 'single_rates')
     
-    # print AIC for each model fit
-    sorted_aics_combined = sorted(aic_models_combined.items(), key=lambda item: item[1])
-    print('Comparison of combined rates fits with Akaike Information Criterion')
-    print("Key    Value")
-    for key, value in sorted_aics_combined:
-        print(f"{key}      {value}")
+    # # print AIC for each model fit
+    # sorted_aics_combined = sorted(aic_models_combined.items(), key=lambda item: item[1])
+    # print('Comparison of combined rates fits with Akaike Information Criterion')
+    # print("Key    Value")
+    # for key, value in sorted_aics_combined:
+    #     print(f"{key}      {value}")
     
     # print AIC for each model fit
     sorted_aics = sorted(aic_models.items(), key=lambda item: item[1])
