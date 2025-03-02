@@ -359,7 +359,6 @@ def export_tempest_regression_plots(experiment_name):
     for plot,plot_filename in zip(plots,plot_filenames):
         os.replace(plot, os.path.join(plots_folder_dir,plot_filename))
         
-
 def plot_combined_OER_fit(experiment_name, 
                                                  fit_result, 
                                                  model_type, 
