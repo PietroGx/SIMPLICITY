@@ -16,6 +16,7 @@ from simplicity.evolution.decoder import decode_genome
 import simplicity.phenotype.distance  as dis
 import pandas as pd
 import simplicity.tuning.evolutionary_rate as er
+import glob
 
 def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
     """
@@ -224,45 +225,7 @@ def read_final_time(seeded_simulation_output_dir):
         final_time = float(f.read().strip())
     return final_time
 
-def extract_u_e_values(experiment_name):
-    ''' Perform tempest regression (get u) and saves the values vs evolutionary rate
-    '''
-    import glob
-    import json
-    from simplicity.tuning.evolutionary_rate import tempest_regression, create_joint_sequencing_df
-    # get simulation parameter files for the selected experiment
-    simulation_parameters_dir = dm.get_simulation_parameters_dir(experiment_name)
-    simulation_parameters_files = glob.glob(os.path.join(simulation_parameters_dir, '*.json'))
-    # get output directory
-    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
-    # Get seeded simulations output subfolders
-    seeeded_simulations_output_directories = [os.path.join(experiment_output_dir, 
-                                    f.name) for f in os.scandir(experiment_output_dir
-                                                                ) if f.is_dir()]
-    # for each simulation set in the experiment perfom the tempest regression
-    results = []
-    for simulation_parameters_file, seeeded_simulations_output_directory in zip(
-            simulation_parameters_files,seeeded_simulations_output_directories):
-        # Read the parameter from the settings file
-        with open(simulation_parameters_file, 'r') as file:
-            data = json.load(file)
-        parameter_value = data.get('evolutionary_rate')
-        
-        # Perform regression for the settings output folder
-        combined_df, _ = create_joint_sequencing_df(seeeded_simulations_output_directory)
-        u, _ = tempest_regression(combined_df)
-        
-        results.append({str('evolutionary_rate'): parameter_value, 'u': u})
-    # add results to df
-    results_df = pd.DataFrame(results)
-    
-    # Sort the results by the 'parameter' values
-    results_df = results_df.sort_values(by=str('evolutionary_rate'))
-    
-    # Save the results to a CSV file
-    csv_file_path = os.path.join(experiment_output_dir, 
-                                 f'{experiment_name}_u_vs_evolutionary_rate_values.csv')
-    results_df.to_csv(csv_file_path, index=False)
+
     
 def get_all_individuals_data_for_simulation_output_dir(simulation_output_dir):
     seeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
@@ -310,13 +273,73 @@ def get_IH_lineages_data_experiment(experiment_name):
         df = pd.concat([df,new_df],axis=0)
     return df
 
+###############################################################################
+
+def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
+    """
+    Filters sequencing files by keeping only the ones from simulation that 
+    lasted at least min_sim_lenght.
+    """
+    filtered_files = []
+    
+    for file in files:
+        seeded_simulation_output_dir = os.path.dirname(file)
+        try: 
+            final_time = read_final_time(seeded_simulation_output_dir)
+            if final_time >= min_sim_lenght:
+                filtered_files.append(file)
+        except Exception as e:
+            print(f"Error reading final_time: {e}")
+    print(f'Keeping files with simulation lenght >= {min_sim_lenght}')
+    print('')
+    return filtered_files
+
+def create_combined_sequencing_df(seeeded_simulations_output_directory, 
+                                  min_seq_number=0,
+                                  min_sim_lenght=0):
+    '''
+    seeeded_simulations_output_directory ==> path to subfolder of 
+                                             experiment_name/04_Output/
+    
+    Join all sequencing_data_regression.csv files of different 
+    seeded simulation runs (SAME PARAMETERS, different seeds) 
+    in a single df and returns it (for tempest regression).
+    '''
+    print('##################################################################')
+    print(f"processing simulation batch: {os.path.basename(seeeded_simulations_output_directory)}")
+    csv_files = glob.glob(os.path.join(seeeded_simulations_output_directory,'**',
+                                       'sequencing_data_regression.csv'),
+                                        recursive=True)
+    filtered_csv_files = filter_sequencing_files_by_simulation_lenght(csv_files, min_sim_lenght)
+    # List to store individual DataFrames
+    data_frames = []
+    for csv_file in filtered_csv_files:
+        # Read each CSV file into a DataFrame
+        try:
+            df = pd.read_csv(csv_file)
+            # only add df if they contain at least min_seq_number sequences
+            if len(df) >= min_seq_number:
+                data_frames.append(df)
+        except: pass # skip empty files
+    # Concatenate all DataFrames into one
+    try:
+        combined_df = pd.concat(data_frames, ignore_index=True)
+        return combined_df
+    except:
+        print('No sequencing data available to plot! Check filter settings!')
+        print('')
+        return None
+
 def get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter,min_sim_lenght):
     experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
     csv_file_path = os.path.join(experiment_output_dir, 
       f'{experiment_name}_combined_observed_evolutionary_rate_vs_{parameter}_values_min_sim_lenght_{min_sim_lenght}.csv')
     return csv_file_path
 
-def build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
+def write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
+                                                              parameter, 
+                                                              min_seq_number=0,
+                                                              min_sim_lenght=0):
     ''' Create df of observed evolutionary rate (tempest regression on joint data) and parameter values
     '''
     csv_file_path = get_combined_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name, parameter, min_sim_lenght)
@@ -334,7 +357,9 @@ def build_combined_observed_evolutionary_rate_vs_parameter_df(experiment_name, p
                                                   simulation_output_dir, parameter)
             
             # Perform regression for the settings output folder
-            combined_df = er.create_joint_sequencing_df(simulation_output_dir, min_sim_lenght)
+            combined_df = create_combined_sequencing_df(simulation_output_dir, 
+                                                        min_seq_number,
+                                                        min_sim_lenght)
             if combined_df is None: 
                 pass
             else:
@@ -356,30 +381,39 @@ def get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,par
       f'{experiment_name}_observed_evolutionary_rate_vs_{parameter}_values_min_sim_lenght_{min_sim_lenght}.csv')
     return csv_file_path
     
-def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter, min_sim_lenght=0):
+def write_observed_evolutionary_rates_vs_parameter_csv(experiment_name, 
+                                                      parameter, 
+                                                      min_seq_number=0,
+                                                      min_sim_lenght=0):
     ''' Create df of observed evolutionary rate (tempest regression) and parameter values
     '''
     csv_file_path = get_observed_evolutionary_rate_vs_parameter_df_file_path(experiment_name,parameter,min_sim_lenght)
+    # if the file exists already, does nothing
     if os.path.exists(csv_file_path):
         # print(f'{csv_file_path} already exists, continuing...')
         pass
+    # create the df and saves it to csv 
     else:
         # Get seeded simulations output subfolders
         simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
-     
         results = []
+        # loop over each simulation_output_dir
         for simulation_output_dir in simulation_output_dirs:
             # Read the parameter from the settings file
             parameter_value = sm.get_parameter_value_from_simulation_output_dir(
                                                   simulation_output_dir, parameter)
             seeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
-            
+            # loop over each seeded_simulation_output_dir
             for seeded_simulation_output_dir in seeded_simulation_output_dirs:
-                final_time = read_final_time(seeded_simulation_output_dir)
-                if final_time >= min_sim_lenght:
-                    # Perform regression for each sequencing file
-                    try:
-                        sequencing_data = read_sequencing_data(seeded_simulation_output_dir)
+                try:
+                    # get simulation final time
+                    final_time = read_final_time(seeded_simulation_output_dir)
+                    # read sequencing_data
+                    sequencing_data = read_sequencing_data(seeded_simulation_output_dir)
+                    seq_number = len(sequencing_data)
+                    # filter by simulation lenght and seq_number
+                    if final_time >= min_sim_lenght and seq_number >= min_seq_number:
+                        # Perform regression for each sequencing file
                         observed_evolutionary_rate = er.tempest_regression(sequencing_data).coef_[0] # substitution rate per site per year
                         results.append({
                             parameter: parameter_value, 
@@ -387,7 +421,7 @@ def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter
                             'simulation_final_time':read_final_time(seeded_simulation_output_dir),
                             'settings_final_time': sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, 'final_time')
                                        })
-                    except: pass # only add files that are present
+                except: pass # only add files that are present
         
         # add fit results to df
         df = pd.DataFrame(results)
@@ -397,8 +431,8 @@ def build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter
         # Save to a CSV file
         df.to_csv(csv_file_path, index=False)
 
-def get_mean_std_observed_evolutionary_rates(experiment_name,parameter,min_sim_lenght):
-    build_observed_evolutionary_rates_vs_parameter_df(experiment_name, parameter, min_sim_lenght)
+def get_mean_std_observed_evolutionary_rates(experiment_name,parameter,min_seq_number,min_sim_lenght):
+    write_observed_evolutionary_rates_vs_parameter_csv(experiment_name, parameter, min_seq_number, min_sim_lenght)
     df = read_observed_evolutionary_rates_csv(experiment_name,parameter,min_sim_lenght)
     df_mean_std = df.groupby(parameter)['observed_evolutionary_rate'].agg(['mean','std']).reset_index()
     return df_mean_std
