@@ -13,17 +13,20 @@ import argparse
 def fit_models(experiment_name, model_types, data_type):
     
     parameter = 'evolutionary_rate'
-    min_seq_number = 500
+    min_seq_number = 0
     min_sim_lenght = 0
     
     if data_type == 'combined_rate':
         # build the dataframe needed for the fit
-        om.write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
-                                                                    parameter,
-                                                                    min_seq_number,
-                                                                    min_sim_lenght)
+        om.write_combined_OER_vs_parameter_csv(experiment_name, 
+                                                parameter,
+                                                min_seq_number,
+                                                min_sim_lenght)
          # import the df needed for the fit
-        df = om.read_combined_observed_evolutionary_rate_csv(experiment_name, parameter)
+        df = om.read_combined_OER_vs_parameter_csv(experiment_name,
+                                                   parameter,
+                                                   min_seq_number,
+                                                   min_sim_lenght)
         weights = None
         # select plot function
         plot_fit = pm.plot_combined_observed_evolutionary_rate_fit
@@ -31,18 +34,19 @@ def fit_models(experiment_name, model_types, data_type):
         
     elif data_type == 'single_rates':
         # build the dataframe needed for the fit
-        om.write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
-                                                                    parameter, 
-                                                                    min_seq_number,
-                                                                    min_sim_lenght)
-        om.write_observed_evolutionary_rates_vs_parameter_csv(experiment_name, 
-                                                                    parameter, 
-                                                                    min_seq_number,
-                                                                    min_sim_lenght)
+        om.write_combined_OER_vs_parameter_csv(experiment_name, 
+                                                parameter, 
+                                                min_seq_number,
+                                                min_sim_lenght)
+        om.write_OER_vs_parameter_csv(experiment_name, 
+                                        parameter, 
+                                        min_seq_number,
+                                        min_sim_lenght)
          # import the df needed for the fit
-        df = om.read_observed_evolutionary_rates_csv(experiment_name, 
-                                                     parameter,
-                                                     min_sim_lenght)
+        df = om.read_OER_vs_parameter_csv(experiment_name, 
+                                             parameter,
+                                             min_seq_number,
+                                             min_sim_lenght)
         weights = None
         # select plot function
         plot_fit = pm.plot_observed_evolutionary_rates_fit

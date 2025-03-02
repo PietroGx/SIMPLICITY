@@ -316,19 +316,17 @@ def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght
     plt.tight_layout()
     plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
 
-def plot_combined_observed_evolutionary_rate_vs_parameter(experiment_name, 
-                                                          parameter,  
-                                                          min_seq_number=0,
-                                                          min_sim_lenght=0):
+def plot_combined_OER_vs_parameter(experiment_name, 
+                                    parameter,  
+                                    min_seq_number=0,
+                                    min_sim_lenght=0):
     ''' Plot observed evolutionary rate (tempest regression) against desired parameter values
     '''
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    # build combined dataframe, filtered by min simulation lenght
-    om.write_combined_observed_evolutionary_rate_vs_parameter_csv(experiment_name, 
-                                                       parameter, 
-                                                       min_seq_number,
-                                                       min_sim_lenght)
-    df = om.read_combined_observed_evolutionary_rate_csv(experiment_name, parameter,min_sim_lenght)
+    df = om.read_combined_OER_vs_parameter_csv(experiment_name, 
+                                               parameter,
+                                               min_seq_number,
+                                               min_sim_lenght)
     # Plot target parameter vs u as a line plot with points
     plt.figure(figsize=(10, 6))
     plt.plot(df[parameter],  df['observed_evolutionary_rate'], 
@@ -362,14 +360,18 @@ def export_tempest_regression_plots(experiment_name):
         os.replace(plot, os.path.join(plots_folder_dir,plot_filename))
         
 
-def plot_combined_observed_evolutionary_rate_fit(experiment_name, 
+def plot_combined_OER_fit(experiment_name, 
                                                  fit_result, 
                                                  model_type, 
+                                                 min_seq_number,
                                                  min_sim_lenght):
     ''' plot fit of evolutionary rate / observed evolutionary rate curve
     '''
 
-    data = om.read_combined_observed_evolutionary_rate_csv(experiment_name, 'evolutionary_rate', min_sim_lenght)
+    data = om.read_combined_OER_vs_parameter_csv(experiment_name, 
+                                                 'evolutionary_rate', 
+                                                 min_seq_number,
+                                                 min_sim_lenght)
     x_data = data['evolutionary_rate'] 
     y_data = data['observed_evolutionary_rate']  
     
@@ -414,11 +416,11 @@ def plot_combined_observed_evolutionary_rate_fit(experiment_name,
      f'{experiment_name}_combined_observed_evolutionary_rate_{model_type}_fit.png')
     plt.savefig(file_path)
 
-def plot_observed_evolutionary_rates_fit(experiment_name, 
-                                         fit_result, 
-                                         model_type,
-                                         min_seq_number,
-                                         min_sim_lenght):
+def plot_OER_fit(experiment_name, 
+                fit_result, 
+                model_type,
+                min_seq_number,
+                min_sim_lenght):
     ''' plot fit of evolutionary rate / observed evolutionary rates curve
     '''
     parameter = 'evolutionary_rate'
@@ -432,15 +434,23 @@ def plot_observed_evolutionary_rates_fit(experiment_name,
     fig, ax = plt.subplots(3,1, figsize=(8, 12))
     
     # import combined regression data
-    combined_data = om.read_combined_observed_evolutionary_rate_csv(experiment_name,parameter,min_sim_lenght)
+    combined_data = om.read_combined_OER_vs_parameter_csv(experiment_name,
+                                                          parameter,
+                                                          min_seq_number,
+                                                          min_sim_lenght)
     
     # import single simulations regression data
-    data = om.read_observed_evolutionary_rates_csv(experiment_name, parameter,min_sim_lenght)
+    data = om.read_OER_vs_parameter_csv(experiment_name, 
+                                        parameter,
+                                        min_seq_number,
+                                        min_sim_lenght)
+    
     # Group by evolutionary_rate and compute mean and standard deviation for OER
-    data_mean_df = om.get_mean_std_observed_evolutionary_rates(experiment_name,
-                                                               parameter,
-                                                               min_seq_number,
-                                                               min_sim_lenght)
+    data_mean_df = om.get_mean_std_OER(experiment_name,
+                                        parameter,
+                                        min_seq_number,
+                                        min_sim_lenght)
+    
     # get lower and upper confidence interval for fit results
     x_data = data['evolutionary_rate']
     x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())

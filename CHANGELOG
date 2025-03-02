@@ -306,7 +306,12 @@
     * deleted obsolete functions from evolutionary_rate.py and plot_manager
     * finished refactoring of tempest regression results csv writing and reading 
     * added option to filter sequencing data for tempest regression by number of sequences present in the file 
+
+2026-02-03 pietro gerletti
+
+	Version 0.8.2
 	
+	* updated names and signatures of OER related functions in output_manager and plots_manager
 	
 	
 	
