@@ -31,8 +31,6 @@ def fit_models(experiment_name, model_types, data_type):
                                                                     min_sim_lenght=120)
          # import the df needed for the fit
         df = om.read_observed_evolutionary_rates_csv(experiment_name, parameter)
-        df = df[df['observed_evolutionary_rate'] != 0]
-        print(df)
         # select plot function
         plot_fit = pm.plot_observed_evolutionary_rates_fit
     else:
