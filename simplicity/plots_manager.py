@@ -488,7 +488,7 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
         # plot fitted curve
         sns.lineplot(x=x_data, y=fit_result.best_fit, 
                      label=f'Fitted {model_type} curve', 
-                     color=line_color, linewidth=2, ax=a,
+                     color=line_color, linewidth=1, ax=a,
                      zorder=1)
         # scatterplot combined regression points (as comparison)
         sns.scatterplot(x='evolutionary_rate', y='observed_evolutionary_rate', marker='X',
@@ -500,6 +500,16 @@ def plot_observed_evolutionary_rates_fit(experiment_name, fit_result, model_type
                         label='Mean of estimated OER (single simulations)', data=data_mean_df,
                         color=scatter_color_2, alpha=1, ax=a,
                         zorder=3)
+        
+        minsimlenghts = [0,100,200,300]
+        palette = sns.color_palette("tab10", len(minsimlenghts))
+        for i, minsimlenght in enumerate(minsimlenghts):
+            df = om.get_mean_std_observed_evolutionary_rates(experiment_name,parameter,minsimlenght)
+            # plot mean of observed_evolutionary_rate from data_mean_std
+            sns.scatterplot(x=parameter, y='mean', marker = 'X',
+                            label=f'Mean of estimated OER - min {minsimlenght} d', data=df,
+                            color=palette[i], alpha=0.8, ax=a,
+                            zorder=1)
 
     # First plot (linear scale) -----------------------------------------------
     ax[0].set_xlabel(f'{parameter}')
