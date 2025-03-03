@@ -18,7 +18,7 @@ STANDARD_VALUES = {
     "tau_3": 7.5,
     "infected_individuals_at_start": 10,
     "R": 1.3,
-    "diagnosis_rate": 0.1,             # in percentage, will be converted to in model 
+    "diagnosis_rate": 0.1,             # in percentage, will be converted to kd in model 
     "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
     "evolutionary_rate": 0.0017,       # e in theoretical model equations
     "final_time": 365,

@@ -29,15 +29,16 @@ def fixture_experiment_settings():
     evolutionary_rate_num_values = 15
     
     # Generate values spaced logarithmically between 10^-5 and 10^-2
-    values = np.logspace(np.log10(1e-7), np.log10(0.5), 
+    values = np.logspace(np.log10(5e-6), np.log10(0.2), 
                          num=evolutionary_rate_num_values)
     evolutionary_rate_values = values.tolist()
 
     
     parameters      = {'evolutionary_rate': evolutionary_rate_values,
-                       'infected_individuals_at_start': [100]*evolutionary_rate_num_values
+                       'infected_individuals_at_start': [50]*evolutionary_rate_num_values,
+                       'final_time': [365*3]*evolutionary_rate_num_values
                        }
-    n_seeds = 150
+    n_seeds = 100
 
     return (parameters, n_seeds)
 
