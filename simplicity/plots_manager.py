@@ -481,9 +481,9 @@ def plot_OER_fit(experiment_name,
                         color=scatter_color_2, alpha=1, ax=a,
                         zorder=3)
         # Add horizontal lines 
-        a.hlines(y=[1e-5, 1e-2], xmin=0, xmax=1, colors=['r', 'r'], linestyles='--')
+        a.hlines(y=[1e-5, 1e-2], xmin=0, xmax=x_data.max(), colors=['r', 'r'], linestyles='--')
         # Set y-axis limits
-        a.set_ylim(0, 0.05)
+        a.set_ylim(0.000009, 0.02)
         
         # minsimlenghts = [0,100,200,300]
         # palette = sns.color_palette("tab10", len(minsimlenghts))
