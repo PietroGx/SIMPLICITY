@@ -29,7 +29,7 @@ def fixture_experiment_settings():
     evolutionary_rate_num_values = 15
     
     # Generate values spaced logarithmically between 10^-5 and 10^-2
-    values = np.logspace(np.log10(1e-6), np.log10(1e-1), 
+    values = np.logspace(np.log10(1e-7), np.log10(0.5), 
                          num=evolutionary_rate_num_values)
     evolutionary_rate_values = values.tolist()
 
