@@ -22,9 +22,9 @@ def tempest_regression(sequencing_data_df):
     Returns
     -------
     u : TYPE
-        observed evolutionary rate.
+        observed evolutionary rate (OER)
     model : func
-        fitted model (sklearn linear regression(.
+        fitted model (sklearn linear regression).
 
     '''
     x = sequencing_data_df['Sequencing_time'].values.reshape(-1, 1)

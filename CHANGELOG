@@ -312,6 +312,8 @@
 	Version 0.8.2
 	
 	* updated names and signatures of OER related functions in output_manager and plots_manager
+	* updated script for simulating OER fit data (running for 3 years, updated er range)
+	* updating phenotype model weights plot function
 	
 	
 	

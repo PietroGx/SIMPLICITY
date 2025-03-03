@@ -5,6 +5,23 @@
 @author: pietro
 
 STANDARD_VALUES for SIMPLICITY simulation: 
+    
+    STANDARD_VALUES = {
+        "population_size": 1000,
+        "tau_3": 7.5,
+        "infected_individuals_at_start": 10,
+        "R": 1.3,
+        "diagnosis_rate": 0.1,             # in percentage, will be converted to kd in model 
+        "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
+        "evolutionary_rate": 0.0017,       # e in theoretical model equations
+        "final_time": 365,
+        "max_runtime": 259200, 
+        "phenotype_model": 'immune waning',  # or 'distance from wt'
+        "sequencing_rate": 0.05,
+        "seed": None,
+        "F": 1.25
+    }
+    
 y, you can specify them in the parameters dictionary below. 
 For each parameter, specify a list of values that you would like to use for the 
 simulation. If you want to change more than one parameter at the time, consider 
@@ -29,14 +46,15 @@ def fixture_experiment_settings():
     evolutionary_rate_num_values = 15
     
     # Generate values spaced logarithmically between 10^-5 and 10^-2
-    values = np.logspace(np.log10(5e-6), np.log10(0.2), 
+    values = np.logspace(np.log10(1e-7), np.log10(0.2), 
                          num=evolutionary_rate_num_values)
     evolutionary_rate_values = values.tolist()
+    mapped_sim_lenght = np.logspace(np.log10(3650), np.log10(365), num=evolutionary_rate_num_values).tolist()
 
     
     parameters      = {'evolutionary_rate': evolutionary_rate_values,
                        'infected_individuals_at_start': [50]*evolutionary_rate_num_values,
-                       'final_time': [365*3]*evolutionary_rate_num_values
+                       'final_time': mapped_sim_lenght
                        }
     n_seeds = 100
 

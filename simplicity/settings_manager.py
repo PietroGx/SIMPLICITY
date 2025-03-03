@@ -22,7 +22,7 @@ STANDARD_VALUES = {
     "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
     "evolutionary_rate": 0.0017,       # e in theoretical model equations
     "final_time": 365,
-    "max_runtime": 259200, 
+    "max_runtime": 86000, 
     "phenotype_model": 'immune waning',  # or 'distance from wt'
     "sequencing_rate": 0.05,
     "seed": None,
