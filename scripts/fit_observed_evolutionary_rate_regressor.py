@@ -13,7 +13,7 @@ import argparse
 def fit_models(experiment_name, model_types, data_type):
     
     parameter = 'evolutionary_rate'
-    min_seq_number = 0
+    min_seq_number = 20
     min_sim_lenght = 0
     
     if data_type == 'combined_rate':
@@ -89,7 +89,9 @@ def main():
     # define model types for the fit
     model_types = ['log',
                    'exp',
-                   'tan'] 
+                   'tan',
+                   'lin',
+                   'spline'] 
     
     # aic_models_combined, _ = fit_models(args.experiment_name, model_types, 'combined_rate')
     aic_models, df = fit_models(args.experiment_name, model_types, 'single_rates')
