@@ -5,22 +5,23 @@ Created on Tue Jan  7 10:00:16 2025
 
 @author: pietro
 """
-
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import pandas as pd
 import os
-import numpy as np
-import simplicity.dir_manager as dm
-import simplicity.output_manager as om
 import math
-from simplicity.tuning.evolutionary_rate import tempest_regression
 import glob
-import simplicity.tuning.diagnosis_rate as dr
-import simplicity.tuning.evolutionary_rate as er
+import matplotlib
+# matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import seaborn           as sns
+import pandas            as pd
+import numpy             as np
+import simplicity.dir_manager      as dm
 import simplicity.settings_manager as sm
-import seaborn as sns
+import simplicity.output_manager   as om
+import simplicity.tuning.diagnosis_rate    as dr
+import simplicity.tuning.evolutionary_rate as er
+import simplicity.phenotype.weight         as pheno_weight
+
+
 
 def plot_fitness(simulation_output):
     """
@@ -66,7 +67,7 @@ def plot_trajectory(seeded_simulation_output_dir):
     diagnosed  = simulation_trajectory['diagnosed']
     susceptibles  = simulation_trajectory['susceptibles'] 
 
-    fig = plt.figure(0,figsize=(16, 9))
+    # fig = plt.figure(0,figsize=(16, 9))
     plt.title('Simulation of SARS-CoV-2 outbreak')
     
     
@@ -305,7 +306,7 @@ def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght
         if sequencing_data_df is None: 
             pass
         else:
-            fitted_tempest_regression = tempest_regression(sequencing_data_df)
+            fitted_tempest_regression = er.tempest_regression(sequencing_data_df)
             ax = axs[i // num_cols][i % num_cols]
             plot_tempest_regression(sequencing_data_df,
                                        fitted_tempest_regression,
@@ -547,12 +548,12 @@ def confidence_interval_fit(model_type, fit_result, x):
  
 ###############################################################################
 ###############################################################################   
-def plot_w_t(weights, t_max, params, t_eval): # plot weights of phenotype model
-    '''plot the weight function
-    from weight.py file in phenotype:
-    # params = w_t_params() 
-    # w_t = weights(t, t_eval, k_e, k_a, t_max)
+def plot_w_t(t_max, t_eval): # plot weights of phenotype model
+    '''plot the phenotype model weight function for calculating fitness score 
+    (distance from weighted consensus sequence)
     '''
+    
+    params = pheno_weight.w_t_params()
     k_e = params[0]
     k_a = params[1]
     
@@ -560,7 +561,7 @@ def plot_w_t(weights, t_max, params, t_eval): # plot weights of phenotype model
     t = np.linspace(0,300,1000)
 
     # Calculate concentration for each time point
-    w_t = weights(t, t_eval, k_e, k_a, t_max)
+    w_t = pheno_weight.weights(t, t_eval, k_e, k_a, t_max)
 
     # Plotting the concentration-time profile
     plt.plot(t, w_t, label=f'w(t) at simulation time {t_eval}',color='black')
