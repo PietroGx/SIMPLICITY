@@ -57,7 +57,7 @@ def factory_model_func(model_type: str):
     
     # Model selection dictionary
     models = {
-        "linear": linear_model,
+        "lin": linear_model,
         "log": log_model,
         "exp": exp_model,
         "double_log": double_log_model,
@@ -75,7 +75,7 @@ def factory_model_func(model_type: str):
 def factory_model_lmfit(model_type: str):
     
     # select the model, assign parameters and return it
-    if model_type == 'linear':
+    if model_type == 'lin':
         model = Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=0.01, B=0)
