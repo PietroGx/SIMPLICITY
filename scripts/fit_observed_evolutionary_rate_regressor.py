@@ -114,7 +114,8 @@ def main():
     print('df OER:')
     df_counts = df['evolutionary_rate'].value_counts().reset_index()
     df_counts.columns = ['evolutionary_rate_value', 'count']
-    print(df_counts)
+    df_sorted = df_counts.sort_values(by='evolutionary_rate_value')
+    print(df_sorted)
     
 if __name__ == "__main__":
     main()
