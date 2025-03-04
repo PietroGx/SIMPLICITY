@@ -315,7 +315,12 @@
 	* updated script for simulating OER fit data (running for 3 years, updated er range)
 	* updating phenotype model weights plot function
 	
+2026-03-03 pietro gerletti
+
+	Version 0.8.3
 	
+	* updated generate_OER_data script - this is the experiment used to fit the curve
+	* added script to plot OER fit for figure in paper
 	
 	
 	

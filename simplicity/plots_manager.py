@@ -422,7 +422,6 @@ def plot_OER_fit(experiment_name,
                 min_seq_number,
                 min_sim_lenght):
     ''' plot fit of evolutionary rate / observed evolutionary rates curve
-    3A in paper
     '''
     parameter = 'evolutionary_rate'
     
@@ -482,10 +481,10 @@ def plot_OER_fit(experiment_name,
                         label='Mean of estimated OER (single simulations)', data=data_mean_df,
                         color=scatter_color_2, alpha=1, ax=a,
                         zorder=3)
-        # # Add horizontal lines 
-        # a.hlines(y=[1e-5, 1e-2], xmin=0, xmax=x_data.max(), colors=['r', 'r'], linestyles='--')
-        # # Set y-axis limits
-        # a.set_ylim(0.000009, 0.02)
+        # Add horizontal lines 
+        a.hlines(y=[1e-5, 1e-2], xmin=0, xmax=x_data.max(), colors=['r', 'r'], linestyles='--')
+        # Set y-axis limits
+        a.set_ylim(0.000009, 0.02)
         
         # minsimlenghts = [0,100,200,300]
         # palette = sns.color_palette("tab10", len(minsimlenghts))
@@ -522,6 +521,85 @@ def plot_OER_fit(experiment_name,
     plt.tight_layout()
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
         f"{experiment_name}_observed_evolutionary_rates_{model_type}_fit.png"))
+    
+def plot_OER_fit_figure(experiment_name, 
+                fit_result, 
+                model_type,
+                min_seq_number,
+                min_sim_lenght):
+    ''' plot fit of evolutionary rate / observed evolutionary rates curve
+    3A in paper
+    '''
+    parameter = 'evolutionary_rate'
+    
+    line_color = 'black' #'#DE8F05' # orange
+    scatter_color = '#DE8F05'# orange
+    combined_OER_marker_color = '#E64B9D' # pink
+    scatter_color_2 = '#0173B2' # blue '#029E73' # green
+    
+    # Create figure and axes
+    fig, ax = plt.subplots(1,1, figsize=(8, 12))
+    
+    # import combined regression data
+    combined_data = om.read_combined_OER_vs_parameter_csv(experiment_name,
+                                                          parameter,
+                                                          min_seq_number,
+                                                          min_sim_lenght)
+    
+    # import single simulations regression data
+    data = om.read_OER_vs_parameter_csv(experiment_name, 
+                                        parameter,
+                                        min_seq_number,
+                                        min_sim_lenght)
+    
+    # Group by evolutionary_rate and compute mean and standard deviation for OER
+    data_mean_df = om.get_mean_std_OER(experiment_name,
+                                        parameter,
+                                        min_seq_number,
+                                        min_sim_lenght)
+    
+    # get lower and upper confidence interval for fit results
+    x_data = data['evolutionary_rate']
+    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
+    
+    # plot on each axis of subplots in a loop
+    for a in ax:
+        # Fill between the upper and lower curves for the confidence interval region
+        a.fill_between(x,lower_curve, upper_curve, 
+                       color=line_color, alpha=0.3, label='95% Confidence Interval',
+                       zorder=-1)
+        # scatterplot Estimated OER - single simulation
+        sns.scatterplot(x=parameter, y='observed_evolutionary_rate', 
+                        label='Estimated OER - single simulation', data=data,
+                        color=scatter_color, alpha=0.5, ax=a,
+                        zorder=0)
+        # plot fitted curve
+        sns.lineplot(x=x_data, y=fit_result.best_fit, 
+                     label=f'Fitted {model_type} curve', 
+                     color=line_color, linewidth=1, ax=a,
+                     zorder=1)
+        # scatterplot combined regression points (as comparison)
+        sns.scatterplot(x='evolutionary_rate', y='observed_evolutionary_rate', marker='X',
+            label='Combined tempest regression estimate of OER', data=combined_data,
+            color=combined_OER_marker_color,alpha=1, ax=a,
+            zorder=2)
+        # plot mean of observed_evolutionary_rate from data_mean_std
+        sns.scatterplot(x=parameter, y='mean', marker = 'X',
+                        label='Mean of estimated OER (single simulations)', data=data_mean_df,
+                        color=scatter_color_2, alpha=1, ax=a,
+                        zorder=3)
+
+    
+    # Set axis (log log scale) -----------------------------------------------
+    ax[0].set_xlabel(f'{parameter}')
+    ax[0].set_ylabel('Observed Evolutionary Rate')
+    ax[0].set_xscale('log')
+    ax[0].set_yscale('log')
+    ax[0].set_xlim(x_data.min(),x_data.max()*1.1)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
+        f"figure3A_OER_{model_type}_fit.png"))
     
 def confidence_interval_fit(model_type, fit_result, x):
     params_lower = {}
