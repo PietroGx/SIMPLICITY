@@ -88,10 +88,10 @@ def main():
     
     # define model types for the fit
     model_types = ['log',
-                   'exp',
-                   'tan',
-                   'lin',
-                   'spline'] 
+                   'exp']
+                   # 'tan',
+                   # 'lin',
+                   # 'spline'] 
     
     # aic_models_combined, _ = fit_models(args.experiment_name, model_types, 'combined_rate')
     aic_models, df = fit_models(args.experiment_name, model_types, 'single_rates')
