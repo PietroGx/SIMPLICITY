@@ -538,7 +538,7 @@ def plot_OER_fit_figure(experiment_name,
     scatter_color_2 = '#0173B2' # blue '#029E73' # green
     
     # Create figure and axes
-    fig, ax = plt.subplots(1,1, figsize=(4,3))
+    fig, ax = plt.subplots(1,1, figsize=(8,6))
     
     # import combined regression data
     combined_data = om.read_combined_OER_vs_parameter_csv(experiment_name,
