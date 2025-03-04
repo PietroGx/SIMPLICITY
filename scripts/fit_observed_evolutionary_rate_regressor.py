@@ -13,7 +13,7 @@ import argparse
 def fit_models(experiment_name, model_types, data_type):
     
     parameter = 'evolutionary_rate'
-    min_seq_number = 30
+    min_seq_number = 20
     min_sim_lenght = 0
     
     if data_type == 'combined_rate':
@@ -88,20 +88,20 @@ def main():
     
     # define model types for the fit
     model_types = ['log',
-                   'exp']
-                   # 'tan',
-                   # 'lin',
-                   # 'spline'] 
+                   'exp',
+                   'tan',
+                   'lin',
+                   'spline'] 
     
-    # aic_models_combined, _ = fit_models(args.experiment_name, model_types, 'combined_rate')
+    aic_models_combined, _ = fit_models(args.experiment_name, model_types, 'combined_rate')
     aic_models, df = fit_models(args.experiment_name, model_types, 'single_rates')
     
-    # # print AIC for each model fit
-    # sorted_aics_combined = sorted(aic_models_combined.items(), key=lambda item: item[1])
-    # print('Comparison of combined rates fits with Akaike Information Criterion')
-    # print("Key    Value")
-    # for key, value in sorted_aics_combined:
-    #     print(f"{key}      {value}")
+    # print AIC for each model fit
+    sorted_aics_combined = sorted(aic_models_combined.items(), key=lambda item: item[1])
+    print('Comparison of combined rates fits with Akaike Information Criterion')
+    print("Key    Value")
+    for key, value in sorted_aics_combined:
+        print(f"{key}      {value}")
     
     # print AIC for each model fit
     sorted_aics = sorted(aic_models.items(), key=lambda item: item[1])
