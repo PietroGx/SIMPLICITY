@@ -75,7 +75,7 @@ def get_experiment_output_dir(experiment_name):
          raise ValueError('No experiment with that name!')
 
 def get_experiment_fit_result_dir(experiment_name):
-    fit_result_dir = os.path.join(get_experiment_output_dir(experiment_name), 'Fit_results')
+    fit_result_dir = os.path.join(get_experiment_dir(experiment_name), 'Fit_results')
     os.makedirs(fit_result_dir, exist_ok=True)
     return fit_result_dir
 
