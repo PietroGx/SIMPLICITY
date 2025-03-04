@@ -321,6 +321,9 @@
 	
 	* updated generate_OER_data script - this is the experiment used to fit the curve
 	* added script to plot OER fit for figure in paper
+	* now fit_observed_evolutionary_rate_regressor saves the fit results to a file 
+	* added inverse_log_regressor to evolutionary_rate.py (get e from OER after fit)
+	
 	
 	
 	

@@ -481,6 +481,24 @@ def get_mean_std_OER(experiment_name,
     df_mean_std = df.groupby(parameter)['observed_evolutionary_rate'].agg(['mean','std']).reset_index()
     return df_mean_std
 
+def get_fit_results_filepath(experiment_name, model_type):
+    experiment_fit_result_dir = dm.get_experiment_fit_result_dir(experiment_name)
+    filename = f'{experiment_name}_{model_type}_fit_results.csv'
+    return os.path.join(experiment_fit_result_dir,filename)
+
+def write_fit_results_csv(experiment_name, model_type, fit_result):
+    fit_results_filepath = get_fit_results_filepath(experiment_name, model_type)
+    # Save best-fit parameters to CSV
+    param_dict = {name: param.value for name, param in fit_result.params.items()}
+    df = pd.DataFrame([param_dict])
+    df.to_csv(fit_results_filepath, index=False)
+
+def read_fit_results_csv(experiment_name, model_type):
+    fit_results = get_fit_results_filepath(experiment_name, model_type)
+    df = pd.read_csv(fit_results)
+    return df
+    
+
 
 
 
