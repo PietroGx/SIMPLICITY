@@ -11,7 +11,7 @@ import argparse
 def get_evolutionary_rate_for_model_from_OER(experiment_name):
     model_type = 'log'
     fit_results_params_df = om.read_fit_results_csv(experiment_name, model_type)
-    print(fit_results_params_df)
+    print(fit_results_params_df.todict())
     # inverse_log_regressor(OER, params)
 
 def main():
