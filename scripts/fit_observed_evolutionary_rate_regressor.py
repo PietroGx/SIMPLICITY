@@ -13,7 +13,7 @@ import argparse
 def fit_models(experiment_name, model_types, data_type):
     
     parameter = 'evolutionary_rate'
-    min_seq_number = 20
+    min_seq_number = 30
     min_sim_lenght = 0
     
     if data_type == 'combined_rate':
