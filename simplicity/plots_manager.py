@@ -590,11 +590,11 @@ def plot_OER_fit_figure(experiment_name,
 
     
     # Set axis (log log scale) -----------------------------------------------
-    ax[0].set_xlabel(f'{parameter}')
-    ax[0].set_ylabel('Observed Evolutionary Rate')
-    ax[0].set_xscale('log')
-    ax[0].set_yscale('log')
-    ax[0].set_xlim(x_data.min(),x_data.max()*1.1)
+    ax.set_xlabel(f'{parameter}')
+    ax.set_ylabel('Observed Evolutionary Rate')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlim(x_data.min(),x_data.max()*1.1)
     
     plt.tight_layout()
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
