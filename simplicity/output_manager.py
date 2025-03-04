@@ -490,7 +490,7 @@ def write_fit_results_csv(experiment_name, model_type, fit_result):
     fit_results_filepath = get_fit_results_filepath(experiment_name, model_type)
     # Save best-fit parameters to CSV
     param_dict = {name: param.value for name, param in fit_result.params.items()}
-    df = pd.DataFrame([param_dict])
+    df = pd.DataFrame.from_dict(param_dict, orient='index', columns=['Best Fit'])
     df.to_csv(fit_results_filepath, index=False)
 
 def read_fit_results_csv(experiment_name, model_type):
