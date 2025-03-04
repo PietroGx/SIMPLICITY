@@ -376,10 +376,12 @@ def write_combined_OER_vs_parameter_csv(experiment_name,
         results_df = pd.DataFrame(results)
         
         # Sort the results by the 'parameter' values
-        results_df = results_df.sort_values(by=str(parameter))
+        df = results_df.sort_values(by=str(parameter))
+        
+        df_filtered = df[df[parameter] > 3e-7]
         
         # Save the results to a CSV file
-        results_df.to_csv(csv_file_path, index=False)
+        df_filtered.to_csv(csv_file_path, index=False)
         
 def read_combined_OER_vs_parameter_csv(experiment_name, 
                                        parameter,
@@ -451,8 +453,11 @@ def write_OER_vs_parameter_csv(experiment_name,
         
         # Sort the df by the 'parameter' values
         df = df.sort_values(by=str(parameter))
+        
+        df_filtered = df[df[parameter] > 3e-7]
+        
         # Save to a CSV file
-        df.to_csv(csv_file_path, index=False)
+        df_filtered.to_csv(csv_file_path, index=False)
 
 def read_OER_vs_parameter_csv(experiment_name, 
                               parameter,
