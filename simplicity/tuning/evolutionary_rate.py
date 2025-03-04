@@ -7,8 +7,8 @@ or vs any other simulation parameter.
 
 import sklearn.linear_model 
 import numpy as np
-from lmfit import Model
-from lmfit.models import SplineModel
+import lmfit
+import simplicity.output_manager as om
 
 def tempest_regression(sequencing_data_df):
     '''
@@ -53,7 +53,7 @@ def factory_model_func(model_type: str):
     
     # Define knot positions for the spline 
     knots = np.logspace(-3, 0, 6)
-    spline_model = SplineModel(prefix='spline_', xknots=knots)
+    spline_model = lmfit.models.SplineModel(prefix='spline_', xknots=knots)
     
     # Model selection dictionary
     models = {
@@ -76,13 +76,13 @@ def factory_model_lmfit(model_type: str):
     
     # select the model, assign parameters and return it
     if model_type == 'lin':
-        model = Model(factory_model_func(model_type))
+        model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=0.01, B=0)
         return model, params 
     
     elif model_type == 'log':
-        model = Model(factory_model_func(model_type))
+        model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=1)
         # Set boundaries for parameters
@@ -91,13 +91,13 @@ def factory_model_lmfit(model_type: str):
         return model, params 
     
     elif model_type == 'exp':
-        model = Model(factory_model_func(model_type))
+        model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=0)
         return model, params 
     
     elif model_type == 'double_log':
-        model = Model(factory_model_func(model_type))
+        model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=0, D=1, E=1, F=0)
         # Set boundaries for parameters
@@ -108,7 +108,7 @@ def factory_model_lmfit(model_type: str):
         return model, params 
     
     elif model_type == 'tan':
-        model = Model(factory_model_func(model_type))
+        model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
         params = model.make_params(A=1, B=1, C=0, D=0)
         return model, params 
@@ -121,7 +121,8 @@ def factory_model_lmfit(model_type: str):
     
     else: raise ValueError('Invalid model selection')
 
-def fit_observed_evolutionary_rate_regressor(df, model_type, weights=None):
+def fit_observed_evolutionary_rate_regressor(experiment_name, 
+                                             df, model_type, weights=None):
     
     x_data = df['evolutionary_rate'] 
     y_data = df['observed_evolutionary_rate']  
@@ -137,6 +138,8 @@ def fit_observed_evolutionary_rate_regressor(df, model_type, weights=None):
     
     # Print the fit results
     print(fit_result.fit_report())
+    # save fit results
+    om.write_fit_results_csv(experiment_name, model_type, fit_result)
     return fit_result
 
 def fit_weight(df):
@@ -151,7 +154,7 @@ def fit_weight_time(df):
 
 def evaluate_model(model_type, params, x):
     model = factory_model_func(model_type)
-    if isinstance(model, SplineModel):
+    if isinstance(model, lmfit.models.SplineModel):
         # Create initial parameters for lmfit
         param_obj = model.make_params()
         for key in param_obj.keys():
@@ -160,3 +163,26 @@ def evaluate_model(model_type, params, x):
         return model.eval(params=param_obj, x=x)
     return model(x, **params)
 
+def inverse_log_regressor(OER, params):
+    """
+    Computes the inverse of the logarithmic regression function y = A * log(Bx + C)
+    
+    Parameters:
+        OER:  desired observed evolutionary rate
+        params (dict): A dictionary containing the parameters 'A', 'B', and 'C'.
+    
+    Returns:
+        float or numpy array: The computed evolutionary rate value(s).
+    """
+    A = params.get('A', 0)
+    B = params.get('B', 0)
+    C = params.get('C', 0)
+    
+    # Compute the inverse function
+    x = (np.exp(OER / A) - C) / B
+    
+    return x
+    
+    
+    
+    

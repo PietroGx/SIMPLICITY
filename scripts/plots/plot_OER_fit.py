@@ -43,7 +43,8 @@ def plot_fit_log_model(experiment_name):
     print('###############################################################')
     print('')
     try:
-        fit_result = er.fit_observed_evolutionary_rate_regressor(df, model_type, weights)
+        fit_result = er.fit_observed_evolutionary_rate_regressor(experiment_name,
+                                                                 df, model_type, weights)
         print(f'saving plot in {experiment_name}/.')
         pm.plot_OER_fit_figure(experiment_name, 
                         fit_result, 

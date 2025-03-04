@@ -74,6 +74,11 @@ def get_experiment_output_dir(experiment_name):
     else:
          raise ValueError('No experiment with that name!')
 
+def get_experiment_fit_result_dir(experiment_name):
+    fit_result_dir = os.path.join(get_experiment_output_dir(experiment_name), 'Fit_results')
+    os.makedirs(fit_result_dir, exist_ok=True)
+    return fit_result_dir
+
 def get_slurm_logs_dir(experiment_name):
     slurm_logs_dir = os.path.join(get_experiment_dir(experiment_name), 'slurm','slurm_logs')
     os.makedirs(slurm_logs_dir, exist_ok=True)
