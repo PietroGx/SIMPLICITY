@@ -562,32 +562,31 @@ def plot_OER_fit_figure(experiment_name,
     x_data = data['evolutionary_rate']
     x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
     
-    # plot on each axis of subplots in a loop
-    for a in ax:
-        # Fill between the upper and lower curves for the confidence interval region
-        a.fill_between(x,lower_curve, upper_curve, 
-                       color=line_color, alpha=0.3, label='95% Confidence Interval',
-                       zorder=-1)
-        # scatterplot Estimated OER - single simulation
-        sns.scatterplot(x=parameter, y='observed_evolutionary_rate', 
-                        label='Estimated OER - single simulation', data=data,
-                        color=scatter_color, alpha=0.5, ax=a,
-                        zorder=0)
-        # plot fitted curve
-        sns.lineplot(x=x_data, y=fit_result.best_fit, 
-                     label=f'Fitted {model_type} curve', 
-                     color=line_color, linewidth=1, ax=a,
-                     zorder=1)
-        # scatterplot combined regression points (as comparison)
-        sns.scatterplot(x='evolutionary_rate', y='observed_evolutionary_rate', marker='X',
-            label='Combined tempest regression estimate of OER', data=combined_data,
-            color=combined_OER_marker_color,alpha=1, ax=a,
-            zorder=2)
-        # plot mean of observed_evolutionary_rate from data_mean_std
-        sns.scatterplot(x=parameter, y='mean', marker = 'X',
-                        label='Mean of estimated OER (single simulations)', data=data_mean_df,
-                        color=scatter_color_2, alpha=1, ax=a,
-                        zorder=3)
+    
+    # Fill between the upper and lower curves for the confidence interval region
+    ax.fill_between(x,lower_curve, upper_curve, 
+                   color=line_color, alpha=0.3, label='95% Confidence Interval',
+                   zorder=-1)
+    # scatterplot Estimated OER - single simulation
+    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', 
+                    label='Estimated OER - single simulation', data=data,
+                    color=scatter_color, alpha=0.5, ax=ax,
+                    zorder=0)
+    # plot fitted curve
+    sns.lineplot(x=x_data, y=fit_result.best_fit, 
+                 label=f'Fitted {model_type} curve', 
+                 color=line_color, linewidth=1, ax=ax,
+                 zorder=1)
+    # scatterplot combined regression points (as comparison)
+    sns.scatterplot(x='evolutionary_rate', y='observed_evolutionary_rate', marker='X',
+        label='Combined tempest regression estimate of OER', data=combined_data,
+        color=combined_OER_marker_color,alpha=1, ax=ax,
+        zorder=2)
+    # plot mean of observed_evolutionary_rate from data_mean_std
+    sns.scatterplot(x=parameter, y='mean', marker = 'X',
+                    label='Mean of estimated OER (single simulations)', data=data_mean_df,
+                    color=scatter_color_2, alpha=1, ax=ax,
+                    zorder=3)
 
     
     # Set axis (log log scale) -----------------------------------------------
