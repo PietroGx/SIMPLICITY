@@ -12,22 +12,80 @@ import simplicity.dir_manager as dm
 
 _data_dir = dm.get_data_dir()
 
-# Define the standard values
-STANDARD_VALUES = {
-    "population_size": 1000,
-    "tau_3": 7.5,
-    "infected_individuals_at_start": 10,
-    "R": 1.3,
-    "diagnosis_rate": 0.1,             # in percentage, will be converted to kd in model 
-    "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
-    "molecular_substitution_rate": 0.0017,       # e in theoretical model equations
-    "final_time": 365,
-    "max_runtime": 86000, 
-    "phenotype_model": 'immune waning',  # or 'distance from wt'
-    "sequencing_rate": 0.05,
-    "seed": None,
-    "F": 1.25
-}
+def get_standard_parameters_values_file_path():
+    standard_parameters_values_file_path = os.path.join(dm.get_reference_parameters_dir(), "standard_values.json")
+    return standard_parameters_values_file_path
+
+def get_parameter_specs_file_path():
+    parameter_specs_file_path = os.path.join(dm.get_reference_parameters_dir(), "parameter_specs.json")
+    return parameter_specs_file_path
+
+def write_standard_parameters_values():
+    filename= get_standard_parameters_values_file_path()
+    standard_values = {
+        "population_size": 1000,
+        "infected_individuals_at_start": 10,
+        "final_time": 365,
+        "tau_3": 7.5,
+        "R": 1.3,
+        "diagnosis_rate": 0.1, # in percentage, will be converted to kd in model 
+        "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
+        "molecular_substitution_rate": 0.001,  # e in theoretical model equations
+        "phenotype_model": 'immune waning',  # or 'distance from wt'
+        "sequencing_rate": 0.05,
+        "max_runtime": 86000, 
+        "seed": None,
+        "F": 1.25
+    }
+    with open(filename, "w") as file:
+        json.dump(standard_values, file, indent=4)
+    print(f"Standard values written to {filename}")
+
+def write_parameter_specs():
+    filename= get_parameter_specs_file_path()
+    parameter_specs = {
+        "population_size":               {"type": "int", "min": 0, "max": 10000},
+        "tau_3":                         {"type": "float", "min": 0, "max": 1000},
+        "infected_individuals_at_start": {"type": "int", "min": 0},
+        "R":                             {"type": "float", "min": 0, "max": 20},
+        "diagnosis_rate":                {"type": "float", "min": 0, "max": 1},
+        "IH_virus_emergence_rate":       {"type": "float", "min": 0},
+        "molecular_substitution_rate":   {"type": "float", "min": 0, "max": 1},
+        "final_time":                    {"type": "int", "min": 0},    
+        "max_runtime":                   {"type": "int", "min": 0},
+        "phenotype_model":               {"type": "str"},
+        "sequencing_rate":               {"type": "float", "min": 0, "max": 1}
+        }
+
+    with open(filename, "w") as file:
+        json.dump(parameter_specs, file, indent=4)
+    print(f"Parameter specifications written to {filename}")
+
+def read_standard_parameters_values():
+    filename= get_standard_parameters_values_file_path()
+    try:
+        with open(filename, "r") as file:
+            return json.load(file)
+    except FileNotFoundError:
+        print(f"Error: {filename} not found. Writing default standard values.")
+        write_standard_parameters_values()
+        return read_standard_parameters_values()
+
+def read_parameter_specs():
+    filename= get_parameter_specs_file_path()
+    try:
+        with open(filename, "r") as file:
+            return json.load(file)
+    except FileNotFoundError:
+        print(f"Error: {filename} not found. Writing default parameter specifications.")
+        write_parameter_specs()
+        return read_parameter_specs()
+    
+def write_user_set_parameters_file(user_set_parameters, filename):
+    file_path = os.path.join(dm.get_reference_parameters_dir(),filename)
+    with open(file_path, "w") as file:
+        json.dump(user_set_parameters, file, indent=4)
+    print(f"user_set_parameters saved to {filename}")
 
 def get_experiment_settings_file_path(experiment_name):
     return os.path.join(_data_dir,
@@ -42,6 +100,7 @@ def get_n_seeds_file_path(experiment_name):
                         f'{experiment_name}_n_seeds.json')
 
 def check_parameters_names(parameters_dic):
+    STANDARD_VALUES = read_standard_parameters_values()
     for key in parameters_dic.keys():
         if key not in STANDARD_VALUES.keys():
             raise ValueError(f'Parameter {key} is not a valid parameter')
@@ -168,7 +227,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
     
     # Define the path to the experiment settings file
     experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
-    
+    STANDARD_VALUES = read_standard_parameters_values()
     # Read the experiment settings file
     with open(experiment_settings_file_path, 'r') as settings_file:
         all_experiment_settings = json.load(settings_file)

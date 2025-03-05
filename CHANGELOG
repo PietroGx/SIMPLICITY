@@ -330,7 +330,9 @@
 	
 	* changed NAMES: observed_evolutionary_rate to observed substitution rate (OER to OSR)
 	* changed NAMES: evolutionary_rate to molecular_substituion rate (MSR)
-	
+	* added script to generate user set parameters json file 
+	* added functions to read and write standard parameters to a file 
+	* added function to write generated user set parameters json file 
 	
 	
 	
