@@ -16,7 +16,7 @@ def get_MSR_for_model_from_OSR(experiment_name, OSR):
     params = {k: float(v) for k, v in params.items()}
 
     print(params)
-    for i in params:
+    for i in params.items():
         print(type(i))
     e = er.inverse_log_regressor(OSR, params)
     print('molecular substitution rate for simulations: ', e)
