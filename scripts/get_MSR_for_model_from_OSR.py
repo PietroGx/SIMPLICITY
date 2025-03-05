@@ -13,7 +13,9 @@ def get_MSR_for_model_from_OSR(experiment_name, OSR):
     model_type = 'log'
     fit_results_params_df = om.read_fit_results_csv(experiment_name, model_type)
     params = {k: float(v) for k, v in fit_results_params_df.to_dict()['Best Fit'].items()}
-   
+    print(params)
+    for i in params:
+        print(type(i))
     e = er.inverse_log_regressor(OSR, params)
     print('molecular substitution rate for simulations: ', e)
     return e
