@@ -15,7 +15,7 @@ def get_MSR_for_model_from_OSR(experiment_name, OSR):
     params = fit_results_params_df.to_dict()
 
     MSR = er.inverse_log_regressor(OSR, params)
-    print('molecular substitution rate for simulations: {MSR:.5f')
+    print('molecular substitution rate for simulations: {MSR:.5f}')
     return MSR
 
 def main():
