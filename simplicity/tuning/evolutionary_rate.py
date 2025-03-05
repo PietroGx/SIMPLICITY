@@ -1,7 +1,7 @@
 '''
 In this file we perform the TempEst linear regression to estimate the observed
 evolutionary rate u from the simulated data of a SIMPLICITY run. There are also
-the functions to plot E (model evolutionary rate) vs u (observed evolutionary rate)
+the functions to plot E (model molecular substitution rate) vs u (observed substitution rate)
 or vs any other simulation parameter.
 '''
 
@@ -22,7 +22,7 @@ def tempest_regression(sequencing_data_df):
     Returns
     -------
     u : TYPE
-        observed evolutionary rate (OER)
+        observed substitution rate (OSR)
     model : func
         fitted model (sklearn linear regression).
 
@@ -121,11 +121,11 @@ def factory_model_lmfit(model_type: str):
     
     else: raise ValueError('Invalid model selection')
 
-def fit_observed_evolutionary_rate_regressor(experiment_name, 
+def fit_observed_substitution_rate_regressor(experiment_name, 
                                              df, model_type, weights=None):
     
-    x_data = df['evolutionary_rate'] 
-    y_data = df['observed_evolutionary_rate']  
+    x_data = df['molecular_substitution_rate'] 
+    y_data = df['observed_substitution_rate']  
     
     # Create the Model
     model, params = factory_model_lmfit(model_type)
@@ -143,12 +143,12 @@ def fit_observed_evolutionary_rate_regressor(experiment_name,
     return fit_result
 
 def fit_weight(df):
-    x_data = df['evolutionary_rate']
+    x_data = df['molecular_substitution_rate']
     weights = 1/x_data 
     return weights
 
 def fit_weight_time(df):
-    x_data = df['evolutionary_rate']
+    x_data = df['molecular_substitution_rate']
     weights = 1/x_data * (df['simulation_final_time']/df['settings_final_time'])
     return weights
 
@@ -163,25 +163,25 @@ def evaluate_model(model_type, params, x):
         return model.eval(params=param_obj, x=x)
     return model(x, **params)
 
-def inverse_log_regressor(OER, params):
+def inverse_log_regressor(OSR, params):
     """
     Computes the inverse of the logarithmic regression function y = A * log(Bx + C)
     
     Parameters:
-        OER:  desired observed evolutionary rate
+        OSR:  desired observed substitution rate
         params (dict): A dictionary containing the parameters 'A', 'B', and 'C'.
     
     Returns:
-        float or numpy array: The computed evolutionary rate value(s).
+        float or numpy array: The computed molecular substitution rate value(s).
     """
     A = params.get('A', 0)
     B = params.get('B', 0)
     C = params.get('C', 0)
     
     # Compute the inverse function
-    x = (np.exp(OER / A) - C) / B
+    MSR = (np.exp(OSR / A) - C) / B
     
-    return x
+    return MSR
     
     
     

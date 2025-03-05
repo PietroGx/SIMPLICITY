@@ -11,7 +11,7 @@ STANDARD_VALUES for SIMPLICITY simulation:
     "R": 1.5,
     "diagnosis_rate": 0.0055,
     "IH_virus_emergence_rate": 0.0085,
-    "evolutionary_rate": 0.0017,
+    "molecular_substitution_rate": 0.0017,
     "final_time": 365*3 ,
     "max_runtime": 100000000, 
     "phenotype_model": 'immune waning',  # or 'distance from wt'
@@ -45,25 +45,25 @@ import numpy as np
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
 
-    # number of values for evolutionary rate
-    evolutionary_rate_num_values = 15
+    # number of values for MSR
+    molecular_substitution_rate_num_values = 15
     
     # Generate values spaced logarithmically between 10^-5 and 1
     values = np.logspace(np.log10(0.00001), np.log10(1), 
-                         num=evolutionary_rate_num_values)
-    evolutionary_rate_values = values.tolist()
+                         num=molecular_substitution_rate_num_values)
+    molecular_substitution_rate_values = values.tolist()
 
     
-    parameters      = {'evolutionary_rate': evolutionary_rate_values,
-                       'final_time':[365] * evolutionary_rate_num_values
+    parameters      = {'molecular_substitution_rate': molecular_substitution_rate_values,
+                       'final_time':[365] * molecular_substitution_rate_num_values
                        }
     n_seeds = 300
 
     return (parameters, n_seeds)
 
 def plot_regressions_and_export(experiment_name):
-    pm.plot_combined_regressions(experiment_name, 'evolutionary_rate')
-    pm.plot_u_vs_parameter(experiment_name,'evolutionary_rate')
+    pm.plot_combined_regressions(experiment_name, 'molecular_substitution_rate')
+    pm.plot_u_vs_parameter(experiment_name,'molecular_substitution_rate')
     pm.export_u_regression_plots(experiment_name)
 
 def explore_u_e_space(runner:str, experiment_number:int):

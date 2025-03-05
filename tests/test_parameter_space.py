@@ -12,7 +12,7 @@ STANDARD_VALUES for SIMPLICITY simulation:
     "R": 1.5,
     "diagnosis_rate": 0.0055,
     "IH_virus_emergence_rate": 0.0085,
-    "evolutionary_rate": 0.0017,
+    "molecular_substitution_rate": 0.0017,
     "final_time": 365*3 ,
     "max_runtime": 100000000, 
     "phenotype_model": 'immune waning',  # or 'distance from wt'
@@ -42,7 +42,7 @@ import warnings
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {'evolutionary_rate': [0.00001, 
+    parameters      = {'molecular_substitution_rate': [0.00001, 
                                              0.0001,
                                              0.001,
                                              0.01,
@@ -64,7 +64,7 @@ def fixture_experiment_settings():
 
 def plot_regressions_and_export(experiment_name):
     pm.plot_combined_regressions(experiment_name)
-    pm.plot_u_vs_parameter(experiment_name,'evolutionary_rate')
+    pm.plot_u_vs_parameter(experiment_name,'molecular_substitution_rate')
     pm.export_u_regression_plots(experiment_name)
 
 ##### <actual test>

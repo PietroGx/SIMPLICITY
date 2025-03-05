@@ -315,7 +315,7 @@
 	* updated script for simulating OER fit data (running for 3 years, updated er range)
 	* updating phenotype model weights plot function
 	
-2026-03-03 pietro gerletti
+2026-04-03 pietro gerletti
 
 	Version 0.8.3
 	
@@ -323,6 +323,14 @@
 	* added script to plot OER fit for figure in paper
 	* now fit_observed_evolutionary_rate_regressor saves the fit results to a file 
 	* added inverse_log_regressor to evolutionary_rate.py (get e from OER after fit)
+	
+2026-05-03 pietro gerletti
+
+	Version 0.9.0
+	
+	* changed NAMES: observed_evolutionary_rate to observed substitution rate (OER to OSR)
+	* changed NAMES: evolutionary_rate to molecular_substituion rate (MSR)
+	
 	
 	
 	

@@ -330,22 +330,22 @@ def create_combined_sequencing_df(seeeded_simulations_output_directory,
         print('')
         return None
 
-def get_combined_OER_vs_parameter_csv_file_path(experiment_name,
+def get_combined_OSR_vs_parameter_csv_file_path(experiment_name,
                                                 parameter,
                                                 min_seq_number,
                                                 min_sim_lenght):
     experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
     csv_file_path = os.path.join(experiment_output_dir, 
-      f'{experiment_name}_combined_OER_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}.csv')
+      f'{experiment_name}_combined_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}.csv')
     return csv_file_path
 
-def write_combined_OER_vs_parameter_csv(experiment_name, 
+def write_combined_OSR_vs_parameter_csv(experiment_name, 
                                         parameter, 
                                         min_seq_number=0,
                                         min_sim_lenght=0):
-    ''' Create df of observed evolutionary rate (tempest regression on joint data) and parameter values
+    ''' Create df of observed substitution rate (tempest regression on joint data) and parameter values
     '''
-    csv_file_path = get_combined_OER_vs_parameter_csv_file_path(experiment_name, 
+    csv_file_path = get_combined_OSR_vs_parameter_csv_file_path(experiment_name, 
                                                                 parameter, 
                                                                 min_seq_number,
                                                                 min_sim_lenght)
@@ -369,9 +369,9 @@ def write_combined_OER_vs_parameter_csv(experiment_name,
             if combined_df is None: 
                 pass
             else:
-                observed_evolutionary_rate = er.tempest_regression(combined_df).coef_[0] # substitution rate per site per year
+                observed_substitution_rate = er.tempest_regression(combined_df).coef_[0] # substitution rate per site per year
                 results.append({str(parameter): parameter_value, 
-                                'observed_evolutionary_rate': observed_evolutionary_rate})
+                                'observed_substitution_rate': observed_substitution_rate})
         # add results to df
         results_df = pd.DataFrame(results)
         
@@ -381,33 +381,33 @@ def write_combined_OER_vs_parameter_csv(experiment_name,
         # Save the results to a CSV file
         df.to_csv(csv_file_path, index=False)
         
-def read_combined_OER_vs_parameter_csv(experiment_name, 
+def read_combined_OSR_vs_parameter_csv(experiment_name, 
                                        parameter,
                                        min_seq_number,
                                        min_sim_lenght):
-    csv_file_path = get_combined_OER_vs_parameter_csv_file_path(experiment_name,
+    csv_file_path = get_combined_OSR_vs_parameter_csv_file_path(experiment_name,
                                                                 parameter,
                                                                 min_seq_number,
                                                                 min_sim_lenght)
-    combined_observed_evolutionary_rates_df = pd.read_csv(csv_file_path)
-    return combined_observed_evolutionary_rates_df
+    combined_observed_substitution_rates_df = pd.read_csv(csv_file_path)
+    return combined_observed_substitution_rates_df
 
-def get_OER_vs_parameter_csv_file_path(experiment_name,
+def get_OSR_vs_parameter_csv_file_path(experiment_name,
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght):
     experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
     csv_file_path = os.path.join(experiment_output_dir, 
-      f'{experiment_name}_OER_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}.csv')
+      f'{experiment_name}_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}.csv')
     return csv_file_path
     
-def write_OER_vs_parameter_csv(experiment_name, 
+def write_OSR_vs_parameter_csv(experiment_name, 
                                 parameter, 
                                 min_seq_number=0,
                                 min_sim_lenght=0):
-    ''' Create df of observed evolutionary rate (tempest regression) and parameter values
+    ''' Create df of observed substitution rate (tempest regression) and parameter values
     '''
-    csv_file_path = get_OER_vs_parameter_csv_file_path(experiment_name,
+    csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name,
                                                       parameter,
                                                       min_seq_number,
                                                       min_sim_lenght)
@@ -437,10 +437,10 @@ def write_OER_vs_parameter_csv(experiment_name,
                     # filter by simulation lenght and seq_number
                     if final_time >= min_sim_lenght and seq_number >= min_seq_number:
                         # Perform regression for each sequencing file
-                        observed_evolutionary_rate = er.tempest_regression(sequencing_data).coef_[0] # substitution rate per site per year
+                        observed_substitution_rate = er.tempest_regression(sequencing_data).coef_[0] # substitution rate per site per year
                         results.append({
                             parameter: parameter_value, 
-                            'observed_evolutionary_rate': observed_evolutionary_rate,
+                            'observed_substitution_rate': observed_substitution_rate,
                             'simulation_final_time':read_final_time(seeded_simulation_output_dir),
                             'settings_final_time': sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, 'final_time')
                                        })
@@ -455,30 +455,30 @@ def write_OER_vs_parameter_csv(experiment_name,
         # Save to a CSV file
         df.to_csv(csv_file_path, index=False)
 
-def read_OER_vs_parameter_csv(experiment_name, 
+def read_OSR_vs_parameter_csv(experiment_name, 
                               parameter,
                               min_seq_number,
                               min_sim_lenght):
-    csv_file_path = get_OER_vs_parameter_csv_file_path(experiment_name,
+    csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name,
                                                       parameter,
                                                       min_seq_number,
                                                       min_sim_lenght)
-    observed_evolutionary_rates_df = pd.read_csv(csv_file_path)
-    return observed_evolutionary_rates_df
+    observed_substitution_rates_df = pd.read_csv(csv_file_path)
+    return observed_substitution_rates_df
 
-def get_mean_std_OER(experiment_name,
+def get_mean_std_OSR(experiment_name,
                      parameter,
                      min_seq_number,
                      min_sim_lenght):
-    write_OER_vs_parameter_csv(experiment_name, 
+    write_OSR_vs_parameter_csv(experiment_name, 
                                parameter, 
                                min_seq_number, 
                                min_sim_lenght)
-    df = read_OER_vs_parameter_csv(experiment_name,
+    df = read_OSR_vs_parameter_csv(experiment_name,
                                    parameter,
                                    min_seq_number,
                                    min_sim_lenght)
-    df_mean_std = df.groupby(parameter)['observed_evolutionary_rate'].agg(['mean','std']).reset_index()
+    df_mean_std = df.groupby(parameter)['observed_substitution_rate'].agg(['mean','std']).reset_index()
     return df_mean_std
 
 def get_fit_results_filepath(experiment_name, model_type):

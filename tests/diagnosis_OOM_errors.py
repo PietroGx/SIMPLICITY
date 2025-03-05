@@ -8,7 +8,7 @@ STANDARD_VALUES for SIMPLICITY simulation:
     "R": 1.5,
     "diagnosis_rate": 0.0055,
     "IH_virus_emergence_rate": 0.0085,
-    "evolutionary_rate": 0.0017,
+    "molecular_substitution_rate": 0.0017,
     "final_time": 365*3 ,
     "max_runtime": 100000000, 
     "phenotype_model": 'immune waning',  # or 'distance from wt'
@@ -38,7 +38,7 @@ from scripts.check_completed_simulations import count_completed_simulations
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {"evolutionary_rate": [0.0001,
+    parameters      = {"molecular_substitution_rate": [0.0001,
                                              0.001,
                                              0.01,
                                              0.1,
@@ -64,7 +64,7 @@ def diagnosis_OOM_errors(test_number:int):
 
 def main():
     # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run test to check OOM relation to evolutionary rate")
+    parser = argparse.ArgumentParser(description="Run test to check OOM relation to MSR parameter")
     parser.add_argument('test_number', type=int, help="Test number")
     args = parser.parse_args()
     # Run 

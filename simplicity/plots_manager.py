@@ -266,13 +266,13 @@ def plot_tempest_regression(sequencing_data_df,
     # get linear regression points
     x = sequencing_data_df['Sequencing_time'].values.reshape(-1, 1)
     y_pred = fitted_tempest_regression.predict(x)
-    # get observed_evolutionary_rate value
-    observed_evolutionary_rate = fitted_tempest_regression.coef_[0] # substitution rate per site per year
+    # get observed subswtitution rate (OSR) value
+    observed_substituion_rate = fitted_tempest_regression.coef_[0] # substitution rate per site per year
     # plot data points
     sequencing_data_df.plot(kind='scatter', x='Sequencing_time', y='Distance_from_root', color='blue', ax=ax)
     # plot linear regression
     ax.plot(x, y_pred, color='red', linewidth=2, 
-            label=f'observed_evolutionary_rate = {observed_evolutionary_rate:.5f}')
+            label=f'observed_substituion_rate = {observed_substituion_rate:.5f}')
     ax.set_xlabel('Time [y]')
     ax.set_ylabel('Distance from root [#S/site]')
     ax.set_xlim(left=0)
@@ -317,32 +317,32 @@ def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght
     plt.tight_layout()
     plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
 
-def plot_combined_OER_vs_parameter(experiment_name, 
+def plot_combined_OSR_vs_parameter(experiment_name, 
                                     parameter,  
                                     min_seq_number=0,
                                     min_sim_lenght=0):
-    ''' Plot observed evolutionary rate (tempest regression) against desired parameter values
+    ''' Plot observed substituion rate (tempest regression) against desired parameter values
     '''
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    df = om.read_combined_OER_vs_parameter_csv(experiment_name, 
+    df = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
                                                parameter,
                                                min_seq_number,
                                                min_sim_lenght)
     # Plot target parameter vs u as a line plot with points
     plt.figure(figsize=(10, 6))
-    plt.plot(df[parameter],  df['observed_evolutionary_rate'], 
+    plt.plot(df[parameter],  df['observed_substitution_rate'], 
              marker='o', 
              color='black', 
              linestyle='-', 
-             label=f'{experiment_name}_{parameter} vs observed_evolutionary_rate')
+             label=f'{experiment_name}_{parameter} vs observed_substitution_rate')
     plt.xlabel(parameter)
     plt.ylabel('u')
-    plt.title(f'{parameter} vs observed_evolutionary_rate')
+    plt.title(f'{parameter} vs observed_substitution_rate')
     plt.grid(True)
     plt.tight_layout()
     plt.legend()
     plt.savefig(os.path.join(experiment_output_dir, 
-                             f"{experiment_name}_{parameter}_vs_observed_evolutionary_rate.png"))
+                             f"{experiment_name}_{parameter}_vs_observed_substitution_rate.png"))
     
 def export_tempest_regression_plots(experiment_name): 
     ''' move tempest regression plots from experiment folder to plots folder
@@ -360,20 +360,20 @@ def export_tempest_regression_plots(experiment_name):
     for plot,plot_filename in zip(plots,plot_filenames):
         os.replace(plot, os.path.join(plots_folder_dir,plot_filename))
         
-def plot_combined_OER_fit(experiment_name, 
+def plot_combined_OSR_fit(experiment_name, 
                                                  fit_result, 
                                                  model_type, 
                                                  min_seq_number,
                                                  min_sim_lenght):
-    ''' plot fit of evolutionary rate / observed evolutionary rate curve
+    ''' plot fit of molecular substitution rate / observed substitution rate curve
     '''
 
-    data = om.read_combined_OER_vs_parameter_csv(experiment_name, 
-                                                 'evolutionary_rate', 
+    data = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
+                                                 'molecular_substitution_rate', 
                                                  min_seq_number,
                                                  min_sim_lenght)
-    x_data = data['evolutionary_rate'] 
-    y_data = data['observed_evolutionary_rate']  
+    x_data = data['molecular_substitution_rate'] 
+    y_data = data['observed_substitution_rate']  
     
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 10))
@@ -388,7 +388,7 @@ def plot_combined_OER_fit(experiment_name,
     ax[0].set_ylim(0)
     ax[0].set_xlim(0)
     # ax[0].set_xlabel('Substitution Rate (site/year) (e)')
-    # ax[0].set_ylabel('Observed evolutionary rate (site/year) (u)')
+    # ax[0].set_ylabel('observed substitution rate (site/year) (u)')
     ax[0].legend()
     # semilog scale
     ax[1].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve',
@@ -396,7 +396,7 @@ def plot_combined_OER_fit(experiment_name,
     ax[1].set_xscale("log")
     ax[1].set_ylim(0)
     # ax[1].set_xlabel('Substitution Rate (site/year) (e)')
-    ax[1].set_ylabel('Observed evolutionary rate (site/year) (u)')
+    ax[1].set_ylabel('observed substitution rate (site/year) (u)')
     ax[1].legend()
     # loglog scale
     ax[2].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve',
@@ -404,7 +404,7 @@ def plot_combined_OER_fit(experiment_name,
     ax[2].set_yscale("log")
     ax[2].set_xscale("log")
     ax[2].set_xlabel('Substitution Rate (site/year) (e)')
-    # ax[2].set_ylabel('Observed evolutionary rate (site/year) (u)')
+    # ax[2].set_ylabel('observed substitution rate (site/year) (u)')
     ax[2].legend()
     
     # fig.legend(loc="upper center", ncol=2, fontsize=10)
@@ -413,46 +413,46 @@ def plot_combined_OER_fit(experiment_name,
     # plt.subplots_adjust(top=0.6)
     plt.tight_layout()
     file_path = os.path.join(dm.get_experiment_dir(experiment_name),
-     f'{experiment_name}_combined_observed_evolutionary_rate_{model_type}_fit.png')
+     f'{experiment_name}_combined_observed_substitution_rate_{model_type}_fit.png')
     plt.savefig(file_path)
 
-def plot_OER_fit(experiment_name, 
+def plot_OSR_fit(experiment_name, 
                 fit_result, 
                 model_type,
                 min_seq_number,
                 min_sim_lenght):
-    ''' plot fit of evolutionary rate / observed evolutionary rates curve
+    ''' plot fit of molecular substitution rate / observed substitution rates curve
     '''
-    parameter = 'evolutionary_rate'
+    parameter = 'molecular_substitution_rate'
     
     line_color = 'black' #'#DE8F05' # orange
     scatter_color = '#DE8F05'# orange
-    combined_OER_marker_color = '#E64B9D' # pink
+    combined_OSR_marker_color = '#E64B9D' # pink
     scatter_color_2 = '#0173B2' # blue '#029E73' # green
     
     # Create figure and axes
     fig, ax = plt.subplots(3,1, figsize=(8, 12))
     
     # import combined regression data
-    combined_data = om.read_combined_OER_vs_parameter_csv(experiment_name,
+    combined_data = om.read_combined_OSR_vs_parameter_csv(experiment_name,
                                                           parameter,
                                                           min_seq_number,
                                                           min_sim_lenght)
     
     # import single simulations regression data
-    data = om.read_OER_vs_parameter_csv(experiment_name, 
+    data = om.read_OSR_vs_parameter_csv(experiment_name, 
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
     
-    # Group by evolutionary_rate and compute mean and standard deviation for OER
-    data_mean_df = om.get_mean_std_OER(experiment_name,
+    # Group by molecular_substitution_rate and compute mean and standard deviation for OSR
+    data_mean_df = om.get_mean_std_OSR(experiment_name,
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
     
     # get lower and upper confidence interval for fit results
-    x_data = data['evolutionary_rate']
+    x_data = data['molecular_substitution_rate']
     x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
     
     # plot on each axis of subplots in a loop
@@ -461,9 +461,9 @@ def plot_OER_fit(experiment_name,
         a.fill_between(x,lower_curve, upper_curve, 
                        color=line_color, alpha=0.3, label='95% Confidence Interval',
                        zorder=-1)
-        # scatterplot Estimated OER - single simulation
-        sns.scatterplot(x=parameter, y='observed_evolutionary_rate', 
-                        label='Estimated OER - single simulation', data=data,
+        # scatterplot Estimated OSR - single simulation
+        sns.scatterplot(x=parameter, y='observed_substitution_rate', 
+                        label='Estimated OSR - single simulation', data=data,
                         color=scatter_color, alpha=0.5, ax=a,
                         zorder=0)
         # plot fitted curve
@@ -472,13 +472,13 @@ def plot_OER_fit(experiment_name,
                      color=line_color, linewidth=1, ax=a,
                      zorder=1)
         # scatterplot combined regression points (as comparison)
-        sns.scatterplot(x='evolutionary_rate', y='observed_evolutionary_rate', marker='X',
-            label='Combined tempest regression estimate of OER', data=combined_data,
-            color=combined_OER_marker_color,alpha=1, ax=a,
+        sns.scatterplot(x='molecular_substitution_rate', y='observed_substitution_rate', marker='X',
+            label='Combined tempest regression estimate of OSR', data=combined_data,
+            color=combined_OSR_marker_color,alpha=1, ax=a,
             zorder=2)
-        # plot mean of observed_evolutionary_rate from data_mean_std
+        # plot mean of observed_substitution_rate from data_mean_std
         sns.scatterplot(x=parameter, y='mean', marker = 'X',
-                        label='Mean of estimated OER (single simulations)', data=data_mean_df,
+                        label='Mean of estimated OSR (single simulations)', data=data_mean_df,
                         color=scatter_color_2, alpha=1, ax=a,
                         zorder=3)
         # Add horizontal lines 
@@ -489,77 +489,77 @@ def plot_OER_fit(experiment_name,
         # minsimlenghts = [0,100,200,300]
         # palette = sns.color_palette("tab10", len(minsimlenghts))
         # for i, minsimlenght in enumerate(minsimlenghts):
-        #     df = om.get_mean_std_observed_evolutionary_rates(experiment_name,
+        #     df = om.get_mean_std_observed_substitution_rates(experiment_name,
                                                                 # parameter,
                                                                 # min_seq_number,
                                                                 # minsimlenght)
-        #     # plot mean of observed_evolutionary_rate from data_mean_std
+        #     # plot mean of observed_substitution_rate from data_mean_std
         #     sns.scatterplot(x=parameter, y='mean', marker = 'X',
-        #                     label=f'Mean of estimated OER - min {minsimlenght} d', data=df,
+        #                     label=f'Mean of estimated OSR - min {minsimlenght} d', data=df,
         #                     color=palette[i], alpha=0.8, ax=a,
         #                     zorder=4)
 
     # First plot (linear scale) -----------------------------------------------
     ax[0].set_xlabel(f'{parameter}')
-    ax[0].set_ylabel('Observed Evolutionary Rate')
+    ax[0].set_ylabel('observed substitution rate')
     
     
     # Second plot (semilog scale) -----------------------------------------------
     
     ax[1].set_xlabel(f'{parameter}')
-    ax[1].set_ylabel('Observed Evolutionary Rate')
+    ax[1].set_ylabel('observed substitution rate')
     ax[1].set_xscale('log')
     ax[1].legend_.remove()
     
     # Third plot (log log scale) -----------------------------------------------
     ax[2].set_xlabel(f'{parameter}')
-    ax[2].set_ylabel('Observed Evolutionary Rate')
+    ax[2].set_ylabel('observed substitution rate')
     ax[2].set_xscale('log')
     ax[2].set_yscale('log')
     ax[2].legend_.remove()
     
     plt.tight_layout()
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
-        f"{experiment_name}_observed_evolutionary_rates_{model_type}_fit.png"))
+        f"{experiment_name}_observed_substitution_rates_{model_type}_fit.png"))
     
-def plot_OER_fit_figure(experiment_name, 
+def plot_OSR_fit_figure(experiment_name, 
                 fit_result, 
                 model_type,
                 min_seq_number,
                 min_sim_lenght):
-    ''' plot fit of evolutionary rate / observed evolutionary rates curve
+    ''' plot fit of molecular substitution rate / observed substitution rates curve
     3A in paper
     '''
-    parameter = 'evolutionary_rate'
+    parameter = 'molecular_substitution_rate'
     
     line_color = 'black' #'#DE8F05' # orange
     scatter_color = '#DE8F05'# orange
-    combined_OER_marker_color = '#E64B9D' # pink
+    combined_OSR_marker_color = '#E64B9D' # pink
     scatter_color_2 = '#0173B2' # blue '#029E73' # green
     
     # Create figure and axes
     fig, ax = plt.subplots(1,1, figsize=(8,6))
     
     # import combined regression data
-    combined_data = om.read_combined_OER_vs_parameter_csv(experiment_name,
+    combined_data = om.read_combined_OSR_vs_parameter_csv(experiment_name,
                                                           parameter,
                                                           min_seq_number,
                                                           min_sim_lenght)
     
     # import single simulations regression data
-    data = om.read_OER_vs_parameter_csv(experiment_name, 
+    data = om.read_OSR_vs_parameter_csv(experiment_name, 
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
     
-    # Group by evolutionary_rate and compute mean and standard deviation for OER
-    data_mean_df = om.get_mean_std_OER(experiment_name,
+    # Group by molecular_substitution_rate and compute mean and standard deviation for OSR
+    data_mean_df = om.get_mean_std_OSR(experiment_name,
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
     
     # get lower and upper confidence interval for fit results
-    x_data = data['evolutionary_rate']
+    x_data = data['molecular_substitution_rate']
     x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
     
     
@@ -567,9 +567,9 @@ def plot_OER_fit_figure(experiment_name,
     ax.fill_between(x,lower_curve, upper_curve, 
                    color=line_color, alpha=0.3, label='95% Confidence Interval',
                    zorder=-1)
-    # scatterplot Estimated OER - single simulation
-    sns.scatterplot(x=parameter, y='observed_evolutionary_rate', 
-                    label='Estimated OER - single simulation', data=data,
+    # scatterplot Estimated OSR - single simulation
+    sns.scatterplot(x=parameter, y='observed_substitution_rate', 
+                    label='Estimated OSR - single simulation', data=data,
                     color=scatter_color, alpha=0.5, ax=ax,
                     zorder=0)
     # plot fitted curve
@@ -578,27 +578,27 @@ def plot_OER_fit_figure(experiment_name,
                  color=line_color, linewidth=1, ax=ax,
                  zorder=1)
     # scatterplot combined regression points (as comparison)
-    sns.scatterplot(x='evolutionary_rate', y='observed_evolutionary_rate', marker='X',
-        label='Combined tempest regression estimate of OER', data=combined_data,
-        color=combined_OER_marker_color,alpha=1, ax=ax,
+    sns.scatterplot(x='molecular_substitution_rate', y='observed_substitution_rate', marker='X',
+        label='Combined tempest regression estimate of OSR', data=combined_data,
+        color=combined_OSR_marker_color,alpha=1, ax=ax,
         zorder=2)
-    # plot mean of observed_evolutionary_rate from data_mean_std
+    # plot mean of observed_substitution_rate from data_mean_std
     sns.scatterplot(x=parameter, y='mean', marker = 'X',
-                    label='Mean of estimated OER (single simulations)', data=data_mean_df,
+                    label='Mean of estimated OSR (single simulations)', data=data_mean_df,
                     color=scatter_color_2, alpha=1, ax=ax,
                     zorder=3)
 
     
     # Set axis (log log scale) -----------------------------------------------
     ax.set_xlabel(f'{parameter}')
-    ax.set_ylabel('Observed Evolutionary Rate')
+    ax.set_ylabel('observed substitution rate')
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlim(x_data.min(),x_data.max()*1.1)
     
     plt.tight_layout()
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
-        f"figure3A_OER_{model_type}_fit.png"))
+        f"figure3A_OSR_{model_type}_fit.png"))
     
 def confidence_interval_fit(model_type, fit_result, x):
     params_lower = {}
