@@ -333,6 +333,7 @@
 	* added script to generate user set parameters json file 
 	* added functions to read and write standard parameters to a file 
 	* added function to write generated user set parameters json file 
+	* added Data/
 	
 	
 	
