@@ -12,7 +12,7 @@ STANDARD_VALUES for SIMPLICITY simulation:
     "R": 1.5,
     "diagnosis_rate": 0.1,             # in percentage, will be converted to in model 
     "IH_virus_emergence_rate": 0       # k_v in theoretical model equations
-    "evolutionary_rate": 0.0017,       # e in theoretical model equations
+    "molecular_substitution_rate": 0.0017,       # e in theoretical model equations
     "final_time": 365,
     "max_runtime": 259200, 
     "phenotype_model": 'immune waning',  # or 'distance from wt'

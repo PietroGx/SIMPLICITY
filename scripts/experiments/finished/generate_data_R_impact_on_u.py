@@ -12,7 +12,7 @@ STANDARD_VALUES for SIMPLICITY simulation:
     "R": 1.5,
     "diagnosis_rate": 0.1,             # in percentage, will be converted to in model 
     "IH_virus_emergence_rate": 0       # k_v in theoretical model equations
-    "evolutionary_rate": 0.0017,       # e in theoretical model equations
+    "molecular_substitution_rate": 0.0017,       # e in theoretical model equations
     "final_time": 365,
     "max_runtime": 259200, 
     "phenotype_model": 'immune waning',  # or 'distance from wt'
@@ -42,7 +42,7 @@ experiment_name = f'generate_data_R{R}_impact_on_u'
 def fixture_experiment_settings():
 
     R_values       = [R]*6
-    evolutionary_rates = [0.00001, 
+    molecular_substitution_rates = [0.00001, 
                         0.0001, 
                         0.001, 
                         0.01, 
@@ -50,7 +50,7 @@ def fixture_experiment_settings():
                         1]
     
     parameters      = {'R': R_values,
-                       'evolutionary_rate': evolutionary_rates
+                       'molecular_substitution_rate': molecular_substitution_rates
                        }
     n_seeds = 100
 

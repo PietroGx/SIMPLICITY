@@ -12,44 +12,44 @@ import argparse
 
 def fit_models(experiment_name, model_types, data_type):
     
-    parameter = 'evolutionary_rate'
+    parameter = 'molecular_substitution_rate'
     min_seq_number = 30
     min_sim_lenght = 0
     
     if data_type == 'combined_rate':
         # build the dataframe needed for the fit
-        om.write_combined_OER_vs_parameter_csv(experiment_name, 
+        om.write_combined_OSR_vs_parameter_csv(experiment_name, 
                                                 parameter,
                                                 min_seq_number,
                                                 min_sim_lenght)
          # import the df needed for the fit
-        df = om.read_combined_OER_vs_parameter_csv(experiment_name,
+        df = om.read_combined_OSR_vs_parameter_csv(experiment_name,
                                                    parameter,
                                                    min_seq_number,
                                                    min_sim_lenght)
         weights = None
         # select plot function
-        plot_fit = pm.plot_combined_OER_fit
+        plot_fit = pm.plot_combined_OSR_fit
         kwargs = {"min_seq_number": min_seq_number, "min_sim_lenght": min_sim_lenght}
         
     elif data_type == 'single_rates':
         # build the dataframe needed for the fit
-        om.write_combined_OER_vs_parameter_csv(experiment_name, 
+        om.write_combined_OSR_vs_parameter_csv(experiment_name, 
                                                 parameter, 
                                                 min_seq_number,
                                                 min_sim_lenght)
-        om.write_OER_vs_parameter_csv(experiment_name, 
+        om.write_OSR_vs_parameter_csv(experiment_name, 
                                         parameter, 
                                         min_seq_number,
                                         min_sim_lenght)
          # import the df needed for the fit
-        df = om.read_OER_vs_parameter_csv(experiment_name, 
+        df = om.read_OSR_vs_parameter_csv(experiment_name, 
                                              parameter,
                                              min_seq_number,
                                              min_sim_lenght)
         weights = None
         # select plot function
-        plot_fit = pm.plot_OER_fit
+        plot_fit = pm.plot_OSR_fit
         kwargs = {"min_seq_number": min_seq_number, "min_sim_lenght": min_sim_lenght}
         
     else:
@@ -62,12 +62,12 @@ def fit_models(experiment_name, model_types, data_type):
         print('')
         print('###############################################################')
         print('')
-        print(f'Fitting {model_type} to evolutionary rate data')
+        print(f'Fitting {model_type} to OSR data')
         print('')
         print('###############################################################')
         print('')
         try:
-            fit_result = er.fit_observed_evolutionary_rate_regressor(experiment_name,
+            fit_result = er.fit_observed_substitution_rate_regressor(experiment_name,
                                                              df, model_type, weights)
             aic_models[model_type] = fit_result.aic
             print(f'saving plot in {experiment_name}/.')
@@ -109,10 +109,10 @@ def main():
         print(f"{key}      {value}")
     
     print('')
-    print('df OER:')
-    df_counts = df['evolutionary_rate'].value_counts().reset_index()
-    df_counts.columns = ['evolutionary_rate_value', 'count']
-    df_sorted = df_counts.sort_values(by='evolutionary_rate_value')
+    print('df MSR / OSR:')
+    df_counts = df['molecular_substitution_rate'].value_counts().reset_index()
+    df_counts.columns = ['molecular_substitution_rate_value', 'count']
+    df_sorted = df_counts.sort_values(by='molecular_substitution_rate_value')
     print(df_sorted)
     
 if __name__ == "__main__":
