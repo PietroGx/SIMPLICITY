@@ -1,0 +1,51 @@
+{
+    "population_size": {
+        "type": "int",
+        "min": 0,
+        "max": 10000
+    },
+    "tau_3": {
+        "type": "float",
+        "min": 0,
+        "max": 1000
+    },
+    "infected_individuals_at_start": {
+        "type": "int",
+        "min": 0
+    },
+    "R": {
+        "type": "float",
+        "min": 0,
+        "max": 20
+    },
+    "diagnosis_rate": {
+        "type": "float",
+        "min": 0,
+        "max": 1
+    },
+    "IH_virus_emergence_rate": {
+        "type": "float",
+        "min": 0
+    },
+    "molecular_substitution_rate": {
+        "type": "float",
+        "min": 0,
+        "max": 1
+    },
+    "final_time": {
+        "type": "int",
+        "min": 0
+    },
+    "max_runtime": {
+        "type": "int",
+        "min": 0
+    },
+    "phenotype_model": {
+        "type": "str"
+    },
+    "sequencing_rate": {
+        "type": "float",
+        "min": 0,
+        "max": 1
+    }
+}

@@ -1,0 +1,15 @@
+{
+    "population_size": 1000,
+    "infected_individuals_at_start": 10,
+    "final_time": 365,
+    "tau_3": 7.5,
+    "R": 1.3,
+    "diagnosis_rate": 0.1,
+    "IH_virus_emergence_rate": 0,
+    "molecular_substitution_rate": 0.001,
+    "phenotype_model": "immune waning",
+    "sequencing_rate": 0.05,
+    "max_runtime": 86000,
+    "seed": null,
+    "F": 1.25
+}
