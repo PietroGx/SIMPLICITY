@@ -496,7 +496,8 @@ def write_fit_results_csv(experiment_name, model_type, fit_result):
 def read_fit_results_csv(experiment_name, model_type):
     fit_results = get_fit_results_filepath(experiment_name, model_type)
     df = pd.read_csv(fit_results,index_col=0)
-    return df
+    best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
+    return best_fit_df
     
 
 
