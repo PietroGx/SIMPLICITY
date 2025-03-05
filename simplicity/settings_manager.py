@@ -85,7 +85,7 @@ def write_user_set_parameters_file(user_set_parameters, filename):
     file_path = os.path.join(dm.get_reference_parameters_dir(),filename)
     with open(file_path, "w") as file:
         json.dump(user_set_parameters, file, indent=4)
-    print(f"user_set_parameters saved to {filename}")
+    print(f"user_set_parameters saved to {file_path}")
 
 def get_experiment_settings_file_path(experiment_name):
     return os.path.join(_data_dir,
