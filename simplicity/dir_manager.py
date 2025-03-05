@@ -28,6 +28,11 @@ def get_data_dir():
     """Get the current data directory path."""
     return _data_dir
 
+def get_reference_parameters_dir():
+    reference_parameters_dir = os.path.join(get_data_dir(), '00_Reference_parameters')
+    os.makedirs(reference_parameters_dir, exist_ok=True)
+    return reference_parameters_dir
+
 def create_directories(experiment_name):
     """Create necessary subdirectories within the data directory."""
     
@@ -107,7 +112,7 @@ def get_seeded_simulation_output_dirs(simulation_output_dir):
     return seeded_simulation_output_dirs
 
 
-
+    
 
 
 
