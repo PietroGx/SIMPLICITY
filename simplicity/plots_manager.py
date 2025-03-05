@@ -352,7 +352,7 @@ def export_tempest_regression_plots(experiment_name):
     # get plots directories
     plots = glob.glob(os.path.join(experiment_output_dir, '*.png'))
     # create target directories to move the plots to
-    plots_folder_dir = os.path.join(dm.get_data_dir(), '00_Tempest_regression_plots')
+    plots_folder_dir = os.path.join(dm.get_data_dir(), '02_Tempest_regression_plots')
     os.makedirs(plots_folder_dir,exist_ok=True)
     # get plots filenames
     plot_filenames = [os.path.basename(plot) for plot in plots]

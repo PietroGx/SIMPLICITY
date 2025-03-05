@@ -51,7 +51,7 @@ def extrande_factory(phenotype_model, parameters,
     ih_tau_2 = 3.91
     tau_inf = parameters['tau_3'] + ih_tau_2
     # diagnosis rate
-    k_d = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate"])
+    k_d = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate"],parameters['tau_3'])
     # multiple variants rate
     k_v = parameters["IH_virus_emergence_rate"]
     # per site per year SPIKE substitution rate
