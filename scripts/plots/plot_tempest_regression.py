@@ -13,10 +13,15 @@ def plot_regressions_and_export(experiment_name, parameter, min_seq_number, min_
     print('')
     print('')
     print('##################################################################')
-    print('################## Plot e vs u relationship ######################')
+    print('############### Plot parameter vs OSR relationship ###############')
     print('##################################################################')
     print('')
-   
+    # write csv needed for plotting 
+    om.write_OSR_vs_parameter_csv(experiment_name, 
+                                parameter, 
+                                min_seq_number,
+                                min_sim_lenght)
+    # plot OSR vs parameter 
     pm.plot_combined_OSR_vs_parameter(experiment_name, 
                                         parameter,  
                                         min_seq_number,
