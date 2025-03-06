@@ -275,7 +275,8 @@ def plot_tempest_regression(sequencing_data_df,
             label='y = OSR · x')
     ax.set_xlabel('Simulation time in years')
     ax.set_ylabel('Distance from root (normed substitions/site)')
-    ax.set_xlim(left=0)
+    ax.set_xlim(left=0,right=3)
+    ax.set_ylim(0)
     ax.grid(True)
     # Adding OSR value to the legend
     extra_text = f'OSR = {observed_substitution_rate:.5f}'
