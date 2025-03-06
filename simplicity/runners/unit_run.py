@@ -10,8 +10,6 @@ def run_seeded_simulation(seeded_simulation_parameters_path: str,
     serializing/deserializing the reference to the simulation parameters 
     that are resolved via the settings_manager.read_seeded_simulation_parameters function).
     """
-    print(f"""<run_seeded_simulation expriment_name="{experiment_name}" path={seeded_simulation_parameters_path}>""")
-
     # <settings and output managers>
     import simplicity.settings_manager as sm
     import simplicity.output_manager   as om

@@ -342,6 +342,7 @@
 	* updated plot_tempest_regression.py
 	* added plot2E to plot manager
 	* added get_experiment_plots_dir to dir_manager
+	* now simulation saves all the consensus sequences generated over a simulation in the population class
 	
 	
 	

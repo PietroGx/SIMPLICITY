@@ -69,6 +69,7 @@ class Population:
         self.lineages = {'wt': []} # dic of lineages sequences
         
         self.consensus_snapshot = [[[],1,0]] # [sequence, lineage_frequency, w_t(t_sim)]
+        self.consensus_sequences_t = [[[],0]] # list to store consensus everytime is calculated in a simulation [consensus,t]
         
         # system trajectory
         self.time         = 0 # time
