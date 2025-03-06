@@ -278,7 +278,32 @@ def plot_tempest_regression(sequencing_data_df,
     ax.set_xlim(left=0)
     ax.grid(True)
     ax.legend()
- 
+    
+def plot_figure_2E():
+    experiment_name = 'generate_data_OSR_fit_#1'
+    parameter = 'molecular_substitution_rate'
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dir = simulation_output_dirs[7]
+    param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
+    sequencing_data_df = om.create_combined_sequencing_df(simulation_output_dir, min_sim_lenght=0)
+    
+    fig, ax = plt.subplots(1, 1, figsize=(8,10))
+    
+    if sequencing_data_df is None: 
+        pass
+    else:
+        fitted_tempest_regression = er.tempest_regression(sequencing_data_df)
+        
+        plot_tempest_regression(sequencing_data_df,
+                                   fitted_tempest_regression,
+                                   ax)
+        ax.set_title(f'Regression - {parameter}: {param}')
+        # ax.set_ylim(0, 1)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(experiment_output_dir, "Figure2E_combined_tempest_regression.png"))
+    
 def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght=0, y_axis_max=0.1):
     # Get sorted simulation output directories for experiment
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
