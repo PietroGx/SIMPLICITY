@@ -9,6 +9,7 @@ Created on Tue Aug 27 19:38:43 2024
 import os
 import json
 import simplicity.dir_manager as dm
+import pandas as pd
 
 _data_dir = dm.get_data_dir()
 
@@ -428,6 +429,13 @@ def get_parameter_value_from_simulation_output_dir(simulation_output_dir, parame
         parameters_dict = json.load(file)
     
     return parameters_dict[parameter]
+
+def read_OSR_MSR_regressor_parameters():
+    file_path = os.path.join(dm.get_reference_parameters_dir(),
+              'OSR_MSR_regressor_parameters_for_standard_parameter_values.csv')
+    df = pd.read_csv(file_path,index_col=0)
+    best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
+    return best_fit_df
 
 
 

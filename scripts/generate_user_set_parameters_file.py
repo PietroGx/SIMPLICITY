@@ -15,13 +15,15 @@ def get_MSR_for_model_from_OSR(experiment_name, OSR):
     model_type = 'log'
     fit_results_params_df = om.read_fit_results_csv(experiment_name, model_type)
     params = fit_results_params_df.to_dict()
-
     MSR = er.inverse_log_regressor(OSR, params)
    
     return MSR
 
-def get_MSR_for_model_from_OSR_using_reference(OSR):
-    pass
+def get_MSR_for_model_from_OSR_using_reference_file(OSR):
+    fit_results_params_df = sm.read_OSR_MSR_regressor_parameters()
+    params = fit_results_params_df.to_dict()
+    MSR = er.inverse_log_regressor(OSR, params)
+    return MSR
 
 def get_MSR():
     ''' Prompts user to give observed evolutionary rate for the simulation and returns the correct MSR parameter
@@ -60,7 +62,7 @@ def get_MSR():
                 try:
                     OSR_value = float(OSR)
                     if 0.0001 <= OSR_value <= 0.001:
-                        return get_MSR_for_model_from_OSR_using_reference(OSR_value)  
+                        return get_MSR_for_model_from_OSR_using_reference_file(OSR_value)  
                     else:
                         print("Invalid OSR value. It must be between 0.0001 and 0.001. Please reenter value.")
                 except Exception as e:
@@ -140,9 +142,9 @@ def get_user_input():
 def main():
     user_set_parameters = get_user_input()
     filename = input("Enter the filename to save the settings (default: user_parameters.json): ").strip()
-    filename = filename + '.json'
     if not filename:
-        filename = "user_parameters.json"
+        filename = "user_parameters"
+    filename = filename + '.json'
     sm.write_user_set_parameters_file(user_set_parameters, filename)
     
 if __name__ == "__main__":

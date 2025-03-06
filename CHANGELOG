@@ -333,8 +333,13 @@
 	* added script to generate user set parameters json file 
 	* added functions to read and write standard parameters to a file 
 	* added function to write generated user set parameters json file 
-	* added Data/
+	* added Data/00_reference_parameters to repo
+
+2026-06-03 pietro gerletti
+
+	Version 0.9.1
 	
+	* updated plot_tempest_regression.py
 	
 	
 	
