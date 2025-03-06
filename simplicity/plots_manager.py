@@ -267,18 +267,23 @@ def plot_tempest_regression(sequencing_data_df,
     x = sequencing_data_df['Sequencing_time'].values.reshape(-1, 1)
     y_pred = fitted_tempest_regression.predict(x)
     # get observed subswtitution rate (OSR) value
-    observed_substituion_rate = fitted_tempest_regression.coef_[0] # substitution rate per site per year
+    observed_substitution_rate = fitted_tempest_regression.coef_[0] # substitution rate per site per year
     # plot data points
     sequencing_data_df.plot(kind='scatter', x='Sequencing_time', y='Distance_from_root', color='blue', ax=ax)
     # plot linear regression
     ax.plot(x, y_pred, color='red', linewidth=2, 
-            label=f'observed_substituion_rate = {observed_substituion_rate:.5f}')
-    ax.set_xlabel('Time [y]')
-    ax.set_ylabel('Distance from root [#S/site]')
+            label='y = OSR · x')
+    ax.set_xlabel('Simulation time in years')
+    ax.set_ylabel('Distance from root (normed substitions/site)')
     ax.set_xlim(left=0)
     ax.grid(True)
-    ax.legend()
-    
+    # Adding OSR value to the legend
+    extra_text = f'OSR = {observed_substitution_rate:.5f}'
+    handles, labels = ax.get_legend_handles_labels()
+    handles.append(plt.Line2D([0], [0], color='white', label=extra_text))  # Invisible line for text
+    # Show legend
+    ax.legend(handles=handles)
+   
 def plot_figure_2E():
     experiment_name = 'generate_data_OSR_fit_#1'
     parameter = 'molecular_substitution_rate'
@@ -288,7 +293,7 @@ def plot_figure_2E():
     param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
     sequencing_data_df = om.create_combined_sequencing_df(simulation_output_dir, min_sim_lenght=0)
     
-    fig, ax = plt.subplots(1, 1, figsize=(8,10))
+    fig, ax = plt.subplots(1, 1, figsize=(8,8))
     
     if sequencing_data_df is None: 
         print('no data to plot')
