@@ -282,7 +282,7 @@ def plot_tempest_regression(sequencing_data_df,
 def plot_figure_2E():
     experiment_name = 'generate_data_OSR_fit_#1'
     parameter = 'molecular_substitution_rate'
-    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
     simulation_output_dir = simulation_output_dirs[7]
     param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
@@ -291,6 +291,8 @@ def plot_figure_2E():
     fig, ax = plt.subplots(1, 1, figsize=(8,10))
     
     if sequencing_data_df is None: 
+        print('no data to plot')
+        print(simulation_output_dir)
         pass
     else:
         fitted_tempest_regression = er.tempest_regression(sequencing_data_df)
@@ -302,11 +304,11 @@ def plot_figure_2E():
         # ax.set_ylim(0, 1)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(experiment_output_dir, "Figure2E_combined_tempest_regression.png"))
+    plt.savefig(os.path.join(experiment_plots_dir, "Figure2E_combined_tempest_regression.png"))
     
 def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght=0, y_axis_max=0.1):
     # Get sorted simulation output directories for experiment
-    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
   
     sorted_simulation_output_dirs = sorted(simulation_output_dirs, 
@@ -340,7 +342,7 @@ def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght
             ax.set_ylim(0, y_axis_max)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(experiment_output_dir, f"{experiment_name}_combined_regression.png"))
+    plt.savefig(os.path.join(experiment_plots_dir, f"{experiment_name}_combined_regression.png"))
 
 def plot_combined_OSR_vs_parameter(experiment_name, 
                                     parameter,  
@@ -348,7 +350,7 @@ def plot_combined_OSR_vs_parameter(experiment_name,
                                     min_sim_lenght=0):
     ''' Plot observed substituion rate (tempest regression) against desired parameter values
     '''
-    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
     df = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
                                                parameter,
                                                min_seq_number,
@@ -366,24 +368,8 @@ def plot_combined_OSR_vs_parameter(experiment_name,
     plt.grid(True)
     plt.tight_layout()
     plt.legend()
-    plt.savefig(os.path.join(experiment_output_dir, 
+    plt.savefig(os.path.join(experiment_plots_dir, 
                              f"{experiment_name}_{parameter}_vs_observed_substitution_rate.png"))
-    
-def export_tempest_regression_plots(experiment_name): 
-    ''' move tempest regression plots from experiment folder to plots folder
-    '''
-    # get experiment output dir
-    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    # get plots directories
-    plots = glob.glob(os.path.join(experiment_output_dir, '*.png'))
-    # create target directories to move the plots to
-    plots_folder_dir = os.path.join(dm.get_data_dir(), '02_Tempest_regression_plots')
-    os.makedirs(plots_folder_dir,exist_ok=True)
-    # get plots filenames
-    plot_filenames = [os.path.basename(plot) for plot in plots]
-    # move the plots
-    for plot,plot_filename in zip(plots,plot_filenames):
-        os.replace(plot, os.path.join(plots_folder_dir,plot_filename))
         
 def plot_combined_OSR_fit(experiment_name, 
                                                  fit_result, 
@@ -437,7 +423,7 @@ def plot_combined_OSR_fit(experiment_name,
     plt.title('')
     # plt.subplots_adjust(top=0.6)
     plt.tight_layout()
-    file_path = os.path.join(dm.get_experiment_dir(experiment_name),
+    file_path = os.path.join(dm.get_experiment_plots_dir(experiment_name),
      f'{experiment_name}_combined_observed_substitution_rate_{model_type}_fit.png')
     plt.savefig(file_path)
 
@@ -544,7 +530,7 @@ def plot_OSR_fit(experiment_name,
     ax[2].legend_.remove()
     
     plt.tight_layout()
-    plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
+    plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
         f"{experiment_name}_observed_substitution_rates_{model_type}_fit.png"))
     
 def plot_OSR_fit_figure(experiment_name, 
@@ -622,7 +608,7 @@ def plot_OSR_fit_figure(experiment_name,
     ax.set_xlim(x_data.min(),x_data.max()*1.1)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name), 
+    plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
         f"figure3A_OSR_{model_type}_fit.png"))
     
 def confidence_interval_fit(model_type, fit_result, x):

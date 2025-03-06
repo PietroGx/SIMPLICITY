@@ -54,5 +54,7 @@ def main():
                                 args.min_seq_number,
                                 args.min_sim_lenght)
     
+    pm.plot_figure_2E()
+    
 if __name__ == "__main__":
     main()

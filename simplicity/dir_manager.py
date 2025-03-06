@@ -78,6 +78,13 @@ def get_experiment_output_dir(experiment_name):
         return os.path.join(experiment_dir, '04_Output')
     else:
          raise ValueError('No experiment with that name!')
+         
+def get_experiment_plots_dir(experiment_name):
+    experiment_dir = os.path.join(_data_dir,experiment_name)
+    experiment_plots_dir = os.path.join(experiment_dir, '05_Plots')
+    os.makedirs(experiment_plots_dir, exist_ok=True) 
+    print(f'created {experiment_plots_dir}')
+    return experiment_plots_dir
 
 def get_experiment_fit_result_dir(experiment_name):
     fit_result_dir = os.path.join(get_experiment_dir(experiment_name), 'Fit_results')
