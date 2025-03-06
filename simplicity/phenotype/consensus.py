@@ -117,22 +117,24 @@ def get_consensus(data,t):
     data = get_seq_weights(data,t)
     matrix, bases, positions= build_weighted_consensus_matrix(data)
     return weighted_consensus(matrix, positions)
-    
-# data = [
-#         [[[10,'A'],[45,'G']],10,10],
-#         [[[13,'A']],       5,10],
-#         [[[10,'C'],[45,'G']],10,10]
-#         ]
-# # data contains sequence, n_infected_t, t
-
-# data = get_seq_weights(data,100)
-
-# # Build the ndarray
-# matrix, bases, positions= build_weighted_consensus_matrix(data)
 
 
-# # Call the function with the matrix and unique numbers
-# positions_with_max_letter = weighted_consensus(matrix, positions)
+## example use 
+data = [
+        [[[10,'A'],[45,'G']],10,10],
+        [[[13,'A']],       5,10],
+        [[[10,'C'],[45,'G']],10,10]
+        ]
+# data contains sequence, n_infected_t, t
+
+data = get_seq_weights(data,100)
+
+# Build the ndarray
+matrix, bases, positions= build_weighted_consensus_matrix(data)
+
+
+# Call the function with the matrix and unique numbers
+positions_with_max_letter = weighted_consensus(matrix, positions)
 
 
 # # To display the result similarly to a pandas DataFrame for visualization:
@@ -140,5 +142,11 @@ def get_consensus(data,t):
 # df = pd.DataFrame(matrix, index=bases, columns=positions)
 # print(df)
 
-# # Display the result
-# print(positions_with_max_letter)
+# Display the result
+print(positions_with_max_letter)
+
+import simplicity.evolution.decoder as dec 
+
+example_consensus_decoded = dec.decode_genome(positions_with_max_letter)
+
+print(example_consensus_decoded)

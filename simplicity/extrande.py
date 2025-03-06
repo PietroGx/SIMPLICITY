@@ -294,6 +294,7 @@ def extrande_factory(phenotype_model, parameters,
                 if np.floor(t) > t_snapshot:
                     t_snapshot += 5
                     consensus =c.get_consensus(population.consensus_snapshot,t)
+                    population.consensus_sequences_t.append([consensus,t])
                         
                 # update fitness values of all individuals in the simulation
                 individuals_to_update = population.infected_i
