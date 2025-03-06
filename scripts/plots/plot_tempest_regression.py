@@ -17,11 +17,11 @@ def plot_regressions_and_export(experiment_name, parameter, min_seq_number, min_
     print('##################################################################')
     print('')
     # write csv needed for plotting 
-    om.write_OSR_vs_parameter_csv(experiment_name, 
+    om.write_combined_OSR_vs_parameter_csv(experiment_name, 
                                 parameter, 
                                 min_seq_number,
                                 min_sim_lenght)
-    # plot OSR vs parameter 
+    # plot combined OSR vs parameter 
     pm.plot_combined_OSR_vs_parameter(experiment_name, 
                                         parameter,  
                                         min_seq_number,
@@ -31,12 +31,12 @@ def plot_regressions_and_export(experiment_name, parameter, min_seq_number, min_
     print('################## Plot combined regressions #####################')
     print('##################################################################')
     print('')
-    OSR_vs_parameter_df = om.read_OSR_vs_parameter_csv(experiment_name,
+    combined_OSR_vs_parameter_df = om.read_combined_OSR_vs_parameter_csv(experiment_name,
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
     
-    y_axis_max = max(OSR_vs_parameter_df['observed_evolutionary_rate'])*1.2
+    y_axis_max = max(combined_OSR_vs_parameter_df['observed_evolutionary_rate'])*1.2
     pm.plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght, y_axis_max)
     
 
