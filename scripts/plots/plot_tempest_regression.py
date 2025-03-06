@@ -9,7 +9,7 @@ import simplicity.plots_manager as pm
 import simplicity.output_manager as om
 import argparse
 
-def plot_regressions_and_export(experiment_name, parameter, min_seq_number, min_sim_lenght):
+def plot_regressions(experiment_name, parameter, min_seq_number, min_sim_lenght):
     print('')
     print('')
     print('##################################################################')
@@ -36,7 +36,7 @@ def plot_regressions_and_export(experiment_name, parameter, min_seq_number, min_
                                         min_seq_number,
                                         min_sim_lenght)
     
-    y_axis_max = max(combined_OSR_vs_parameter_df['observed_evolutionary_rate'])*1.2
+    y_axis_max = max(combined_OSR_vs_parameter_df['observed_substitution_rate'])*1.2
     pm.plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght, y_axis_max)
     
 
@@ -49,7 +49,7 @@ def main():
     parser.add_argument('min_sim_lenght', type=float, help="only keep data from simulations that lasted at least this number of days")
     args = parser.parse_args()
     # Run the script with the provided parameter
-    plot_regressions_and_export(args.experiment_name, 
+    plot_regressions(args.experiment_name, 
                                 args.parameter, 
                                 args.min_seq_number,
                                 args.min_sim_lenght)
