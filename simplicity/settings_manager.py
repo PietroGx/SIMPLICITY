@@ -25,7 +25,7 @@ def write_standard_parameters_values():
     filename= get_standard_parameters_values_file_path()
     standard_values = {
         "population_size": 1000,
-        "infected_individuals_at_start": 10,
+        "infected_individuals_at_start": 100,
         "final_time": 365,
         "tau_3": 7.5,
         "R": 1.3,
