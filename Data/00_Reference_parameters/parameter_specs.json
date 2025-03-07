@@ -27,7 +27,7 @@
         "type": "float",
         "min": 0
     },
-    "molecular_substitution_rate": {
+    "nucleotide_substitution_rate": {
         "type": "float",
         "min": 0,
         "max": 1

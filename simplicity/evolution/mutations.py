@@ -40,7 +40,7 @@ def sub_events(rng, e, dt, variants):
     rng : numpy method
         Random number generator.
     e : float
-        population molecular substitution rate.
+        population nucleotide substitution rate.
     dt : float
         delta t - extrande time step.
     variants : int
@@ -72,7 +72,7 @@ def select_positions(population,L_var,rng,e,dt):
     rng : numpy method
         Random number generator.
     e : float
-        population molecular substitution rate.
+        population nucleotide substitution rate.
     dt : float
         delta t - extrande time step.
 

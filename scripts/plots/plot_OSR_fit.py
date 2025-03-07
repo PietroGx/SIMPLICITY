@@ -12,7 +12,7 @@ import argparse
 
 def plot_fit_log_model(experiment_name):
     
-    parameter = 'molecular_substitution_rate'
+    parameter = 'nucleotide_substitution_rate'
     min_seq_number = 30
     min_sim_lenght = 0
     model_type = 'log'

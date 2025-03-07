@@ -9,14 +9,14 @@ import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
 import argparse
 
-def get_MSR_for_model_from_OSR(experiment_name, OSR):
+def get_NSR_for_model_from_OSR(experiment_name, OSR):
     model_type = 'log'
     fit_results_params_df = om.read_fit_results_csv(experiment_name, model_type)
     params = fit_results_params_df.to_dict()
 
-    MSR = er.inverse_log_regressor(OSR, params)
-    print(f'molecular substitution rate for simulations: {MSR:.5f}')
-    return MSR
+    NSR = er.inverse_log_regressor(OSR, params)
+    print(f'nucleotide substitution rate for simulations: {NSR:.5f}')
+    return NSR
 
 def main():
     # Set up the argument parser
@@ -25,7 +25,7 @@ def main():
     parser.add_argument('OSR', type=float, help="desired observed substitution rate for simulation")
     args = parser.parse_args()
     
-    get_MSR_for_model_from_OSR(args.experiment_name, args.OSR)
+    get_NSR_for_model_from_OSR(args.experiment_name, args.OSR)
     
     
 if __name__ == "__main__":

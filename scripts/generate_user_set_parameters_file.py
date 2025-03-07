@@ -11,22 +11,22 @@ import simplicity.tuning.evolutionary_rate as er
 import simplicity.settings_manager as sm
 import simplicity.output_manager as om
 
-def get_MSR_for_model_from_OSR(experiment_name, OSR):
+def get_NSR_for_model_from_OSR(experiment_name, OSR):
     model_type = 'log'
     fit_results_params_df = om.read_fit_results_csv(experiment_name, model_type)
     params = fit_results_params_df.to_dict()
-    MSR = er.inverse_log_regressor(OSR, params)
+    NSR = er.inverse_log_regressor(OSR, params)
    
-    return MSR
+    return NSR
 
-def get_MSR_for_model_from_OSR_using_reference_file(OSR):
-    fit_results_params_df = sm.read_OSR_MSR_regressor_parameters()
+def get_NSR_for_model_from_OSR_using_reference_file(OSR):
+    fit_results_params_df = sm.read_OSR_NSR_regressor_parameters()
     params = fit_results_params_df.to_dict()
-    MSR = er.inverse_log_regressor(OSR, params)
-    return MSR
+    NSR = er.inverse_log_regressor(OSR, params)
+    return NSR
 
-def get_MSR():
-    ''' Prompts user to give observed evolutionary rate for the simulation and returns the correct MSR parameter
+def get_NSR():
+    ''' Prompts user to give observed evolutionary rate for the simulation and returns the correct NSR parameter
     '''
     while True:
         print('')
@@ -47,7 +47,7 @@ def get_MSR():
                 OSR = input("Enter the desired observed substitution rate (OSR) value: ")
                 try:
                     OSR_value = float(OSR)
-                    return get_MSR_for_model_from_OSR(experiment_name, OSR_value)
+                    return get_NSR_for_model_from_OSR(experiment_name, OSR_value)
                 except Exception as e:
                     print(e)
                     sys.exit() 
@@ -62,7 +62,7 @@ def get_MSR():
                 try:
                     OSR_value = float(OSR)
                     if 0.0001 <= OSR_value <= 0.001:
-                        return get_MSR_for_model_from_OSR_using_reference_file(OSR_value)  
+                        return get_NSR_for_model_from_OSR_using_reference_file(OSR_value)  
                     else:
                         print("Invalid OSR value. It must be between 0.0001 and 0.001. Please reenter value.")
                 except Exception as e:
@@ -130,8 +130,8 @@ def get_user_input():
         
         if key in no_prompt_params:
             params[key] = standard_value  # Automatically set from standard values
-        elif key == 'molecular_substitution_rate':
-            params[key] = get_MSR()
+        elif key == 'nucleotide_substitution_rate':
+            params[key] = get_NSR()
         else:
             print('')
             prompt = f"Please enter {key} value"

@@ -13,7 +13,7 @@ STANDARD_VALUES for SIMPLICITY simulation:
         "R": 1.3,
         "diagnosis_rate": 0.1,             # in percentage, will be converted to kd in model 
         "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
-        "molecular_substitution_rate": 0.0017,       # e in theoretical model equations
+        "nucleotide_substitution_rate": 0.0017,       # e in theoretical model equations
         "final_time": 365,
         "max_runtime": 259200, 
         "phenotype_model": 'immune waning',  # or 'distance from wt'
@@ -42,19 +42,19 @@ experiment_name =  'generate_data_OSR_fit'
 
 def fixture_experiment_settings():
 
-    # number of values for MSR
-    molecular_substitution_rate_num_values = 15
+    # number of values for NSR
+    nucleotide_substitution_rate_num_values = 15
     
     # Generate values spaced logarithmically between 10^-5 and 10^-2
     values = np.logspace(np.log10(1e-5), np.log10(0.01), 
-                         num=molecular_substitution_rate_num_values)
-    molecular_substitution_rate_values = values.tolist()
-    # mapped_sim_lenght = np.logspace(np.log10(3650), np.log10(365), num=molecular_substitution_rate_num_values).tolist()
+                         num=nucleotide_substitution_rate_num_values)
+    nucleotide_substitution_rate_values = values.tolist()
+    # mapped_sim_lenght = np.logspace(np.log10(3650), np.log10(365), num=nucleotide_substitution_rate_num_values).tolist()
 
     
-    parameters      = {'molecular_substitution_rate': molecular_substitution_rate_values,
-                       'infected_individuals_at_start': [100]*molecular_substitution_rate_num_values,
-                       'final_time': [365*3]*molecular_substitution_rate_num_values
+    parameters      = {'nucleotide_substitution_rate': nucleotide_substitution_rate_values,
+                       'infected_individuals_at_start': [100]*nucleotide_substitution_rate_num_values,
+                       'final_time': [365*3]*nucleotide_substitution_rate_num_values
                        }
     n_seeds = 100
 

@@ -497,7 +497,7 @@ class Population:
         Parameters
         ----------
         e : float
-            population molecular substitution rate.
+            population nucleotide substitution rate.
         dt : float
             delta t - extrande time step (in years)
 

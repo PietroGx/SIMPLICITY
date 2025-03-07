@@ -287,7 +287,7 @@ def plot_tempest_regression(sequencing_data_df,
    
 def plot_figure_2E():
     experiment_name = 'generate_data_OSR_fit_#1'
-    parameter = 'molecular_substitution_rate'
+    parameter = 'nucleotide_substitution_rate'
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
     simulation_output_dir = simulation_output_dirs[7]
@@ -382,14 +382,14 @@ def plot_combined_OSR_fit(experiment_name,
                                                  model_type, 
                                                  min_seq_number,
                                                  min_sim_lenght):
-    ''' plot fit of molecular substitution rate / observed substitution rate curve
+    ''' plot fit of nucleotide substitution rate / observed substitution rate curve
     '''
 
     data = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
-                                                 'molecular_substitution_rate', 
+                                                 'nucleotide_substitution_rate', 
                                                  min_seq_number,
                                                  min_sim_lenght)
-    x_data = data['molecular_substitution_rate'] 
+    x_data = data['nucleotide_substitution_rate'] 
     y_data = data['observed_substitution_rate']  
     
     # Create figure and axes
@@ -438,9 +438,9 @@ def plot_OSR_fit(experiment_name,
                 model_type,
                 min_seq_number,
                 min_sim_lenght):
-    ''' plot fit of molecular substitution rate / observed substitution rates curve
+    ''' plot fit of nucleotide substitution rate / observed substitution rates curve
     '''
-    parameter = 'molecular_substitution_rate'
+    parameter = 'nucleotide_substitution_rate'
     
     line_color = 'black' #'#DE8F05' # orange
     scatter_color = '#DE8F05'# orange
@@ -462,14 +462,14 @@ def plot_OSR_fit(experiment_name,
                                         min_seq_number,
                                         min_sim_lenght)
     
-    # Group by molecular_substitution_rate and compute mean and standard deviation for OSR
+    # Group by nucleotide_substitution_rate and compute mean and standard deviation for OSR
     data_mean_df = om.get_mean_std_OSR(experiment_name,
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
     
     # get lower and upper confidence interval for fit results
-    x_data = data['molecular_substitution_rate']
+    x_data = data['nucleotide_substitution_rate']
     x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
     
     # plot on each axis of subplots in a loop
@@ -489,7 +489,7 @@ def plot_OSR_fit(experiment_name,
                      color=line_color, linewidth=1, ax=a,
                      zorder=1)
         # scatterplot combined regression points (as comparison)
-        sns.scatterplot(x='molecular_substitution_rate', y='observed_substitution_rate', marker='X',
+        sns.scatterplot(x='nucleotide_substitution_rate', y='observed_substitution_rate', marker='X',
             label='Combined tempest regression estimate of OSR', data=combined_data,
             color=combined_OSR_marker_color,alpha=1, ax=a,
             zorder=2)
@@ -544,10 +544,10 @@ def plot_OSR_fit_figure(experiment_name,
                 model_type,
                 min_seq_number,
                 min_sim_lenght):
-    ''' plot fit of molecular substitution rate / observed substitution rates curve
+    ''' plot fit of nucleotide substitution rate / observed substitution rates curve
     3A in paper
     '''
-    parameter = 'molecular_substitution_rate'
+    parameter = 'nucleotide_substitution_rate'
     
     line_color = 'black' #'#DE8F05' # orange
     scatter_color = '#DE8F05'# orange
@@ -569,14 +569,14 @@ def plot_OSR_fit_figure(experiment_name,
                                         min_seq_number,
                                         min_sim_lenght)
     
-    # Group by molecular_substitution_rate and compute mean and standard deviation for OSR
+    # Group by nucleotide_substitution_rate and compute mean and standard deviation for OSR
     data_mean_df = om.get_mean_std_OSR(experiment_name,
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
     
     # get lower and upper confidence interval for fit results
-    x_data = data['molecular_substitution_rate']
+    x_data = data['nucleotide_substitution_rate']
     x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data.to_numpy())
     
     
@@ -595,7 +595,7 @@ def plot_OSR_fit_figure(experiment_name,
                  color=line_color, linewidth=1, ax=ax,
                  zorder=1)
     # scatterplot combined regression points (as comparison)
-    sns.scatterplot(x='molecular_substitution_rate', y='observed_substitution_rate', marker='X',
+    sns.scatterplot(x='nucleotide_substitution_rate', y='observed_substitution_rate', marker='X',
         label='Combined tempest regression estimate of OSR', data=combined_data,
         color=combined_OSR_marker_color,alpha=1, ax=ax,
         zorder=2)

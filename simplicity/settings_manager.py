@@ -31,7 +31,7 @@ def write_standard_parameters_values():
         "R": 1.3,
         "diagnosis_rate": 0.1, # in percentage, will be converted to kd in model 
         "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
-        "molecular_substitution_rate": 0.001,  # e in theoretical model equations
+        "nucleotide_substitution_rate": 0.000275,  # e in theoretical model equations
         "phenotype_model": 'immune waning',  # or 'distance from wt'
         "sequencing_rate": 0.05,
         "max_runtime": 86000, 
@@ -51,7 +51,7 @@ def write_parameter_specs():
         "R":                             {"type": "float", "min": 0, "max": 20},
         "diagnosis_rate":                {"type": "float", "min": 0, "max": 1},
         "IH_virus_emergence_rate":       {"type": "float", "min": 0},
-        "molecular_substitution_rate":   {"type": "float", "min": 0, "max": 1},
+        "nucleotide_substitution_rate":   {"type": "float", "min": 0, "max": 1},
         "final_time":                    {"type": "int", "min": 0},    
         "max_runtime":                   {"type": "int", "min": 0},
         "phenotype_model":               {"type": "str"},
@@ -183,7 +183,7 @@ def write_simulation_parameters(file_path,
                                 R,
                                 diagnosis_rate,
                                 IH_virus_emergence_rate,
-                                molecular_substitution_rate,
+                                nucleotide_substitution_rate,
                                 final_time, 
                                 max_runtime, 
                                 phenotype_model,
@@ -198,7 +198,7 @@ def write_simulation_parameters(file_path,
         "R": R,
         "diagnosis_rate": diagnosis_rate, 
         "IH_virus_emergence_rate" : IH_virus_emergence_rate,
-        "molecular_substitution_rate": molecular_substitution_rate,
+        "nucleotide_substitution_rate": nucleotide_substitution_rate,
         "t_0": 0,
         "final_time": final_time,
         "max_runtime": max_runtime,
@@ -247,7 +247,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                     STANDARD_VALUES["R"],
                                     STANDARD_VALUES["diagnosis_rate"],
                                     STANDARD_VALUES["IH_virus_emergence_rate"],
-                                    STANDARD_VALUES["molecular_substitution_rate"],
+                                    STANDARD_VALUES["nucleotide_substitution_rate"],
                                     STANDARD_VALUES["final_time"],
                                     STANDARD_VALUES["max_runtime"],
                                     STANDARD_VALUES["phenotype_model"],
@@ -285,7 +285,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                         settings["R"],
                                         settings["diagnosis_rate"],
                                         settings["IH_virus_emergence_rate"],
-                                        settings["molecular_substitution_rate"],
+                                        settings["nucleotide_substitution_rate"],
                                         settings["final_time"],
                                         settings["max_runtime"],
                                         settings["phenotype_model"],
@@ -430,9 +430,9 @@ def get_parameter_value_from_simulation_output_dir(simulation_output_dir, parame
     
     return parameters_dict[parameter]
 
-def read_OSR_MSR_regressor_parameters():
+def read_OSR_NSR_regressor_parameters():
     file_path = os.path.join(dm.get_reference_parameters_dir(),
-              'OSR_MSR_regressor_parameters_for_standard_parameter_values.csv')
+              'OSR_NSR_regressor_parameters_for_standard_parameter_values.csv')
     df = pd.read_csv(file_path,index_col=0)
     best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
     return best_fit_df
