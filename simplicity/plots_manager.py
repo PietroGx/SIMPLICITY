@@ -356,17 +356,26 @@ def plot_combined_OSR_vs_parameter(experiment_name,
     ''' Plot observed substituion rate (tempest regression) against desired parameter values
     '''
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
-    df = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
+    # import combined regression data
+    df_combined = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
                                                parameter,
                                                min_seq_number,
                                                min_sim_lenght)
-    # Plot target parameter vs u as a line plot with points
+    # import single simulations regression data
+    df_single = om.read_OSR_vs_parameter_csv(experiment_name, 
+                                        parameter,
+                                        min_seq_number,
+                                        min_sim_lenght)
+    # Plot target parameter vs OSR as a line plot with points
     plt.figure(figsize=(10, 6))
-    plt.plot(df[parameter],  df['observed_substitution_rate'], 
+    plt.plot(df_combined[parameter],  df_combined['observed_substitution_rate'], 
              marker='o', 
              color='black', 
              linestyle='-', 
              label=f'{experiment_name}_{parameter} vs observed_substitution_rate')
+    # scatterplot Estimated OSR - single simulation
+    plt.scatter(x=df_single[parameter], y=df_single['observed_substitution_rate'],
+                    label='Estimated OSR - single simulation', alpha=0.5)
     plt.xlabel(parameter)
     plt.ylabel('Observed substitution rate')
     plt.title(f'{parameter} vs observed substitution rate')
