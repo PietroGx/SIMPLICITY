@@ -362,7 +362,7 @@ def plot_combined_OSR_vs_parameter(experiment_name,
                                                min_seq_number,
                                                min_sim_lenght)
     # import single simulations regression data
-    df_single = om.read_OSR_vs_parameter_csv(experiment_name, 
+    df = om.read_OSR_vs_parameter_csv(experiment_name, 
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
@@ -373,9 +373,13 @@ def plot_combined_OSR_vs_parameter(experiment_name,
              color='black', 
              linestyle='-', 
              label=f'{experiment_name}_{parameter} vs observed_substitution_rate')
-    # scatterplot Estimated OSR - single simulation
-    plt.scatter(x=df_single[parameter], y=df_single['observed_substitution_rate'],
-                    label='Estimated OSR - single simulation', alpha=0.5)
+
+    # Boxplot for each X position
+    sns.boxplot(x=df[parameter], y=df['observed_substitution_rate'], palette="coolwarm", width=0.6, showfliers=False)
+    
+    # Scatterplot overlaid on top
+    sns.stripplot(x=df[parameter], y=df['observed_substitution_rate'], color='black', alpha=0.5, jitter=True)
+    
     plt.xlabel(parameter)
     plt.ylabel('Observed substitution rate')
     plt.title(f'{parameter} vs observed substitution rate')
