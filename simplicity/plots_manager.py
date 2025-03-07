@@ -285,7 +285,7 @@ def plot_tempest_regression(sequencing_data_df,
     # Show legend
     ax.legend(handles=handles)
    
-def plot_figure_2E():
+def plot_figure_tempest_regression():
     experiment_name = 'generate_data_OSR_fit_#1'
     parameter = 'nucleotide_substitution_rate'
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
@@ -545,7 +545,6 @@ def plot_OSR_fit_figure(experiment_name,
                 min_seq_number,
                 min_sim_lenght):
     ''' plot fit of nucleotide substitution rate / observed substitution rates curve
-    3A in paper
     '''
     parameter = 'nucleotide_substitution_rate'
     
