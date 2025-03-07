@@ -628,7 +628,7 @@ def plot_OSR_fit_figure(experiment_name,
     
     plt.tight_layout()
     plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
-        f"figure3A_OSR_{model_type}_fit.png"))
+        f"Figure4_OSR_{model_type}_fit.png"))
     
 def confidence_interval_fit(model_type, fit_result, x):
     params_lower = {}
