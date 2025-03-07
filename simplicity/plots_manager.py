@@ -376,11 +376,11 @@ def plot_combined_OSR_vs_parameter(experiment_name,
 
     # Boxplot for each X position
     sns.boxplot(x=df[parameter], y=df['observed_substitution_rate'], hue=df[parameter], 
-                palette="coolwarm", width=0.6, showfliers=False)
+                palette="coolwarm", width=0.6, showfliers=True)
     
-    # Scatterplot overlaid on top
-    sns.stripplot(x=df[parameter], y=df['observed_substitution_rate'], 
-                  color='black', alpha=0.5, jitter=True)
+    # # Scatterplot overlaid on top
+    # sns.stripplot(x=df[parameter], y=df['observed_substitution_rate'], 
+    #               color='black', alpha=0.5, jitter=True)
     
     plt.xlabel(parameter)
     plt.ylabel('Observed substitution rate')
