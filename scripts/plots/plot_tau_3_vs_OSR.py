@@ -14,7 +14,9 @@ def main():
     parser.add_argument('experiment_name', type=str, help="experiment name")
     args = parser.parse_args()
     # Run the script with the provided parameter
-    
+    pm.plot_combined_OSR_vs_parameter(args.experiment_name,'tau_3', 
+                                      min_seq_number=0, 
+                                      min_sim_lenght=0)
     
 if __name__ == "__main__":
     main()

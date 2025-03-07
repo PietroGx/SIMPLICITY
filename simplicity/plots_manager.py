@@ -7,7 +7,6 @@ Created on Tue Jan  7 10:00:16 2025
 """
 import os
 import math
-import glob
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -369,8 +368,8 @@ def plot_combined_OSR_vs_parameter(experiment_name,
              linestyle='-', 
              label=f'{experiment_name}_{parameter} vs observed_substitution_rate')
     plt.xlabel(parameter)
-    plt.ylabel('u')
-    plt.title(f'{parameter} vs observed_substitution_rate')
+    plt.ylabel('Observed substitution rate')
+    plt.title(f'{parameter} vs observed substitution rate')
     plt.grid(True)
     plt.tight_layout()
     plt.legend()
