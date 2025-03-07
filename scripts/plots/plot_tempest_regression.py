@@ -10,12 +10,7 @@ import simplicity.output_manager as om
 import argparse
 
 def plot_regressions(experiment_name, parameter, min_seq_number, min_sim_lenght):
-    print('')
-    print('')
-    print('##################################################################')
-    print('############### Plot parameter vs OSR relationship ###############')
-    print('##################################################################')
-    print('')
+    
     # write csv needed for plotting 
     om.write_combined_OSR_vs_parameter_csv(experiment_name, 
                                 parameter, 
@@ -26,11 +21,11 @@ def plot_regressions(experiment_name, parameter, min_seq_number, min_sim_lenght)
                                 parameter, 
                                 min_seq_number,
                                 min_sim_lenght)
-    # plot combined OSR vs parameter 
-    pm.plot_combined_OSR_vs_parameter(experiment_name, 
-                                        parameter,  
-                                        min_seq_number,
-                                        min_sim_lenght)
+    # # plot combined OSR vs parameter 
+    # pm.plot_combined_OSR_vs_parameter(experiment_name, 
+    #                                     parameter,  
+    #                                     min_seq_number,
+    #                                     min_sim_lenght)
     print('')
     print('##################################################################')
     print('################## Plot combined regressions #####################')
@@ -65,6 +60,7 @@ def main():
                                 min_sim_lenght)
     
     pm.plot_figure_tempest_regression()
+    print('Plotting completed.')
     
 if __name__ == "__main__":
     main()
