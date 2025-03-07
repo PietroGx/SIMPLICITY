@@ -17,7 +17,7 @@ def main():
     
     parameter = 'tau_3'
     min_seq_number = 10
-    min_sim_lenght = 0
+    min_sim_lenght = 100
     
     # build the dataframe needed for the plot
     om.write_combined_OSR_vs_parameter_csv(args.experiment_name, 
