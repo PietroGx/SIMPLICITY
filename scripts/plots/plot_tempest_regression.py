@@ -54,7 +54,7 @@ def main():
                                 args.min_seq_number,
                                 args.min_sim_lenght)
     
-    pm.plot_figure_2E()
+    pm.plot_figure_tempest_regression()
     
 if __name__ == "__main__":
     main()
