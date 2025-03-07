@@ -1,7 +1,7 @@
 '''
 In this file we perform the TempEst linear regression to estimate the observed
 evolutionary rate u from the simulated data of a SIMPLICITY run. There are also
-the functions to plot E (model molecular substitution rate) vs u (observed substitution rate)
+the functions to plot E (model nucleotide substitution rate) vs u (observed substitution rate)
 or vs any other simulation parameter.
 '''
 
@@ -124,7 +124,7 @@ def factory_model_lmfit(model_type: str):
 def fit_observed_substitution_rate_regressor(experiment_name, 
                                              df, model_type, weights=None):
     
-    x_data = df['molecular_substitution_rate'] 
+    x_data = df['nucleotide_substitution_rate'] 
     y_data = df['observed_substitution_rate']  
     
     # Create the Model
@@ -143,12 +143,12 @@ def fit_observed_substitution_rate_regressor(experiment_name,
     return fit_result
 
 def fit_weight(df):
-    x_data = df['molecular_substitution_rate']
+    x_data = df['nucleotide_substitution_rate']
     weights = 1/x_data 
     return weights
 
 def fit_weight_time(df):
-    x_data = df['molecular_substitution_rate']
+    x_data = df['nucleotide_substitution_rate']
     weights = 1/x_data * (df['simulation_final_time']/df['settings_final_time'])
     return weights
 
@@ -172,16 +172,16 @@ def inverse_log_regressor(OSR, params):
         params (dict): A dictionary containing the parameters 'A', 'B', and 'C'.
     
     Returns:
-        float or numpy array: The computed molecular substitution rate value(s).
+        float or numpy array: The computed nucleotide substitution rate value(s).
     """
     A = params.get('A', 0)
     B = params.get('B', 0)
     C = params.get('C', 0)
     
     # Compute the inverse function
-    MSR = (np.exp(OSR / A) - C) / B
+    NSR = (np.exp(OSR / A) - C) / B
     
-    return MSR
+    return NSR
     
     
     

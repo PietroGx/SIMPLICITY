@@ -344,8 +344,11 @@
 	* added get_experiment_plots_dir to dir_manager
 	* now simulation saves all the consensus sequences generated over a simulation in the population class
 	
+2026-07-03 pietro gerletti
 	
+	Version 0.10.0
 	
+	* changed NAMES: molecular_substituion rate (MSR) to nucleotide substitution rate (NSR)
 	
 	
 	

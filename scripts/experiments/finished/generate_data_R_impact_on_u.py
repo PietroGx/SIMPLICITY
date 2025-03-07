@@ -4,23 +4,7 @@
 
 @author: pietro
 
-STANDARD_VALUES for SIMPLICITY simulation: 
-
-    "population_size": 1000,
-    "tau_3": 7.5,
-    "infected_individuals_at_start": 10,
-    "R": 1.5,
-    "diagnosis_rate": 0.1,             # in percentage, will be converted to in model 
-    "IH_virus_emergence_rate": 0       # k_v in theoretical model equations
-    "molecular_substitution_rate": 0.0017,       # e in theoretical model equations
-    "final_time": 365,
-    "max_runtime": 259200, 
-    "phenotype_model": 'immune waning',  # or 'distance from wt'
-    "sequencing_rate": 0.05,
-    "seed": None,
-    "F": 1.25
-    
-If you want to change any, you can specify them in the parameters dictionary below. 
+If you want to change any parameter, you can specify them in the parameters dictionary below. 
 For each parameter, specify a list of values that you would like to use for the 
 simulation. If you want to change more than one parameter at the time, consider 
 that you need to enter the same number of values for each parameter, e.g. :
@@ -42,7 +26,7 @@ experiment_name = f'generate_data_R{R}_impact_on_u'
 def fixture_experiment_settings():
 
     R_values       = [R]*6
-    molecular_substitution_rates = [0.00001, 
+    nucleotide_substitution_rates = [0.00001, 
                         0.0001, 
                         0.001, 
                         0.01, 
@@ -50,7 +34,7 @@ def fixture_experiment_settings():
                         1]
     
     parameters      = {'R': R_values,
-                       'molecular_substitution_rate': molecular_substitution_rates
+                       'nucleotide_substitution_rate': nucleotide_substitution_rates
                        }
     n_seeds = 100
 

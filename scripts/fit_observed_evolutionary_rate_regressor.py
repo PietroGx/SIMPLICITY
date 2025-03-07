@@ -12,7 +12,7 @@ import argparse
 
 def fit_models(experiment_name, model_types, data_type):
     
-    parameter = 'molecular_substitution_rate'
+    parameter = 'nucleotide_substitution_rate'
     min_seq_number = 30
     min_sim_lenght = 0
     
@@ -109,10 +109,10 @@ def main():
         print(f"{key}      {value}")
     
     print('')
-    print('df MSR / OSR:')
-    df_counts = df['molecular_substitution_rate'].value_counts().reset_index()
-    df_counts.columns = ['molecular_substitution_rate_value', 'count']
-    df_sorted = df_counts.sort_values(by='molecular_substitution_rate_value')
+    print('df NSR / OSR:')
+    df_counts = df['nucleotide_substitution_rate'].value_counts().reset_index()
+    df_counts.columns = ['nucleotide_substitution_rate_value', 'count']
+    df_sorted = df_counts.sort_values(by='nucleotide_substitution_rate_value')
     print(df_sorted)
     
 if __name__ == "__main__":

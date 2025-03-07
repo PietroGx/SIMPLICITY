@@ -55,7 +55,7 @@ def extrande_factory(phenotype_model, parameters,
     # multiple variants rate
     k_v = parameters["IH_virus_emergence_rate"]
     # per site per year SPIKE substitution rate
-    avg_spike_ssy = parameters["molecular_substitution_rate"]
+    avg_spike_ssy = parameters["nucleotide_substitution_rate"]
     # substitution rates (per site, pe_r year) of SARS-CoV-2 Spike gene
     rate_sites_var = [avg_spike_ssy for i in range(len(ref.get_reference()))]
     # substitution rate (per year) of SARS-CoV-2 variants

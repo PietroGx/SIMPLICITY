@@ -3,24 +3,8 @@
 """
 
 @author: pietro
-
-STANDARD_VALUES for SIMPLICITY simulation: 
-
-    "population_size": 1000,
-    "infected_individuals_at_start": 100,
-    "R": 1.5,
-    "diagnosis_rate": 0.0055,
-    "IH_virus_emergence_rate": 0.0085,
-    "molecular_substitution_rate": 0.0017,
-    "final_time": 365*3 ,
-    "max_runtime": 100000000, 
-    "phenotype_model": 'immune waning',  # or 'distance from wt'
-    "sequencing_rate": 0.05,
-    "seed": None,
-    "F": 1.25
-
     
-If you want to change any, you can specify them in the parameters dictionary below. 
+If you want to change any parameter, you can specify them in the parameters dictionary below. 
 For each parameter, specify a list of values that you would like to use for the 
 simulation. If you want to change more than one parameter at the time, consider 
 that you need to enter the same number of values for each parameter, e.g. :
@@ -38,7 +22,6 @@ import simplicity.runners.serial
 import simplicity.runners.multiprocessing
 import simplicity.runners.slurm
 import simplicity.plots_manager as pm
-import warnings
 import argparse
 from scripts.slurm_diagnostics.slurm_error_summary import print_slurm_error_summary
 

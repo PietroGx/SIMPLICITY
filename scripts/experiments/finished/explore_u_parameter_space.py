@@ -4,23 +4,8 @@
 
 @author: pietro
 
-STANDARD_VALUES for SIMPLICITY simulation: 
-
-    "population_size": 1000,
-    "infected_individuals_at_start": 100,
-    "R": 1.5,
-    "diagnosis_rate": 0.0055,
-    "IH_virus_emergence_rate": 0.0085,
-    "molecular_substitution_rate": 0.0017,
-    "final_time": 365*3 ,
-    "max_runtime": 100000000, 
-    "phenotype_model": 'immune waning',  # or 'distance from wt'
-    "sequencing_rate": 0.05,
-    "seed": None,
-    "F": 1.25
-
     
-If you want to change any, you can specify them in the parameters dictionary below. 
+If you want to change any parameter, you can specify them in the parameters dictionary below. 
 For each parameter, specify a list of values that you would like to use for the 
 simulation. If you want to change more than one parameter at the time, consider 
 that you need to enter the same number of values for each parameter, e.g. :
@@ -45,25 +30,25 @@ import numpy as np
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
 
-    # number of values for MSR
-    molecular_substitution_rate_num_values = 15
+    # number of values for NSR
+    nucleotide_substitution_rate_num_values = 15
     
     # Generate values spaced logarithmically between 10^-5 and 1
     values = np.logspace(np.log10(0.00001), np.log10(1), 
-                         num=molecular_substitution_rate_num_values)
-    molecular_substitution_rate_values = values.tolist()
+                         num=nucleotide_substitution_rate_num_values)
+    nucleotide_substitution_rate_values = values.tolist()
 
     
-    parameters      = {'molecular_substitution_rate': molecular_substitution_rate_values,
-                       'final_time':[365] * molecular_substitution_rate_num_values
+    parameters      = {'nucleotide_substitution_rate': nucleotide_substitution_rate_values,
+                       'final_time':[365] * nucleotide_substitution_rate_num_values
                        }
     n_seeds = 300
 
     return (parameters, n_seeds)
 
 def plot_regressions_and_export(experiment_name):
-    pm.plot_combined_regressions(experiment_name, 'molecular_substitution_rate')
-    pm.plot_u_vs_parameter(experiment_name,'molecular_substitution_rate')
+    pm.plot_combined_regressions(experiment_name, 'nucleotide_substitution_rate')
+    pm.plot_u_vs_parameter(experiment_name,'nucleotide_substitution_rate')
     pm.export_u_regression_plots(experiment_name)
 
 def explore_u_e_space(runner:str, experiment_number:int):

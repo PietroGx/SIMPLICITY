@@ -1,7 +1,7 @@
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {'molecular_substitution_rate': [0.001]}
+    parameters      = {}
     n_seeds         = 1
     return (parameters, n_seeds)
 
