@@ -21,6 +21,11 @@ def plot_regressions(experiment_name, parameter, min_seq_number, min_sim_lenght)
                                 parameter, 
                                 min_seq_number,
                                 min_sim_lenght)
+    
+    om.write_OSR_vs_parameter_csv(experiment_name, 
+                                parameter, 
+                                min_seq_number,
+                                min_sim_lenght)
     # plot combined OSR vs parameter 
     pm.plot_combined_OSR_vs_parameter(experiment_name, 
                                         parameter,  
@@ -44,15 +49,20 @@ def main():
     # Set up the argument parser
     parser = argparse.ArgumentParser(description="Run script to perform and plot u regression")
     parser.add_argument('experiment_name', type=str, help="experiment name")
-    parser.add_argument('parameter', type=str, help="parameter to compare with u in regression plots")
-    parser.add_argument('min_seq_number', type=float, help="only use datasets with at least this number of sequences")
-    parser.add_argument('min_sim_lenght', type=float, help="only keep data from simulations that lasted at least this number of days")
+    # parser.add_argument('parameter', type=str, help="parameter to compare with u in regression plots")
+    # parser.add_argument('min_seq_number', type=float, help="only use datasets with at least this number of sequences")
+    # parser.add_argument('min_sim_lenght', type=float, help="only keep data from simulations that lasted at least this number of days")
     args = parser.parse_args()
+    
+    parameter = 'nucleotide_substitution_rate'
+    min_seq_number = 20
+    min_sim_lenght = 0
+    
     # Run the script with the provided parameter
     plot_regressions(args.experiment_name, 
-                                args.parameter, 
-                                args.min_seq_number,
-                                args.min_sim_lenght)
+                                parameter, 
+                                min_seq_number,
+                                min_sim_lenght)
     
     pm.plot_figure_tempest_regression()
     
