@@ -19,7 +19,7 @@ def fixture_experiment_settings():
                                 60,
                                 120
                                 ],
-                       'final_time':[365]*6
+                       'final_time':[365*3]*6
                        }
     n_seeds = 300
 
