@@ -349,6 +349,7 @@
 	Version 0.10.0
 	
 	* changed NAMES: molecular_substituion rate (MSR) to nucleotide substitution rate (NSR)
+	* added plot tau3/OSR
 	
 	
 	
