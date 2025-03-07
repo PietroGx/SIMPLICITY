@@ -309,7 +309,7 @@ def plot_figure_tempest_regression():
         # ax.set_ylim(0, 1)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(experiment_plots_dir, "Figure2E_combined_tempest_regression.png"))
+    plt.savefig(os.path.join(experiment_plots_dir, f"{experiment_name}_figure_combined_tempest_regression.png"))
     
 def plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght=0, y_axis_max=0.1):
     # Get sorted simulation output directories for experiment
