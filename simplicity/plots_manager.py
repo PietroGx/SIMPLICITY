@@ -387,7 +387,7 @@ def plot_combined_OSR_vs_parameter(experiment_name,
     plt.title(f'{parameter} vs observed substitution rate')
     plt.grid(True)
     plt.tight_layout()
-    plt.legend()
+    # plt.legend()
     plt.savefig(os.path.join(experiment_plots_dir, 
                              f"{experiment_name}_{parameter}_vs_observed_substitution_rate.png"))
         
