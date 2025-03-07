@@ -6,6 +6,7 @@ Created on Fri Feb 14 15:08:05 2025
 @author: pietro
 """
 import simplicity.plots_manager as pm
+import simplicity.output_manager as om
 import argparse
 
 def main():
@@ -19,11 +20,11 @@ def main():
     min_sim_lenght = 0
     
     # build the dataframe needed for the plot
-    om.write_combined_OSR_vs_parameter_csv(experiment_name, 
+    om.write_combined_OSR_vs_parameter_csv(args.experiment_name, 
                                             parameter, 
                                             min_seq_number,
                                             min_sim_lenght)
-    om.write_OSR_vs_parameter_csv(experiment_name, 
+    om.write_OSR_vs_parameter_csv(args.experiment_name, 
                                     parameter, 
                                     min_seq_number,
                                     min_sim_lenght)
