@@ -356,26 +356,26 @@ def plot_combined_OSR_vs_parameter(experiment_name,
     ''' Plot observed substituion rate (tempest regression) against desired parameter values
     '''
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
-    # import combined regression data
-    df_combined = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
-                                               parameter,
-                                               min_seq_number,
-                                               min_sim_lenght)
+    # # import combined regression data
+    # df_combined = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
+    #                                            parameter,
+    #                                            min_seq_number,
+    #                                            min_sim_lenght)
     # import single simulations regression data
     df = om.read_OSR_vs_parameter_csv(experiment_name, 
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
-    # Plot target parameter vs OSR as a line plot with points
-    plt.figure(figsize=(10, 6))
-    plt.plot(df_combined[parameter],  df_combined['observed_substitution_rate'], 
-             marker='o', 
-             color='black', 
-             linestyle='-', 
-             label=f'{experiment_name}_{parameter} vs observed_substitution_rate')
+    # # Plot target parameter vs OSR as a line plot with points
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(df_combined[parameter],  df_combined['observed_substitution_rate'], 
+    #          marker='o', 
+    #          color='black', 
+    #          linestyle='-', 
+    #          label=f'{experiment_name}_{parameter} vs observed_substitution_rate')
 
     # Boxplot for each X position
-    sns.boxplot(x=df[parameter], y=df['observed_substitution_rate'], hue=None, 
+    sns.boxplot(x=df[parameter], y=df['observed_substitution_rate'], hue=df[parameter], 
                 palette="coolwarm", width=0.6, showfliers=False)
     
     # Scatterplot overlaid on top
