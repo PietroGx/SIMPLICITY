@@ -31,7 +31,7 @@ def run_experiment_script(runner:str,
         run_experiment(f'{experiment_name}_#{experiment_number}', 
                        fixture_experiment_settings,             
                        simplicity_runner  = runner_module,
-                       plot_trajectory = False,
+                       plot_trajectory = True,
                        archive_experiment = False)
     except Exception as e:
         print(f'The simulation failed to run: {e}')
