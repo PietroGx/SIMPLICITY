@@ -6,48 +6,21 @@ Created on Thu Jan 16 09:51:20 2025
 @author: pietro
 """
 import anytree
-import matplotlib
-import pandas as pd
-import os
-import ast
-import simplicity.evolution.decoder as decoder
-from anytree.exporter import DotExporter
-import numpy as np
-import collections
-import simplicity.tree.newick as nwk
-import simplicity.tree.nexus as nx
+from ete3 import  Tree
+# import simplicity.evolution.decoder as decoder
+import simplicity.output_manager as om
+import simplicity.plots_manager as pm
 
-def fitness_color(fitness,data):
-    cmap = matplotlib.pyplot.get_cmap('cool')
-    
-    # Normalize the value
-    norm = matplotlib.colors.Normalize(vmin=data.fitness.min(), vmax=data.fitness.max())
-    normalized_value = norm(fitness)
-    hexcolor = matplotlib.colors.rgb2hex(cmap(normalized_value))
-    
-    return hexcolor
-
-def getcolor(state):
-    if state == 'infected':
-        return 'red'
-    if state == 'recovered':
-        return 'green'
-    if state == 'diagnosed':
-        return 'orange'
-    if state == 'deceased':
-        return 'black'
-
-def infection_tree(output_directory):
+def infection_tree(seeded_simulation_output_dir):
     
     # import individuals data
-    individuals_data_file_path = os.path.join(output_directory, 'individuals_data.csv')
-    data = pd.read_csv(individuals_data_file_path)
-    
+    data = om.read_individuals_data(seeded_simulation_output_dir)
     tree = []
     # tree root
     root = anytree.Node('root',label='root',distance=0,
-                sequence='',leaf=False,
-                color = 'white',fitness_color = 'white',infection_type ='normal')
+                sequence='',leaf=False,t_infection = 0,
+                fitness=0,infection_type ='normal',
+                lineage = 'wt')
     tree.append(root)
     # patients 0 nodes
     for row in data[data['parent'] =='root'].itertuples():
@@ -68,11 +41,8 @@ def infection_tree(output_directory):
                          state            = row.state,
                          infection_type   = row.type,
                          fitness          = row.fitness,
-                         IH_virus_fitness = row.IH_virus_fitness,
-                         IH_virus_max     = row.IH_virus_max,
+                         lineage          = row.IH_virus_names[0]
                          
-                         color = 'black',
-                         fitness_color = fitness_color(row.fitness,data)
                          ))
         data = data.drop(row.Index)
         
@@ -83,14 +53,14 @@ def infection_tree(output_directory):
         #
         if row.parent != None:
             try:
-                parent_node = [node for node in tree if node.name == str(row.parent)
+                parent_node = [node for node in tree if node.label == str(row.parent)
                                and node.leaf == True][0]
                 # for node in tree: print(node.name, node.leaf)
                 # print('')
             except: 
                 # print('pass')
                 pass
-               
+            
             # add new infection
             tree.append(anytree.Node(
                         name           = str(row.Index), 
@@ -107,11 +77,7 @@ def infection_tree(output_directory):
                         state            = row.state,
                         infection_type   = row.type,
                         fitness          = row.fitness,
-                        IH_virus_fitness = row.IH_virus_fitness,
-                        IH_virus_max     = row.IH_virus_max,
-                        
-                        color = getcolor(row.state),
-                        fitness_color = fitness_color(row.fitness,data)
+                        lineage          = row.IH_virus_names[0]
                          ))
             
             # extend parent node
@@ -119,7 +85,7 @@ def infection_tree(output_directory):
                         name           = parent_node.name, 
                         parent         = parent_node,
                         distance       = 0,
-                        label          = str(parent_node.label),
+                        label          = parent_node.label,
                         leaf           = True,
                         
                         t_infection    = parent_node.t_infection,
@@ -130,153 +96,108 @@ def infection_tree(output_directory):
                         state            = parent_node.state,
                         infection_type   = parent_node.infection_type,
                         fitness          = parent_node.fitness,
-                        IH_virus_fitness = parent_node.IH_virus_fitness,
-                        IH_virus_max     = parent_node.IH_virus_max,
-                        
-                        color          = getcolor(parent_node.state),
-                        fitness_color = fitness_color(parent_node.fitness,data)
+                        lineage          = parent_node.lineage
                          ))
             
             
             # update parent node
             parent_node.leaf=False # labels internal nodes (inactive)
             # parent_node.color = 'white'
-            parent_node.label =  parent_node.name + '=>'+ str(row.Index) #+'}' '{'+
+            parent_node.name =  parent_node.label + '=>'+ str(row.Index) #+'}' '{'+
             
     return(tree)
 
-def phylogenetic_tree(output_directory):
+def phylogenetic_tree(seeded_simulation_output_dir):
     
     # import phylogenetic_data 
-    phylogenetic_data_file_path = os.path.join(output_directory, 'phylogenetic_data.csv')
-    phylogenetic_data = pd.read_csv(phylogenetic_data_file_path)
-    phylogenetic_data['genome'] = phylogenetic_data['genome'].apply(ast.literal_eval)
-    if phylogenetic_data.empty:
-        print('No evolution took place during this simulation')
-        return 
-   
+    phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
+    first_row = phylogenetic_data.iloc[0]
     tree = []
     # tree root
-    root = anytree.Node(name='wt',label='wt',distance=0,
-                leaf=True,
-                color = 'white',
-                sequence  = None,
-                genome = [],
-                individual = None,
-                host_type      = None,
-                fitness        = 1,
-                fitness_color = 'black')
-    tree.append(root)
-        
-    # build the phylogenetic tree
-    for row in phylogenetic_data.itertuples():
-            try:
-                parent_node = [node for node in tree if node.name == row.parent
-                               and node.leaf == True][0]
-                # for node in tree: print(node.name, node.leaf)
-                # print('')
-            except: 
-                print('pass')
-                pass
+    root = anytree.Node(
+                name           = str(first_row.lineage_name), 
+                parent         = None,
+                lineage        = str(first_row.lineage_name),
+                label          = str(first_row.lineage_name),
+                distance       = 0,   
+                leaf           = True,
+                
+                time_emergence = 0,
+                
+                genome         = first_row.genome,
+                sequence       = None,
+                individual     = None,
+                
+                host_type      = first_row.host_type,
+                fitness        = first_row.fitness)
     
+    tree.append(root)
+    phylogenetic_data.drop(phylogenetic_data.index[0], inplace=True)
+    # build the phylogenetic tree
+    internal_node_names = []
+    for row in phylogenetic_data.itertuples():
+            
+            parent_node = [node for node in tree if node.label == row.parent
+                           and node.leaf == True][0]
+           
+            time_distance = row.time_emergence - parent_node.time_emergence
             # add new variant
             tree.append(anytree.Node(
-                        name           = str(row.name), 
+                        name           = str(row.lineage_name), 
                         parent         = parent_node,
-                        label          = str(row.name),
-                        distance       = 1,   
+                        lineage        = str(row.lineage_name),
+                        label          = str(row.lineage_name),
+                        distance       = time_distance,   
                         leaf           = True,
                         
-                        time           = row.time,
+                        time_emergence = row.time_emergence,
                         
                         genome         = row.genome,
                         sequence       = None,
                         individual     = row.individual,
                         
                         host_type      = row.host_type,
-                        fitness        = row.fitness,
-                        fitness_color = fitness_color(row.fitness,phylogenetic_data)
+                        fitness        = row.fitness
                          ))
             
             # extend parent node
             tree.append(anytree.Node(
                 
-                        name           = str(parent_node.name), 
+                        name           = parent_node.name,
                         parent         = parent_node,
-                        label          = str(parent_node.label)+ '.m',
-                        distance       = 0,   
+                        lineage        = parent_node.lineage,
+                        label          = parent_node.label,
+                        distance       = time_distance,   
                         leaf           = True,
                         
-                        time           = row.time,
+                        time_emergence = row.time_emergence,
                         
                         genome         = parent_node.genome,
                         sequence       = None,
                         individual     = parent_node.individual,
                         
                         host_type      = parent_node.host_type,
-                        fitness        = parent_node.fitness,
-                        fitness_color = fitness_color(parent_node.fitness,phylogenetic_data)
+                        fitness        = parent_node.fitness
                         ))
             
-            # update patent node
+            # update parent node
             parent_node.leaf=False # labels internal nodes (inactive)
-            # parent_node.color = 'white'
-            # parent_node.label += '.m'
-             
-    # save all the mutations positions in the leaves nodes
-    for node in tree[1:]:
-        node.sequence = decoder.decode_genome(node.genome)
+            internal_node_name = parent_node.name+ f'_time:{row.time_emergence:.2f}'
+            parent_node.name=internal_node_name
+            if internal_node_name in internal_node_names:
+                internal_node_name += '_' 
+                parent_node.name=internal_node_name
             
+            internal_node_names.append(internal_node_name)
     return(tree)
-
-def tree_fitness_legend(tree_data, tree_type, output_directory): 
-    '''
-    Create legend for fitness color in plotted trees 
-    
-    tree_data: 
-        phylogenetic data OR individuals data
-    tree: str 
-        'infection' or 'phylogenetic' 
-    '''
-    # Create a dummy invisible image.
-    d = np.linspace(0, tree_data.fitness.max(),
-                    int(tree_data.fitness.max())).reshape(1, -1)
-    d = np.vstack((d, d))
-
-    fig, ax = matplotlib.pyplot.subplots(figsize=(6, 2))
-    fig.subplots_adjust(bottom=0.5, top=0.99, left=0.01, right=0.8)
-
-    # Set the extent to cover the range of data
-    extent = [0, tree_data.fitness.max(), 0, 1]
-
-    # The imshow plots the dummy data.
-    cax = ax.imshow(d, aspect='auto',
-                    cmap=matplotlib.pyplot.get_cmap('cool'),
-                    extent=extent)
-
-    # Set the ticks at the beginning and end of the color bar
-    ax.set_xticks([0, tree_data.fitness.max()])
-    # ax.set_xticks(np.arange(0,data.fitness.max(),10))
-    # Set the labels "low" and "high" for the ticks
-    ax.set_xticklabels(["low", "high"])
-    
-    # Remove y-ticks and their labels
-    ax.set_yticklabels([])
-    ax.set_yticks([])
-
-    # Set the title for the plot
-    ax.set_title("Relative Fitness")
-    legend_path = os.path.join(output_directory,
-                               tree_type+"_tree_fitness_legend.png")
-    matplotlib.pyplot.savefig(legend_path,
-                  dpi=600, bbox_inches='tight')
-    matplotlib.pyplot.close()
-    
-def get_tree(output_directory,
+   
+def get_tree(experiment_name,
+             seeded_simulation_output_dir,
              tree_type,
              tree_subtype='binary',
+             coloring = 'lineage',
              save_plot=True,
-             export='nexus',
+             export_filetype='json',
              dashplot=False):
     '''
     Build the infection tree or the phylogenetic tree of the simulation.
@@ -291,37 +212,45 @@ def get_tree(output_directory,
     __________________________FOR INFECTION TREE___________________________
     binary - binary infection tree where each internal node is an infection 
              event that has as offspring the newly infected individual and 
-             the parent that can continue to infect more individuals; the
-             tree is colored based on the compartment each individual is in.
+             the parent that can continue to infect more individuals;
     
-    compact - infection tree, colored as above, but not binary. Each node 
-                is an individual connected with all the people they infected
+    compact - infection tree. Each node is an individual 
+              connected with all the people they infected
     
-    fitness - infection tree colored with heatmap of individuals fitness value
     _________________________FOR PHYLOGENETIC TREE__________________________
     binary - binary phylogenetic tree where each internal node is 
              substitution event happening in the simulation
     
-    non-binary - lineages tree where each edge connects parent and 
-                offspring variants
+    compact - lineages tree where each edge connects parent and 
+              offspring lineages
     ________________________________________________________________________
     save_plot : bool
     
     export : str
        file type to export tree (newick or nexus). The default is 'nexus'.
     '''
-    img_filename    = tree_type + '_tree_'+tree_subtype+'.png'
-    newick_filename = tree_type + '_tree_newick.txt'
-    nexus_filename  = tree_type + '_tree_nexus.txt'
-    # path to save the plot
-    img_path = os.path.join(output_directory,img_filename) 
+    # import individuals data
+    infection_tree_data = om.read_individuals_data(seeded_simulation_output_dir)
+    # import phylogenetic_data 
+    phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
+    # stop execution if tree cannot be created
+    if phylogenetic_data.empty:
+        print('No evolution took place during this simulation')
+        
+        if tree_type == 'phylogenetic':
+            print('Cannot create phylogenetic tree, no evolution happened!')
+            return
+            
+        elif coloring == 'lineage':
+            print('Cannot color by lineage, no evolution happened!')
+            return
+    # get lineages data
+    lineages = phylogenetic_data['lineage_name'].tolist()
     
+    # infection tree
     if tree_type == 'infection':
-        # import individuals data
-        individuals_data_file_path = os.path.join(output_directory, 'individuals_data.csv')
-        tree_data = pd.read_csv(individuals_data_file_path)
         # infection tree
-        tree = infection_tree(output_directory)
+        tree = infection_tree(seeded_simulation_output_dir)
         root = tree[0]
         
         # Visualize the tree
@@ -330,85 +259,25 @@ def get_tree(output_directory,
                 print("%s%s" % (pre, node.label))
         
         if save_plot:
-            # path to save the plot
-            tree_img_filepath = os.path.join(output_directory,'infection_tree_'+tree_subtype+'.png')
             
-            if tree_subtype == 'binary':
-               
-                def nodenamefunc(node):
-                    return node.label 
-                
-                def nodeattrfunc(node):
-                    if node.infection_type == 'normal':
-                        return 'color="{}", label="{}"'.format(node.color, 
-                                                               node.label)
-                    else:
-                        return 'color="{}", label="{}", shape=diamond, style=filled'.format(
-                            node.color, node.label)
-                    
-                DotExporter(root,
-                            nodeattrfunc=nodeattrfunc,
-                            nodenamefunc=nodenamefunc,
-                            ).to_picture(tree_img_filepath)
-                
-            elif tree_subtype == 'compact':
-                def nodenamefunc(node):
-                    return node.name 
-                
-                def edgeattrfunc(node, child):
-                    if node.name == child.name:
-                        return 'color=transparent'
-                
-                def nodeattrfunc(node):
-                    if node.infection_type == 'normal':
-                        return 'color="{}", label="{}"'.format(node.color, 
-                                                               node.label)
-                    else:
-                        return 'color="{}", label="{}", shape=diamond, style=filled'.format(
-                            node.color, node.label)
+            tree_plot_filepath = om.get_tree_plot_filepath(experiment_name,
+                                  seeded_simulation_output_dir,
+                                  tree_type,
+                                  tree_subtype)
             
-                DotExporter(root,
-                            nodeattrfunc=nodeattrfunc,
-                            nodenamefunc=nodenamefunc,
-                            edgeattrfunc=edgeattrfunc,
-                            ).to_picture(tree_img_filepath)
-             
-            elif tree_subtype == 'fitness':
-                def nodenamefunc(node):
-                    return node.name 
-                
-                def edgeattrfunc(node, child):
-                    if node.name == child.name:
-                        return 'color=transparent'
-                    
-                def nodeattrfunc(node):
-                    if node.infection_type == 'normal':
-                        return 'color="{}", label="{}"'.format(node.fitness_color, 
-                                                               node.label)
-                    else:
-                        return 'color="{}", label="{}", shape=diamond, style=filled'.format(
-                            node.fitness_color, node.label)
-              
-                    
-                tree_fitness_legend(tree_data, tree_type, output_directory)
-                DotExporter(root,
-                            nodeattrfunc=nodeattrfunc,
-                            nodenamefunc=nodenamefunc,
-                            edgeattrfunc=edgeattrfunc,
-                            ).to_picture(tree_img_filepath)
-                
+            pm.plot_infection_tree(root,
+                                       infection_tree_data,
+                                       tree_subtype,
+                                       coloring,
+                                       lineages,
+                                       tree_plot_filepath)
+            
+            if coloring == 'fitness':
+                pm.tree_fitness_legend(infection_tree_data, tree_type, tree_plot_filepath)
+       
+    # phylogenetic tree            
     elif tree_type == 'phylogenetic':
-        # import phylogenetic_data 
-        phylogenetic_data_file_path = os.path.join(output_directory, 'phylogenetic_data.csv')
-        phylogenetic_data = pd.read_csv(phylogenetic_data_file_path)
-        tree_data = phylogenetic_data
-        
-        if phylogenetic_data.empty:
-            print('No evolution took place during this simulation')
-            return 
-        
-        # phylogenetic tree
-        tree = phylogenetic_tree(output_directory)
+        tree = phylogenetic_tree(seeded_simulation_output_dir)
         root = tree[0]
         
         # Visualize the tree
@@ -417,55 +286,39 @@ def get_tree(output_directory,
                 print("%s%s" % (pre, node.name))
         
         if save_plot:
-            # define nodeattrfunc for DotExporter to format the graph picture
-            def nodeattrfunc(node):
-                    return 'color="{}", label="{}"'.format(node.fitness_color, 
-                                                           node.name)
-            # plot and save legend for fitness color scale
-            tree_fitness_legend(tree_data, tree_type, output_directory)
-            # format tree for binary tree
-            if tree_subtype == 'binary':
-                # define nodenamefunc for DotExporter so that it uses labels 
-                # instead of names to build the tree picture
-                def nodenamefunc(node):
-                    return node.label 
-                # save tree picture
-                anytree.exporter.DotExporter(root,
-                            nodeattrfunc=nodeattrfunc,
-                            nodenamefunc=nodenamefunc,
-                            ).to_picture(img_path)
-                
-            # format tree for non-binary tree
-            elif tree_subtype == 'non-binary':
-                
-                # not needed but to add transparency to the code I explicitly
-                # left the nodenamefunc doing what it already does
-                def nodenamefunc(node):
-                    return node.name 
-                
-                # define nodeattrfunc for DotExporter for it to not display edges 
-                # that connect collapsed nodes
-                def edgeattrfunc(node, child):
-                    if node.name == child.name:
-                        return 'color=transparent'
-                # save tree picture
-                anytree.exporter.DotExporter(root,
-                            nodeattrfunc=nodeattrfunc,
-                            nodenamefunc=nodenamefunc,
-                            edgeattrfunc=edgeattrfunc,
-                            ).to_picture(img_path)
-        
-    # tree to ordered dictionary
-    exporter = anytree.exporter.DictExporter(dictcls= collections.OrderedDict, attriter=sorted)
-    dic = exporter.export(root)
-    # ordered dictionary to newick format
-    newick_tree = nwk.newick(dic)
-        
-    if export =='nexus':
-        nx.export_nexus(newick_tree, tree, output_directory, nexus_filename) 
+            tree_plot_filepath = om.get_tree_plot_filepath(experiment_name,
+                                  seeded_simulation_output_dir,
+                                  tree_type,
+                                  tree_subtype)
+            
+            pm.plot_phylogenetic_tree(root,
+                                       phylogenetic_data,
+                                       tree_subtype,
+                                       coloring,
+                                       lineages,
+                                       tree_plot_filepath)
+            if coloring == 'fitness':
+                # plot and save legend for fitness color scale
+                pm.tree_fitness_legend(phylogenetic_data,tree_type, tree_plot_filepath)
        
-    if export == 'newick':
-        newick_filepath = os.path.join(output_directory, newick_filename) 
-        with open(newick_filepath, 'w') as f:
-            f.write(newick_tree)
-            f.write('\n')
+    # ------------------- export tree to file -----------------------------        
+    om.export_tree(tree,
+                    experiment_name,
+                    seeded_simulation_output_dir,
+                    tree_type,
+                    tree_subtype,
+                    export_filetype)
+    
+# Convert anytree node -> ETE node
+def build_ete_from_anytree(any_node):
+    ete_node = Tree()
+    ete_node.name = any_node.name
+    # Copy all attributes from any_node
+    for key, val in any_node.__dict__.items():
+        if key not in ("children", "parent", "name"):
+            ete_node.add_features(**{key: val})
+    # Recursively add children
+    for child in any_node.children:
+        ete_child = build_ete_from_anytree(child)
+        ete_node.add_child(ete_child)
+    return ete_node

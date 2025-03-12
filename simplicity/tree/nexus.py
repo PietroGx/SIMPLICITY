@@ -5,9 +5,10 @@ Created on Wed Jan 19 01:35:14 2022
 
 @author: pietro
 """
-import os
 
-def export_nexus(newick_tree,tree,output_directory,filename):
+import simplicity.tree.newick as nwk
+
+def write_nexus_file(tree, nexus_filepath):
     '''
     Generate nexus file from AnyTree tree and newick file
 
@@ -20,8 +21,9 @@ def export_nexus(newick_tree,tree,output_directory,filename):
     Save tree in Nexus format.
 
     '''
-    file_path = os.path.join(output_directory,filename)
-    with open(file_path, 'w') as f:
+    root = tree[0]
+    newick_tree = nwk.export_newick(root)
+    with open(nexus_filepath, 'w') as f:
         f.write('#NEXUS')
         f.write('\n')
         f.write('begin data;')

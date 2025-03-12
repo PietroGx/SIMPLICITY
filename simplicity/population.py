@@ -62,7 +62,14 @@ class Population:
                                                     # one simulation run
         
         # track data for building the phylogenetic tree
-        self.track_phylogeny = []
+        self.track_phylogeny = [{'lineage_name'   : 'wt',
+                                 'parent'         : None,
+                                 'individual'     : None,
+                                 'genome'         : [],
+                                 'time_emergence' : 0,
+                                 'host_type'      : 'normal',
+                                 'fitness'        : 0
+                                 }]
         self.phylodots = []
         self.lineage_frequency = {} # count lineages in the population
         
@@ -82,7 +89,7 @@ class Population:
                            self.detectables,
                            self.susceptibles
                            ]]
-        
+        self.R_effective_trajectory = []
         self.fitness_trajectory = [[0,[0,0]]]  
         self.sequencing_data = []
         
@@ -328,10 +335,10 @@ class Population:
         index = self.rng4.integers(0,self.individuals[parent]['IH_virus_number'])
         self.individuals[new_inf]['viral_genomes'] = [copy.deepcopy(
             self.individuals[parent]['viral_genomes'][index])]
-        # variant name
-        self.individuals[new_inf]['IH_virus_names'].append(
-            self.individuals[parent]['IH_virus_names'][index])
-        # variant fitness
+        # lineage name
+        parent_lineage = self.individuals[parent]['IH_virus_names'][index]
+        self.individuals[new_inf]['IH_virus_names'].append(parent_lineage)
+        # lineage fitness
         self.individuals[new_inf]['IH_virus_fitness'] = [int(
             self.individuals[parent]['IH_virus_fitness'][index])]
         # update individual fitness (average of variants fitness)
@@ -340,6 +347,10 @@ class Population:
         # state
         self.individuals[new_inf]['state'] = 'infected'
         
+        # store infected info for R effective
+        self.R_effective_trajectory.append([self.time,parent,parent_lineage])
+        
+        # update susceptibles and infected 
         self.susceptibles -= 1
         self.infected     += 1
         
@@ -529,7 +540,7 @@ class Population:
             # assign the mutations to their relative genome
             subst_coord = evo.assign_sub(unassigned_subst, subst_coord)
             # update variants in simulation with the corresponding substitution
-            evo.update_variants(self, subst_coord)
+            evo.update_lineages(self, subst_coord)
             
             # update fitness score of individuals and variants
             # print('--X----X----X----X----X----X--')
@@ -575,6 +586,20 @@ class Population:
             'Time': times,
             'Mean': means,
             'Std': stds
+        })
+        
+        return df
+    
+    def R_effective_trajectory_to_df(self):
+        times = [item[0] for item in self.R_effective_trajectory]
+        parents = [item[1] for item in self.R_effective_trajectory]
+        lineages = [item[2] for item in self.R_effective_trajectory]
+        
+        # Create a pandas DataFrame
+        df = pd.DataFrame({
+            'Time': times,
+            'Parent': parents,
+            'Lineage': lineages
         })
         
         return df
