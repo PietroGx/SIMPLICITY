@@ -12,7 +12,7 @@ import matplotlib.colors as mcolors
 matplotlib.use('Agg')
 import anytree
 from anytree.exporter import DotExporter
-from ete3 import  NodeStyle, TreeStyle, faces, AttrFace
+from ete3 import NodeStyle, TreeStyle, faces, AttrFace
 import matplotlib.pyplot as plt
 import seaborn           as sns
 import pandas            as pd
