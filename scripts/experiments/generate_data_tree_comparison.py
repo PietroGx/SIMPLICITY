@@ -23,7 +23,7 @@ experiment_name =  'generate_data_tree_comparison'
 
 def fixture_experiment_settings():
     
-    parameters      = {
+    parameters      = {'infected_individuals_at_start': [1],
                        'final_time':[365*3]
                        }
     n_seeds = 100
