@@ -21,7 +21,8 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
             # import phylogenetic_data 
             phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
             # get lineages data
-            lineages = phylogenetic_data['lineage_name'].tolist()   
+            lineages = phylogenetic_data['lineage_name'].tolist()  
+            print(lineages)
             lineages_number = len(lineages)
             if lineages_number > lineage_threshold:
                 print(ssod)
@@ -47,6 +48,7 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                              save_plot=False,
                              export_filetype='json',
                              dashplot=False)
+                print('importing trees...')
                 # get infection tree filepath
                 inf_tree_filepath = om.get_tree_file_filepath(experiment_name,
                                       seeded_simulation_output_dir,
@@ -62,6 +64,8 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                 # import infection and phylogenetic trees from json
                 inf_tree = jt.import_tree(inf_tree_filepath)
                 phylo_tree = jt.import_tree(phylo_tree_filepath)
+                print('')
+                print('Converting trees into ete3 format...')
                 # convert anytree trees into ete3 trees
                 ete_inf_tree = tb.build_ete_from_anytree(inf_tree)
                 ete_phylo_tree = tb.build_ete_from_anytree(phylo_tree)
@@ -74,7 +78,8 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                                       seeded_simulation_output_dir,
                                       tree_type = 'phylogenetic',
                                       tree_subtype = 'circular')
-                # plot circular trees
+                print('')
+                print('Plotting circular trees...')
                 pm.plot_circular_tree(ete_inf_tree,
                                       lineages,
                                       'infection',
@@ -95,6 +100,7 @@ def main():
     time_threshold = 300
     lineage_threshold =  20
     generate_and_plot_trees(args.experiment_name,time_threshold,lineage_threshold)
+    print('Tree plotting completed.')
     
 if __name__ == "__main__":
     main()
