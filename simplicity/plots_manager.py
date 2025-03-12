@@ -1263,6 +1263,7 @@ def plot_circular_tree(ete_root,
             if node.lineage in individuals_lineages:
                 if node.lineage is None:
                     raise ValueError(f'Lineage is NoneType! Check {node}.')
+                print(node)
                 node.img_style["bgcolor"] = get_clade_color(node.lineage, lineages, factor=0.55)
             else:
                 node.img_style["bgcolor"] = 'white'
