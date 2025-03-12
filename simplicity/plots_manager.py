@@ -1196,9 +1196,10 @@ def plot_phylogenetic_tree(root,
                     ).to_picture(tree_plot_filepath)
 
 def plot_circular_tree(ete_root,
-             lineages,
-             individuals_lineages,
-             file_path):
+                       tree_type,
+                       lineages,
+                       individuals_lineages,
+                       file_path):
     
     # function to set layout of branches
     def color_branches_black(tree):
@@ -1267,18 +1268,25 @@ def plot_circular_tree(ete_root,
         if node.is_leaf():
             N = AttrFace("name", fsize=14)
             faces.add_face_to_node(N, node, 0, position="aligned")
+    def layout_inf(node):
+        pass
     # color tree
     color_branches_black(ete_root)
     color_clades_by_lineage(ete_root,lineages, individuals_lineages)
             
     # setup circular tree
     ts = TreeStyle()
-    ts.layout_fn = layout
+    if tree_type == 'infection':
+        ts.layout_fn = layout_inf
+        ts.scale = 20
+    elif tree_type == 'phylogenetic':
+        ts.layout_fn = layout
+        ts.scale = 20
+        
     ts.mode = "c"  # circular layout    
     ts.show_leaf_name = False
     ts.show_branch_length = False
-    ts.scale = 20
-    ts.complete_branch_lines_when_necessary = True
+    # ts.complete_branch_lines_when_necessary = True
     ts.draw_guiding_lines = True
     ts.root_opening_factor = 1.0  
     
