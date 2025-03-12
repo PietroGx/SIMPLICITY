@@ -35,7 +35,7 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                              tree_type='infection',
                              tree_subtype='binary',
                              coloring = 'lineage',
-                             save_plot=True,
+                             save_plot=False,
                              export_filetype='json',
                              dashplot=False)
                 # build phylogenetic tree    
@@ -44,7 +44,7 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                              tree_type='phylogenetic',
                              tree_subtype='binary',
                              coloring = 'lineage',
-                             save_plot=True,
+                             save_plot=False,
                              export_filetype='json',
                              dashplot=False)
                 # get infection tree filepath
