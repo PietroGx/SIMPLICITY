@@ -91,8 +91,8 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                 print('')
                 print('Plotting circular trees...')
                 pm.plot_circular_tree(ete_inf_tree,
-                                      lineages,
                                       'infection',
+                                      lineages,
                                       individuals_lineages,
                                       ete_inf_tree_filepath)
                 pm.plot_circular_tree(ete_phylo_tree,
