@@ -981,7 +981,9 @@ def get_lineage_color(lineage, lineages):
     color mapping: colormap
         output of make_lineages_colormap
     """
-    if lineage not in lineages:
+    if lineage is None:
+        raise ValueError('Lineage cannot be NoneType!')
+    elif lineage not in lineages:
         raise ValueError(f'Lineage {lineage} not in lineages list! Cannot compute color.')
         
     color_mapping = make_lineages_colormap(lineages)
@@ -1247,7 +1249,6 @@ def plot_circular_tree(ete_root,
         return f"#{r_new:02x}{g_new:02x}{b_new:02x}"
     
     def get_clade_color(lineage, lineages, factor=0.5):
-
         lineage_color = get_lineage_color(lineage, lineages)
         clade_color = blend_with_white(lineage_color, factor)
         return clade_color
@@ -1260,6 +1261,8 @@ def plot_circular_tree(ete_root,
        
         for node in tree.traverse():
             if node.lineage in individuals_lineages:
+                if node.lineage is None:
+                    raise ValueError(f'Lineage is NoneType! Check {node}.')
                 node.img_style["bgcolor"] = get_clade_color(node.lineage, lineages, factor=0.55)
             else:
                 node.img_style["bgcolor"] = 'white'

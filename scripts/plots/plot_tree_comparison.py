@@ -30,25 +30,7 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                 # import individuals data
                 individuals_data = om.read_individuals_data(seeded_simulation_output_dir)
                 individuals_lineages = [lin[0] for lin in individuals_data.IH_virus_names.to_list()]
-                # build infection tree
-                tb.get_tree(experiment_name,
-                             seeded_simulation_output_dir,
-                             tree_type='infection',
-                             tree_subtype='binary',
-                             coloring = 'lineage',
-                             save_plot=False,
-                             export_filetype='json',
-                             dashplot=False)
-                # build phylogenetic tree    
-                tb.get_tree(experiment_name,
-                             seeded_simulation_output_dir,
-                             tree_type='phylogenetic',
-                             tree_subtype='binary',
-                             coloring = 'lineage',
-                             save_plot=False,
-                             export_filetype='json',
-                             dashplot=False)
-                print('importing trees...')
+                print('Importing trees...')
                 # get infection tree filepath
                 inf_tree_filepath = om.get_tree_file_filepath(experiment_name,
                                       seeded_simulation_output_dir,
@@ -62,8 +44,36 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                                       tree_subtype = 'binary',
                                       file_type='json')
                 # import infection and phylogenetic trees from json
-                inf_tree = jt.import_tree(inf_tree_filepath)
-                phylo_tree = jt.import_tree(phylo_tree_filepath)
+                try:
+                    inf_tree = jt.import_tree(inf_tree_filepath)
+                except:
+                    print('')
+                    print('Infection tree file not found, building it from data...')
+                    # build infection tree
+                    tb.get_tree(experiment_name,
+                                 seeded_simulation_output_dir,
+                                 tree_type='infection',
+                                 tree_subtype='binary',
+                                 coloring = 'lineage',
+                                 save_plot=True,
+                                 export_filetype='json',
+                                 dashplot=False)
+                    inf_tree = jt.import_tree(inf_tree_filepath)
+                try:
+                    phylo_tree = jt.import_tree(phylo_tree_filepath)
+                except:
+                    print('')
+                    print('Phylogenetic tree file not found, building it from data...')
+                    # build phylogenetic tree    
+                    tb.get_tree(experiment_name,
+                                 seeded_simulation_output_dir,
+                                 tree_type='phylogenetic',
+                                 tree_subtype='binary',
+                                 coloring = 'lineage',
+                                 save_plot=True,
+                                 export_filetype='json',
+                                 dashplot=False)
+                    phylo_tree = jt.import_tree(phylo_tree_filepath)
                 print('')
                 print('Converting trees into ete3 format...')
                 # convert anytree trees into ete3 trees
