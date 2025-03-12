@@ -8,7 +8,11 @@ Created on Tue Jan  7 10:00:16 2025
 import os
 import math
 import matplotlib
+import matplotlib.colors as mcolors
 matplotlib.use('Agg')
+import anytree
+from anytree.exporter import DotExporter
+from ete3 import  NodeStyle, TreeStyle, faces, AttrFace
 import matplotlib.pyplot as plt
 import seaborn           as sns
 import pandas            as pd
@@ -948,13 +952,339 @@ def plot_histograms(experiment_name, final_times_data_frames):
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name),
                              'simulations_lenght_histogram.png'))
    
+###############################################################################
+
+def make_lineages_colormap(lineages):
+    
+    def lineage_to_colormap(index, lineages, cmap_name='gist_rainbow'):
+        """Map a lineage to a unique color in a gradient colormap."""
+        cmap = plt.get_cmap(cmap_name)
+        rgb =  cmap(index / lineages)[:3]  # Ensure it returns an RGB tuple without alpha
+        return mcolors.rgb2hex(rgb) #convert to HEX format
+        
+
+    # Sort lineages alphabetically
+    lineages.sort()
+
+    # Generate colors for each string based on their order
+    colors = [lineage_to_colormap(i, len(lineages), cmap_name='gist_rainbow') for i in range(len(lineages))]
+
+    # Create a mapping dictionary for lookup
+    color_mapping = {lineage: color for lineage, color in zip(lineages, colors)}
+    
+    return color_mapping
+
+def get_lineage_color(lineage, lineages):
+    """Return the corresponding color for a given lineage name.
+    lineage: str 
+        string with lineage name
+    color mapping: colormap
+        output of make_lineages_colormap
+    """
+    if lineage not in lineages:
+        raise ValueError(f'Lineage {lineage} not in lineages list! Cannot compute color.')
+        
+    color_mapping = make_lineages_colormap(lineages)
+    return color_mapping.get(lineage)  
+
+def plot_lineages_colors_tab(seeded_simulation_output_dir):
+    # import phylogenetic data
+    phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
+    lineages = phylogenetic_data['lineage_name'].tolist()
+    # Plot lineages colors in a table format with circles
+    fig, ax = plt.subplots(figsize=(5, len(lineages) * 0.5))
+    for i, lineage in enumerate(reversed(lineages)):
+        ax.scatter(0, i, color=get_lineage_color(lineage, lineages), s=200, marker='o')  # Draw a circle
+        ax.text(0.2, i, lineage, va='center', fontsize=12)  # Add text next to it
+    
+    ax.set_xlim(-0.1, 1)
+    ax.set_ylim(-1, len(lineages))
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_frame_on(False)
+    
+    plt.savefig(os.path.join(seeded_simulation_output_dir,
+                             'lineages_colors_tab.png'))
+
+def get_fitness_color(fitness, nodes_data):
+    cmap = matplotlib.pyplot.get_cmap('cool')
+    
+    # Normalize the value
+    norm = matplotlib.colors.Normalize(vmin=nodes_data.fitness.min(), vmax=nodes_data.fitness.max())
+    normalized_value = norm(fitness)
+    hexcolor = matplotlib.colors.rgb2hex(cmap(normalized_value))
+    
+    return hexcolor
+
+def get_state_color(state):
+    if state == 'infected':
+        return 'red'
+    if state == 'recovered':
+        return 'green'
+    if state == 'diagnosed':
+        return 'orange'
+    if state == 'deceased':
+        return 'black'
+    
+def get_node_color(node, 
+                   coloring, 
+                   tree_data, 
+                   lineages): 
+    if coloring == 'state':
+        color = get_state_color(node.state)
+        return color
+    if coloring == 'fitness':
+        color = get_fitness_color(node.fitness, tree_data)
+        return color
+    if coloring == 'lineage':
+        color = get_lineage_color(node.lineage, lineages)
+        return color
+
+def tree_fitness_legend(tree_data, tree_type, tree_plot_filepath): 
+    '''
+    Create legend for fitness color in plotted trees 
+    
+    tree_data: 
+        phylogenetic data OR individuals data
+    tree: str 
+        'infection' or 'phylogenetic' 
+    '''
+    # Create a dummy invisible image.
+    d = np.linspace(0, tree_data.fitness.max(),
+                    int(tree_data.fitness.max())).reshape(1, -1)
+    d = np.vstack((d, d))
+
+    fig, ax = matplotlib.pyplot.subplots(figsize=(6, 2))
+    fig.subplots_adjust(bottom=0.5, top=0.99, left=0.01, right=0.8)
+
+    # Set the extent to cover the range of data
+    extent = [0, tree_data.fitness.max(), 0, 1]
+
+    # The imshow plots the dummy data.
+    ax.imshow(d, aspect='auto',
+                    cmap=matplotlib.pyplot.get_cmap('cool'),
+                    extent=extent)
+
+    # Set the ticks at the beginning and end of the color bar
+    ax.set_xticks([0, tree_data.fitness.max()])
+    # ax.set_xticks(np.arange(0,data.fitness.max(),10))
+    # Set the labels "low" and "high" for the ticks
+    ax.set_xticklabels(["low", "high"])
+    
+    # Remove y-ticks and their labels
+    ax.set_yticklabels([])
+    ax.set_yticks([])
+
+    # Set the title for the plot
+    ax.set_title("Relative Fitness")
+    
+    # Extract filename without extension
+    tree_filename = os.path.splitext(os.path.basename(tree_plot_filepath))[0]
+    
+    # Construct the new legend file path
+    legend_filename = tree_filename + "_legend.png"
+    legend_path = os.path.join(os.path.dirname(tree_plot_filepath), legend_filename)
+    
+    matplotlib.pyplot.savefig(legend_path,
+                  dpi=600, bbox_inches='tight')
+    matplotlib.pyplot.close()
 
 
+def plot_infection_tree(root,
+                           infection_tree_data,
+                           tree_subtype,
+                           coloring,
+                           lineages,
+                           tree_plot_filepath):
+    tree_data = infection_tree_data
+    
+    def nodeattrfunc(node):
+        
+        if node.infection_type == 'normal':
+            return 'color="{}", label="{}",'.format(get_node_color(node, 
+                                                                  coloring, 
+                                                                  tree_data, 
+                                                                  lineages), 
+                                                   node.name)
+        else:
+            return 'color="{}", label="{}",shape=diamond, style=filled'.format(get_node_color(node, 
+                                                                  coloring, 
+                                                                  tree_data, 
+                                                                  lineages), 
+                                                   node.label)
+            
+    if tree_subtype == 'binary':
+        
+        DotExporter(root,
+                    nodeattrfunc=nodeattrfunc,
+                    ).to_picture(tree_plot_filepath)
+     
+    elif tree_subtype == 'compact':
+        
+        def edgeattrfunc(node, child):
+            if node.name == child.name:
+                return 'color=transparent'
+            
+        DotExporter(root,
+                    nodeattrfunc=nodeattrfunc,
+                    edgeattrfunc=edgeattrfunc,
+                    ).to_picture(tree_plot_filepath)
+   
+    # work in progress: infection tree clustering
+    # elif tree_subtype == 'cluster_lin':
+       
+    #     def nodenamefunc(node):
+    #         return node.lineage 
+        
+    #     def nodeattrfunc(node):
+            
+    #         return 'color="{}", label="{}",'.format(get_node_color(node, 
+    #                                                                   coloring, 
+    #                                                                   tree_data, 
+    #                                                                   lineages), 
+    #                                                    node.lineage)
+    #     def edgeattrfunc(node, child):
+    #         if node.lineage == child.lineage:
+    #             return 'color=transparent'
+    #     DotExporter(root,
+    #                 nodeattrfunc=nodeattrfunc,
+    #                 nodenamefunc=nodenamefunc,
+    #                 edgeattrfunc=edgeattrfunc,
+    #                 ).to_picture(tree_plot_filepath) 
+        
+def plot_phylogenetic_tree(root,
+                           phylogenetic_data,
+                           tree_subtype,
+                           coloring,
+                           lineages,
+                           tree_plot_filepath):
+    tree_data = phylogenetic_data
+    
+    # define nodeattrfunc for DotExporter to format the graph picture
+    def nodeattrfunc(node):
+        if coloring == 'state':
+            return 'color="{}", label="{}"'.format('black', 
+                                                   node.name)
+        else:    
+            return 'color="{}", label="{}"'.format(get_node_color(node, 
+                                                                  coloring, 
+                                                                  tree_data, 
+                                                                  lineages), 
+                                                   node.name)
+    
+    # format tree for binary tree
+    if tree_subtype == 'binary':
+    
+        # save tree picture
+        anytree.exporter.DotExporter(root,
+                    nodeattrfunc=nodeattrfunc,
+                    ).to_picture(tree_plot_filepath)
+        
+    # format tree for compact tree
+    elif tree_subtype == 'compact':
+        
+        # define nodeattrfunc for DotExporter for it to not display edges 
+        # that connect collapsed nodes
+        def edgeattrfunc(node, child):
+            if node.name == child.name:
+                return 'color=transparent'
+            
+        # save tree picture
+        anytree.exporter.DotExporter(root,
+                    nodeattrfunc=nodeattrfunc,
+                    edgeattrfunc=edgeattrfunc,
+                    ).to_picture(tree_plot_filepath)
 
+def plot_circular_tree(ete_root,
+             lineages,
+             individuals_lineages,
+             file_path):
+    
+    # function to set layout of branches
+    def color_branches_black(tree):
+        """
+        Make all branch lines black and set style.
+        """
+        for node in tree.traverse():
+            ns = NodeStyle()
+            ns["hz_line_color"] = "black"
+            ns["vt_line_color"] = "black"
+            ns["hz_line_width"] = 1
+            ns["hz_line_type"] = 0
+            ns["vt_line_width"] = 1
+            # Keep node circles invisible
+            ns["size"] = 0
+            node.set_style(ns)
+            
+    # functions to color tree nodes background
+    def blend_with_white(hex_color, factor=0.5):
+        """
+        Blend the input hex color with white by the given factor.
+        
+        Parameters:
+            hex_color (str): Color in the format "#RRGGBB" (e.g., "#ff0000").
+            factor (float): Blend ratio between 0 and 1. 
+                            0 returns the original color, 1 returns white.
+        
+        Returns:
+            str: The blended color as a hex string in "#RRGGBB" format.
+        """
+        # Remove '#' if it exists.
+        hex_color = hex_color.lstrip('#')
+        
+        # Convert hex components to integers.
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        
+        # Blend each component with white (255) using the factor.
+        r_new = int(r + (255 - r) * factor)
+        g_new = int(g + (255 - g) * factor)
+        b_new = int(b + (255 - b) * factor)
+        
+        # Return the new hex color string.
+        return f"#{r_new:02x}{g_new:02x}{b_new:02x}"
+    
+    def get_clade_color(lineage, lineages, factor=0.5):
 
-
-
-
+        lineage_color = get_lineage_color(lineage, lineages)
+        clade_color = blend_with_white(lineage_color, factor)
+        return clade_color
+    
+    def color_clades_by_lineage(tree, lineages, individuals_lineages):
+        """
+        For each node, color the background wedge in circular layout. 
+        If plotting phylo tree, color white lineages not present in infection tree.
+        """
+       
+        for node in tree.traverse():
+            if node.lineage in individuals_lineages:
+                node.img_style["bgcolor"] = get_clade_color(node.lineage, lineages, factor=0.55)
+            else:
+                node.img_style["bgcolor"] = 'white'
+    # tree layout (faces = labels of branches outside tree)
+    def layout(node):
+        if node.is_leaf():
+            N = AttrFace("name", fsize=14)
+            faces.add_face_to_node(N, node, 0, position="aligned")
+    # color tree
+    color_branches_black(ete_root)
+    color_clades_by_lineage(ete_root,lineages, individuals_lineages)
+            
+    # setup circular tree
+    ts = TreeStyle()
+    ts.layout_fn = layout
+    ts.mode = "c"  # circular layout    
+    ts.show_leaf_name = False
+    ts.show_branch_length = False
+    ts.scale = 20
+    ts.complete_branch_lines_when_necessary = True
+    ts.draw_guiding_lines = True
+    ts.root_opening_factor = 1.0  
+    
+    # Render tree
+    ete_root.render(file_path, w=800, h=800, tree_style=ts)
+    print(f"Saved plot: {file_path}.")
 
 
 

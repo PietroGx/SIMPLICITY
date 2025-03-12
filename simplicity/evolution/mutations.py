@@ -392,9 +392,9 @@ def varname(phylodots,variant_name):
     
     return phylodots, variant_name
 
-def update_variants(population, sub_coord_dicmap):
+def update_lineages(population, sub_coord_dicmap):
     '''
-    Update variants genomes in population with the selected mutations from the 
+    Update lineages genomes in population with the selected mutations from the 
     coordinates.
 
     Parameters
@@ -409,10 +409,10 @@ def update_variants(population, sub_coord_dicmap):
         # parent of the phylogenetic tree node
         parent = population.individuals[coord[0]]['IH_virus_names'][coord[1]]
         
-        # add mutation to variant
+        # add mutation to ih_lineages
         population.individuals[coord[0]]['viral_genomes'][coord[1]].append([coord[2],coord[3]])
         
-        # rename the variant after new mutation introduced
+        # rename the lineage after new mutation introduced
         update = varname(population.phylodots,parent)
         population.phylodots = update[0]
         child = update[1]
@@ -425,11 +425,11 @@ def update_variants(population, sub_coord_dicmap):
         # save variant info for phylogenetic tree
         genome = copy.deepcopy(
             population.individuals[coord[0]]['viral_genomes'][coord[1]])
-        population.track_phylogeny.append({'name': child,
+        population.track_phylogeny.append({'lineage_name': child,
                       'parent'         : parent,
                       'individual'     : coord[0],
                       'genome'         : genome,
-                      'time'           : population.time,
+                      'time_emergence' : population.time,
                       'host_type'      : population.individuals[coord[0]]['type'],
                       'fitness'        : dis.hamming(population.individuals[coord[0]]['viral_genomes'][coord[1]])
                     })

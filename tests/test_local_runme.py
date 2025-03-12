@@ -87,6 +87,7 @@ def test_experiment_output(experiment_name):
             check_output_file(seed_directory, 'sequencing_data_regression.csv')
             check_output_file(seed_directory, 'sequencing_data.fasta')
             check_output_file(seed_directory, 'simulation_trajectory.csv')
+            check_output_file(seed_directory, 'R_effective_trajectory.csv')
             # check_output_file(seed_directory, 'simulation_trajectory.png')
     print('')
     print(f'TEST {experiment_name} OUTPUT -- SUCCESS.')
@@ -98,5 +99,5 @@ def test_experiment_local(runner:str, test_number:int):
 ##### </actual test>
 
 if __name__ == "__main__":
-    test_experiment_local('serial',4)
-    # test_experiment_local('multiprocessing',9)
+    # test_experiment_local('serial',12)
+    test_experiment_local('multiprocessing',4)

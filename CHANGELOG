@@ -350,6 +350,15 @@
 	
 	* changed NAMES: molecular_substituion rate (MSR) to nucleotide substitution rate (NSR)
 	* added plot tau3/OSR
+
+2026-12-03 pietro gerletti
+	
+	Version 0.11.0
+	
+	* refactored tree building (a lot of changes here!)
+	* added get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir) to dm
+	* added plot_lineages_colors_tab, get_lineage_color, make_lineages_colormap to plot manager
+	* added circular tree plot with ete3 to plot manager
 	
 	
 	

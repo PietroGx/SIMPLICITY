@@ -17,6 +17,7 @@ import simplicity.phenotype.distance  as dis
 import pandas as pd
 import simplicity.tuning.evolutionary_rate as er
 import glob
+import ast
 
 def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
     """
@@ -103,7 +104,8 @@ def archive_experiment(experiment_name):
     # Delete the original experiment folder
     shutil.rmtree(experiment_folder_path)
     print(f"Deleted the original experiment folder: {experiment_folder_path}")
-    
+
+# -------------------------- read and write simulation output -----------------
 def save_sequencing_dataset(simulation_output, output_path):
     """
     Writes the simulated sequencing data to a FASTA file.
@@ -197,12 +199,29 @@ def save_individuals_data(simulation_output, seeded_simulation_output_dir):
     individuals_data_file_path = os.path.join(seeded_simulation_output_dir,
                                                "individuals_data.csv")
     individuals_data.to_csv(individuals_data_file_path)
+    
+def read_individuals_data(seeded_simulation_output_dir):
+    trajectory_file_path = os.path.join(seeded_simulation_output_dir,
+                                        "individuals_data.csv")
+    df = pd.read_csv(trajectory_file_path, index_col=0)
+    df['IH_virus_names'] = df['IH_virus_names'].apply(ast.literal_eval)
+    df['IH_virus_fitness'] = df['IH_virus_fitness'].apply(ast.literal_eval) 
+    df['viral_genomes'] = df['viral_genomes'].apply(ast.literal_eval) 
+    return df
 
 def save_phylogenetic_data(simulation_output, seeded_simulation_output_dir):
     phylogenetic_data = simulation_output.phylogeny()
     phylogenetic_data_file_path = os.path.join(seeded_simulation_output_dir,
                                                "phylogenetic_data.csv")
     phylogenetic_data.to_csv(phylogenetic_data_file_path)
+    
+def read_phylogenetic_data(seeded_simulation_output_dir):
+    trajectory_file_path = os.path.join(seeded_simulation_output_dir,
+                                        "phylogenetic_data.csv")
+    
+    df = pd.read_csv(trajectory_file_path, index_col=0)
+    df['genome'] = df['genome'].apply(ast.literal_eval)
+    return df
     
 def save_fitness_trajectory(simulation_output, seeded_simulation_output_dir):
     fitness_trajectory = simulation_output.fitness_trajectory_to_df()
@@ -225,8 +244,19 @@ def read_final_time(seeded_simulation_output_dir):
         final_time = float(f.read().strip())
     return final_time
 
+def save_R_effective_trajectory(simulation_output, seeded_simulation_output_dir):
+    R_effective_trajectory = simulation_output.R_effective_trajectory_to_df()
+    R_effective_trajectory_file_path = os.path.join(seeded_simulation_output_dir,
+                                               "R_effective_trajectory.csv")
+    R_effective_trajectory.to_csv(R_effective_trajectory_file_path)
 
-    
+def read_R_effective_trajectory(seeded_simulation_output_dir):
+    trajectory_file_path = os.path.join(seeded_simulation_output_dir,
+                                        "R_effective_trajectory.csv")
+    df = pd.read_csv(trajectory_file_path,index_col=0)
+    return df
+
+# ----------------------- IH lineages data ------------------------------------
 def get_all_individuals_data_for_simulation_output_dir(simulation_output_dir):
     seeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
     all_individuals_data = pd.DataFrame()
@@ -273,7 +303,7 @@ def get_IH_lineages_data_experiment(experiment_name):
         df = pd.concat([df,new_df],axis=0)
     return df
 
-###############################################################################
+# --------------------------- Fitting OSR -------------------------------------
 
 def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
     """
@@ -499,7 +529,92 @@ def read_fit_results_csv(experiment_name, model_type):
     best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
     return best_fit_df
     
+# -------------------------- Tree exporter ------------------------------------
 
+def get_tree_filename(seeded_simulation_output_dir,
+                      tree_type,
+                      tree_subtype,
+                      file_type):
+    seed_folder = os.path.basename(seeded_simulation_output_dir)
+    ext = {'json'  :'.json',
+           'newick': '_newick.txt',
+           'nexus' : '_nexus.txt',
+           'img'   : '.png',
+           }
+    if file_type not in ext.keys():
+        raise ValueError('Invalid file_type selection for tree export.')
+        
+    filename = f'{seed_folder}_{tree_type}_tree_{tree_subtype}{ext[file_type]}'
+    return filename
+
+def get_tree_file_filepath(experiment_name,
+                      seeded_simulation_output_dir,
+                      tree_type,
+                      tree_subtype,
+                      file_type):
+    experiment_tree_simulation_files_dir = dm.get_experiment_tree_simulation_files_dir(
+                                                                    experiment_name,
+                                                                    seeded_simulation_output_dir)
+    tree_filename = get_tree_filename(seeded_simulation_output_dir,
+                          tree_type,
+                          tree_subtype,
+                          file_type)
+    return os.path.join(experiment_tree_simulation_files_dir,tree_filename)
+
+def get_tree_plot_filepath(experiment_name,
+                      seeded_simulation_output_dir,
+                      tree_type,
+                      tree_subtype,
+                      file_type='img'):
+    experiment_tree_simulation_plots_dir = dm.get_experiment_tree_simulation_plots_dir(
+                                                                    experiment_name,
+                                                                    seeded_simulation_output_dir)
+    tree_filename = get_tree_filename(seeded_simulation_output_dir,
+                          tree_type,
+                          tree_subtype,
+                          file_type)
+    return os.path.join(experiment_tree_simulation_plots_dir,tree_filename)
+
+def export_tree(tree,
+                experiment_name,
+                seeded_simulation_output_dir,
+                tree_type,
+                tree_subtype,
+                file_type):
+    """Export an anytree tree to file"""
+    import simplicity.tree.newick as nwk
+    import simplicity.tree.nexus as nx
+    import simplicity.tree.json_tree as jt
+    root = tree[0]
+    
+    if file_type =='json':
+        json_tree_filepath = get_tree_file_filepath(experiment_name,
+                              seeded_simulation_output_dir,
+                              tree_type,
+                              tree_subtype,
+                              file_type)
+        print(f'saving json file: {json_tree_filepath}')
+        jt.write_json_tree_file(root, json_tree_filepath)
+        
+    if file_type =='nexus':
+        nexus_filepath = get_tree_file_filepath(experiment_name,
+                              seeded_simulation_output_dir,
+                              tree_type,
+                              tree_subtype,
+                              file_type)
+        print(f'saving nexus file: {nexus_filepath}')
+        nx.write_nexus_file(tree, nexus_filepath)
+       
+    if file_type == 'newick':
+        newick_filepath = get_tree_file_filepath(experiment_name,
+                              seeded_simulation_output_dir,
+                              tree_type,
+                              tree_subtype,
+                              file_type)
+        print(f'saving newick file: {newick_filepath}')
+        nwk.write_newick_file(root, newick_filepath)
+    print('')
+    print('Tree file exported successfully.')
 
 
 

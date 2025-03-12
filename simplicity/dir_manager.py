@@ -16,7 +16,7 @@ os.makedirs(DEFAULT_DATA_DIR,exist_ok=True)
 _data_dir = DEFAULT_DATA_DIR
 
 # set env variables 
-os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(15)
+os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(10)
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(500)
 
 def set_data_dir(path):
@@ -85,6 +85,12 @@ def get_experiment_plots_dir(experiment_name):
     os.makedirs(experiment_plots_dir, exist_ok=True) 
     return experiment_plots_dir
 
+def get_experiment_tree_dir(experiment_name):
+    experiment_dir = get_experiment_dir(experiment_name)
+    experiment_tree_dir = os.path.join(experiment_dir, '06_Trees')
+    os.makedirs(experiment_tree_dir, exist_ok=True) 
+    return experiment_tree_dir
+
 def get_experiment_fit_result_dir(experiment_name):
     fit_result_dir = os.path.join(get_experiment_dir(experiment_name), 'Fit_results')
     os.makedirs(fit_result_dir, exist_ok=True)
@@ -117,7 +123,39 @@ def get_seeded_simulation_output_dirs(simulation_output_dir):
             seeded_simulation_output_dirs.append(seeded_simulation_output_dir)
     return seeded_simulation_output_dirs
 
+# SSOD = seeded_simulation_output_dir
+def get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir):
+    ''' Get the simulation_output folder_name of Data/experiment/04_Output/simulation_output/seed_nr'''
+    
+    simulation_output_foldername = os.path.basename(os.path.dirname(seeded_simulation_output_dir))
+    return simulation_output_foldername
 
+def get_experiment_tree_simulation_dir(experiment_name,
+                                       seeded_simulation_output_dir):
+    experiment_tree_dir = get_experiment_tree_dir(experiment_name)
+    simulation_output_foldername = get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
+    experiment_tree_simulation_dir = os.path.join(experiment_tree_dir,simulation_output_foldername)
+    os.makedirs(experiment_tree_simulation_dir,exist_ok=True)
+    return experiment_tree_simulation_dir
+
+def get_experiment_tree_simulation_files_dir(experiment_name,
+                                       seeded_simulation_output_dir):
+    experiment_tree_simulation_dir = get_experiment_tree_simulation_dir(experiment_name,
+                                           seeded_simulation_output_dir)
+   
+    experiment_tree_simulation_files_dir = os.path.join(experiment_tree_simulation_dir,
+                                                       'files')
+    os.makedirs(experiment_tree_simulation_files_dir,exist_ok=True)
+    return experiment_tree_simulation_files_dir
+
+def get_experiment_tree_simulation_plots_dir(experiment_name,
+                                       seeded_simulation_output_dir):
+    experiment_tree_simulation_dir = get_experiment_tree_simulation_dir(experiment_name,
+                                           seeded_simulation_output_dir)
+    experiment_tree_simulation_plots_dir = os.path.join(experiment_tree_simulation_dir,
+                                                       'plots')
+    os.makedirs(experiment_tree_simulation_plots_dir,exist_ok=True)
+    return experiment_tree_simulation_plots_dir
     
 
 
