@@ -360,7 +360,14 @@
 	* added plot_lineages_colors_tab, get_lineage_color, make_lineages_colormap to plot manager
 	* added circular tree plot with ete3 to plot manager
 	
+2026-13-03 pietro gerletti
 	
+	Version 0.11.1
+	
+	* added R effective data processing
+	* added R effective plot
+	* polished plot manager and output manager for better readability
+	* added script to plot R effective plots for selected seeds folders
 	
 	
 	

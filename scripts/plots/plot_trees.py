@@ -22,7 +22,6 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
             phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
             # get lineages data
             lineages = phylogenetic_data['lineage_name'].tolist()  
-            print(lineages)
             lineages_number = len(lineages)
             if lineages_number > lineage_threshold:
                 print(ssod)
@@ -55,7 +54,7 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                                  tree_type='infection',
                                  tree_subtype='binary',
                                  coloring = 'lineage',
-                                 save_plot=True,
+                                 save_plot=False,
                                  export_filetype='json',
                                  dashplot=False)
                     inf_tree = jt.import_tree(inf_tree_filepath)
@@ -70,7 +69,7 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                                  tree_type='phylogenetic',
                                  tree_subtype='binary',
                                  coloring = 'lineage',
-                                 save_plot=True,
+                                 save_plot=False,
                                  export_filetype='json',
                                  dashplot=False)
                     phylo_tree = jt.import_tree(phylo_tree_filepath)

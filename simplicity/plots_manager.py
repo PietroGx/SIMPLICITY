@@ -9,7 +9,7 @@ import os
 import math
 import matplotlib
 import matplotlib.colors as mcolors
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import anytree
 from anytree.exporter import DotExporter
 from ete3 import NodeStyle, TreeStyle, faces, AttrFace
@@ -24,7 +24,9 @@ import simplicity.tuning.diagnosis_rate    as dr
 import simplicity.tuning.evolutionary_rate as er
 import simplicity.phenotype.weight         as pheno_weight
 
-
+# -----------------------------------------------------------------------------
+#                        Simplicity simulation plots
+# -----------------------------------------------------------------------------
 
 def plot_fitness(simulation_output):
     """
@@ -91,7 +93,6 @@ def plot_trajectory(seeded_simulation_output_dir):
     plt.tight_layout()
     plt.legend()
     
-
 def plot_lineage_frequency(simulation_output,threshold):
     '''
     Plot relative frequency of lineages during the simulation
@@ -248,11 +249,9 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     plt.savefig(figure_output_path)
     plt.close()
 
-###############################################################################
-###############################################################################
-######################## PLOT TEMPEST REGRESSION ##############################
-###############################################################################
-###############################################################################
+# -----------------------------------------------------------------------------
+#                       Tempest regression and OSR plots
+# -----------------------------------------------------------------------------
 
 def ideal_subplot_grid(num_plots):
     # Calculate the number of columns (the ceiling of the square root of the number of plots)
@@ -657,9 +656,11 @@ def confidence_interval_fit(model_type, fit_result, x):
     upper_curve = er.evaluate_model(model_type, params_upper, x)
     lower_curve = er.evaluate_model(model_type, params_lower, x)
     return x, lower_curve, upper_curve
- 
-###############################################################################
-###############################################################################   
+
+# -----------------------------------------------------------------------------
+#                          Phenotype model plots
+# -----------------------------------------------------------------------------
+
 def plot_w_t(t_max, t_eval): # plot weights of phenotype model
     '''plot the phenotype model weight function for calculating fitness score 
     (distance from weighted consensus sequence)
@@ -686,8 +687,9 @@ def plot_w_t(t_max, t_eval): # plot weights of phenotype model
     plt.legend(loc ='upper left',fontsize=20)
     plt.show()
     
-###############################################################################
-###############################################################################
+# -----------------------------------------------------------------------------
+#                             Intra host model plots
+# -----------------------------------------------------------------------------
 def plot_intra_host(intra_host_model,time,step):
     '''
     Plot intra-host model solutions.
@@ -770,8 +772,9 @@ def plot_comparison_intra_host_models(intra_host_model):
     plt.legend()
     plt.show()    
     
-###############################################################################
-###############################################################################
+# -----------------------------------------------------------------------------
+#                           Runtime analysis plot
+# -----------------------------------------------------------------------------
 
 def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
     ''' Plots infected number vs simulation RUNTIME.
@@ -800,8 +803,9 @@ def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
     plt.savefig('extrande_pop_runtime.png')
     plt.show()
     
-###############################################################################
-###############################################################################
+# -----------------------------------------------------------------------------
+#                          Diagnosis rate plots
+# -----------------------------------------------------------------------------
 
 def plot_effective_theoretical_diagnosis_rate(experiment_name):
     ''' plot scatter and regression line of effective vs theoretical diagnosis rate
@@ -891,8 +895,9 @@ def plot_heatmap_R_diagnosis_rate(experiment_name):
     plt.ylabel('R')
     plt.xlabel('Theoretical (user input) diagnosis rates')
     
-###############################################################################
-###############################################################################
+# -----------------------------------------------------------------------------
+#                      Intra host lineage distribution plot
+# -----------------------------------------------------------------------------
 
 def plot_IH_lineage_distribution(experiment_name):
     fig, axes  = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
@@ -933,8 +938,9 @@ def plot_IH_lineage_distribution(experiment_name):
     fig_path = os.path.join(experiment_output_dir,'IH variability plot.png')
     plt.savefig(fig_path)
 
-###############################################################################
-###############################################################################
+# -----------------------------------------------------------------------------
+#                       Simulations final times histogram
+# -----------------------------------------------------------------------------
 def plot_histograms(experiment_name, final_times_data_frames):
     ''' plot histograms of simulation final times.
     Called from statistics_simulation_lenght.py
@@ -952,7 +958,9 @@ def plot_histograms(experiment_name, final_times_data_frames):
     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name),
                              'simulations_lenght_histogram.png'))
    
-###############################################################################
+# -----------------------------------------------------------------------------
+#                              Lineages colors 
+# -----------------------------------------------------------------------------
 
 def make_lineages_colormap(lineages):
     
@@ -1007,6 +1015,10 @@ def plot_lineages_colors_tab(seeded_simulation_output_dir):
     
     plt.savefig(os.path.join(seeded_simulation_output_dir,
                              'lineages_colors_tab.png'))
+
+# -----------------------------------------------------------------------------
+#                              Trees plots
+# -----------------------------------------------------------------------------
 
 def get_fitness_color(fitness, nodes_data):
     cmap = matplotlib.pyplot.get_cmap('cool')
@@ -1297,8 +1309,123 @@ def plot_circular_tree(ete_root,
     ete_root.render(file_path, w=800, h=800, tree_style=ts)
     print(f"Saved plot: {file_path}.")
 
+# -----------------------------------------------------------------------------
+#                              R effective plots
+# -----------------------------------------------------------------------------
 
+def plot_infections_hist(R_eff_data, lineages, ax, window_size):
+    """
+    Plots a stacked bar histogram of the infections over a timeframe =window_size
+    on the given ax. Used for ax1b plot in plot_R_effective().
+    Note: lineages is the list of all lineages in the simulation and is needed 
+    to assign a unique color to each lineage.
+    """
+    df = R_eff_data
+    # Define bin edges based on window size
+    max_time = df['Time'].max()
+    bin_edges = np.arange(0, max_time + window_size, window_size)
+    # Compute bin centers and adjust bar width 
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    bin_width = (bin_edges[1] - bin_edges[0]) * 0.97
+    # Sort lineages for stacking order
+    lineages_cat = sorted(df['Lineage'].unique())
+    # Initialize the bottom for stacking
+    bottom = np.zeros(len(bin_centers))
+    # Create stacked bars for each lineage
+    for lineage in lineages_cat:
+        subset = df[df['Lineage'] == lineage]
+        counts, _ = np.histogram(subset['Time'], bins=bin_edges)
+        # color barstack
+        color = get_lineage_color(lineage, lineages)
+        ax.bar(
+            bin_centers, 
+            counts, 
+            width=bin_width, 
+            bottom=bottom, 
+            color=color, 
+            alpha=0.7, 
+            label=lineage
+        )
+        bottom += counts  # raise the bottom for the next category
+    # Set y-limits 
+    max_stacked = bottom.max()
+    ax.set_ylim(0, max_stacked * 1.2)
 
+def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size, threshold):
+    ''' Plot average R_effective and lineage (filtered by threshold of occurence) R_effective
+        calculated over a window_size time window.
+    '''
+    print('')
+    print('plot_R_effective: importing files needed for plot')
+    # import R effective data
+    R_eff_data = om.read_R_effective_trajectory(seeded_simulation_output_dir)
+    # import R effective procesed data
+    R_effective_avg_df, R_effective_lineage_df = om.read_R_effective_dfs_csv(experiment_name, 
+                                                                          seeded_simulation_output_dir, 
+                                                                          window_size, threshold)
+    # import phylogenetic_data 
+    phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
+    # get lineages data
+    lineages = phylogenetic_data['name'].tolist() 
+    if 'wt' not in lineages:
+        lineages.insert(0,'wt')
+    # create figure
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+    R_effective_avg_label = f'R_effective calculated over previous {window_size}d'
+    # Subplot 1: Infections count his + avg R effective------------------------
+   
+    # Create secondary y-axis for binned infections counts
+    ax1b = ax1.twinx()
+    ax1.set_zorder(ax1b.get_zorder() + 1)  # Bring ax1 forward
+    ax1.patch.set_visible(False)  # Hide ax1 background to prevent it from covering ax1b
+    # plot infections histogram
+    plot_infections_hist(R_eff_data, lineages, ax1b, window_size)
+    ax1b.set_ylabel('Infections in time window')
+    # Plot avg R effective
+    ax1.plot(R_effective_avg_df['Time'], R_effective_avg_df['R_effective'], 
+             color='black', label=R_effective_avg_label)
+    
+    # # Plot hline
+    # Compute the overall average of the sliding window values
+    # R_avg = R_effective_avg_df["R_effective"].mean()
+    # total_time_range = [0, 365]
+    # ax1.hlines(R_avg, *total_time_range, colors='red', linestyles='dashed', 
+    #            label=f'Overall avg {R_avg}')
+    
+    ax1.set_title('Average R_effective in simulation')
+    ax1.set_xlabel('Time (days)')
+    ax1.set_ylabel(f'Average R_effective over {window_size} d')
+    ax1.legend(loc='upper left')
+    # ax1b.legend(loc='upper right')
+
+    # Subplot 2: lineage R effective ------------------------------------------
+    colors = [get_lineage_color(lineage, lineages) for lineage in R_effective_lineage_df.columns.to_list()]
+    R_effective_lineage_df.plot(ax=ax2, color=colors) 
+    # remove df plot labels from legend
+    for line in ax2.get_lines():
+        line.set_label('_nolegend_')
+        
+    # Plot avg R_effective
+    ax2.plot(R_effective_avg_df['Time'], R_effective_avg_df['R_effective'], 
+             color='black', label=R_effective_avg_label)
+    
+    ax2.set_title(f'Average lineage R_effective (filtered by prevalence >{threshold*100}%)')
+    ax2.set_xlabel('Time (days)')
+    ax2.set_ylabel(f'Average R_effective over {window_size} d')
+    ax2.legend(loc='upper left')
+    # -------------------------------------------------------------------------
+    # set axis limits
+    ax1.set_xlim(0,max(R_effective_avg_df['Time']))
+    ax2.set_xlim(0,max(R_effective_avg_df['Time']))
+    ax1.set_ylim(0,max(R_effective_lineage_df.max())*1.2)
+    ax2.set_ylim(0,max(R_effective_lineage_df.max())*1.2)
+    # save plot
+    plt.tight_layout()
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
+    foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
+    seed = os.path.basename(seeded_simulation_output_dir)
+    plt.savefig(os.path.join(experiment_plots_dir, 
+                             f"{experiment_name}_{foldername}_{seed}_R_effective.png"))
 
 
 

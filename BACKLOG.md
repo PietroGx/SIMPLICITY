@@ -23,4 +23,5 @@ Created on Tue Feb 18 22:01:47 2025
 - [ ] memory and runtime requests to slurm hardcoded into runner
 - [ ] env variables set in dir_manager (should be set somewhere else or rename dir_manager)
 - [ ] tau_2 value hard coded into extrande. it should be passed and read from parameters, as maybe should all the other tau's values 
-- [ ] in tree builder line 43,78: node of tree will only store the first of the IH lineages (for correct tree lineage coloring).  If multiple lineagesare stored, decide on coloring strategy.
+- [ ] in tree builder line 43,78: node of tree will only store the first of the IH lineages (for correct tree lineage coloring).  
+      If multiple lineages are stored, decide on coloring strategy.

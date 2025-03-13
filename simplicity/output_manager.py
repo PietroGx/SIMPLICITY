@@ -18,6 +18,7 @@ import pandas as pd
 import simplicity.tuning.evolutionary_rate as er
 import glob
 import ast
+import numpy as np
 
 def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
     """
@@ -105,7 +106,9 @@ def archive_experiment(experiment_name):
     shutil.rmtree(experiment_folder_path)
     print(f"Deleted the original experiment folder: {experiment_folder_path}")
 
-# -------------------------- read and write simulation output -----------------
+# -----------------------------------------------------------------------------
+#                            read and write simulation output
+# -----------------------------------------------------------------------------
 def save_sequencing_dataset(simulation_output, output_path):
     """
     Writes the simulated sequencing data to a FASTA file.
@@ -256,7 +259,10 @@ def read_R_effective_trajectory(seeded_simulation_output_dir):
     df = pd.read_csv(trajectory_file_path,index_col=0)
     return df
 
-# ----------------------- IH lineages data ------------------------------------
+# -----------------------------------------------------------------------------
+#                              Intra host lineages
+# -----------------------------------------------------------------------------
+
 def get_all_individuals_data_for_simulation_output_dir(simulation_output_dir):
     seeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
     all_individuals_data = pd.DataFrame()
@@ -303,7 +309,9 @@ def get_IH_lineages_data_experiment(experiment_name):
         df = pd.concat([df,new_df],axis=0)
     return df
 
-# --------------------------- Fitting OSR -------------------------------------
+# -----------------------------------------------------------------------------
+#                              OSR fitting
+# ------------------------------------------------------------------------------
 
 def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
     """
@@ -529,7 +537,9 @@ def read_fit_results_csv(experiment_name, model_type):
     best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
     return best_fit_df
     
-# -------------------------- Tree exporter ------------------------------------
+# -----------------------------------------------------------------------------
+#                              Tree exporter
+# -----------------------------------------------------------------------------
 
 def get_tree_filename(seeded_simulation_output_dir,
                       tree_type,
@@ -616,7 +626,129 @@ def export_tree(tree,
     print('')
     print('Tree file exported successfully.')
 
+# -----------------------------------------------------------------------------
+#                                R effective 
+# -----------------------------------------------------------------------------
 
+def get_R_effective_dfs(seeded_simulation_output_dir, window_size, threshold):
+    ''' Process R_effective_trajectory data to get avg R effective and 
+        lineage avg R effective over a time period (window_size) and
+        filtering lineages under a relative occurence threshold.
+    '''
+    # ------------------- define R effective df function ----------------------
+    def get_R_effective_avg_df(R_eff_data, window_size):
+        ''' compute average newly infected individuals in a (sliding) time window
+        '''
+        df = R_eff_data
+        avg_counts = []
+        for t in np.arange(0,max(df["Time"]),1):
+            window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
+            if not window_df.empty:
+                # Count occurrences of each unique value (individual index)
+                individuals_counts = window_df['Individual'].value_counts().values  
+                # Compute mean of individuals_counts
+                avg_count = np.mean(individuals_counts) if len(individuals_counts) > 0 else 0  
+                avg_counts.append((t, avg_count))
+        return pd.DataFrame(avg_counts, columns=["Time", "R_effective"])
+    
+    # ------------- define R effective lineage df function ---------------------
+    def get_R_effective_lineage_df(R_eff_data, window_size):
+        ''' compute average newly infected individuals in a (sliding) time window
+            for each lineage in the df.
+        '''
+        df = R_eff_data
+        avg_counts = []
+        for t in df["Time"]:
+            window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
+            if not window_df.empty:
+                # Count occurrences of each individual per lineage (in time window)
+                individual_counts_per_lineage = window_df.groupby(["Lineage", "Individual"]).size().reset_index(name="count")  
+                # Compute average count of individuals per lineage
+                avg_individual_count_per_lineage = individual_counts_per_lineage.groupby("Lineage")["count"].mean().reset_index()  
+                # Add the time column
+                avg_individual_count_per_lineage.insert(0, "Time", t)  
+                avg_counts.append(avg_individual_count_per_lineage)
+        
+        result_df = pd.concat(avg_counts, ignore_index=True)  # Concatenate all the dataframes
+        result_df.columns = ["Time", 'Lineage', "Lineage R_effective"]
+        return result_df
+    
+    # ----------- define filtering function for R eff lineage data ------------
+    def get_R_eff_lineage_filtered(R_eff_data, threshold):
+        ''' Filter R_effective_trajectory data by occurrence threshold before
+            calculating the lineages avg R effective.
+        '''
+        lin_prevalence_count = R_eff_data['Lineage'].value_counts(normalize=True)
+        lin_to_keep = lin_prevalence_count[lin_prevalence_count >= threshold].index
+        R_eff_data_filtered = R_eff_data[R_eff_data['Lineage'].isin(lin_to_keep)].copy()
+
+        R_effective_lineage_df = get_R_effective_lineage_df(R_eff_data_filtered, window_size)
+        # Pivot the DataFrame for plotting
+        pivot_R_effective_lineage_df = R_effective_lineage_df.pivot(index="Time", columns='Lineage', values="Lineage R_effective")
+        return pivot_R_effective_lineage_df
+    # -------------------------------------------------------------------------
+    # import R effective data
+    R_eff_data = read_R_effective_trajectory(seeded_simulation_output_dir)
+    # R effective avg
+    R_effective_avg_df = get_R_effective_avg_df(R_eff_data, window_size)
+    # R effective lineage
+    R_effective_lineage_df = get_R_eff_lineage_filtered(R_eff_data, threshold)
+    
+    return R_effective_avg_df, R_effective_lineage_df
+
+def get_R_effective_avg_csv_filepath(experiment_name, 
+                                     seeded_simulation_output_dir, 
+                                     window_size, threshold):
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
+    seed = os.path.basename(seeded_simulation_output_dir)
+    filename = f'{experiment_name}_{foldername}_{seed}_R_effective_avg_win_{window_size}_ts_{threshold}.csv'
+    return os.path.join(experiment_output_dir,filename)
+
+def get_R_effective_lineage_csv_filepath(experiment_name, 
+                                         seeded_simulation_output_dir, 
+                                         window_size, threshold):
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
+    seed = os.path.basename(seeded_simulation_output_dir)
+    filename = f'{experiment_name}_{foldername}_{seed}_R_effective_lineage_win_{window_size}_ts_{threshold}.csv'
+    return os.path.join(experiment_output_dir,filename)
+
+def write_R_effective_dfs_csv(experiment_name, seeded_simulation_output_dir, window_size, threshold):
+    print('')
+    print('Writing R_effective csv files...')
+    # get csv filepaths
+    R_effective_avg_csv_filepath = get_R_effective_avg_csv_filepath(experiment_name, 
+                                                                    seeded_simulation_output_dir, 
+                                                                    window_size, threshold)
+    R_effective_lineage_csv_filepath = get_R_effective_lineage_csv_filepath(experiment_name, 
+                                                                    seeded_simulation_output_dir, 
+                                                                    window_size, threshold)
+    # create dataframes if they don't exist already
+    if os.path.exists(R_effective_avg_csv_filepath) and os.path.exists(R_effective_lineage_csv_filepath):
+        print('')
+        print("R_effective csv files already exist, skipping file writing.")
+    else:
+        R_effective_avg_df, R_effective_lineage_df = get_R_effective_dfs(seeded_simulation_output_dir, 
+                                                                         window_size, threshold)
+        # save dataframes
+        R_effective_avg_df.to_csv(R_effective_avg_csv_filepath)
+        R_effective_lineage_df.to_csv(R_effective_lineage_csv_filepath)
+        print('')
+        print(f"R_effective csv files written to {experiment_name} output folder.")
+
+def read_R_effective_dfs_csv(experiment_name, seeded_simulation_output_dir, window_size, threshold):
+    # get csv filepaths
+    R_effective_avg_csv_filepath = get_R_effective_avg_csv_filepath(experiment_name, 
+                                                                    seeded_simulation_output_dir, 
+                                                                    window_size, threshold)
+    R_effective_lineage_csv_filepath = get_R_effective_lineage_csv_filepath(experiment_name, 
+                                                                    seeded_simulation_output_dir, 
+                                                                    window_size, threshold)
+    # read csv into df
+    R_effective_avg_df = pd.read_csv(R_effective_avg_csv_filepath,index_col=0)
+    R_effective_lineage_df = pd.read_csv(R_effective_lineage_csv_filepath,index_col=0)
+    return R_effective_avg_df, R_effective_lineage_df
 
 
 
