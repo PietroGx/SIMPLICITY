@@ -75,7 +75,7 @@ class Simplicity:
     def plot(self):
         assert hasattr(self, "simulation_output"), "simulation has not run yet. Hint: see Simplicity.run"
         # plot simulation trajectory
-        pm.plot_simulation(self.output_directory,threshold=0.05)
+        pm.plot_simulation(self.output_directory,threshold=0.1)
     
     def save_consensus(self):
         assert hasattr(self, "simulation_output"), "simulation has not run yet. Hint: see Simplicity.run"

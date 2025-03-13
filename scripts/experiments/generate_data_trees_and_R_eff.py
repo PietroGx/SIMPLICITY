@@ -23,8 +23,9 @@ experiment_name =  'generate_data_trees_and_R_eff'
 
 def fixture_experiment_settings():
     
-    parameters      = {'infected_individuals_at_start': [1],
-                       'final_time':[365*3]
+    parameters      = {'phenotype_model':['distance from wt', 'immune waning'],
+                       'infected_individuals_at_start': [1]*2,
+                       'final_time':[365*3]*2
                        }
     n_seeds = 100
 

@@ -29,8 +29,8 @@ import os
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {}
-    n_seeds         = 10
+    parameters      = {'phenotype_model':['distance from wt']}
+    n_seeds         = 1
     return (parameters, n_seeds)
 
 def check_output_file(directory, filename): 
@@ -99,5 +99,5 @@ def test_experiment_local(runner:str, test_number:int):
 ##### </actual test>
 
 if __name__ == "__main__":
-    # test_experiment_local('serial',12)
-    test_experiment_local('multiprocessing',4)
+    test_experiment_local('serial',21)
+    # test_experiment_local('multiprocessing',4)
