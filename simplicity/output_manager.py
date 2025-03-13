@@ -191,10 +191,16 @@ def read_simulation_trajectory(seeded_simulation_output_dir):
     return df
     
 def save_lineage_frequency(simulation_output, seeded_simulation_output_dir):
-    df = pd.DataFrame(simulation_output.lineage_frequency)
+    df = simulation_output.lineage_frequency_to_df()
     lineage_frequency_file_path = os.path.join(seeded_simulation_output_dir,
                                                "lineage_frequency.csv")
     df.to_csv(lineage_frequency_file_path, index=False)
+
+def read_lineage_frequency(seeded_simulation_output_dir):
+    lineage_frequency_file_path = os.path.join(seeded_simulation_output_dir,
+                                        "lineage_frequency.csv")
+    df = pd.read_csv(lineage_frequency_file_path)
+    return df
         
 def save_individuals_data(simulation_output, seeded_simulation_output_dir):
     individuals_data = simulation_output.data()

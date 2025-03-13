@@ -9,7 +9,7 @@ import os
 import math
 import matplotlib
 import matplotlib.colors as mcolors
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import anytree
 from anytree.exporter import DotExporter
 from ete3 import NodeStyle, TreeStyle, faces, AttrFace
@@ -93,55 +93,16 @@ def plot_trajectory(seeded_simulation_output_dir):
     plt.tight_layout()
     plt.legend()
     
-def plot_lineage_frequency(simulation_output,threshold):
-    '''
-    Plot relative frequency of lineages during the simulation
-
-    Parameters
-    ----------
-    threshold : float
-        Do not plot variants under this frequency threshold
-    t_final : int
-        X axis upper limit.
-
-    Returns
-    -------
-    None.
-
-    '''
-    df = pd.DataFrame(simulation_output.variant_inf_count)
-    df.fillna(0,inplace=True)
-    df_normalized = df.div(df.sum(axis=0), axis=1)
-    # # remove last value (for correct plot visualization)
-    # df_normalized = df_normalized.drop(df_normalized.columns[-1], axis=1)
-    # set last column values for better visualization
-    df_normalized.iloc[:, -1] = df_normalized.iloc[:, -2]
-    
-    df_cut = df_normalized[df_normalized.gt(threshold).any(axis=1)]
-    df_cut = df_cut.transpose()
-    # ax = df_cut.plot(kind='area', stacked=True, colormap='gist_rainbow')
-    
-    # Reverse the column order
-    df_cut_reversed = df_cut[df_cut.columns[::-1]]
-    
-    # Plot with transparency
-    ax = df_cut_reversed.plot(kind='area', stacked=True, colormap='gist_rainbow', alpha=0.5)
-            
-    ax.set_xlim([0,simulation_output.time])
-    # Set tick label sizes for both axes
-    ax.tick_params(axis='both', labelsize=20)
-    plt.show()
-    
 def plot_simulation(seeded_simulation_output_dir, threshold):
     '''
     joins plots of population trajectory and lineages frequency in a single 
     plot
 
     '''
-    threshold = 0.05 # dont show lineages under this frequency
+    
     from matplotlib.ticker import FuncFormatter
     from matplotlib.gridspec import GridSpec
-    fig = plt.figure(figsize=(12, 8))
+    fig = plt.figure(num=1,figsize=(12, 8))
 
     # Create a gridspec object with 3 rows. 
     # The height_ratios argument determines the relative heights of the plots.
@@ -163,15 +124,14 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
         wspace=0.085
     )
     
-    # system trajectory subplot
-    ######################################################################
+    # -------------------- system trajectory subplot  -------------------------
     trajectory_df = om.read_simulation_trajectory(seeded_simulation_output_dir)
     
     time = trajectory_df['time'].tolist()
     infected   = trajectory_df['infected'].tolist()
             
     ax2.plot(time,infected,
-            label='Infected individuals', 
+            label='Infected individuals at time t', 
             color= 'red')
     
     ax2.set_ylim(0,max(infected)*1.5)
@@ -179,22 +139,20 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     ax2.set_ylabel('N individuals', fontsize=15)
     ax2.legend(loc='upper left', fontsize=15)
     
-    ######################################################################
-    # variants frequency subplot
-    lineage_frequency_file_path = os.path.join(seeded_simulation_output_dir, 'lineage_frequency.csv')
-    lineage_frequency_df = pd.read_csv(lineage_frequency_file_path)
-    
-    lineage_frequency_df.fillna(0,inplace=True)
-    lineage_frequency_df_normalized = lineage_frequency_df.div(lineage_frequency_df.sum(axis=0), axis=1)
-    # set last column values for better visualization
-    lineage_frequency_df_normalized.iloc[:, -1] = lineage_frequency_df_normalized.iloc[:, -2]
-    
-    df_cut = lineage_frequency_df_normalized[lineage_frequency_df_normalized.gt(threshold).any(axis=1)]
-    df_cut = df_cut.transpose()   
-    # Reverse the column order
-    df_cut_reversed = df_cut[df_cut.columns[::-1]]
-    # Plot with transparency
-    df_cut_reversed.plot(kind='area', stacked=True, colormap='gist_rainbow',
+    # ----------------- variants frequency subplot ----------------------------
+    lineage_frequency_df = om.read_lineage_frequency(seeded_simulation_output_dir)
+    # import phylogenetic_data 
+    phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
+    # get lineages data
+    lineages = phylogenetic_data['lineage_name'].tolist() 
+    # save lineages colors tab
+    plot_lineages_colors_tab(seeded_simulation_output_dir)
+   
+    pivot_df = lineage_frequency_df.pivot(index='Time', columns='Lineage_name', values='Frequency')
+    # Filter columns that reach at least the threshold at some point.
+    filtered_df = pivot_df.loc[:, pivot_df.max() >= threshold]
+    colors = [get_lineage_color(lineage, lineages) for lineage in filtered_df.columns]
+    filtered_df.plot(kind='area', stacked=False, color=colors,
                          alpha=0.5, ax=ax1)
     time_file_path = os.path.join(seeded_simulation_output_dir, 'final_time.csv')
     time_final = pd.read_csv(time_file_path, header=None).iloc[0, 0]
@@ -210,8 +168,7 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     # ax2.legend(loc='upper left', bbox_to_anchor=(1, 2.95))
     ax1.legend().remove()
     
-    #######################################################################
-    # fitness subplot
+    # ------------------------ fitness subplot --------------------------------
     fitness_trajectory_file_path = os.path.join(seeded_simulation_output_dir, 'fitness_trajectory.csv')
     fitness_trajectory_df = pd.read_csv(fitness_trajectory_file_path)
     
@@ -226,14 +183,14 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     ax3.fill_between(times, 
                      [m - s for m, s in zip(means, stds)], 
                      [m + s for m, s in zip(means, stds)], 
-                     color='#2ca02c', alpha=0.3, label='Std')
+                     color='#2ca02c', alpha=0.3, label='Fitness score std')
 
     # Add labels and title
     # ax3.xlabel('Time')
     ax3.tick_params(axis='both', labelsize=15)
     ax3.set_xlabel('Time - days', fontsize=15)
-    ax3.set_xticks(np.arange(0,time_final,10))
-    ax3.set_xticklabels(np.arange(0,time_final,10).astype(int))
+    ax3.set_xticks(np.arange(0,time_final,50))
+    ax3.set_xticklabels(np.arange(0,time_final,50).astype(int))
     ax3.set_ylabel('Fitness score',fontsize=15)
     ax3.set_xlim(left=0)
     ax3.set_ylim(bottom=0)
@@ -241,7 +198,6 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     # Add legend
     ax3.legend(loc='upper left', fontsize=15)
     
-    #######################################################################
     # Align the y-axis labels
     fig.align_ylabels([ax2, ax3])
     plt.tight_layout()
@@ -1002,7 +958,7 @@ def plot_lineages_colors_tab(seeded_simulation_output_dir):
     phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
     lineages = phylogenetic_data['lineage_name'].tolist()
     # Plot lineages colors in a table format with circles
-    fig, ax = plt.subplots(figsize=(5, len(lineages) * 0.5))
+    fig, ax = plt.subplots(num=2,figsize=(5, len(lineages) * 0.5))
     for i, lineage in enumerate(reversed(lineages)):
         ax.scatter(0, i, color=get_lineage_color(lineage, lineages), s=200, marker='o')  # Draw a circle
         ax.text(0.2, i, lineage, va='center', fontsize=12)  # Add text next to it
@@ -1015,6 +971,7 @@ def plot_lineages_colors_tab(seeded_simulation_output_dir):
     
     plt.savefig(os.path.join(seeded_simulation_output_dir,
                              'lineages_colors_tab.png'))
+    plt.close()
 
 # -----------------------------------------------------------------------------
 #                              Trees plots

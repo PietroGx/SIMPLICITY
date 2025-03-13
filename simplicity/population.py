@@ -70,16 +70,15 @@ class Population:
                                  'host_type'      : 'normal',
                                  'fitness'        : 0
                                  }]
-        self.phylodots = []
-        self.lineage_frequency = {} # count lineages in the population
-        
+        self.phylodots = []         # needed to name lineages
+        self.lineage_frequency = [] # count lineages in the population
         self.lineages = {'wt': []} # dic of lineages sequences
         
         self.consensus_snapshot = [[[],1,0]] # [sequence, lineage_frequency, w_t(t_sim)]
         self.consensus_sequences_t = [[[],0]] # list to store consensus everytime is calculated in a simulation [consensus,t]
         
         # system trajectory
-        self.time         = 0 # time
+        self.time         = 0 
         self.trajectory = [[self.time,
                            self.infected,
                            self.diagnosed,
@@ -169,58 +168,60 @@ class Population:
             dic[i]['IH_virus_names'] = ['wt']
             
             self.infected_i.append(self.susceptibles_i.pop(self.susceptibles_i.index(i)))
-        # update variant-individuals track
-        self.lineage_frequency[0] = {'wt':I_0}
+        # update lineage_frequency
+        self.lineage_frequency.append({'Lineage_name':'wt',
+                                               'Time':0,
+                                               'Frequency':1})
         
         # return dictionary containing all individuals data (self.individuals)
         return dic
     
-    def count_variants_t(self,t):
-        '''
-        Count how many individuals are infected by each variant at time
-        t in the population
+    # def update_lineage_frequency_t(self,t):
+    #     '''
+    #     Count how many individuals are infected by each lineage at time
+    #     t in the population
 
-        Parameters
-        ----------
-        t : float
-            time.
-        '''
-        # store variants here
-        # {'variant name': number of infected patients}
-        count_t = {}
+    #     Parameters
+    #     ----------
+    #     t : float
+    #         time.
+    #     '''
+    #     # store variants here
+    #     # {'variant name': number of infected patients}
+    #     count_t = {}
         
         
-        # once every 5 days save snapshot of lineages for consensus
-        if np.floor(t%5) == 0:
+    #     # once every 5 days save snapshot of lineages for consensus
+    #     if np.floor(t%5) == 0:
             
-            # Loop through the infected individuals and get a list of IH_virus names
-            for key in self.infected_i:
-                string_list = list(set(self.individuals[key]['IH_virus_names']))
+    #         # Loop through the infected individuals and get a list of IH_virus names
+    #         for key in self.infected_i:
+    #             string_list = list(set(self.individuals[key]['IH_virus_names']))
             
-                # Count each lineage and update count_t
-                for s in string_list:
-                    count_t[s] = count_t.get(s, 0) + 1
+    #             # Count each lineage and update count_t
+    #             for s in string_list:
+    #                 count_t[s] = count_t.get(s, 0) + 1
                     
             
-            for key in count_t:
+    #         for key in count_t:
                 
-                self.consensus_snapshot.append([self.lineages[key],count_t[key
-                                                   ]/sum(count_t.values()),t])
+    #             self.consensus_snapshot.append([self.lineages[key],count_t[key
+    #                                                ]/sum(count_t.values()),t])
             
-            self.lineage_frequency[t] = count_t
+    #         self.lineage_frequency[t] = count_t
             
-        # else just count lineages frequency    
-        else: 
-            # Loop through the infected individuals and get a list of IH_virus names
-            for key in self.infected_i:
-                string_list = list(set(self.individuals[key]['IH_virus_names']))
+    #     # else just count lineages frequency    
+    #     else: 
+    #         # Loop through the infected individuals and get a list of IH_virus names
+    #         for key in self.infected_i:
+    #             string_list = list(set(self.individuals[key]['IH_virus_names']))
             
-                # Count each lineage and update count_t
-                for s in string_list:
-                    count_t[s] = count_t.get(s, 0) + 1
+    #             # Count each lineage and update count_t
+    #             for s in string_list:
+    #                 count_t[s] = count_t.get(s, 0) + 1
             
-            self.lineage_frequency[t] = count_t
-        
+    #         self.lineage_frequency[t] = count_t
+    
     def diagnosis(self, seq_rate=0):
         '''
         Select an infected (and detectable) individual at random and tags it
@@ -501,7 +502,7 @@ class Population:
         else: 
             pass
             
-    def mutate(self, e, dt, phenotype_model, consensus):
+    def mutate(self, e, dt, phenotype_model, **consensus):
         '''
         Mutation model, mutates the viruses in the population.
 
@@ -548,12 +549,16 @@ class Population:
             individuals_to_update = pheno.get_individuals_to_update(subst_coord)
             # print('Individuals to be updated: ', individuals_to_update)
             update_fitness = pheno.update_fitness_factory(phenotype_model)
-            self.individuals = update_fitness(self.individuals, 
-                                              individuals_to_update, consensus)
+            if consensus:
+                self.individuals = update_fitness(self.individuals, 
+                                                  individuals_to_update, consensus)
+            else:
+                self.individuals = update_fitness(self.individuals, 
+                                                  individuals_to_update)
             # print('Mutation #', self.mutationsnumber)
             # print('')
         # else skip other steps
-        
+    
     def calculate_mean_fitness(self):
         value = []
         
@@ -565,7 +570,41 @@ class Population:
     # store avg fitness
     def track_fitness(self):
         self.fitness_trajectory.append([self.time,self.calculate_mean_fitness()])
+    
+    def update_lineage_frequency_t(self, t):
+        '''
+        Count how many individuals are infected by each lineage at time
+        t in the population and store the following information:
+        time, lineage_name, frequency.
+        '''
+        # store lineages here: {'lineage name': number of infected individuals}
+        count_t = {}
         
+        # Loop through the infected individuals and get a list of unique IH_virus names (lineage)
+        for key in self.infected_i:
+            unique_lineages = set(self.individuals[key]['IH_virus_names'])
+            for s in unique_lineages:
+                count_t[s] = count_t.get(s, 0) + 1
+    
+        # Calculate the total count for normalization
+        total = sum(count_t.values())
+        
+        # Store: [time, lineage_name, frequency]
+        for lineage_name in count_t:
+            # Compute frequency as the relative count
+            frequency = count_t[lineage_name] / total
+            # store frequency data
+            dic = {'Lineage_name':lineage_name,
+                   'Time':t,
+                   'Frequency':frequency
+                }
+            self.lineage_frequency.append(dic)
+        
+        for lineage_name in count_t:
+            frequency = count_t[lineage_name] / total
+            self.consensus_snapshot.append([self.lineages[lineage_name],
+                                                frequency,t])
+    
     def data(self):
         # return population dictionary as data frame
         df = pd.DataFrame(self.individuals).transpose()
@@ -576,6 +615,10 @@ class Population:
         # return phylogeny dictionary as data frame
         return pd.DataFrame(self.track_phylogeny)
     
+    def lineage_frequency_to_df(self):
+        # return lineage_frequency as data frame
+        return pd.DataFrame(self.lineage_frequency)
+        
     def fitness_trajectory_to_df(self):
         times = [coord[0] for coord in self.fitness_trajectory]
         means = [coord[1][0] for coord in self.fitness_trajectory]

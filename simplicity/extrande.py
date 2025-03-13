@@ -109,8 +109,6 @@ def extrande_factory(phenotype_model, parameters,
             # compute delta_t from tau_1 (equivalent of exp distributed delta_t)
             delta_t = -1/B * np.log(tau_1)
             
-            
-                
             # time leap
             #######################################################################
             if delta_t > L: 
@@ -137,9 +135,18 @@ def extrande_factory(phenotype_model, parameters,
                 population.update_inf_det()
                 ###############################################################
                 
+                # update fitness values of all individuals in the simulation
+                individuals_to_update = population.infected_i
+                update_all_fitness = pheno.update_fitness_factory(phenotype_model)
+                population.individuals = update_all_fitness(
+                    population.individuals, individuals_to_update)
+                
+                # store mean fitness for plot
+                population.track_fitness()
+                
                 # mutations happen
                 delta_t_y = delta_t/365.25 # delta t in years
-                population.mutate(e, delta_t_y, phenotype_model,'')
+                population.mutate(e, delta_t_y, phenotype_model)
                 
                 # reaction 1 - infection
                 a1 = b*population.infectious_normal
@@ -174,7 +181,7 @@ def extrande_factory(phenotype_model, parameters,
                     # update count of lineages frequency
                     if math.floor(t) > t_day: # only count once per day
                         t_day += 1    
-                        population.count_variants_t(t)
+                        population.update_lineage_frequency_t(t)
                 
                 ##  break if conditions are met
                 if population.infected == 0:
@@ -343,7 +350,7 @@ def extrande_factory(phenotype_model, parameters,
                 # update count of lineages frequency
                 if math.floor(t) > t_day: # only count once per day
                     t_day += 1    
-                    population.count_variants_t(t)
+                    population.update_lineage_frequency_t(t)
             
                 ##  break if conditions are met
                 if population.infected == 0:

@@ -368,6 +368,15 @@
 	* added R effective plot
 	* polished plot manager and output manager for better readability
 	* added script to plot R effective plots for selected seeds folders
+
+2026-13-03 pietro gerletti
+	
+	Version 0.12.0
+	
+	* updated extrande, population, phenotype.update to fix fitness score tracking
+	* updated simulation trajectory plot
+	* added lineage colors to simulation trajectory plot
+	* changed how lineage_frequency is stored and saved
 	
 	
 	
