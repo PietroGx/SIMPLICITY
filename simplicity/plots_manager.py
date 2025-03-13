@@ -1407,7 +1407,7 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
         
     # Plot avg R_effective
     ax2.plot(R_effective_avg_df['Time'], R_effective_avg_df['R_effective'], 
-             color='black', label=R_effective_avg_label)
+             color='black', label=R_effective_avg_label, zorder=-1)
     
     ax2.set_title(f'Average lineage R_effective (filtered by prevalence >{threshold*100}%)')
     ax2.set_xlabel('Time (days)')
@@ -1417,7 +1417,7 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     # set axis limits
     ax1.set_xlim(0,max(R_effective_avg_df['Time']))
     ax2.set_xlim(0,max(R_effective_avg_df['Time']))
-    ax1.set_ylim(0,max(R_effective_lineage_df.max())*1.2)
+    # ax1.set_ylim(0,max(R_effective_lineage_df.max())*1.2)
     ax2.set_ylim(0,max(R_effective_lineage_df.max())*1.2)
     # save plot
     plt.tight_layout()
