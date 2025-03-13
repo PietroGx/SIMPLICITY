@@ -502,7 +502,7 @@ class Population:
         else: 
             pass
             
-    def mutate(self, e, dt, phenotype_model, **consensus):
+    def mutate(self, e, dt, phenotype_model, *args):
         '''
         Mutation model, mutates the viruses in the population.
 
@@ -514,6 +514,7 @@ class Population:
             delta t - extrande time step (in years)
 
         '''
+        
         # select number of substitutions and positions in pooled genome
         select_pos = evo.select_positions(self, self.L_var, self.rng5, e, dt) 
         
@@ -549,7 +550,8 @@ class Population:
             individuals_to_update = pheno.get_individuals_to_update(subst_coord)
             # print('Individuals to be updated: ', individuals_to_update)
             update_fitness = pheno.update_fitness_factory(phenotype_model)
-            if consensus:
+            if args:
+                consensus = args[0]
                 self.individuals = update_fitness(self.individuals, 
                                                   individuals_to_update, consensus)
             else:
