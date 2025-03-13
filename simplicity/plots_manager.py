@@ -1366,7 +1366,7 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     # import phylogenetic_data 
     phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
     # get lineages data
-    lineages = phylogenetic_data['name'].tolist() 
+    lineages = phylogenetic_data['lineage_name'].tolist() 
     if 'wt' not in lineages:
         lineages.insert(0,'wt')
     # create figure
