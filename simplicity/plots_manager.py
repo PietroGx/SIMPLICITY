@@ -9,7 +9,7 @@ import os
 import math
 import matplotlib
 import matplotlib.colors as mcolors
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import anytree
 from anytree.exporter import DotExporter
 from ete3 import NodeStyle, TreeStyle, faces, AttrFace
