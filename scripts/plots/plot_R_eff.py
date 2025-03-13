@@ -31,7 +31,7 @@ def main():
     parser = argparse.ArgumentParser(description="Plot")
     parser.add_argument('experiment_name', type=str, help="experiment name")
     parser.add_argument('window_size', type=int, help="time window_size")
-    parser.add_argument('lin_threshold', type=str, help="lineage occurence threshold")
+    parser.add_argument('lin_threshold', type=float, help="lineage occurence threshold")
     parser.add_argument('selected_seeds', nargs='+', type=int, help="List of selected seeds (plot relative simulation)")
     args = parser.parse_args()
     
