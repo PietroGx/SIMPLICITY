@@ -127,7 +127,6 @@ def get_seeded_simulation_output_dirs(simulation_output_dir):
 # SSOD = seeded_simulation_output_dir
 def get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir):
     ''' Get the simulation_output folder_name of Data/experiment/04_Output/simulation_output/seed_nr'''
-    
     simulation_output_foldername = os.path.basename(os.path.dirname(seeded_simulation_output_dir))
     return simulation_output_foldername
 

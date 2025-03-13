@@ -19,7 +19,7 @@ The set of all simulations is what we call an experiment.
 from experiment_script_runner import run_experiment_script
 import argparse
 
-experiment_name =  'generate_data_tree_comparison'
+experiment_name =  'generate_data_trees_and_R_eff'
 
 def fixture_experiment_settings():
     
