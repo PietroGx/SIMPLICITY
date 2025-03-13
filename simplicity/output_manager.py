@@ -637,37 +637,37 @@ def get_R_effective_dfs(seeded_simulation_output_dir, window_size, threshold):
     '''
     # ------------------- define R effective df function ----------------------
     def get_R_effective_avg_df(R_eff_data, window_size):
-        ''' compute average newly infected individuals in a (sliding) time window
+        ''' compute average new infections by parent (individual) in a (sliding) time window
         '''
         df = R_eff_data
         avg_counts = []
         for t in np.arange(0,max(df["Time"]),1):
             window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
             if not window_df.empty:
-                # Count occurrences of each unique value (individual index)
-                individuals_counts = window_df['Individual'].value_counts().values  
-                # Compute mean of individuals_counts
-                avg_count = np.mean(individuals_counts) if len(individuals_counts) > 0 else 0  
+                # Count occurrences of each unique value (parent index)
+                parents_counts = window_df['Parent'].value_counts().values  
+                # Compute mean of Parents_counts
+                avg_count = np.mean(parents_counts) if len(parents_counts) > 0 else 0  
                 avg_counts.append((t, avg_count))
         return pd.DataFrame(avg_counts, columns=["Time", "R_effective"])
     
     # ------------- define R effective lineage df function ---------------------
     def get_R_effective_lineage_df(R_eff_data, window_size):
-        ''' compute average newly infected individuals in a (sliding) time window
-            for each lineage in the df.
+        ''' compute average new infections by parent in a (sliding) time window
+            for each lineage in the df (each parent transmits a lineage)
         '''
         df = R_eff_data
         avg_counts = []
         for t in df["Time"]:
             window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
             if not window_df.empty:
-                # Count occurrences of each individual per lineage (in time window)
-                individual_counts_per_lineage = window_df.groupby(["Lineage", "Individual"]).size().reset_index(name="count")  
-                # Compute average count of individuals per lineage
-                avg_individual_count_per_lineage = individual_counts_per_lineage.groupby("Lineage")["count"].mean().reset_index()  
+                # Count occurrences of each Parent per lineage (in time window)
+                parent_counts_per_lineage = window_df.groupby(["Lineage", "Parent"]).size().reset_index(name="count")  
+                # Compute average count of Parents per lineage
+                avg_parent_count_per_lineage = parent_counts_per_lineage.groupby("Lineage")["count"].mean().reset_index()  
                 # Add the time column
-                avg_individual_count_per_lineage.insert(0, "Time", t)  
-                avg_counts.append(avg_individual_count_per_lineage)
+                avg_parent_count_per_lineage.insert(0, "Time", t)  
+                avg_counts.append(avg_parent_count_per_lineage)
         
         result_df = pd.concat(avg_counts, ignore_index=True)  # Concatenate all the dataframes
         result_df.columns = ["Time", 'Lineage', "Lineage R_effective"]
