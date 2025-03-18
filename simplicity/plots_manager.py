@@ -1376,7 +1376,7 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     ax1.set_xlim(0,max(R_effective_avg_df['Time']))
     ax2.set_xlim(0,max(R_effective_avg_df['Time']))
     # ax1.set_ylim(0,max(R_effective_lineage_df.max())*1.2)
-    ax2.set_ylim(min(R_effective_lineage_df),max(R_effective_lineage_df.max())*1.2)
+    ax2.set_ylim(min(R_effective_lineage_df.min()),max(R_effective_lineage_df.max())*1.2)
     # save plot
     plt.tight_layout()
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
