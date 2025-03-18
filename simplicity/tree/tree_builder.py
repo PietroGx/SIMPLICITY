@@ -110,20 +110,17 @@ def phylogenetic_tree(seeded_simulation_output_dir):
     tree = []
     # tree root
     root = anytree.Node(
-                name           = str(first_row.lineage_name), 
+                name           = str(first_row.Lineage_name), 
                 parent         = None,
-                lineage        = str(first_row.lineage_name),
-                label          = str(first_row.lineage_name),
+                lineage        = str(first_row.Lineage_name),
+                label          = str(first_row.Lineage_name),
                 distance       = 0,   
                 leaf           = True,
                 
                 time_emergence = 0,
                 
-                sequence       = None,
-                individual     = None,
-                
-                host_type      = first_row.host_type,
-                fitness        = first_row.fitness)
+                host_type      = first_row.Host_type,
+                )
     
     tree.append(root)
     phylogenetic_data.drop(phylogenetic_data.index[0], inplace=True)
@@ -131,26 +128,22 @@ def phylogenetic_tree(seeded_simulation_output_dir):
     internal_node_names = []
     for row in phylogenetic_data.itertuples():
             
-            parent_node = [node for node in tree if node.label == row.parent
+            parent_node = [node for node in tree if node.label == row.Lineage_parent
                            and node.leaf == True][0]
            
-            time_distance = row.time_emergence - parent_node.time_emergence
+            time_distance = row.Time_emergence - parent_node.time_emergence
             # add new variant
             tree.append(anytree.Node(
-                        name           = str(row.lineage_name), 
+                        name           = row.Lineage_name, 
                         parent         = parent_node,
-                        lineage        = str(row.lineage_name),
-                        label          = str(row.lineage_name),
+                        lineage        = row.Lineage_name,
+                        label          = row.Lineage_name,
                         distance       = time_distance,   
                         leaf           = True,
                         
-                        time_emergence = row.time_emergence,
+                        time_emergence = row.Time_emergence,
                         
-                        sequence       = None,
-                        individual     = row.individual,
-                        
-                        host_type      = row.host_type,
-                        fitness        = row.fitness
+                        host_type      = row.Host_type
                          ))
             
             # extend parent node
@@ -163,19 +156,14 @@ def phylogenetic_tree(seeded_simulation_output_dir):
                         distance       = time_distance,   
                         leaf           = True,
                         
-                        time_emergence = row.time_emergence,
+                        time_emergence = row.Time_emergence,
                         
-                        genome         = parent_node.genome,
-                        sequence       = None,
-                        individual     = parent_node.individual,
-                        
-                        host_type      = parent_node.host_type,
-                        fitness        = parent_node.fitness
+                        host_type      = parent_node.host_type
                         ))
             
             # update parent node
             parent_node.leaf=False # labels internal nodes (inactive)
-            internal_node_name = parent_node.name+ f'_time:{row.time_emergence:.2f}'
+            internal_node_name = parent_node.name+ f'_time:{row.Time_emergence:.2f}'
             parent_node.name=internal_node_name
             if internal_node_name in internal_node_names:
                 internal_node_name += '_' 
