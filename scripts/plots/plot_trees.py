@@ -13,16 +13,14 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
     for simulation_output_dir in dm.get_simulation_output_dirs(experiment_name):
         SSODs += (dm.get_seeded_simulation_output_dirs(simulation_output_dir))
     
-    
     for ssod in SSODs:
         seeded_simulation_output_dir = ssod
         final_time = om.read_final_time(seeded_simulation_output_dir)
         if final_time > time_threshold:
             # import phylogenetic_data 
             phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
-            # get lineages data
-            lineages = phylogenetic_data['Lineage_name'].tolist()  
-            lineages_number = len(lineages)
+            lineages_number = len(phylogenetic_data['Lineage_name'])
+            colormap_df = pm.make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow')
             if lineages_number > lineage_threshold:
                 print(ssod)
                 print(f'Lineage threshold: {lineages_number}')
@@ -91,12 +89,12 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
                 print('Plotting circular trees...')
                 pm.plot_circular_tree(ete_inf_tree,
                                       'infection',
-                                      lineages,
+                                      colormap_df,
                                       individuals_lineages,
                                       ete_inf_tree_filepath)
                 pm.plot_circular_tree(ete_phylo_tree,
                                       'phylogenetic',
-                                      lineages,
+                                      colormap_df,
                                       individuals_lineages,
                                       ete_phylo_tree_filepath)
 
