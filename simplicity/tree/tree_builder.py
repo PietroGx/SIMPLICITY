@@ -35,13 +35,12 @@ def infection_tree(seeded_simulation_output_dir):
                          t_infection      = row.t_infection,
                          t_final          = row.t_final,
                          
-                         viral_genomes    = row.viral_genomes,
                          sequence         = '',
                          
                          state            = row.state,
                          infection_type   = row.type,
                          fitness          = row.fitness,
-                         lineage          = row.IH_virus_names[0]
+                         lineage          = row.IH_lineages[0]
                          
                          ))
         data = data.drop(row.Index)
@@ -72,12 +71,10 @@ def infection_tree(seeded_simulation_output_dir):
                         t_infection    = row.t_infection,
                         t_final        = row.t_final,
                         
-                        viral_genomes  = row.viral_genomes,
-                        
                         state            = row.state,
                         infection_type   = row.type,
                         fitness          = row.fitness,
-                        lineage          = row.IH_virus_names[0]
+                        lineage          = row.IH_lineages[0]
                          ))
             
             # extend parent node
@@ -90,8 +87,6 @@ def infection_tree(seeded_simulation_output_dir):
                         
                         t_infection    = parent_node.t_infection,
                         t_final        = parent_node.t_final,
-                        
-                        viral_genomes  = parent_node.viral_genomes,
                         
                         state            = parent_node.state,
                         infection_type   = parent_node.infection_type,
@@ -124,7 +119,6 @@ def phylogenetic_tree(seeded_simulation_output_dir):
                 
                 time_emergence = 0,
                 
-                genome         = first_row.genome,
                 sequence       = None,
                 individual     = None,
                 
@@ -152,7 +146,6 @@ def phylogenetic_tree(seeded_simulation_output_dir):
                         
                         time_emergence = row.time_emergence,
                         
-                        genome         = row.genome,
                         sequence       = None,
                         individual     = row.individual,
                         
@@ -244,9 +237,9 @@ def get_tree(experiment_name,
         elif coloring == 'lineage':
             print('Cannot color by lineage, no evolution happened!')
             return
-    # get lineages data
-    lineages = phylogenetic_data['lineage_name'].tolist()
-    
+    # get lineages colormap
+    colormap_df = pm.make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow')
+   
     # infection tree
     if tree_type == 'infection':
         # infection tree
@@ -269,7 +262,7 @@ def get_tree(experiment_name,
                                        infection_tree_data,
                                        tree_subtype,
                                        coloring,
-                                       lineages,
+                                       colormap_df,
                                        tree_plot_filepath)
             
             if coloring == 'fitness':
@@ -295,7 +288,7 @@ def get_tree(experiment_name,
                                        phylogenetic_data,
                                        tree_subtype,
                                        coloring,
-                                       lineages,
+                                       colormap_df,
                                        tree_plot_filepath)
             if coloring == 'fitness':
                 # plot and save legend for fitness color scale

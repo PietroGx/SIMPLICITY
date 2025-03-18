@@ -4,7 +4,7 @@ Created on Tue Jun  6 13:13:14 2023
 @author: pietro
 """
 import simplicity.host                as h
-import simplicity.evolution.mutations as evo
+import simplicity.evolution.mutations as evo_model
 import simplicity.evolution.reference as ref
 import simplicity.phenotype.update    as pheno
 from   simplicity.random          import randomgen
@@ -24,7 +24,7 @@ class Population:
         
         # counter for inf reactions
         self.count_infections = 0
-        self.count_infections_from_long_shedders = 0
+        # self.count_infections_from_long_shedders = 0
         
         # random number generator
         self.rng3 = rng3
@@ -32,7 +32,7 @@ class Population:
         self.rng5 = rng5
         self.rng6 = rng6 # for synthetic sequencing data
         
-        # compartments and population groups
+        # compartments and population groups ---------------------------------
         self.susceptibles = size-I_0 # number of susceptible individuals
         self.infected     = I_0 # compartment - number of infected individuals
         self.diagnosed    = 0   # compartment - number of diagnosed individuals
@@ -48,36 +48,34 @@ class Population:
         self.infectious_normal   = 0        # number of infectious individuals
         self.detectables  = 0        # number of detectable individuals
         
-        # set attributes for evolutionary model
+        # set attributes for evolutionary model ===============================
         
         self.ref_genome      = ref.get_reference()  # sequence of reference genome
-        self.L_var           = len(self.ref_genome) # lenght of reference genome
-        self.M               = evo.sub_matrix()     # substitution matrix
+        self.L_lin           = len(self.ref_genome) # lenght of reference genome
+        self.sub_matrix      = evo_model.sub_matrix()     # substitution matrix
         
         self.active_variants_n = I_0                # number of IH viruses in the 
                                                     # infected population
         
-        self.mutationsnumber = 0                    # counter of how many 
-                                                    # substitutions happen in  
-                                                    # one simulation run
-        
-        # track data for building the phylogenetic tree
-        self.track_phylogeny = [{'lineage_name'   : 'wt',
-                                 'parent'         : None,
-                                 'individual'     : None,
-                                 'genome'         : [],
-                                 'time_emergence' : 0,
-                                 'host_type'      : 'normal',
-                                 'fitness'        : 0
+        # Phylogenetic tree data ----------------------------------------------
+        self.phylogenetic_data = [{  'Time_emergence'  : 0,
+                                     'Lineage_name'    : 'wt',
+                                     'Lineage_parent'  : None,
+                                     'Genome'          : [],
+                                     'Host_type'       : 'normal'
+                                     
                                  }]
         self.phylodots = []         # needed to name lineages
-        self.lineage_frequency = [] # count lineages in the population
-        self.lineages = {'wt': []} # dic of lineages sequences
+        self.sequencing_data = []
+        # ---------------------------------------------------------------------
+        self.lineage_frequency = [] # count lineage frequency in the population
+        
+        # =====================================================================
         
         self.consensus_snapshot = [[[],1,0]] # [sequence, lineage_frequency, w_t(t_sim)]
         self.consensus_sequences_t = [[[],0]] # list to store consensus everytime is calculated in a simulation [consensus,t]
         
-        # system trajectory
+        # system trajectory ---------------------------------------------------
         self.time         = 0 
         self.trajectory = [[self.time,
                            self.infected,
@@ -90,11 +88,11 @@ class Population:
                            ]]
         self.R_effective_trajectory = []
         self.fitness_trajectory = [[0,[0,0]]]  
-        self.sequencing_data = []
         
-        # individuals
+        
+        # individuals ---------------------------------------------------------
         self.individuals = {}              # store individuals data
-        self.host_model  = h.Host(tau_3)        # intra host model for normal individuals 
+        self.host_model  = h.Host(tau_3)   # intra host model for normal individuals 
         
         self.reservoir_i = []    # list of indices of individuals in the reservoir
         self.susceptibles_i = [] # list of susceptible individuals indices  
@@ -107,7 +105,7 @@ class Population:
         self.infectious_normal_i = []
         self.detectable_i = []   # list of detectable individuals indices 
         
-        # dictionary with all individuals data
+        # dictionary with all individuals data 
         self.individuals = self._init_individuals(size,I_0)
         
     def _init_individuals(self,size,I_0):
@@ -137,15 +135,15 @@ class Population:
                      't_infection' : None,
                      't_final'     : None,
                      'parent'      : None,
-                     'viral_genomes'       : [[]],
                      'state_t'     : 0,
                      'state'       : 'susceptible',
                      'model'       : self.host_model,
                      'type'        : 'normal',
+                     'IH_lineages'   : [],
+                     
                      'fitness'     : 1,
                      'IH_virus_fitness' : [1],
                      'IH_virus_number'    : 1,
-                     'IH_virus_names'   : [],
                      'IH_virus_max': self.rng3.integers(1,6),
                      'lineages_number': 1
                     }
@@ -165,62 +163,20 @@ class Population:
             dic[i]['t_infection'] = 0
             dic[i]['state_t'] = 5
             dic[i]['state'] = 'infected'
-            dic[i]['IH_virus_names'] = ['wt']
+            dic[i]['IH_lineages'] = ['wt']
             
             self.infected_i.append(self.susceptibles_i.pop(self.susceptibles_i.index(i)))
         # update lineage_frequency
-        self.lineage_frequency.append({'Lineage_name':'wt',
-                                               'Time':0,
-                                               'Frequency':1})
+        self.lineage_frequency.append({'Lineage_name'              :'wt',
+                                       'Time_sampling'             :0,
+                                       'Frequency_at_t'            :1,
+                                       'Individuals_infected_at_t' : I_0
+                                       })
         
         # return dictionary containing all individuals data (self.individuals)
         return dic
     
-    # def update_lineage_frequency_t(self,t):
-    #     '''
-    #     Count how many individuals are infected by each lineage at time
-    #     t in the population
-
-    #     Parameters
-    #     ----------
-    #     t : float
-    #         time.
-    #     '''
-    #     # store variants here
-    #     # {'variant name': number of infected patients}
-    #     count_t = {}
-        
-        
-    #     # once every 5 days save snapshot of lineages for consensus
-    #     if np.floor(t%5) == 0:
-            
-    #         # Loop through the infected individuals and get a list of IH_virus names
-    #         for key in self.infected_i:
-    #             string_list = list(set(self.individuals[key]['IH_virus_names']))
-            
-    #             # Count each lineage and update count_t
-    #             for s in string_list:
-    #                 count_t[s] = count_t.get(s, 0) + 1
-                    
-            
-    #         for key in count_t:
-                
-    #             self.consensus_snapshot.append([self.lineages[key],count_t[key
-    #                                                ]/sum(count_t.values()),t])
-            
-    #         self.lineage_frequency[t] = count_t
-            
-    #     # else just count lineages frequency    
-    #     else: 
-    #         # Loop through the infected individuals and get a list of IH_virus names
-    #         for key in self.infected_i:
-    #             string_list = list(set(self.individuals[key]['IH_virus_names']))
-            
-    #             # Count each lineage and update count_t
-    #             for s in string_list:
-    #                 count_t[s] = count_t.get(s, 0) + 1
-            
-    #         self.lineage_frequency[t] = count_t
+    # -------------------------- SIR model reactions --------------------------
     
     def diagnosis(self, seq_rate=0):
         '''
@@ -231,69 +187,70 @@ class Population:
         self.infected  -= 1
         
         # select random patient to be diagnosed
-        patient = self.rng4.choice(self.detectable_i)
+        patient_index = self.rng4.choice(self.detectable_i)
         
         if self.rng6.uniform(0,1) < seq_rate:
             # store sequencing data
             # patient_id, time, genome, subst number, patient time, inf duration
             i = 0
-            for genome in self.individuals[patient]['viral_genomes']:
+            for lineage_name in self.individuals[patient_index]['IH_lineages']:
+                genome = self.get_lineage_genome(lineage_name)
                 self.sequencing_data.append([
-                    patient,
+                    patient_index,
                     self.time,
                     genome,
                     len(genome),
-                    self.individuals[patient]['type'],
-                    self.time - self.individuals[patient]['t_infection'],
+                    self.individuals[patient_index]['type'],
+                    self.time - self.individuals[patient_index]['t_infection'],
                     i
                     ])
                 i+=1
         
         # update the active variants number
-        self.active_variants_n -= self.individuals[patient]['IH_virus_number']
+        self.active_variants_n -= self.individuals[patient_index]['IH_virus_number']
         
-        # 0.01 of patients diagnosed die
-        if self.rng4.uniform(0,1) < 0.01:
+        # 0 % of patients diagnosed die
+        if self.rng4.uniform(0,1) < 0:
             self.deceased += 1
             
             # set patient as deceased
-            self.individuals[patient]['t_final'] = self.time
-            self.individuals[patient]['state']   = 'deceased'
+            self.individuals[patient_index]['t_final'] = self.time
+            self.individuals[patient_index]['state']   = 'deceased'
             
             # remove individual's index from detectable_i, infectious_i and 
             # infected_i and add it to deceased_i
             try:
                 ## in case the diagnosed patient was infectious, updated the infectious list
-                self.infectious_normal_i.pop(self.infectious_normal_i.index(patient))
+                self.infectious_normal_i.pop(self.infectious_normal_i.index(patient_index))
                 self.infectious_normal -= 1
             except:
                 pass
             ## update detectables
-            self.detectable_i.pop(self.detectable_i.index(patient))
+            self.detectable_i.pop(self.detectable_i.index(patient_index))
             self.detectables -= 1
             
             ## update deceased and infected
-            self.deceased_i.append(self.infected_i.pop(self.infected_i.index(patient)))
+            self.deceased_i.append(self.infected_i.pop(self.infected_i.index(patient_index)))
            
         else:
             self.diagnosed += 1
             # set patient as diagnosed
-            self.individuals[patient]['t_final'] = self.time
-            self.individuals[patient]['state']   = 'diagnosed'
+            self.individuals[patient_index]['t_final'] = self.time
+            self.individuals[patient_index]['state']   = 'diagnosed'
            
             # remove individual's index from detectable_i, infectious_i and 
             # infected_i and add it to diagnosed_i
             try:
                 ## in case the diagnosed patient was infectious, updated the infectious list
-                self.infectious_normal_i.pop(self.infectious_normal_i.index(patient))
+                self.infectious_normal_i.pop(self.infectious_normal_i.index(patient_index))
                 self.infectious_normal -= 1
             except:
                 pass
             ## update detectables
-            self.detectable_i.pop(self.detectable_i.index(patient))
+            self.detectable_i.pop(self.detectable_i.index(patient_index))
             self.detectables -= 1
             ## update diagnosed and infected
-            self.diagnosed_i.append(self.infected_i.pop(self.infected_i.index(patient)))
+            self.diagnosed_i.append(self.infected_i.pop(self.infected_i.index(patient_index)))
         
         # add a susceptible back in from reservoir
         self.susceptibles += 1
@@ -332,19 +289,19 @@ class Population:
         self.individuals[new_inf]['t_infection'] = self.time
         # parent
         self.individuals[new_inf]['parent'] = parent
-        # virus (select variant at random to be transmitted)
+        
+        # virus (select lineage at random to be transmitted)
         index = self.rng4.integers(0,self.individuals[parent]['IH_virus_number'])
-        self.individuals[new_inf]['viral_genomes'] = [copy.deepcopy(
-            self.individuals[parent]['viral_genomes'][index])]
-        # lineage name
-        parent_lineage = self.individuals[parent]['IH_virus_names'][index]
-        self.individuals[new_inf]['IH_virus_names'].append(parent_lineage)
+        parent_lineage = self.individuals[parent]['IH_lineages'][index]
+        self.individuals[new_inf]['IH_lineages'].append(parent_lineage)
         # lineage fitness
-        self.individuals[new_inf]['IH_virus_fitness'] = [int(
-            self.individuals[parent]['IH_virus_fitness'][index])]
+        self.individuals[new_inf]['IH_virus_fitness'] = [
+            self.individuals[parent]['IH_virus_fitness'][index]]
+        
         # update individual fitness (average of variants fitness)
         self.individuals[new_inf]['fitness'] = np.average(
                     self.individuals[new_inf]['IH_virus_fitness']) 
+        
         # state
         self.individuals[new_inf]['state'] = 'infected'
         
@@ -377,6 +334,139 @@ class Population:
                 # add a new individual
                 new_susceptible_index = self.reservoir_i.pop(0)
                 self.susceptibles_i.append(new_susceptible_index)
+                
+    def add_variant(self):
+        
+        # select individual that will get a new variant
+        individual_index = self.rng4.choice(self.infected_i)
+        
+        # if variants present are less then the max
+        if self.individuals[individual_index]['IH_virus_number'] < self.individuals[individual_index][
+                                                               'IH_virus_max']:     
+                ## duplicate variant at random
+                # select randomly index of lineage to duplicate
+                index = self.rng4.integers(0,self.individuals[individual_index][
+                                                                   'IH_virus_number'])
+                # add IH lineage name
+                self.individuals[individual_index]['IH_lineages'].append(
+                    self.individuals[individual_index]['IH_lineages'][index]) 
+                # add IH lineage fitness 
+                self.individuals[individual_index]['IH_virus_fitness'].append(
+                    self.individuals[individual_index]['IH_virus_fitness'][index])
+                # update individual fitness (average of variants fitness)
+                self.individuals[individual_index]['fitness'] = np.average(
+                    self.individuals[individual_index]['IH_virus_fitness'])
+                # update the variants count
+                self.individuals[individual_index]['IH_virus_number'] +=1 
+                # update the active variants number
+                self.active_variants_n += 1
+                
+        # if variants present are equal to the max           
+        elif self.individuals[individual_index]['IH_virus_number'] == self.individuals[individual_index
+             ]['IH_virus_max'] and self.individuals[individual_index]['IH_virus_max']>1:
+                    ## delete a variant at random
+                     # select randomly index of variant to delete
+                    random_index = self.rng4.integers(0, len(
+                        self.individuals[individual_index]['IH_lineages']))
+                     # delete lineage
+                    self.individuals[individual_index]['IH_lineages'].pop(random_index)
+                     # delete fitness value
+                    self.individuals[individual_index]['IH_virus_fitness'].pop(random_index)
+                    ## duplicate an existing IH lineage at random
+                     # select randomly index of variant to duplicate
+                    index = self.rng4.integers(0,len(
+                        self.individuals[individual_index]['IH_lineages']))
+
+                     # add lineage name    
+                    self.individuals[individual_index]['IH_lineages'].append(
+                        self.individuals[individual_index]['IH_lineages'][index])
+                     # add IH lineage fitness 
+                    self.individuals[individual_index]['IH_virus_fitness'].append(
+                        self.individuals[individual_index]['IH_virus_fitness'][index])
+                    # update individual fitness (average of IH lineages fitness)
+                    self.individuals[individual_index]['fitness'] = np.average(
+                        self.individuals[individual_index]['IH_virus_fitness'])
+        
+        # raise error if there are too many variants
+        elif self.individuals[individual_index]['IH_virus_number'] > self.individuals[individual_index]['IH_virus_max']:
+                    raise ValueError("Too many variants in", individual_index )
+        else: 
+            pass
+ 
+    # -------------------------------------------------------------------------
+    #                              Mutations
+    # -------------------------------------------------------------------------
+    
+    def get_lineage_genome(self, lineage_name):
+       '''
+       Fetch lineage genome from lineage name
+       '''
+       genome = next((d['Genome'] for d in self.phylogenetic_data if d['Lineage_name'] == lineage_name))
+       # print(f'{lineage_name} Genome: ', genome)
+       return genome
+   
+    def mutate(self, e, dt, phenotype_model, *args):
+        '''
+        Mutation model, mutates the viruses in the population.
+
+        Parameters
+        ----------
+        e : float
+            population nucleotide substitution rate.
+        dt : float
+            delta t - extrande time step (in years)
+
+        '''
+        
+        # select number of substitutions and positions in pooled genome
+        select_pos = evo_model.select_positions(self, self.L_lin, self.rng5, e, dt) 
+        
+        # if mutations are happening
+        if select_pos != 'No substitutions':
+            
+            # positions in pooled genome
+            positions = select_pos[0] 
+            # vector of active variants
+            active_lineages = select_pos[1]
+            # number of substitutions happening
+            subst_number = select_pos[2]
+            
+            # map substitutions to index of variants
+            subst_coord = evo_model.map_to_dic(active_lineages, positions, self.L_lin)
+            
+            # fetch the bases that will undergo substituion
+            subst_coord = evo_model.fetch_bases(self, subst_coord)
+            # count number of each nitrogenous base to be mutated (for bulk update)
+            bases_count = evo_model.get_subst_numbers(subst_coord, subst_number)
+            # use substitution matrix to select mutations that will happen
+            unassigned_subst = evo_model.substitution(self.sub_matrix, bases_count,self.rng5)
+            # assign the mutations to their relative genome
+            subst_coord = evo_model.assign_sub(unassigned_subst, subst_coord)
+            # update variants in simulation with the corresponding substitution
+            evo_model.update_lineages(self, subst_coord)
+            
+            # update fitness score of individuals and variants
+            
+            # print('--X----X----X----X----X----X--')
+            # print('Substitution coordinates: ', subst_coord)
+            individuals_to_update = pheno.get_individuals_to_update(subst_coord)
+            # print('Individuals to be updated: ', individuals_to_update)
+            update_fitness = pheno.update_fitness_factory(phenotype_model)
+            if args:
+                consensus = args[0]
+                update_fitness(self, individuals_to_update, consensus)
+            else:
+                update_fitness(self, individuals_to_update)
+            # print('')
+        # else skip other steps
+    
+    # -------------------------------------------------------------------------
+    #                               Updates
+    # -------------------------------------------------------------------------
+    
+    def update_time(self,time):
+        # update the time 
+        self.time = time
         
     def update_states(self,delta_t):
         '''
@@ -395,10 +485,6 @@ class Population:
              ].update_state(self.individuals[key]['model'
              ].probabilities[state],state,tau[i])
             i += 1       
-            
-    def update_time(self,time):
-        # update the time 
-        self.time = time
         
     def update_inf_det(self):
         '''
@@ -437,141 +523,16 @@ class Population:
                            self.susceptibles
                            ])
     
-    def add_variant(self):
-        
-        # select individual that will get a new variant
-        new_var = self.rng4.choice(self.infected_i)
-        
-        # if variants present are less then the max
-        if self.individuals[new_var]['IH_virus_number'] < self.individuals[new_var][
-                                                               'IH_virus_max']:     
-                ## duplicate variant at random
-                # select randomly index of variant to duplicate
-                index = self.rng4.integers(0,self.individuals[new_var][
-                                                                   'IH_virus_number'])
-                # add copy of variant to individual
-                self.individuals[new_var]['viral_genomes'].append(copy.deepcopy(list(
-                    self.individuals[new_var]['viral_genomes'][index])))  
-                # add variant name
-                self.individuals[new_var]['IH_virus_names'].append(
-                    self.individuals[new_var]['IH_virus_names'][index]) 
-                # add variant fitness 
-                self.individuals[new_var]['IH_virus_fitness'].append(
-                    self.individuals[new_var]['IH_virus_fitness'][index])
-                # update individual fitness (average of variants fitness)
-                self.individuals[new_var]['fitness'] = np.average(
-                    self.individuals[new_var]['IH_virus_fitness'])
-                # update the variants count
-                self.individuals[new_var]['IH_virus_number'] +=1 
-                # update the active variants number
-                self.active_variants_n += 1
-                
-        # if variants present are equal to the max           
-        elif self.individuals[new_var]['IH_virus_number'] == self.individuals[new_var
-             ]['IH_virus_max'] and self.individuals[new_var]['IH_virus_max']>1:
-                    ## delete a variant at random
-                     # select randomly index of variant to delete
-                    random_index = self.rng4.integers(0, len(
-                        self.individuals[new_var]['viral_genomes']))
-                     # delete variant
-                    self.individuals[new_var]['viral_genomes'].pop(random_index)
-                     # delete name
-                    self.individuals[new_var]['IH_virus_names'].pop(random_index)
-                     # delete fitness value
-                    self.individuals[new_var]['IH_virus_fitness'].pop(random_index)
-                    ## duplicate an existing variant at random
-                     # select randomly index of variant to duplicate
-                    index = self.rng4.integers(0,len(
-                        self.individuals[new_var]['viral_genomes']))
-                     # duplicate variant and append it to the variants list 
-                    self.individuals[new_var]['viral_genomes'].append(copy.deepcopy(
-                        list(self.individuals[new_var]['viral_genomes'][index])))    
-                     # add variant name    
-                    self.individuals[new_var]['IH_virus_names'].append(
-                        self.individuals[new_var]['IH_virus_names'][index])
-                     # add variant fitness 
-                    self.individuals[new_var]['IH_virus_fitness'].append(
-                        self.individuals[new_var]['IH_virus_fitness'][index])
-                    # update individual fitness (average of variants fitness)
-                    self.individuals[new_var]['fitness'] = np.average(
-                        self.individuals[new_var]['IH_virus_fitness'])
-        
-        # raise error if there are too many variants
-        elif self.individuals[new_var]['IH_virus_number'] > self.individuals[new_var]['IH_virus_max']:
-                    raise ValueError("Too many variants in", new_var )
-        else: 
-            pass
-            
-    def mutate(self, e, dt, phenotype_model, *args):
-        '''
-        Mutation model, mutates the viruses in the population.
-
-        Parameters
-        ----------
-        e : float
-            population nucleotide substitution rate.
-        dt : float
-            delta t - extrande time step (in years)
-
-        '''
-        
-        # select number of substitutions and positions in pooled genome
-        select_pos = evo.select_positions(self, self.L_var, self.rng5, e, dt) 
-        
-        # if mutations are happening
-        if select_pos != 'No substitutions':
-            
-            # positions in pooled genome
-            positions = select_pos[0] 
-            # vector of active variants
-            active_variants = select_pos[1]
-            # number of substitutions happening
-            subst_number = select_pos[2]
-            # count the number of substitutions happening during the simulation
-            self.mutationsnumber += subst_number
-            
-            # map substitutions to index of variants
-            subst_coord = evo.map_to_dic(active_variants, positions, self.L_var)
-            
-            # fetch the bases that will undergo substituion
-            subst_coord = evo.fetch_bases(self, subst_coord)
-            # count number of each nitrogenous base to be mutated (for bulk update)
-            bases_count = evo.get_subst_numbers(subst_coord, subst_number)
-            # use substitution matrix to select mutations that will happen
-            unassigned_subst = evo.substitution(self.M, bases_count,self.rng5)
-            # assign the mutations to their relative genome
-            subst_coord = evo.assign_sub(unassigned_subst, subst_coord)
-            # update variants in simulation with the corresponding substitution
-            evo.update_lineages(self, subst_coord)
-            
-            # update fitness score of individuals and variants
-            # print('--X----X----X----X----X----X--')
-            # print('Substitution coordinates: ', subst_coord)
-            individuals_to_update = pheno.get_individuals_to_update(subst_coord)
-            # print('Individuals to be updated: ', individuals_to_update)
-            update_fitness = pheno.update_fitness_factory(phenotype_model)
-            if args:
-                consensus = args[0]
-                self.individuals = update_fitness(self.individuals, 
-                                                  individuals_to_update, consensus)
-            else:
-                self.individuals = update_fitness(self.individuals, 
-                                                  individuals_to_update)
-            # print('Mutation #', self.mutationsnumber)
-            # print('')
-        # else skip other steps
-    
-    def calculate_mean_fitness(self):
-        value = []
-        
-        for i in self.infected_i:
-                value.append(self.individuals[i]['fitness'])
-                
-        return [np.mean(value),np.std(value)]
-
-    # store avg fitness
-    def track_fitness(self):
-        self.fitness_trajectory.append([self.time,self.calculate_mean_fitness()])
+    def update_fitness_trajectory(self):
+        # update fitness trajectory
+        def compute_mean_fitness(individuals, infected_i):
+            value = []
+            for i in infected_i:
+                    value.append(individuals[i]['fitness'])
+                    
+            return [np.mean(value),np.std(value)]
+     
+        self.fitness_trajectory.append([self.time,compute_mean_fitness(self.individuals, self.infected_i)])
     
     def update_lineage_frequency_t(self, t):
         '''
@@ -580,42 +541,47 @@ class Population:
         time, lineage_name, frequency.
         '''
         # store lineages here: {'lineage name': number of infected individuals}
-        count_t = {}
+        count_lineages_t = {}
         
         # Loop through the infected individuals and get a list of unique IH_virus names (lineage)
-        for key in self.infected_i:
-            unique_lineages = set(self.individuals[key]['IH_virus_names'])
-            for s in unique_lineages:
-                count_t[s] = count_t.get(s, 0) + 1
+        for individual_index in self.infected_i:
+            unique_lineages = set(self.individuals[individual_index]['IH_lineages'])
+            for lineage_name in unique_lineages:
+                count_lineages_t[lineage_name] = count_lineages_t.get(lineage_name, 0) + 1
     
         # Calculate the total count for normalization
-        total = sum(count_t.values())
+        infected_individuals_at_t_total = sum(count_lineages_t.values()) # note that if an individual is infected by more than one lineage it  will count double
         
-        # Store: [time, lineage_name, frequency]
-        for lineage_name in count_t:
+        # Store: [time, lineage_name, frequency, infected_individuals_at_t]
+        for lineage_name in count_lineages_t:
             # Compute frequency as the relative count
-            frequency = count_t[lineage_name] / total
+            infected_individuals_lin = count_lineages_t[lineage_name]
+            frequency = infected_individuals_lin / infected_individuals_at_t_total
             # store frequency data
-            dic = {'Lineage_name':lineage_name,
-                   'Time':t,
-                   'Frequency':frequency
+            dic = {'Lineage_name'              :lineage_name,
+                   'Time_sampling'             :t,
+                   'Frequency_at_t'            :frequency,
+                   'Individuals_infected_at_t' :infected_individuals_lin
                 }
             self.lineage_frequency.append(dic)
         
-        for lineage_name in count_t:
-            frequency = count_t[lineage_name] / total
-            self.consensus_snapshot.append([self.lineages[lineage_name],
-                                                frequency,t])
+        for lineage_name in count_lineages_t:
+            frequency = count_lineages_t[lineage_name] / infected_individuals_at_t_total
+            self.consensus_snapshot.append([self.get_lineage_genome(lineage_name),
+                                                frequency,
+                                                t])
+            
+    # -------------------------------------------------------------------------
     
-    def data(self):
+    def individuals_data_to_df(self):
         # return population dictionary as data frame
         df = pd.DataFrame(self.individuals).transpose()
         filtered_df = df[~df['state'].str.contains('susceptible')]
         return filtered_df
     
-    def phylogeny(self):
+    def phylogenetic_data_to_df(self):
         # return phylogeny dictionary as data frame
-        return pd.DataFrame(self.track_phylogeny)
+        return pd.DataFrame(self.phylogenetic_data)
     
     def lineage_frequency_to_df(self):
         # return lineage_frequency as data frame
@@ -648,8 +614,11 @@ class Population:
         })
         
         return df
-#####################################################################################################
-    
+
+# -----------------------------------------------------------------------------
+# =============================================================================
+# -----------------------------------------------------------------------------  
+
 def create_population(parameters):
     '''
     Create population instance from parameters file and return it.

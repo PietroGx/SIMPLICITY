@@ -82,6 +82,9 @@ def extrande_factory(phenotype_model, parameters,
         # counter to update lineages count
         t_day = 0 # only count lineages frequency once per day
         
+        # assign correct fitness update function
+        update_all_fitness = pheno.update_fitness_factory(phenotype_model)
+        
         # store times of infections and diagnosis reaction (benchmarking)
         # store_inf_t  = []
         # store_dia_t  = []
@@ -137,12 +140,10 @@ def extrande_factory(phenotype_model, parameters,
                 
                 # update fitness values of all individuals in the simulation
                 individuals_to_update = population.infected_i
-                update_all_fitness = pheno.update_fitness_factory(phenotype_model)
-                population.individuals = update_all_fitness(
-                    population.individuals, individuals_to_update)
+                update_all_fitness(population, individuals_to_update)
                 
                 # store mean fitness for plot
-                population.track_fitness()
+                population.update_fitness_trajectory()
                 
                 # mutations happen
                 delta_t_y = delta_t/365.25 # delta t in years
@@ -244,6 +245,8 @@ def extrande_factory(phenotype_model, parameters,
         t_snapshot = 0
         consensus  = []
         
+        # assign correct fitness update function
+        update_all_fitness = pheno.update_fitness_factory(phenotype_model)
         # store times of infections and diagnosis reaction (benchmarking)
         # store_inf_t  = []
         # store_dia_t  = []
@@ -305,12 +308,10 @@ def extrande_factory(phenotype_model, parameters,
                         
                 # update fitness values of all individuals in the simulation
                 individuals_to_update = population.infected_i
-                update_all_fitness = pheno.update_fitness_factory(phenotype_model)
-                population.individuals = update_all_fitness(
-                    population.individuals, individuals_to_update, consensus)
+                update_all_fitness(population, individuals_to_update, consensus)
                 
                 # store mean fitness for plot
-                population.track_fitness()
+                population.update_fitness_trajectory()
                 
                 # mutations happen
                 delta_t_y = delta_t/365.25 # delta t in years

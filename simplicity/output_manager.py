@@ -203,7 +203,7 @@ def read_lineage_frequency(seeded_simulation_output_dir):
     return df
         
 def save_individuals_data(simulation_output, seeded_simulation_output_dir):
-    individuals_data = simulation_output.data()
+    individuals_data = simulation_output.individuals_data_to_df()
     individuals_data.drop('model',axis=1,inplace=True)
     individuals_data_file_path = os.path.join(seeded_simulation_output_dir,
                                                "individuals_data.csv")
@@ -213,13 +213,12 @@ def read_individuals_data(seeded_simulation_output_dir):
     trajectory_file_path = os.path.join(seeded_simulation_output_dir,
                                         "individuals_data.csv")
     df = pd.read_csv(trajectory_file_path, index_col=0)
-    df['IH_virus_names'] = df['IH_virus_names'].apply(ast.literal_eval)
+    df['IH_lineages'] = df['IH_lineages'].apply(ast.literal_eval)
     df['IH_virus_fitness'] = df['IH_virus_fitness'].apply(ast.literal_eval) 
-    df['viral_genomes'] = df['viral_genomes'].apply(ast.literal_eval) 
     return df
 
 def save_phylogenetic_data(simulation_output, seeded_simulation_output_dir):
-    phylogenetic_data = simulation_output.phylogeny()
+    phylogenetic_data = simulation_output.phylogenetic_data_to_df()
     phylogenetic_data_file_path = os.path.join(seeded_simulation_output_dir,
                                                "phylogenetic_data.csv")
     phylogenetic_data.to_csv(phylogenetic_data_file_path)
@@ -229,7 +228,7 @@ def read_phylogenetic_data(seeded_simulation_output_dir):
                                         "phylogenetic_data.csv")
     
     df = pd.read_csv(trajectory_file_path, index_col=0)
-    df['genome'] = df['genome'].apply(ast.literal_eval)
+    df['Genome'] = df['Genome'].apply(ast.literal_eval)
     return df
     
 def save_fitness_trajectory(simulation_output, seeded_simulation_output_dir):
