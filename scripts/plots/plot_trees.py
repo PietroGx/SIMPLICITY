@@ -21,14 +21,14 @@ def generate_and_plot_trees(experiment_name,time_threshold,lineage_threshold):
             # import phylogenetic_data 
             phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
             # get lineages data
-            lineages = phylogenetic_data['lineage_name'].tolist()  
+            lineages = phylogenetic_data['Lineage_name'].tolist()  
             lineages_number = len(lineages)
             if lineages_number > lineage_threshold:
                 print(ssod)
-                print(lineages_number)
+                print(f'Lineage threshold: {lineages_number}')
                 # import individuals data
                 individuals_data = om.read_individuals_data(seeded_simulation_output_dir)
-                individuals_lineages = [lin[0] for lin in individuals_data.IH_virus_names.to_list()]
+                individuals_lineages = [lin[0] for lin in individuals_data.IH_lineages.to_list()]
                 print('Importing trees...')
                 # get infection tree filepath
                 inf_tree_filepath = om.get_tree_file_filepath(experiment_name,

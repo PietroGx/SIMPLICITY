@@ -141,17 +141,16 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     
     # ----------------- variants frequency subplot ----------------------------
     lineage_frequency_df = om.read_lineage_frequency(seeded_simulation_output_dir)
-    # import phylogenetic_data 
-    phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
-    # get lineages data
-    lineages = phylogenetic_data['lineage_name'].tolist() 
+    
+    # get lineages colormap
+    colormap_df = make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow')
     # save lineages colors tab
     plot_lineages_colors_tab(seeded_simulation_output_dir)
    
-    pivot_df = lineage_frequency_df.pivot(index='Time', columns='Lineage_name', values='Frequency')
+    pivot_df = lineage_frequency_df.pivot(index='Time_sampling', columns='Lineage_name', values='Frequency_at_t')
     # Filter columns that reach at least the threshold at some point.
     filtered_df = pivot_df.loc[:, pivot_df.max() >= threshold]
-    colors = [get_lineage_color(lineage, lineages) for lineage in filtered_df.columns]
+    colors = [get_lineage_color(lineage_name, colormap_df) for lineage_name in filtered_df.columns]
     filtered_df.plot(kind='area', stacked=False, color=colors,
                          alpha=0.5, ax=ax1)
     time_file_path = os.path.join(seeded_simulation_output_dir, 'final_time.csv')
@@ -918,53 +917,58 @@ def plot_histograms(experiment_name, final_times_data_frames):
 #                              Lineages colors 
 # -----------------------------------------------------------------------------
 
-def make_lineages_colormap(lineages):
-    
-    def lineage_to_colormap(index, lineages, cmap_name='gist_rainbow'):
+def make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow'):
+    """
+    Generate a DataFrame mapping lineages to unique colors based on their time order.
+
+    Returns:
+    pd.DataFrame: DataFrame with 'Lineage_name' and 'Color' columns.
+    """
+    def lineage_to_colormap(index, lineages, cmap_name):
         """Map a lineage to a unique color in a gradient colormap."""
         cmap = plt.get_cmap(cmap_name)
         rgb =  cmap(index / lineages)[:3]  # Ensure it returns an RGB tuple without alpha
         return mcolors.rgb2hex(rgb) #convert to HEX format
-        
-
-    # Sort lineages alphabetically
-    lineages.sort()
-
-    # Generate colors for each string based on their order
-    colors = [lineage_to_colormap(i, len(lineages), cmap_name='gist_rainbow') for i in range(len(lineages))]
-
-    # Create a mapping dictionary for lookup
-    color_mapping = {lineage: color for lineage, color in zip(lineages, colors)}
     
-    return color_mapping
+    df = om.read_phylogenetic_data(seeded_simulation_output_dir)
+    # Sort lineages by time of emergence
+    sorted_lineages = df.sort_values(by='Time_emergence')['Lineage_name'].tolist()
+    # Generate colors
+    colors = [lineage_to_colormap(i, len(sorted_lineages), cmap_name) for i in range(len(sorted_lineages))]
 
-def get_lineage_color(lineage, lineages):
+    # Create a new DataFrame mapping lineages to colors
+    lineage_color_mapping_df = pd.DataFrame({'Lineage_name': sorted_lineages, 'Color': colors})
+
+    return lineage_color_mapping_df
+
+
+def get_lineage_color(lineage_name, colormap_df, cmap_name='gist_rainbow'):
     """Return the corresponding color for a given lineage name.
     lineage: str 
         string with lineage name
     color mapping: colormap
         output of make_lineages_colormap
     """
-    if lineage is None:
+    df = colormap_df
+    if lineage_name is None:
         raise ValueError('Lineage cannot be NoneType!')
-    elif lineage not in lineages:
-        raise ValueError(f'Lineage {lineage} not in lineages list! Cannot compute color.')
+    elif lineage_name not in df['Lineage_name'].values:
+        raise ValueError(f'Lineage {lineage_name} not in lineages list! Cannot compute color.')
         
-    color_mapping = make_lineages_colormap(lineages)
-    return color_mapping.get(lineage)  
+    lineage_color = df.loc[df['Lineage_name'] == lineage_name, 'Color'].values[0]
+    return lineage_color  
 
 def plot_lineages_colors_tab(seeded_simulation_output_dir):
-    # import phylogenetic data
-    phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
-    lineages = phylogenetic_data['lineage_name'].tolist()
+    
+    colormap_df = make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow')
     # Plot lineages colors in a table format with circles
-    fig, ax = plt.subplots(num=2,figsize=(5, len(lineages) * 0.5))
-    for i, lineage in enumerate(reversed(lineages)):
-        ax.scatter(0, i, color=get_lineage_color(lineage, lineages), s=200, marker='o')  # Draw a circle
-        ax.text(0.2, i, lineage, va='center', fontsize=12)  # Add text next to it
+    fig, ax = plt.subplots(num=2,figsize=(5, len(colormap_df) * 0.5))
+    for i, lineage_name in enumerate(reversed(colormap_df['Lineage_name'].values)):
+        ax.scatter(0, i, color=get_lineage_color(lineage_name, colormap_df), s=200, marker='o')  # Draw a circle
+        ax.text(0.2, i, lineage_name, va='center', fontsize=12)  # Add text next to it
     
     ax.set_xlim(-0.1, 1)
-    ax.set_ylim(-1, len(lineages))
+    ax.set_ylim(-1, len(colormap_df))
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_frame_on(False)
@@ -1000,7 +1004,7 @@ def get_state_color(state):
 def get_node_color(node, 
                    coloring, 
                    tree_data, 
-                   lineages): 
+                   colormap_df): 
     if coloring == 'state':
         color = get_state_color(node.state)
         return color
@@ -1008,7 +1012,7 @@ def get_node_color(node,
         color = get_fitness_color(node.fitness, tree_data)
         return color
     if coloring == 'lineage':
-        color = get_lineage_color(node.lineage, lineages)
+        color = get_lineage_color(node.lineage, colormap_df)
         return color
 
 def tree_fitness_legend(tree_data, tree_type, tree_plot_filepath): 
@@ -1065,7 +1069,7 @@ def plot_infection_tree(root,
                            infection_tree_data,
                            tree_subtype,
                            coloring,
-                           lineages,
+                           colormap_df,
                            tree_plot_filepath):
     tree_data = infection_tree_data
     
@@ -1075,13 +1079,13 @@ def plot_infection_tree(root,
             return 'color="{}", label="{}",'.format(get_node_color(node, 
                                                                   coloring, 
                                                                   tree_data, 
-                                                                  lineages), 
+                                                                  colormap_df), 
                                                    node.name)
         else:
             return 'color="{}", label="{}",shape=diamond, style=filled'.format(get_node_color(node, 
                                                                   coloring, 
                                                                   tree_data, 
-                                                                  lineages), 
+                                                                  colormap_df), 
                                                    node.label)
             
     if tree_subtype == 'binary':
@@ -1127,7 +1131,7 @@ def plot_phylogenetic_tree(root,
                            phylogenetic_data,
                            tree_subtype,
                            coloring,
-                           lineages,
+                           colormap_df,
                            tree_plot_filepath):
     tree_data = phylogenetic_data
     
@@ -1140,7 +1144,7 @@ def plot_phylogenetic_tree(root,
             return 'color="{}", label="{}"'.format(get_node_color(node, 
                                                                   coloring, 
                                                                   tree_data, 
-                                                                  lineages), 
+                                                                  colormap_df), 
                                                    node.name)
     
     # format tree for binary tree
@@ -1168,7 +1172,7 @@ def plot_phylogenetic_tree(root,
 
 def plot_circular_tree(ete_root,
                        tree_type,
-                       lineages,
+                       colormap_df,
                        individuals_lineages,
                        file_path):
     
@@ -1217,12 +1221,12 @@ def plot_circular_tree(ete_root,
         # Return the new hex color string.
         return f"#{r_new:02x}{g_new:02x}{b_new:02x}"
     
-    def get_clade_color(lineage, lineages, factor=0.5):
-        lineage_color = get_lineage_color(lineage, lineages)
+    def get_clade_color(lineage, colormap_df, factor=0.5):
+        lineage_color = get_lineage_color(lineage, colormap_df)
         clade_color = blend_with_white(lineage_color, factor)
         return clade_color
     
-    def color_clades_by_lineage(tree, lineages, individuals_lineages):
+    def color_clades_by_lineage(tree, colormap_df, individuals_lineages):
         """
         For each node, color the background wedge in circular layout. 
         If plotting phylo tree, color white lineages not present in infection tree.
@@ -1232,7 +1236,7 @@ def plot_circular_tree(ete_root,
             if node.lineage in individuals_lineages:
                 if node.lineage is None:
                     raise ValueError(f'Lineage is NoneType! Check {node}.')
-                node.img_style["bgcolor"] = get_clade_color(node.lineage, lineages, factor=0.55)
+                node.img_style["bgcolor"] = get_clade_color(node.lineage, colormap_df, factor=0.55)
             else:
                 node.img_style["bgcolor"] = 'white'
     # tree layout (faces = labels of branches outside tree)
@@ -1244,7 +1248,7 @@ def plot_circular_tree(ete_root,
         pass
     # color tree
     color_branches_black(ete_root)
-    color_clades_by_lineage(ete_root,lineages, individuals_lineages)
+    color_clades_by_lineage(ete_root,colormap_df, individuals_lineages)
             
     # setup circular tree
     ts = TreeStyle()
@@ -1270,7 +1274,7 @@ def plot_circular_tree(ete_root,
 #                              R effective plots
 # -----------------------------------------------------------------------------
 
-def plot_infections_hist(R_eff_data, lineages, ax, window_size):
+def plot_infections_hist(R_eff_data, colormap_df, ax, window_size):
     """
     Plots a stacked bar histogram of the infections over a timeframe =window_size
     on the given ax. Used for ax1b plot in plot_R_effective().
@@ -1293,7 +1297,7 @@ def plot_infections_hist(R_eff_data, lineages, ax, window_size):
         subset = df[df['Lineage'] == lineage]
         counts, _ = np.histogram(subset['Time'], bins=bin_edges)
         # color barstack
-        color = get_lineage_color(lineage, lineages)
+        color = get_lineage_color(lineage, colormap_df)
         ax.bar(
             bin_centers, 
             counts, 
@@ -1320,12 +1324,9 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     R_effective_avg_df, R_effective_lineage_df = om.read_R_effective_dfs_csv(experiment_name, 
                                                                           seeded_simulation_output_dir, 
                                                                           window_size, threshold)
-    # import phylogenetic_data 
-    phylogenetic_data = om.read_phylogenetic_data(seeded_simulation_output_dir)
-    # get lineages data
-    lineages = phylogenetic_data['lineage_name'].tolist() 
-    if 'wt' not in lineages:
-        lineages.insert(0,'wt')
+    # get lineages colormap
+    colormap_df = make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow')
+    
     # create figure
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
     R_effective_avg_label = f'R_effective calculated over previous {window_size}d'
@@ -1336,7 +1337,7 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     ax1.set_zorder(ax1b.get_zorder() + 1)  # Bring ax1 forward
     ax1.patch.set_visible(False)  # Hide ax1 background to prevent it from covering ax1b
     # plot infections histogram
-    plot_infections_hist(R_eff_data, lineages, ax1b, window_size)
+    plot_infections_hist(R_eff_data, colormap_df, ax1b, window_size)
     ax1b.set_ylabel('Infections in time window')
     # Plot avg R effective
     ax1.plot(R_effective_avg_df['Time'], R_effective_avg_df['R_effective'], 
@@ -1356,7 +1357,7 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     # ax1b.legend(loc='upper right')
 
     # Subplot 2: lineage R effective ------------------------------------------
-    colors = [get_lineage_color(lineage, lineages) for lineage in R_effective_lineage_df.columns.to_list()]
+    colors = [get_lineage_color(lineage_name, colormap_df) for lineage_name in R_effective_lineage_df.columns.to_list()]
     R_effective_lineage_df.plot(ax=ax2, color=colors) 
     # remove df plot labels from legend
     for line in ax2.get_lines():
@@ -1375,7 +1376,7 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     ax1.set_xlim(0,max(R_effective_avg_df['Time']))
     ax2.set_xlim(0,max(R_effective_avg_df['Time']))
     # ax1.set_ylim(0,max(R_effective_lineage_df.max())*1.2)
-    ax2.set_ylim(0,max(R_effective_lineage_df.max())*1.2)
+    ax2.set_ylim(min(R_effective_lineage_df),max(R_effective_lineage_df.max())*1.2)
     # save plot
     plt.tight_layout()
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)

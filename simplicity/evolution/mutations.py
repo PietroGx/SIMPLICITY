@@ -5,9 +5,9 @@ Created on Thu Jun 1 11:15:10 2023
 
 @author: pietro
 """
-import simplicity.phenotype.distance as dis
 import numpy as np
 import copy
+
 # import Evolution.Reference as ref
 
 '''
@@ -31,7 +31,7 @@ p_sites_var = [i/E for i in rate_sites_var]
 
 '''
 
-def sub_events(rng, e, dt, variants):
+def sub_events(rng, e, dt, IH_lineages):
     ''' Choose the number of substitutions that happen in a time step dt,
         drawing random number sampled from Poisson distribution.
 
@@ -43,8 +43,8 @@ def sub_events(rng, e, dt, variants):
         population nucleotide substitution rate.
     dt : float
         delta t - extrande time step.
-    variants : int
-        number of active variants that can mutate in time step dt
+    IH_lineages : int
+        number of active IH_lineages that can mutate in time step dt
 
     Returns
     -------
@@ -52,12 +52,12 @@ def sub_events(rng, e, dt, variants):
         number of substitutions that happen in a time step dt.
 
     '''
-    lambda_pop = e*dt*variants
+    lambda_pop = e*dt*IH_lineages
     events = rng.poisson(lambda_pop)
     
     return events
 
-def select_positions(population,L_var,rng,e,dt):
+def select_positions(population,L_lin,rng,e,dt):
     '''
     Select positions of the pooled genome to mutate.
 
@@ -65,8 +65,8 @@ def select_positions(population,L_var,rng,e,dt):
     ----------
     population : 
         instance of population class.
-    L_var : int
-        lenght or variant genome
+    L_lin : int
+        lenght of IH_lineage genome
     p_sites_var : array
         vector of single site substitution rate
     rng : numpy method
@@ -93,19 +93,19 @@ def select_positions(population,L_var,rng,e,dt):
     '''
     # # raise error if the vector of probabilites per site is not as long as 
     # # the variant genome
-    # if L_var != len(p_sites_var):
-    #     raise ValueError('p_sites_var must have L_var lenght')
+    # if L_lin != len(p_sites_var):
+    #     raise ValueError('p_sites_var must have L_lin lenght')
     
-    # list of "active" variants, coord map onto individuals
-    active_variants = [[i, j] for i in population.infected_i for j 
+    # list of "active" lineages, coord map onto individuals
+    active_lineages = [[i, j] for i in population.infected_i for j 
                        in range(0,population.individuals[i]['IH_virus_number'])]
      
     # raise error if the lenght of active_variants is not same as variants_number       
-    if population.active_variants_n != len(active_variants):
+    if population.active_variants_n != len(active_lineages):
         raise ValueError('variants_number must have lenght "active_variants"')
     
     # vector of pooled genome positions
-    positions = np.arange(0,population.active_variants_n*L_var,1)
+    positions = np.arange(0,population.active_variants_n*L_lin,1)
     
     # # vector of pooled genome sites rate
     # p_sites = p_sites_var*population.active_variants_n
@@ -118,9 +118,9 @@ def select_positions(population,L_var,rng,e,dt):
         return 'No substitutions'
     else:    
         # return vector of positions that will be mutated p=p_sites_normed
-        return rng.choice(positions,sub_number), active_variants, sub_number
+        return rng.choice(positions,sub_number), active_lineages, sub_number
 
-def map_to_var(positions,L_var):
+def map_to_lin(positions,L_lin):
     '''
     Maps positions to be mutated onto active_variants.
 
@@ -128,8 +128,8 @@ def map_to_var(positions,L_var):
     ----------
     positions: array
         positions that will undergo substitution
-    L_var : int
-        lenght or variant genome
+    L_lin : int
+        lenght of lineage genome
 
     Returns
     -------
@@ -143,12 +143,12 @@ def map_to_var(positions,L_var):
     '''
     sub_coord_varmap = []
     for position in positions:
-        c = [int(np.floor(position/L_var)),position%L_var]
+        c = [int(np.floor(position/L_lin)),position%L_lin]
         sub_coord_varmap.append(c)
         
     return sub_coord_varmap
 
-def map_to_dic(active_variants, positions, L_var):
+def map_to_dic(active_lineages, positions, L_lin):
     '''
     Map mutation positions onto dictionary of population.individuals
 
@@ -172,17 +172,17 @@ def map_to_dic(active_variants, positions, L_var):
     '''
     
     sub_coord_dicmap = []
-    sub_coord_varmap = map_to_var(positions, L_var)
+    sub_coord_linmap = map_to_lin(positions, L_lin)
     
-    for i in sub_coord_varmap:
+    for i in sub_coord_linmap:
         # i[0] --> index of active_variants that refers to variants to mutate 
-        var_coord = active_variants[i[0]]
+        lin_coord = active_lineages[i[0]]
         
-        # var_coord[0] --> index of individual (in population.individuals) that hosts the variant
-        # var_coord[1] --> index of variant inside the host
-        # i[1] --> position in the genome of variant to be mutated
-        sub_coord_dicmap.append([var_coord[0], 
-                           var_coord[1],
+        # lin_coord[0] --> index of individual (in population.individuals) that hosts the variant
+        # lin_coord[1] --> index of variant inside the host
+        # i[1] --> position in the genome of lineage to be mutated
+        sub_coord_dicmap.append([lin_coord[0], 
+                           lin_coord[1],
                            i[1]])
     return sub_coord_dicmap
         
@@ -207,21 +207,22 @@ def fetch_bases(population, sub_coord_dicmap):
         
     index of individual (in population.individuals) that hosts the variant    
     index of variant inside the host
-    position in the genome of variant to be mutated
-    nitrogenous base of the variant at that position
+    position in the genome of lineage mutated
+    nitrogenous base of the lineage at that position
 
     '''
     # loop over list of coordinates to fetch the corresponding base
     for coord in sub_coord_dicmap:
-        # variant --> list of mutations that a variant holds (property of individual)        
-        variant = population.individuals[coord[0]]['viral_genomes'][coord[1]]
+        # lineage --> list of mutations that a lineage holds (property of individual)        
+        lineage_name = population.individuals[coord[0]]['IH_lineages'][coord[1]]
+        lineage_genome = population.get_lineage_genome(lineage_name)
+        
         # get mutation if the variant already have one at position
-        mut_coord = [mut for mut in variant if coord[2] in mut]
-        # if so, fetch the base from variant and delete mutation from variant (to add the new one)
+        mut_coord = [mut for mut in lineage_genome if coord[2] in mut]
+        # if so, fetch the base from variant
         if mut_coord:
             coord.append(mut_coord[0][1])
-            mut_index = [i for i, mut in enumerate(variant) if coord[2] in mut]
-            population.individuals[coord[0]]['viral_genomes'][coord[1]].pop(mut_index[0])
+            
         # else, fetch it from reference genome
         else:
             coord.append(population.ref_genome[coord[2]])
@@ -350,7 +351,7 @@ def assign_sub(unassigned_subst,sub_coord_dicmap):
         
     index of individual (in population.individuals) that hosts the variant    
     index of variant inside the host
-    position in the genome of variant to be mutated
+    position in the genome of lineage mutated
     nitrogenous base that will be introduced at that position
     '''
     
@@ -380,17 +381,17 @@ def assign_sub(unassigned_subst,sub_coord_dicmap):
     # print(i_G)    
     return sub_coord_dicmap
 
-def varname(phylodots,variant_name):    
+def get_lineage_name(phylodots,lineage_name):    
     # function to name the variants during the simulation
-    n_dots = variant_name.count('.')
+    n_dots = lineage_name.count('.')
     try: 
         phylodots[n_dots] += 1
-        variant_name = variant_name + '.' + str(phylodots[n_dots])
+        lineage_name = lineage_name + '.' + str(phylodots[n_dots])
     except: 
         phylodots.append(0)
-        variant_name = variant_name + '.0'
+        lineage_name = lineage_name + '.0'
     
-    return phylodots, variant_name
+    return phylodots, lineage_name
 
 def update_lineages(population, sub_coord_dicmap):
     '''
@@ -407,31 +408,50 @@ def update_lineages(population, sub_coord_dicmap):
     # mutate every individual selected and update nodes info
     for coord in sub_coord_dicmap:
         # parent of the phylogenetic tree node
-        parent = population.individuals[coord[0]]['IH_virus_names'][coord[1]]
+        parent_lineage_name = population.individuals[coord[0]]['IH_lineages'][coord[1]]
         
-        # add mutation to ih_lineages
-        population.individuals[coord[0]]['viral_genomes'][coord[1]].append([coord[2],coord[3]])
-        
-        # rename the lineage after new mutation introduced
-        update = varname(population.phylodots,parent)
-        population.phylodots = update[0]
-        child = update[1]
-        population.individuals[coord[0]]['IH_virus_names'][coord[1]] = child
-        
-        # update lineages count
+        # rename the IH lineage after new mutation introduced (in individual)
+        population.phylodots, new_lineage_name = get_lineage_name(population.phylodots,parent_lineage_name)
+        population.individuals[coord[0]]['IH_lineages'][coord[1]] = new_lineage_name
+        # update lineages count inside individual
         population.individuals[coord[0]]['lineages_number'] = len(
-            set(population.individuals[coord[0]]['IH_virus_names']))
+            set(population.individuals[coord[0]]['IH_lineages']))
         
-        # save variant info for phylogenetic tree
-        genome = copy.deepcopy(
-            population.individuals[coord[0]]['viral_genomes'][coord[1]])
-        population.track_phylogeny.append({'lineage_name': child,
-                      'parent'         : parent,
-                      'individual'     : coord[0],
-                      'genome'         : genome,
-                      'time_emergence' : population.time,
-                      'host_type'      : population.individuals[coord[0]]['type'],
-                      'fitness'        : dis.hamming(population.individuals[coord[0]]['viral_genomes'][coord[1]])
+        parent_lineage_genome = population.get_lineage_genome(parent_lineage_name)
+        new_lineage_genome = copy.deepcopy(parent_lineage_genome)
+        new_lineage_genome.append([coord[2],coord[3]])
+        
+        population.phylogenetic_data.append(
+                     {'Time_emergence'  : population.time,
+                      'Lineage_name'    : new_lineage_name,
+                      'Lineage_parent'  : parent_lineage_name,
+                      'Genome'          : new_lineage_genome,
+                      'Host_type'       : population.individuals[coord[0]]['type']
                     })
+        # print(f'Phylo data: {population.phylogenetic_data}')
         
-        population.lineages[child] = genome
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        

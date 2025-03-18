@@ -378,9 +378,14 @@
 	* added lineage colors to simulation trajectory plot
 	* changed how lineage_frequency is stored and saved
 	
+2026-18-03 pietro gerletti
 	
+	Version 0.13.0
 	
-	
+	* changed named of population methods data and phylogeny to individuals_data_to_df/phylogenetic_data_to_df
+	* updated and cleaned population class (track_fitness now called update_fitness trajectory)
+	* refactored population class, evolution.mutations module and phenotype.update module (only working with lineages names, genomes now stored in population.phylogenetic_data)
+	* updated plot_manager: now lineages color are based on lineage time of emergence and have unique labels
 	
 	
 	

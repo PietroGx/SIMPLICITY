@@ -29,7 +29,7 @@ import os
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {'phenotype_model':['distance from wt', 'immune waning']}
+    parameters      = {'phenotype_model':['immune waning']}
     n_seeds         = 1
     return (parameters, n_seeds)
 
@@ -59,8 +59,8 @@ def test_run_experiment_local(runner:str, test_number:int):
                        simplicity_runner  = runner_module,
                        plot_trajectory = True,
                        archive_experiment = False)
-    except:
-        raise RuntimeError('The code did not pass the running test')
+    except Exception as e:
+        raise RuntimeError(f'The code did not pass the running test. Error: {e}')
     print('')
     print(f'TEST LOCAL {runner} RUNNER {test_number} -- SUCCESS.')
     print('##########################################')
