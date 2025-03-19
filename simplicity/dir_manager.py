@@ -86,6 +86,12 @@ def get_experiment_plots_dir(experiment_name):
     os.makedirs(experiment_plots_dir, exist_ok=True) 
     return experiment_plots_dir
 
+def get_experiment_simulations_plots_dir(experiment_name):
+    experiment_plots_dir = get_experiment_plots_dir(experiment_name)
+    experiment_simulations_plots_dir = os.path.join(experiment_plots_dir, 'Simulations')
+    os.makedirs(experiment_simulations_plots_dir, exist_ok=True) 
+    return experiment_simulations_plots_dir
+
 def get_experiment_tree_dir(experiment_name):
     experiment_dir = get_experiment_dir(experiment_name)
     experiment_tree_dir = os.path.join(experiment_dir, '06_Trees')
@@ -129,6 +135,13 @@ def get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir):
     ''' Get the simulation_output folder_name of Data/experiment/04_Output/simulation_output/seed_nr'''
     simulation_output_foldername = os.path.basename(os.path.dirname(seeded_simulation_output_dir))
     return simulation_output_foldername
+
+def get_experiment_foldername_from_SSOD(seeded_simulation_output_dir):
+    # Split the path into parts
+    path_parts = os.path.normpath(seeded_simulation_output_dir).split(os.sep)
+    # Extract the experiment folder name
+    experiment_foldername = path_parts[-4]
+    return experiment_foldername
 
 def get_experiment_tree_simulation_dir(experiment_name,
                                        seeded_simulation_output_dir):

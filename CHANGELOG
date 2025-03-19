@@ -387,9 +387,14 @@
 	* refactored population class, evolution.mutations module and phenotype.update module (only working with lineages names, genomes now stored in population.phylogenetic_data)
 	* updated plot_manager: now lineages color are based on lineage time of emergence and have unique labels
 	
+2026-19-03 pietro gerletti
 	
+	Version 0.13.1
 	
-	
+	* Updated path to save simulation plots and lineages tabs
+	* updated name of simulation trajectory plots and lineages tabs
+	* added script to sort plots by seed number
+	* prepared new experiment to run (generate_data_trees_and_R_eff)
 	
 	
 	

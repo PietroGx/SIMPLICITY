@@ -29,7 +29,7 @@ import os
 
 ## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {'phenotype_model':['immune waning']}
+    parameters      = {'phenotype_model':['immune waning','distance from wt']}
     n_seeds         = 1
     return (parameters, n_seeds)
 
@@ -88,7 +88,6 @@ def test_experiment_output(experiment_name):
             check_output_file(seed_directory, 'sequencing_data.fasta')
             check_output_file(seed_directory, 'simulation_trajectory.csv')
             check_output_file(seed_directory, 'R_effective_trajectory.csv')
-            check_output_file(seed_directory, 'simulation_trajectory.png')
     print('')
     print(f'TEST {experiment_name} OUTPUT -- SUCCESS.')
     print('##########################################')
@@ -99,5 +98,5 @@ def test_experiment_local(runner:str, test_number:int):
 ##### </actual test>
 
 if __name__ == "__main__":
-    test_experiment_local('serial',25)
+    test_experiment_local('serial',1)
     # test_experiment_local('multiprocessing',4)
