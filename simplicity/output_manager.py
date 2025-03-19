@@ -724,7 +724,7 @@ def get_R_effective_lineage_csv_filepath(experiment_name,
 
 def write_R_effective_dfs_csv(experiment_name, seeded_simulation_output_dir, window_size, threshold):
     print('')
-    print('Writing R_effective csv files...')
+    print('Writing R_effective trajectory csv files...')
     # get csv filepaths
     R_effective_avg_csv_filepath = get_R_effective_avg_csv_filepath(experiment_name, 
                                                                     seeded_simulation_output_dir, 
