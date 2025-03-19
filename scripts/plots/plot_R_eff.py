@@ -24,12 +24,14 @@ def select_and_plot_R_effective(experiment_name, window_size, lin_threshold, sel
                     om.write_R_effective_dfs_csv(experiment_name, 
                                                  seeded_simulation_output_dir, 
                                                  window_size, lin_threshold)
-                    pm.plot_R_effective(experiment_name, 
-                                        seeded_simulation_output_dir, 
-                                        window_size, lin_threshold)
-                    print('Plot R effective: completed.')
-                    print('')
-
+                    try:
+                        pm.plot_R_effective(experiment_name, 
+                                            seeded_simulation_output_dir, 
+                                            window_size, lin_threshold)
+                        print('Plot R effective: COMPLETE.')
+                        print('')
+                    except:
+                        print('Plotting failed, check dataframes!')
 def main():
     # Set up the argument parser
     parser = argparse.ArgumentParser(description="Plot")

@@ -737,13 +737,17 @@ def write_R_effective_dfs_csv(experiment_name, seeded_simulation_output_dir, win
         print('')
         print("R_effective csv files already exist, skipping file writing.")
     else:
-        R_effective_avg_df, R_effective_lineage_df = get_R_effective_dfs(seeded_simulation_output_dir, 
-                                                                         window_size, threshold)
-        # save dataframes
-        R_effective_avg_df.to_csv(R_effective_avg_csv_filepath)
-        R_effective_lineage_df.to_csv(R_effective_lineage_csv_filepath)
-        print('')
-        print(f"R_effective csv files written to {experiment_name} output folder.")
+        try:
+            R_effective_avg_df, R_effective_lineage_df = get_R_effective_dfs(seeded_simulation_output_dir, 
+                                                                             window_size, threshold)
+            # save dataframes
+            R_effective_avg_df.to_csv(R_effective_avg_csv_filepath)
+            R_effective_lineage_df.to_csv(R_effective_lineage_csv_filepath)
+            print('')
+            print(f"R_effective csv files written to {experiment_name} output folder.")
+        except:
+            print('')
+            print('Could not create R_effective trajectory dataframe, try lowering the threshold.')
 
 def read_R_effective_dfs_csv(experiment_name, seeded_simulation_output_dir, window_size, threshold):
     # get csv filepaths
