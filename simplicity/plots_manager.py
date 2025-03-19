@@ -200,7 +200,11 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     # Align the y-axis labels
     fig.align_ylabels([ax2, ax3])
     plt.tight_layout()
-    figure_output_path = os.path.join(seeded_simulation_output_dir,"simulation_trajectory.png")
+    experiment_name = dm.get_experiment_foldername_from_SSOD(seeded_simulation_output_dir)
+    so_foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
+    seed = os.path.basename(seeded_simulation_output_dir)
+    experiment_simulations_plots_dir = dm.get_experiment_simulations_plots_dir(experiment_name)
+    figure_output_path = os.path.join(experiment_simulations_plots_dir,f"{so_foldername}_{seed}_simulation_trajectory.png")
     plt.savefig(figure_output_path)
     plt.close()
 
@@ -972,9 +976,12 @@ def plot_lineages_colors_tab(seeded_simulation_output_dir):
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_frame_on(False)
-    
-    plt.savefig(os.path.join(seeded_simulation_output_dir,
-                             'lineages_colors_tab.png'))
+    experiment_name = dm.get_experiment_foldername_from_SSOD(seeded_simulation_output_dir)
+    so_foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
+    seed = os.path.basename(seeded_simulation_output_dir)
+    experiment_simulations_plots_dir = dm.get_experiment_simulations_plots_dir(experiment_name)
+    plt.savefig(os.path.join(experiment_simulations_plots_dir,
+                             f'{so_foldername}_{seed}_lineages_colors_tab.png'))
     plt.close()
 
 # -----------------------------------------------------------------------------

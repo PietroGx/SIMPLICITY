@@ -546,7 +546,8 @@ def read_fit_results_csv(experiment_name, model_type):
 #                              Tree exporter
 # -----------------------------------------------------------------------------
 
-def get_tree_filename(seeded_simulation_output_dir,
+def get_tree_filename(experiment_name,
+                      seeded_simulation_output_dir,
                       tree_type,
                       tree_subtype,
                       file_type):
@@ -558,8 +559,8 @@ def get_tree_filename(seeded_simulation_output_dir,
            }
     if file_type not in ext.keys():
         raise ValueError('Invalid file_type selection for tree export.')
-        
-    filename = f'{seed_folder}_{tree_type}_tree_{tree_subtype}{ext[file_type]}'
+    foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
+    filename = f'{experiment_name}_{foldername}_{seed_folder}_{tree_type}_tree_{tree_subtype}{ext[file_type]}'
     return filename
 
 def get_tree_file_filepath(experiment_name,
@@ -570,10 +571,11 @@ def get_tree_file_filepath(experiment_name,
     experiment_tree_simulation_files_dir = dm.get_experiment_tree_simulation_files_dir(
                                                                     experiment_name,
                                                                     seeded_simulation_output_dir)
-    tree_filename = get_tree_filename(seeded_simulation_output_dir,
-                          tree_type,
-                          tree_subtype,
-                          file_type)
+    tree_filename = get_tree_filename(experiment_name,
+                                seeded_simulation_output_dir,
+                                tree_type,
+                                tree_subtype,
+                                file_type)
     return os.path.join(experiment_tree_simulation_files_dir,tree_filename)
 
 def get_tree_plot_filepath(experiment_name,
@@ -584,10 +586,11 @@ def get_tree_plot_filepath(experiment_name,
     experiment_tree_simulation_plots_dir = dm.get_experiment_tree_simulation_plots_dir(
                                                                     experiment_name,
                                                                     seeded_simulation_output_dir)
-    tree_filename = get_tree_filename(seeded_simulation_output_dir,
-                          tree_type,
-                          tree_subtype,
-                          file_type)
+    tree_filename = get_tree_filename(experiment_name,
+                                      seeded_simulation_output_dir,
+                                      tree_type,
+                                      tree_subtype,
+                                      file_type)
     return os.path.join(experiment_tree_simulation_plots_dir,tree_filename)
 
 def export_tree(tree,
