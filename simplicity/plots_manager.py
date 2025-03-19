@@ -1318,6 +1318,7 @@ def plot_infections_hist(R_eff_data, colormap_df, ax, window_size):
     # Set y-limits 
     max_stacked = bottom.max()
     ax.set_ylim(0, max_stacked * 1.2)
+    
 
 def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size, threshold):
     ''' Plot average R_effective and lineage (filtered by threshold of occurence) R_effective
@@ -1391,6 +1392,7 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     seed = os.path.basename(seeded_simulation_output_dir)
     plt.savefig(os.path.join(experiment_plots_dir, 
                              f"{experiment_name}_{foldername}_{seed}_R_effective.png"))
+    plt.close()
 
 
 
