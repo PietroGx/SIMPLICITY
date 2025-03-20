@@ -68,6 +68,7 @@ class Population:
         self.phylodots = []         # needed to name lineages
         self.sequencing_data = []
         # ---------------------------------------------------------------------
+        
         self.lineage_frequency = [] # count lineage frequency in the population
         
         # =====================================================================
@@ -86,6 +87,10 @@ class Population:
                            self.detectables,
                            self.susceptibles
                            ]]
+        
+        self.last_infection = {}    # tracks the information about the last infection event
+                                    # that happened in the simulaiton, used for 
+                                    # R_effective calculations
         self.R_effective_trajectory = []
         self.fitness_trajectory = [[0,[0,0]]]  
         
@@ -292,8 +297,8 @@ class Population:
         
         # virus (select lineage at random to be transmitted)
         index = self.rng4.integers(0,self.individuals[parent]['IH_virus_number'])
-        parent_lineage = self.individuals[parent]['IH_lineages'][index]
-        self.individuals[new_inf]['IH_lineages'].append(parent_lineage)
+        transmitted_lineage = self.individuals[parent]['IH_lineages'][index]
+        self.individuals[new_inf]['IH_lineages'].append(transmitted_lineage)
         # lineage fitness
         self.individuals[new_inf]['IH_virus_fitness'] = [
             self.individuals[parent]['IH_virus_fitness'][index]]
@@ -305,8 +310,10 @@ class Population:
         # state
         self.individuals[new_inf]['state'] = 'infected'
         
-        # store infected info for R effective
-        self.R_effective_trajectory.append([self.time,parent,parent_lineage])
+        # store infection info for R effective
+        self.last_infection = {'time_infection':self.time, 
+                               'transmitter_index':parent,
+                               'transmitted_lineage':transmitted_lineage}
         
         # update susceptibles and infected 
         self.susceptibles -= 1
@@ -570,6 +577,27 @@ class Population:
             self.consensus_snapshot.append([self.get_lineage_genome(lineage_name),
                                                 frequency,
                                                 t])
+    def update_R_effective_trajectory(self):
+        for individual_index in self.infected_i:
+            
+            if self.time == self.last_infection['time_infection']:
+                individual_index = self.last_infection['transmitter_index']
+                lineage_transmitted = self.last_infection['transmitted_lineage']
+                new_infections_at_t = 1
+                # store infection info for R effective
+                self.R_effective_trajectory.append([self.time,
+                                           individual_index,
+                                           lineage_transmitted,
+                                           new_infections_at_t])
+            else:
+                new_infections_at_t = 0
+                individual_lineages = self.individuals[individual_index]['IH_lineages']
+                # store infection info for R effective
+                for IH_lineage_index in range(0,len(individual_lineages)):
+                    self.R_effective_trajectory.append([self.time,
+                                                    individual_index,
+                                                    individual_lineages[IH_lineage_index],
+                                                    new_infections_at_t])
             
     # -------------------------------------------------------------------------
     
@@ -605,12 +633,14 @@ class Population:
         times = [item[0] for item in self.R_effective_trajectory]
         parents = [item[1] for item in self.R_effective_trajectory]
         lineages = [item[2] for item in self.R_effective_trajectory]
+        new_infections_at_t = [item[3] for item in self.R_effective_trajectory]
         
         # Create a pandas DataFrame
         df = pd.DataFrame({
             'Time': times,
-            'Parent': parents,
-            'Lineage': lineages
+            'Individual': parents,
+            'Lineage': lineages,
+            'Infections_at_t':new_infections_at_t
         })
         
         return df

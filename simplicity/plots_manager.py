@@ -1351,12 +1351,12 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     ax1.plot(R_effective_avg_df['Time'], R_effective_avg_df['R_effective'], 
              color='black', label=R_effective_avg_label)
     
-    # # Plot hline
+    # Plot hline
     # Compute the overall average of the sliding window values
-    # R_avg = R_effective_avg_df["R_effective"].mean()
-    # total_time_range = [0, 365]
-    # ax1.hlines(R_avg, *total_time_range, colors='red', linestyles='dashed', 
-    #            label=f'Overall avg {R_avg}')
+    R_avg = R_effective_avg_df["R_effective"].mean()
+    total_time_range = [0, max(R_effective_avg_df['Time'])]
+    ax1.hlines(R_avg, *total_time_range, colors='red', linestyles='dashed', 
+               label=f'Overall avg {R_avg}')
     
     ax1.set_title('Average R_effective in simulation')
     ax1.set_xlabel('Time (days)')

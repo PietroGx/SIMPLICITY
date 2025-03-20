@@ -637,6 +637,11 @@ def export_tree(tree,
 # -----------------------------------------------------------------------------
 #                                R effective 
 # -----------------------------------------------------------------------------
+def get_filtered_lineages(seeded_simulation_output_dir, threshold):
+    lineage_frequency_df = read_lineage_frequency(seeded_simulation_output_dir)
+    # Filter lineage_names that have ever reached or exceeded the threshold
+    filtered_lineages = lineage_frequency_df[lineage_frequency_df["Frequency_at_t"] >= threshold]["Lineage_name"].unique()
+    return list(filtered_lineages)
 
 def get_R_effective_dfs(seeded_simulation_output_dir, window_size, threshold):
     ''' Process R_effective_trajectory data to get avg R effective and 
@@ -648,16 +653,16 @@ def get_R_effective_dfs(seeded_simulation_output_dir, window_size, threshold):
         ''' compute average new infections by parent (individual) in a (sliding) time window
         '''
         df = R_eff_data
-        avg_counts = []
+        r_eff = []
         for t in np.arange(0,max(df["Time"]),1):
             window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
             if not window_df.empty:
-                # Count occurrences of each unique value (parent index)
-                parents_counts = window_df['Parent'].value_counts().values  
-                # Compute mean of Parents_counts
-                avg_count = np.mean(parents_counts) if len(parents_counts) > 0 else 0  
-                avg_counts.append((t, avg_count))
-        return pd.DataFrame(avg_counts, columns=["Time", "R_effective"])
+                # Group by individual and sum infections
+                individual_infections = window_df.groupby('Individual')['Infections_at_t'].sum()
+                # Compute the average number of infections per unique individual
+                avg_infections = individual_infections.mean() if not individual_infections.empty else 0  
+                r_eff.append((t, avg_infections))
+        return pd.DataFrame(r_eff, columns=["Time", "R_effective"])
     
     # ------------- define R effective lineage df function ---------------------
     def get_R_effective_lineage_df(R_eff_data, window_size):
@@ -665,44 +670,46 @@ def get_R_effective_dfs(seeded_simulation_output_dir, window_size, threshold):
             for each lineage in the df (each parent transmits a lineage)
         '''
         df = R_eff_data
-        avg_counts = []
+        r_lineage = []
         for t in df["Time"]:
             window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
             if not window_df.empty:
-                # Count occurrences of each Parent per lineage (in time window)
-                parent_counts_per_lineage = window_df.groupby(["Lineage", "Parent"]).size().reset_index(name="count")  
-                # Compute average count of Parents per lineage
-                avg_parent_count_per_lineage = parent_counts_per_lineage.groupby("Lineage")["count"].mean().reset_index()  
-                # Add the time column
-                avg_parent_count_per_lineage.insert(0, "Time", t)  
-                avg_counts.append(avg_parent_count_per_lineage)
-        
-        result_df = pd.concat(avg_counts, ignore_index=True)  # Concatenate all the dataframes
+                # Sum the infections per individual within each lineage
+                infections_per_individual = window_df.groupby(["Lineage", "Individual"])["Infections_at_t"].sum().reset_index()
+                # Compute the average infections per individual for each lineage
+                avg_infections_per_lineage = infections_per_individual.groupby("Lineage")["Infections_at_t"].mean().reset_index()
+                # Add the time column and update
+                avg_infections_per_lineage.insert(0, "Time", t)
+                r_lineage.append(avg_infections_per_lineage)
+
+        result_df = pd.concat(r_lineage, ignore_index=True)  # Concatenate all the dataframes
         result_df.columns = ["Time", 'Lineage', "Lineage R_effective"]
         return result_df
     
-    # ----------- define filtering function for R eff lineage data ------------
-    def get_R_eff_lineage_filtered(R_eff_data, threshold):
-        ''' Filter R_effective_trajectory data by occurrence threshold before
-            calculating the lineages avg R effective.
+    # ----------- define filtering function for R eff lineage data ------------   
+    def get_R_eff_lineage_filtered(R_effective_lineage_df, threshold):
+        ''' Filter R_effective_lineage_df data by occurrence threshold.
         '''
-        lin_prevalence_count = R_eff_data['Lineage'].value_counts(normalize=True)
-        lin_to_keep = lin_prevalence_count[lin_prevalence_count >= threshold].index
-        R_eff_data_filtered = R_eff_data[R_eff_data['Lineage'].isin(lin_to_keep)].copy()
-
-        R_effective_lineage_df = get_R_effective_lineage_df(R_eff_data_filtered, window_size)
+        # Get filtered lineages based on the threshold
+        filtered_lineages = get_filtered_lineages(seeded_simulation_output_dir, threshold)
+        
+        # Filter the dataframe to keep only the lineages in filtered_lineages
+        filtered_df = R_effective_lineage_df[R_effective_lineage_df["Lineage"].isin(filtered_lineages)]
+        
         # Pivot the DataFrame for plotting
-        pivot_R_effective_lineage_df = R_effective_lineage_df.pivot(index="Time", columns='Lineage', values="Lineage R_effective")
+        pivot_R_effective_lineage_df = filtered_df.pivot(index="Time", columns='Lineage', values="Lineage R_effective")
         return pivot_R_effective_lineage_df
+
     # -------------------------------------------------------------------------
     # import R effective data
     R_eff_data = read_R_effective_trajectory(seeded_simulation_output_dir)
     # R effective avg
     R_effective_avg_df = get_R_effective_avg_df(R_eff_data, window_size)
     # R effective lineage
-    R_effective_lineage_df = get_R_eff_lineage_filtered(R_eff_data, threshold)
-    
-    return R_effective_avg_df, R_effective_lineage_df
+    R_effective_lineage_df = get_R_effective_lineage_df(R_eff_data, window_size)
+    # R effective filtered
+    R_effective_lineage_df_filtered = get_R_eff_lineage_filtered(R_effective_lineage_df, threshold)
+    return R_effective_avg_df, R_effective_lineage_df_filtered
 
 def get_R_effective_avg_csv_filepath(experiment_name, 
                                      seeded_simulation_output_dir, 
