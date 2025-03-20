@@ -135,8 +135,7 @@ def select_seeded_simulations_to_plot(experiment_name, time_threshold, lineage_n
                             seeds_per_dir[seed] = [ssod]
     
     # Keep only directories with seeds that appear in every filtered list
-    common_seeds = set.intersection(*[set(seeds) for seeds in seeds_per_dir.values()])
-    print(common_seeds)
+    common_seeds = [key for key in seeds_per_dir if len(seeds_per_dir[key]) == len(simulation_output_dirs)]
     final_filtered_dirs = [dir_ for seed, dirs in seeds_per_dir.items() if seed in common_seeds for dir_ in dirs]
     kept_seeds = sorted(list(common_seeds))
     return final_filtered_dirs, kept_seeds
