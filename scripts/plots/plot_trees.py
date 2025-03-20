@@ -128,12 +128,12 @@ def select_seeded_simulations_to_plot(experiment_name, time_threshold, lineage_n
                     
                     if match:
                         seed = match.group(1)
-                        print(seed)
+                        
                         if seed in seeds_per_dir:
                             seeds_per_dir[seed].append(ssod)
                         else:
                             seeds_per_dir[seed] = [ssod]
-
+    print(seeds_per_dir)
     # Keep only directories with seeds that appear in every filtered list
     common_seeds = set.intersection(*[set(seeds) for seeds in seeds_per_dir.values()])
     
