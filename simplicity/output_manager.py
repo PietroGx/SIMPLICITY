@@ -671,7 +671,7 @@ def get_R_effective_dfs(seeded_simulation_output_dir, window_size, threshold):
         '''
         df = R_eff_data
         r_lineage = []
-        for t in df["Time"]:
+        for t in np.arange(0,max(df["Time"]),1):
             window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
             if not window_df.empty:
                 # Sum the infections per individual within each lineage
