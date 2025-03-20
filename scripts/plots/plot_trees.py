@@ -125,9 +125,10 @@ def select_seeded_simulations_to_plot(experiment_name, time_threshold, lineage_n
                     
                     # Extract seed number
                     match = seed_pattern.search(ssod)
-                    print(match)
+                    
                     if match:
                         seed = match.group(1)
+                        print(seed)
                         if seed in seeds_per_dir:
                             seeds_per_dir[seed].append(ssod)
                         else:
