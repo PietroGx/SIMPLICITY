@@ -579,26 +579,39 @@ class Population:
                                                 t])
     def update_R_effective_trajectory(self):
         for individual_index in self.infected_i:
-            
-            if self.time == self.last_infection['time_infection']:
-                individual_index = self.last_infection['transmitter_index']
-                lineage_transmitted = self.last_infection['transmitted_lineage']
-                new_infections_at_t = 1
-                # store infection info for R effective
-                self.R_effective_trajectory.append([self.time,
-                                           individual_index,
-                                           lineage_transmitted,
-                                           new_infections_at_t])
-            else:
-                new_infections_at_t = 0
-                individual_lineages = self.individuals[individual_index]['IH_lineages']
-                # store infection info for R effective
-                for IH_lineage_index in range(0,len(individual_lineages)):
+            try:
+                if self.time == self.last_infection['time_infection']:
+                    individual_index = self.last_infection['transmitter_index']
+                    lineage_transmitted = self.last_infection['transmitted_lineage']
+                    new_infections_at_t = 1
+                    # store infection info for R effective
                     self.R_effective_trajectory.append([self.time,
+                                               individual_index,
+                                               lineage_transmitted,
+                                               new_infections_at_t])
+                
+                else:
+                    new_infections_at_t = 0
+                    individual_lineages = self.individuals[individual_index]['IH_lineages']
+                    # store infection info for R effective
+                    for IH_lineage_index in range(0,len(individual_lineages)):
+                        self.R_effective_trajectory.append([self.time,
                                                     individual_index,
                                                     individual_lineages[IH_lineage_index],
                                                     new_infections_at_t])
-            
+            except:
+                if self.last_infection == {}:
+                    new_infections_at_t = 0
+                    individual_lineages = self.individuals[individual_index]['IH_lineages']
+                    # store infection info for R effective
+                    for IH_lineage_index in range(0,len(individual_lineages)):
+                        self.R_effective_trajectory.append([self.time,
+                                                    individual_index,
+                                                    individual_lineages[IH_lineage_index],
+                                                    new_infections_at_t])
+                
+                else:
+                    raise ValueError('There is something wrong with R_effective_trajectory')
     # -------------------------------------------------------------------------
     
     def individuals_data_to_df(self):
