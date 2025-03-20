@@ -82,12 +82,15 @@ def generate_and_plot_trees(experiment_name,seeded_simulation_output_dir):
                           colormap_df,
                           individuals_lineages,
                           ete_inf_tree_filepath)
+    print('')
     pm.plot_circular_tree(ete_phylo_tree,
                           'phylogenetic',
                           colormap_df,
                           individuals_lineages,
                           ete_phylo_tree_filepath)
-
+    print('------------------------------------------------------------------')
+    print('')
+    
 def select_seeded_simulations_to_plot(experiment_name, time_threshold, lineage_number_threshold):
     """
     Filters simulation output directories by:
