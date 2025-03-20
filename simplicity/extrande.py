@@ -169,20 +169,21 @@ def extrande_factory(phenotype_model, parameters,
                         population.add_variant()
                     elif a1 < tau_2  <= a1+a2:  # reaction 2 - diagnosis
                         population.diagnosis(seq_rate)
-                        
                         # store_dia_t.append(t)
                                             
                     elif tau_2 <= a1:           # reaction 1 - infection
                         population.infection()
-                        
                         # store_inf_t.append(t)
                         
                     # save the system state at time t
                     population.update_trajectory()
+                    # update R_effective trajectory
+                    population.update_R_effective_trajectory()
                     # update count of lineages frequency
-                    if math.floor(t) > t_day: # only count once per day
-                        t_day += 1    
-                        population.update_lineage_frequency_t(t)
+                    
+                if math.floor(t) > t_day: # only count once per day
+                    t_day += 1    
+                    population.update_lineage_frequency_t(t)
                 
                 ##  break if conditions are met
                 if population.infected == 0:
@@ -344,6 +345,8 @@ def extrande_factory(phenotype_model, parameters,
                         # store_inf_t.append(t)
                     # save the system state at time t
                     population.update_trajectory()
+                    # update R_effective trajectory
+                    population.update_R_effective_trajectory()
                 
                 
                 # pop_size_runtime_plot_coord.append((time.time()-start00, population.infected))

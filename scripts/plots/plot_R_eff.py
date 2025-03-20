@@ -28,7 +28,7 @@ def select_and_plot_R_effective(experiment_name, window_size, lin_threshold, sel
                         pm.plot_R_effective(experiment_name, 
                                             seeded_simulation_output_dir, 
                                             window_size, lin_threshold)
-                        print('Plot R effective: COMPLETE.')
+                        print('Plot R effective: success.')
                         print('')
                     except:
                         print('Plotting failed, check dataframes!')

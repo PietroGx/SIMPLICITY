@@ -395,7 +395,14 @@
 	* updated name of simulation trajectory plots and lineages tabs
 	* added script to sort plots by seed number
 	* prepared new experiment to run (generate_data_trees_and_R_eff)
+
+2026-20-03 pietro gerletti
 	
+	Version 0.14.0
+	
+	* Changed the way we store R_effective trajectory (correcting mistake in calculations)
+	* Updated tree_plotting script to automatically filter by seeds shared by simulations after filtering
+	* added average R line to R_effective plot
 	
 	
 	
