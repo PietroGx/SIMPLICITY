@@ -404,7 +404,11 @@
 	* Updated tree_plotting script to automatically filter by seeds shared by simulations after filtering
 	* added average R line to R_effective plot
 	
+2026-20-03 pietro gerletti
 	
+	Version 0.14.1
+	
+	* Working on fixing R effective plot.
 	
 	
 	

@@ -1291,7 +1291,7 @@ def plot_infections_hist(R_eff_data, colormap_df, ax, window_size):
     df = R_eff_data
     # Define bin edges based on window size
     max_time = df['Time'].max()
-    bin_edges = np.arange(0, max_time + window_size, window_size)
+    bin_edges = np.arange(0, max_time, window_size)
     # Compute bin centers and adjust bar width 
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     bin_width = (bin_edges[1] - bin_edges[0]) * 0.97
@@ -1301,7 +1301,7 @@ def plot_infections_hist(R_eff_data, colormap_df, ax, window_size):
     bottom = np.zeros(len(bin_centers))
     # Create stacked bars for each lineage
     for lineage in lineages_cat:
-        subset = df[df['Lineage'] == lineage]
+        subset = df[(df['Lineage'] == lineage) & (df['Infections_at_t'] == 1)]
         counts, _ = np.histogram(subset['Time'], bins=bin_edges)
         # color barstack
         color = get_lineage_color(lineage, colormap_df)
