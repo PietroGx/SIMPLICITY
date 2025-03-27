@@ -67,7 +67,8 @@ def extrande_factory(phenotype_model, parameters,
     # @profile
     def extrande_0(population):
         # count number of infectious and detectables individuals
-        population.update_inf_det()
+        population.update_infectious()
+        population.update_detectables()
         # record computation start time
         start00 = time.time()
         # start time
@@ -135,7 +136,8 @@ def extrande_factory(phenotype_model, parameters,
                 population.recovery()
                 
                 # update the number of detectable and infectious individuals
-                population.update_inf_det()
+                population.update_infectious()
+                population.update_detectables()
                 ###############################################################
                 
                 # update fitness values of all individuals in the simulation
@@ -177,10 +179,10 @@ def extrande_factory(phenotype_model, parameters,
                         
                     # save the system state at time t
                     population.update_trajectory()
-                    # update R_effective trajectory
-                    population.update_R_effective_trajectory()
-                    # update count of lineages frequency
+                    # # update R_effective trajectory
+                    # population.update_R_effective_trajectory()
                     
+                # update count of lineages frequency    
                 if math.floor(t) > t_day: # only count once per day
                     t_day += 1    
                     population.update_lineage_frequency_t(t)
@@ -228,7 +230,8 @@ def extrande_factory(phenotype_model, parameters,
     # @profile
     def extrande_1(population):
         # count number of infectious and detectables individuals
-        population.update_inf_det()
+        population.update_infectious()
+        population.update_detectables()
         
         # record computation start time
         start00 = time.time()
@@ -298,7 +301,8 @@ def extrande_factory(phenotype_model, parameters,
                 population.recovery()
                 
                 # update the number of detectable and infectious individuals
-                population.update_inf_det()
+                population.update_infectious()
+                population.update_detectables()
                 ###############################################################
                 
                 # calculate consensus sequence every 10 days
@@ -345,8 +349,8 @@ def extrande_factory(phenotype_model, parameters,
                         # store_inf_t.append(t)
                     # save the system state at time t
                     population.update_trajectory()
-                    # update R_effective trajectory
-                    population.update_R_effective_trajectory()
+                    # # update R_effective trajectory
+                    # population.update_R_effective_trajectory()
                 
                 
                 # pop_size_runtime_plot_coord.append((time.time()-start00, population.infected))

@@ -30,8 +30,9 @@ def select_and_plot_R_effective(experiment_name, window_size, lin_threshold, sel
                                             window_size, lin_threshold)
                         print('Plot R effective: success.')
                         print('')
-                    except:
-                        print('Plotting failed, check dataframes!')
+                    except Exception as e:
+                        raise ValueError(f'Plotting failed, check dataframes! Error: {e}')
+                        break
 def main():
     # Set up the argument parser
     parser = argparse.ArgumentParser(description="Plot")
@@ -48,5 +49,9 @@ def main():
                                 args.selected_seeds)
     
 if __name__ == "__main__":
-    main()
+    # main()
+    select_and_plot_R_effective('test_local_experiment_serial_#1', 
+                                14,
+                                0,
+                                [7])
     

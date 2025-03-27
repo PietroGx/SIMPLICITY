@@ -37,17 +37,21 @@ import simplicity.output_manager as om
 import simplicity.runners.serial 
 from   simplicity.runners.unit_run import run_seeded_simulation
 import types
+
 experiment_name = 'Test_runme'
-
-## experiment settings (sm.write_settings arguments)
-
+# experiment settings
 def user_set_experiment_settings():
-    parameters      = {}
+    varying_params = {
+        'phenotype_model': ['distance from wt', 'immune waning']
+    }
+    # parameters to keep fixed (but different from standard_value) across combinations
+    fixed_params = {}
+    
     n_seeds         = 2
-    return (parameters, n_seeds)
+    return (varying_params,fixed_params,n_seeds)
 
 def run_experiment(experiment_name: str, 
-                   experiment_settings: types.FunctionType,
+                   set_experiment_parameters: types.FunctionType,
                    simplicity_runner: types.ModuleType,
                    plot_trajectory:bool,
                    archive_experiment=False):
@@ -57,9 +61,10 @@ def run_experiment(experiment_name: str,
     # setup experiment files directories
     dm.create_directories(experiment_name)
     # set parameters 
-    parameters, n_seeds = experiment_settings()
+    varying_params, fixed_params, n_seeds = set_experiment_parameters()
+    experiment_settings = sm.generate_experiment_settings(varying_params, fixed_params)
     # Write experiment settings file
-    sm.write_experiment_settings(experiment_name, parameters, n_seeds)
+    sm.write_experiment_settings(experiment_name, experiment_settings, n_seeds)
     # write simulation parameters files
     sm.read_settings_and_write_simulation_parameters(experiment_name)
     # write seeded simulation parameters files

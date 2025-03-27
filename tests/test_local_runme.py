@@ -23,15 +23,37 @@ The set of all simulations is what we call an experiment.
 """
 from simplicity.runme import run_experiment
 from simplicity.dir_manager import get_experiment_output_dir
+import simplicity.settings_manager as sm
 import simplicity.runners.serial
 import simplicity.runners.multiprocessing
 import os
 
-## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
-    parameters      = {'phenotype_model':['immune waning','distance from wt']}
-    n_seeds         = 1
-    return (parameters, n_seeds)
+    # --------- Specify parameter values manually -----------------------------
+    
+    # # parameters value to get combinations from
+    # varying_params = {
+    #     'phenotype_model': ['distance from wt', 'immune waning']
+    # }
+    # # parameters to keep fixed (but different from standard_value) across combinations
+    # fixed_params = {
+    #     'infected_individuals_at_start': 10,
+    #     'final_time': 365
+    # }
+    
+    # ---------- OR import them from file -------------------------------------
+    
+    # leave empty if you only want to import parameters values from file
+    varying_params = {}
+    # import fixed parameters from user geenerated file. You can either create 
+    # it manually or use the provided script: generate_user_set_parameters_file.py
+    filename = 'standard_values.json'
+    fixed_params = sm.read_user_set_parameters_file(filename)
+   
+    # -------------------------------------------------------------------------
+    n_seeds = 10
+    
+    return (varying_params,fixed_params,n_seeds)
 
 def check_output_file(directory, filename): 
     file_path = os.path.join(directory, filename)
@@ -87,7 +109,6 @@ def test_experiment_output(experiment_name):
             check_output_file(seed_directory, 'sequencing_data_regression.csv')
             check_output_file(seed_directory, 'sequencing_data.fasta')
             check_output_file(seed_directory, 'simulation_trajectory.csv')
-            check_output_file(seed_directory, 'R_effective_trajectory.csv')
     print('')
     print(f'TEST {experiment_name} OUTPUT -- SUCCESS.')
     print('##########################################')

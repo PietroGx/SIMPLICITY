@@ -12,7 +12,7 @@ import simplicity.runners.slurm
 
 def run_experiment_script(runner:str, 
                           experiment_number:int, 
-                          fixture_experiment_settings,
+                          user_set_experiment_settings,
                           experiment_name):
     if runner == 'serial':
         runner_module = simplicity.runners.serial
@@ -29,7 +29,7 @@ def run_experiment_script(runner:str,
     print('')
     try:
         run_experiment(f'{experiment_name}_#{experiment_number}', 
-                       fixture_experiment_settings,             
+                       user_set_experiment_settings,             
                        simplicity_runner  = runner_module,
                        plot_trajectory = True,
                        archive_experiment = False)

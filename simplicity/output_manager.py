@@ -215,6 +215,7 @@ def read_individuals_data(seeded_simulation_output_dir):
     df = pd.read_csv(trajectory_file_path, index_col=0)
     df['IH_lineages'] = df['IH_lineages'].apply(ast.literal_eval)
     df['IH_virus_fitness'] = df['IH_virus_fitness'].apply(ast.literal_eval) 
+    df['new_infections'] = df['new_infections'].apply(ast.literal_eval)
     return df
 
 def save_phylogenetic_data(simulation_output, seeded_simulation_output_dir):
@@ -654,14 +655,24 @@ def get_R_effective_dfs(seeded_simulation_output_dir, window_size, threshold):
         '''
         df = R_eff_data
         r_eff = []
+        # individual_infections_df = []
         for t in np.arange(0,max(df["Time"]),1):
             window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
             if not window_df.empty:
                 # Group by individual and sum infections
                 individual_infections = window_df.groupby('Individual')['Infections_at_t'].sum()
+                
+                # print(individual_infections[individual_infections >= 1])
+                # individual_infections = individual_infections.reset_index()
+                # individual_infections.insert(0, "Time", t)
+                # print(individual_infections)
+                # individual_infections_df.append(individual_infections)
+                
                 # Compute the average number of infections per unique individual
                 avg_infections = individual_infections.mean() if not individual_infections.empty else 0  
                 r_eff.append((t, avg_infections))
+        # individual_infections_df_check = pd.concat(individual_infections_df, ignore_index=True)  # Concatenate all the dataframes
+        # individual_infections_df_check.to_csv(f'{seeded_simulation_output_dir}/individuals_infections.csv')
         return pd.DataFrame(r_eff, columns=["Time", "R_effective"])
     
     # ------------- define R effective lineage df function ---------------------
