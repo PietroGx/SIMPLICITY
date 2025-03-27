@@ -9,7 +9,6 @@ import simplicity.evolution.reference as ref
 import simplicity.phenotype.update    as pheno
 from   simplicity.random          import randomgen
 import pandas as pd
-import copy
 import numpy as np
 
 class Population:
@@ -99,16 +98,15 @@ class Population:
         self.individuals = {}              # store individuals data
         self.host_model  = h.Host(tau_3)   # intra host model for normal individuals 
         
-        self.reservoir_i = []    # list of indices of individuals in the reservoir
-        self.susceptibles_i = [] # list of susceptible individuals indices  
-        self.infected_i = []     # list of infected individuals indices 
-        self.diagnosed_i = []    # list of diagnosed individuals indices
-        self.recovered_i = []    # list of recovered individuals indices
-        self.deceased_i = []     # list of deceased individuals indices
+        self.reservoir_i    = set()    # list of indices of individuals in the reservoir
+        self.susceptibles_i = set()    # list of susceptible individuals indices  
+        self.infected_i     = set()    # list of infected individuals indices 
+        self.diagnosed_i    = set()    # list of diagnosed individuals indices
+        self.recovered_i    = set()    # list of recovered individuals indices
         
-        self.infectious_i = []   # list of infectious individuals indices 
-        self.infectious_normal_i = []
-        self.detectable_i = []   # list of detectable individuals indices 
+        # self.infectious_i = []    
+        self.infectious_normal_i = set()   # list of infectious individuals indices
+        self.detectable_i        = set()   # list of detectable individuals indices 
         
         # dictionary with all individuals data 
         self.individuals = self._init_individuals(size,I_0)
@@ -138,39 +136,47 @@ class Population:
             
             dic[i] = {
                      't_infection' : None,
-                     't_final'     : None,
+                     't_infectious': None,
+                     't_not_infectious': None,
+                     
                      'parent'      : None,
+                     'new_infections'  : [],
+                     
                      'state_t'     : 0,
                      'state'       : 'susceptible',
                      'model'       : self.host_model,
                      'type'        : 'normal',
+                     
                      'IH_lineages'   : [],
+                     'lineages_number': 1,
                      
                      'fitness'     : 1,
                      'IH_virus_fitness' : [1],
                      'IH_virus_number'    : 1,
-                     'IH_virus_max': self.rng3.integers(1,6),
-                     'lineages_number': 1
+                     'IH_virus_max': self.rng3.integers(1,6)
                     }
             # add index of individuals to either susceptibles indices or to 
             # reservoir indices (the simulaiton starts with a pool of susceptibles)
             # that is replenished from the reservoir every time individuals
             # are removed from the system
             if i < size:
-                self.susceptibles_i.append(i) 
+                self.susceptibles_i.add(i) 
             else:
-                self.reservoir_i.append(i)
+                self.reservoir_i.add(i)
             
         # set individuals infected at the beginning of the simulation
         for i in range(I_0): # update data of individuals infected at the beginning of the simulation
             
             dic[i]['parent'] = 'root'
             dic[i]['t_infection'] = 0
+            dic[i]['t_infectious'] = 0
             dic[i]['state_t'] = 5
             dic[i]['state'] = 'infected'
             dic[i]['IH_lineages'] = ['wt']
             
-            self.infected_i.append(self.susceptibles_i.pop(self.susceptibles_i.index(i)))
+            self.susceptibles_i.remove(i)  
+            self.infected_i.add(i)
+            
         # update lineage_frequency
         self.lineage_frequency.append({'Lineage_name'              :'wt',
                                        'Time_sampling'             :0,
@@ -192,129 +198,105 @@ class Population:
         self.infected  -= 1
         
         # select random patient to be diagnosed
-        patient_index = self.rng4.choice(self.detectable_i)
+        diagnosed_individual_i = self.rng4.choice(list(self.detectable_i))
         
         if self.rng6.uniform(0,1) < seq_rate:
             # store sequencing data
             # patient_id, time, genome, subst number, patient time, inf duration
             i = 0
-            for lineage_name in self.individuals[patient_index]['IH_lineages']:
+            for lineage_name in self.individuals[diagnosed_individual_i]['IH_lineages']:
                 genome = self.get_lineage_genome(lineage_name)
                 self.sequencing_data.append([
-                    patient_index,
+                    diagnosed_individual_i,
                     self.time,
                     genome,
                     len(genome),
-                    self.individuals[patient_index]['type'],
-                    self.time - self.individuals[patient_index]['t_infection'],
+                    self.individuals[diagnosed_individual_i]['type'],
+                    self.time - self.individuals[diagnosed_individual_i]['t_infection'],
                     i
                     ])
                 i+=1
         
         # update the active variants number
-        self.active_variants_n -= self.individuals[patient_index]['IH_virus_number']
-        
-        # 0 % of patients diagnosed die
-        if self.rng4.uniform(0,1) < 0:
-            self.deceased += 1
+        self.active_variants_n -= self.individuals[diagnosed_individual_i]['IH_virus_number']
+    
+        self.diagnosed += 1
+        # set patient as diagnosed
+        self.individuals[diagnosed_individual_i]['t_not_infectious'] = self.time
+        self.individuals[diagnosed_individual_i]['state']   = 'diagnosed'
+       
+        # remove individual's index from detectable_i, infectious_i and 
+        # infected_i and add it to diagnosed_i
+        if diagnosed_individual_i in self.infectious_normal_i:
+            self.infectious_normal_i.remove(diagnosed_individual_i)
+            self.infectious_normal -= 1
             
-            # set patient as deceased
-            self.individuals[patient_index]['t_final'] = self.time
-            self.individuals[patient_index]['state']   = 'deceased'
-            
-            # remove individual's index from detectable_i, infectious_i and 
-            # infected_i and add it to deceased_i
-            try:
-                ## in case the diagnosed patient was infectious, updated the infectious list
-                self.infectious_normal_i.pop(self.infectious_normal_i.index(patient_index))
-                self.infectious_normal -= 1
-            except:
-                pass
-            ## update detectables
-            self.detectable_i.pop(self.detectable_i.index(patient_index))
-            self.detectables -= 1
-            
-            ## update deceased and infected
-            self.deceased_i.append(self.infected_i.pop(self.infected_i.index(patient_index)))
-           
-        else:
-            self.diagnosed += 1
-            # set patient as diagnosed
-            self.individuals[patient_index]['t_final'] = self.time
-            self.individuals[patient_index]['state']   = 'diagnosed'
-           
-            # remove individual's index from detectable_i, infectious_i and 
-            # infected_i and add it to diagnosed_i
-            try:
-                ## in case the diagnosed patient was infectious, updated the infectious list
-                self.infectious_normal_i.pop(self.infectious_normal_i.index(patient_index))
-                self.infectious_normal -= 1
-            except:
-                pass
-            ## update detectables
-            self.detectable_i.pop(self.detectable_i.index(patient_index))
-            self.detectables -= 1
-            ## update diagnosed and infected
-            self.diagnosed_i.append(self.infected_i.pop(self.infected_i.index(patient_index)))
-        
+        self.detectable_i.remove(diagnosed_individual_i)
+        self.detectables -= 1
+        ## update diagnosed and infected
+        self.infected_i.discard(diagnosed_individual_i)
+        self.diagnosed_i.add(diagnosed_individual_i)
+    
         # add a susceptible back in from reservoir
         self.susceptibles += 1
-        new_susceptible_index = self.reservoir_i.pop(0)
-        self.susceptibles_i.append(new_susceptible_index)
+        new_susceptible_index = self.reservoir_i.pop()
+        self.susceptibles_i.add(new_susceptible_index)
        
     def infection(self):
         '''
         Select a random susceptible individual to be infected and tags it as 
         such. Update compartments and infected_i
         '''
-        
+        # Convert sets to lists for random sampling
+        infectious_i_list = list(self.infectious_normal_i)
+        susceptibles_list = list(self.susceptibles_i)
+       
         # select random patient to be the transmitter
-        fitness_inf = [self.individuals[k]['fitness'] for k in self.infectious_normal_i]
+        fitness_inf = [self.individuals[i]['fitness'] for i in infectious_i_list]
         fitsum = np.sum(fitness_inf)
     
-        if fitsum != 0:
-            normed_fitness = [j/fitsum for j in fitness_inf]
-            parent = self.rng4.choice(self.infectious_normal_i,p=normed_fitness)
+        if fitsum > 0:
+            normed_fitness = [f/fitsum for f in fitness_inf]
+            parent = self.rng4.choice(infectious_i_list,p=normed_fitness)
         else:
-            parent = self.rng4.choice(self.infectious_normal_i)
-            
-        # count inf reactions
-        self.count_infections += 1
+            parent = self.rng4.choice(infectious_i_list)
         
         # select random patient to be infected
-        new_inf = self.rng4.choice(self.susceptibles_i)
+        new_infected_index = self.rng4.choice(susceptibles_list)
             
         # update the active variants number
-        self.active_variants_n += self.individuals[new_inf]['IH_virus_number']
+        self.active_variants_n += self.individuals[new_infected_index]['IH_virus_number']
+       
+        # Move individual from susceptibles to infected
+        self.susceptibles_i.discard(new_infected_index)
+        self.infected_i.add(new_infected_index)
         
-        # move index to infected list
-        self.infected_i.append(self.susceptibles_i.pop(
-            self.susceptibles_i.index(new_inf)))
         # time of infection
-        self.individuals[new_inf]['t_infection'] = self.time
+        self.individuals[new_infected_index]['t_infection'] = self.time
         # parent
-        self.individuals[new_inf]['parent'] = parent
+        self.individuals[new_infected_index]['parent'] = parent
         
         # virus (select lineage at random to be transmitted)
         index = self.rng4.integers(0,self.individuals[parent]['IH_virus_number'])
         transmitted_lineage = self.individuals[parent]['IH_lineages'][index]
-        self.individuals[new_inf]['IH_lineages'].append(transmitted_lineage)
+        self.individuals[new_infected_index]['IH_lineages'].append(transmitted_lineage)
+        
         # lineage fitness
-        self.individuals[new_inf]['IH_virus_fitness'] = [
+        self.individuals[new_infected_index]['IH_virus_fitness'] = [
             self.individuals[parent]['IH_virus_fitness'][index]]
         
         # update individual fitness (average of variants fitness)
-        self.individuals[new_inf]['fitness'] = np.average(
-                    self.individuals[new_inf]['IH_virus_fitness']) 
+        self.individuals[new_infected_index]['fitness'] = np.average(
+                    self.individuals[new_infected_index]['IH_virus_fitness']) 
         
         # state
-        self.individuals[new_inf]['state'] = 'infected'
+        self.individuals[new_infected_index]['state'] = 'infected'
         
         # store infection info for R effective
-        self.last_infection = {'time_infection':self.time, 
-                               'transmitter_index':parent,
-                               'transmitted_lineage':transmitted_lineage}
-        
+        self.individuals[parent]['new_infections'].append({
+                                                    'time_infection':self.time, 
+                                                    'transmitted_lineage':transmitted_lineage})
+  
         # update susceptibles and infected 
         self.susceptibles -= 1
         self.infected     += 1
@@ -324,82 +306,68 @@ class Population:
         Tag recovered individuals as such, update the infected and recovered
         compartments and add the index of recovered individuals to recovered_i.
         '''
+        indices_recovered = []
+        
         for i in self.infected_i:
             if self.individuals[i]['state_t'] > 19:
-                self.individuals[i]['t_final'] = self.time
+                # update individual info
                 self.individuals[i]['state']   = 'recovered'
-                
-                # add index to recovered and remove it from infected indices
-                self.recovered_i.append(self.infected_i.pop(self.infected_i.index(i)))
+                self.individuals[i]['t_not_infectious'] = self.time
+                # add individual index to list of recovered
+                indices_recovered.append(i)
+        
                 # update the active variants number
                 self.active_variants_n -= self.individuals[i]['IH_virus_number']
-                    
+                
+                # update compartments
                 self.infected  -= 1 
                 self.recovered += 1
-                # add a susceptible back in from reservoir
                 self.susceptibles += 1
-                # add a new individual
-                new_susceptible_index = self.reservoir_i.pop(0)
-                self.susceptibles_i.append(new_susceptible_index)
-                
+                # add a susceptible back in from reservoir
+                new_susceptible_index = self.reservoir_i.pop()
+                self.susceptibles_i.add(new_susceptible_index)
+        
+        # Move recovered individuals from infected_i to recovered_i
+        for i in indices_recovered:
+            self.infected_i.remove(i)
+            self.recovered_i.add(i)
+        
     def add_variant(self):
-        
-        # select individual that will get a new variant
-        individual_index = self.rng4.choice(self.infected_i)
-        
-        # if variants present are less then the max
-        if self.individuals[individual_index]['IH_virus_number'] < self.individuals[individual_index][
-                                                               'IH_virus_max']:     
-                ## duplicate variant at random
-                # select randomly index of lineage to duplicate
-                index = self.rng4.integers(0,self.individuals[individual_index][
-                                                                   'IH_virus_number'])
-                # add IH lineage name
-                self.individuals[individual_index]['IH_lineages'].append(
-                    self.individuals[individual_index]['IH_lineages'][index]) 
-                # add IH lineage fitness 
-                self.individuals[individual_index]['IH_virus_fitness'].append(
-                    self.individuals[individual_index]['IH_virus_fitness'][index])
-                # update individual fitness (average of variants fitness)
-                self.individuals[individual_index]['fitness'] = np.average(
-                    self.individuals[individual_index]['IH_virus_fitness'])
-                # update the variants count
-                self.individuals[individual_index]['IH_virus_number'] +=1 
-                # update the active variants number
-                self.active_variants_n += 1
-                
-        # if variants present are equal to the max           
-        elif self.individuals[individual_index]['IH_virus_number'] == self.individuals[individual_index
-             ]['IH_virus_max'] and self.individuals[individual_index]['IH_virus_max']>1:
-                    ## delete a variant at random
-                     # select randomly index of variant to delete
-                    random_index = self.rng4.integers(0, len(
-                        self.individuals[individual_index]['IH_lineages']))
-                     # delete lineage
-                    self.individuals[individual_index]['IH_lineages'].pop(random_index)
-                     # delete fitness value
-                    self.individuals[individual_index]['IH_virus_fitness'].pop(random_index)
-                    ## duplicate an existing IH lineage at random
-                     # select randomly index of variant to duplicate
-                    index = self.rng4.integers(0,len(
-                        self.individuals[individual_index]['IH_lineages']))
-
-                     # add lineage name    
-                    self.individuals[individual_index]['IH_lineages'].append(
-                        self.individuals[individual_index]['IH_lineages'][index])
-                     # add IH lineage fitness 
-                    self.individuals[individual_index]['IH_virus_fitness'].append(
-                        self.individuals[individual_index]['IH_virus_fitness'][index])
-                    # update individual fitness (average of IH lineages fitness)
-                    self.individuals[individual_index]['fitness'] = np.average(
-                        self.individuals[individual_index]['IH_virus_fitness'])
-        
-        # raise error if there are too many variants
-        elif self.individuals[individual_index]['IH_virus_number'] > self.individuals[individual_index]['IH_virus_max']:
-                    raise ValueError("Too many variants in", individual_index )
-        else: 
-            pass
- 
+        """Adds a new variant to a randomly selected infected individual, 
+        duplicating an existing lineage or replacing one if at max capacity."""
+    
+        # Convert set to list for sampling
+        infected_list = list(self.infected_i)
+        individual_index = self.rng4.choice(infected_list)
+    
+        individual = self.individuals[individual_index]
+        virus_n = individual['IH_virus_number']
+        virus_max = individual['IH_virus_max']
+    
+        # -- Add a duplicate variant if under max capacity 
+        if virus_n < virus_max:
+            idx = self.rng4.integers(0, virus_n)
+    
+            individual['IH_lineages'].append(individual['IH_lineages'][idx])
+            individual['IH_virus_fitness'].append(individual['IH_virus_fitness'][idx])
+    
+            individual['IH_virus_number'] += 1
+            self.active_variants_n += 1
+    
+        # -- Replace one variant (delete + duplicate) if at max
+        elif virus_n == virus_max and virus_max > 1:
+            # Randomly delete one
+            delete_idx = self.rng4.integers(0, virus_n)
+            individual['IH_lineages'].pop(delete_idx)
+            individual['IH_virus_fitness'].pop(delete_idx)
+    
+            # Duplicate another
+            idx = self.rng4.integers(0, virus_n - 1)  # now virus_n - 1 after deletion
+            individual['IH_lineages'].append(individual['IH_lineages'][idx])
+            individual['IH_virus_fitness'].append(individual['IH_virus_fitness'][idx])
+    
+        # --- Update fitness in all valid cases ---
+        individual['fitness'] = np.average(individual['IH_virus_fitness'])
     # -------------------------------------------------------------------------
     #                              Mutations
     # -------------------------------------------------------------------------
@@ -493,38 +461,55 @@ class Population:
              ].probabilities[state],state,tau[i])
             i += 1       
         
-    def update_inf_det(self):
+    def update_infectious(self):
         '''
-        Update the lists of infectious and detectables individuals.
+        Update the list of currently infectious individuals of type 'normal'.
         '''
-        # remove indeces of individuals not infectious anymore (NORMAL)
-        for i in self.infectious_normal_i:
-            if self.individuals[i]['state_t']>=19:
-                self.infectious_normal_i.pop(self.infectious_normal_i.index(i))
-        # update the list of infectious individuals      
-        for i in list(set(self.infected_i).symmetric_difference(set(self.infectious_normal_i))):
-            if self.individuals[i]['state_t']>4 and self.individuals[i]['state_t']<19 and self.individuals[i]['type']=='normal':
-                self.infectious_normal_i.append(i)
+        prev_infectious = set(self.infectious_normal_i)
+        # Remove individuals who are no longer infectious
+        self.infectious_normal_i = {
+            i for i in self.infectious_normal_i
+            if self.individuals[i]['state_t'] < 19}
         
-        # remove indices of individuals not detectable anymore
-        for i in copy.deepcopy(self.detectable_i):
-            if self.individuals[i]['state_t']==20:
-                self.detectable_i.pop(self.detectable_i.index(i))
-        # update the list of detectable individuals
-        for i in list(set(self.infected_i).symmetric_difference(set(self.detectable_i))):
-            if self.individuals[i]['state_t']>4 and self.individuals[i]['state_t']<20:
-                self.detectable_i.append(i)
-
+        # update end infectiousness time of non infectious patients
+        no_longer_infectious = prev_infectious - self.infectious_normal_i
+        for i in no_longer_infectious:
+            self.individuals[i]['t_not_infectious'] = self.time
+    
+        # Add individuals to infectious index list and update their inf time
+        for i in self.infected_i - self.infectious_normal_i:
+            individual = self.individuals[i]
+            if 4 < individual['state_t'] < 19 and individual['type'] == 'normal':
+                self.infectious_normal_i.add(i)
+                self.individuals[i]['t_infectious'] = self.time
+                
+        # Update counter
+        self.infectious_normal = len(self.infectious_normal_i)
+        
+    def update_detectables(self):
+        '''
+        Update the list of currently detectable individuals.
+        '''
+        # Remove individuals who are no longer detectable
+        self.detectable_i = {
+            i for i in self.detectable_i
+            if self.individuals[i]['state_t'] < 20}
+    
+        # Add individuals who should now be considered detectable
+        for i in self.infected_i - self.detectable_i:
+            person = self.individuals[i]
+            if 4 < person['state_t'] < 20:
+                self.detectable_i.add(i)
+    
+        # Update counter
         self.detectables = len(self.detectable_i)
-        self.infectious_normal  = len(self.infectious_normal_i)
-        
+    
     def update_trajectory(self):
         # update the system trajectory
         self.trajectory.append([self.time,
                            self.infected,
                            self.diagnosed,
                            self.recovered,
-                           self.deceased,
                            self.infectious_normal,
                            self.detectables,
                            self.susceptibles
@@ -577,41 +562,40 @@ class Population:
             self.consensus_snapshot.append([self.get_lineage_genome(lineage_name),
                                                 frequency,
                                                 t])
-    def update_R_effective_trajectory(self):
-        for individual_index in self.infected_i:
-            try:
-                if self.time == self.last_infection['time_infection']:
-                    individual_index = self.last_infection['transmitter_index']
-                    lineage_transmitted = self.last_infection['transmitted_lineage']
-                    new_infections_at_t = 1
-                    # store infection info for R effective
-                    self.R_effective_trajectory.append([self.time,
-                                               individual_index,
-                                               lineage_transmitted,
-                                               new_infections_at_t])
+    # def update_R_effective_trajectory(self):
+    #     for individual_index in self.infectious_normal_i:
+    #         try:
+    #             if self.time == self.last_infection['time_infection'] and individual_index == self.last_infection['transmitter_index']:
+    #                 lineage_transmitted = self.last_infection['transmitted_lineage']
+    #                 new_infections_at_t = 1
+    #                 # store infection info for R effective
+    #                 self.R_effective_trajectory.append([self.time,
+    #                                            individual_index,
+    #                                            lineage_transmitted,
+    #                                            new_infections_at_t])
                 
-                else:
-                    new_infections_at_t = 0
-                    individual_lineages = self.individuals[individual_index]['IH_lineages']
-                    # store infection info for R effective
-                    for IH_lineage_index in range(0,len(individual_lineages)):
-                        self.R_effective_trajectory.append([self.time,
-                                                    individual_index,
-                                                    individual_lineages[IH_lineage_index],
-                                                    new_infections_at_t])
-            except:
-                if self.last_infection == {}:
-                    new_infections_at_t = 0
-                    individual_lineages = self.individuals[individual_index]['IH_lineages']
-                    # store infection info for R effective
-                    for IH_lineage_index in range(0,len(individual_lineages)):
-                        self.R_effective_trajectory.append([self.time,
-                                                    individual_index,
-                                                    individual_lineages[IH_lineage_index],
-                                                    new_infections_at_t])
+    #             else:
+    #                 new_infections_at_t = 0
+    #                 individual_lineages = self.individuals[individual_index]['IH_lineages']
+    #                 # store infection info for R effective
+    #                 for IH_lineage_index in range(0,len(individual_lineages)):
+    #                     self.R_effective_trajectory.append([self.time,
+    #                                                 individual_index,
+    #                                                 individual_lineages[IH_lineage_index],
+    #                                                 new_infections_at_t])
+    #         except:
+    #             if self.last_infection == {}:
+    #                 new_infections_at_t = 0
+    #                 individual_lineages = self.individuals[individual_index]['IH_lineages']
+    #                 # store infection info for R effective
+    #                 for IH_lineage_index in range(0,len(individual_lineages)):
+    #                     self.R_effective_trajectory.append([self.time,
+    #                                                 individual_index,
+    #                                                 individual_lineages[IH_lineage_index],
+    #                                                 new_infections_at_t])
                 
-                else:
-                    raise ValueError('There is something wrong with R_effective_trajectory')
+    #             else:
+    #                 raise ValueError('There is something wrong with R_effective_trajectory')
     # -------------------------------------------------------------------------
     
     def individuals_data_to_df(self):
@@ -642,21 +626,21 @@ class Population:
         
         return df
     
-    def R_effective_trajectory_to_df(self):
-        times = [item[0] for item in self.R_effective_trajectory]
-        parents = [item[1] for item in self.R_effective_trajectory]
-        lineages = [item[2] for item in self.R_effective_trajectory]
-        new_infections_at_t = [item[3] for item in self.R_effective_trajectory]
+    # def R_effective_trajectory_to_df(self):
+    #     times = [item[0] for item in self.R_effective_trajectory]
+    #     parents = [item[1] for item in self.R_effective_trajectory]
+    #     lineages = [item[2] for item in self.R_effective_trajectory]
+    #     new_infections_at_t = [item[3] for item in self.R_effective_trajectory]
         
-        # Create a pandas DataFrame
-        df = pd.DataFrame({
-            'Time': times,
-            'Individual': parents,
-            'Lineage': lineages,
-            'Infections_at_t':new_infections_at_t
-        })
+    #     # Create a pandas DataFrame
+    #     df = pd.DataFrame({
+    #         'Time': times,
+    #         'Individual': parents,
+    #         'Lineage': lineages,
+    #         'Infections_at_t':new_infections_at_t
+    #     })
         
-        return df
+    #     return df
 
 # -----------------------------------------------------------------------------
 # =============================================================================

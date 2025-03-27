@@ -410,11 +410,23 @@
 	
 	* Working on fixing R effective plot.
 	
+2026-27-03 pietro gerletti
 	
+	Version 0.15.0
 	
-	
-	
-	
+	* changed list of indices in population class to python sets and updated code accordingly
+	* individuals store t_not_infectious (for R calculation)
+	* individuals store time and number of infection caused.	
+	* refactored population.add_variant for clarity
+	* refactored infection tree builder for clarity and efficiency
+	* added experiment_example_runme
+	* updated write_experiment_settings and create generate_experiment_settings in sm
+	* updated runme
+	* changed simulation settings files and folders naming (to shorten them up)
+	                                   
+	                             
+               	                                    
+	                          
 	
 	
 	

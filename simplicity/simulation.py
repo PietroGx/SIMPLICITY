@@ -66,11 +66,7 @@ class Simplicity:
                                       self.output_directory)
         print('DONE.')
         print('')
-        print('Saving R_effective_trajectory data...')
-        om.save_R_effective_trajectory(self.simulation_output, 
-                                      self.output_directory)
-        print('DONE.')
-        print('')
+        
         
     def plot(self):
         assert hasattr(self, "simulation_output"), "simulation has not run yet. Hint: see Simplicity.run"

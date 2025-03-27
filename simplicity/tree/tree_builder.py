@@ -11,96 +11,108 @@ from ete3 import  Tree
 import simplicity.output_manager as om
 import simplicity.plots_manager as pm
 
+def create_infection_node(row, parent_node):
+    """Creates a new infection node as a child of the given parent node."""
+    return anytree.Node(
+        
+        name=str(row.Index),
+        parent=parent_node,
+        distance=row.t_infection - parent_node.t_infection,
+        label=str(row.Index),
+        leaf=True,
+        
+        t_infection=row.t_infection,
+        t_infectious=row.t_infectious,
+        t_not_infectious=row.t_not_infectious,
+        
+        state=row.state,
+        infection_type=row.type,
+        fitness=row.fitness,
+        lineage=row.IH_lineages[0]
+    )
+
+def extend_parent_node(parent_node):
+    """Creates a duplicate of the parent node as a leaf child to prolong the branch."""
+    return anytree.Node(
+        name=parent_node.name,
+        parent=parent_node,
+        distance=0,
+        label=parent_node.label,
+        leaf=True,
+        
+        t_infection=parent_node.t_infection,
+        t_infectious=parent_node.t_infectious,
+        t_not_infectious=parent_node.t_not_infectious,
+        
+        state=parent_node.state,
+        infection_type=parent_node.infection_type,
+        fitness=parent_node.fitness,
+        lineage=parent_node.lineage
+    )
+
 def infection_tree(seeded_simulation_output_dir):
-    
-    # import individuals data
+    # Import individuals data
     data = om.read_individuals_data(seeded_simulation_output_dir)
     tree = []
-    # tree root
-    root = anytree.Node('root',label='root',distance=0,
-                sequence='',leaf=False,t_infection = 0,
-                fitness=0,infection_type ='normal',
-                lineage = 'wt')
+
+    # Initialize root node
+    root = anytree.Node(
+        name='root',
+        parent=None,
+        distance=0,
+        label='root',
+        leaf=False,
+        
+        t_infection=0,
+        t_infectious=0,
+        t_not_infectious=0,
+        
+        fitness=0,
+        infection_type='normal',
+        lineage='wt'
+    )
     tree.append(root)
-    # patients 0 nodes
-    for row in data[data['parent'] =='root'].itertuples():
-        
-        tree.append(anytree.Node(
-                         name           = str(row.Index), 
-                         parent         = root,
-                         distance       = 0,   
-                         label          = str(row.Index),
-                         leaf           = True,
-                         
-                         t_infection      = row.t_infection,
-                         t_final          = row.t_final,
-                         
-                         sequence         = '',
-                         
-                         state            = row.state,
-                         infection_type   = row.type,
-                         fitness          = row.fitness,
-                         lineage          = row.IH_lineages[0]
-                         
-                         ))
-        data = data.drop(row.Index)
-        
-    # build the infection tree
+
+    # Lookup for current leaves by label
+    leaf_lookup = {}
+
+    # Handle patient zero(s)
+    patient_zero_data = data[data['parent'] == 'root']
+    for row in patient_zero_data.itertuples():
+        node = create_infection_node(row, root)
+        tree.append(node)
+        leaf_lookup[node.label] = node
+
+    # Drop patient zero entries from data
+    data = data.drop(patient_zero_data.index)
+
+    # Build the infection tree from remaining data
     sorted_data = data.sort_values(by='t_infection')
-    
+
     for row in sorted_data.itertuples():
-        #
-        if row.parent != None:
-            try:
-                parent_node = [node for node in tree if node.label == str(row.parent)
-                               and node.leaf == True][0]
-                # for node in tree: print(node.name, node.leaf)
-                # print('')
-            except: 
-                # print('pass')
-                pass
-            
-            # add new infection
-            tree.append(anytree.Node(
-                        name           = str(row.Index), 
-                        parent         = parent_node,
-                        distance       = row.t_infection - parent_node.t_infection,
-                        label          = str(row.Index),
-                        leaf           = True,
-                        
-                        t_infection    = row.t_infection,
-                        t_final        = row.t_final,
-                        
-                        state            = row.state,
-                        infection_type   = row.type,
-                        fitness          = row.fitness,
-                        lineage          = row.IH_lineages[0]
-                         ))
-            
-            # extend parent node
-            tree.append(anytree.Node(
-                        name           = parent_node.name, 
-                        parent         = parent_node,
-                        distance       = 0,
-                        label          = parent_node.label,
-                        leaf           = True,
-                        
-                        t_infection    = parent_node.t_infection,
-                        t_final        = parent_node.t_final,
-                        
-                        state            = parent_node.state,
-                        infection_type   = parent_node.infection_type,
-                        fitness          = parent_node.fitness,
-                        lineage          = parent_node.lineage
-                         ))
-            
-            
-            # update parent node
-            parent_node.leaf=False # labels internal nodes (inactive)
-            # parent_node.color = 'white'
-            parent_node.name =  parent_node.label + '=>'+ str(row.Index) #+'}' '{'+
-            
-    return(tree)
+        if row.parent is not None:
+            parent_label = str(row.parent)
+            parent_node = leaf_lookup.get(parent_label)
+
+            if parent_node is None:
+                print(f"Warning: parent node '{parent_label}' not found. Skipping.")
+                continue
+
+            # Mark the parent node as internal
+            parent_node.leaf = False
+            parent_node.name = f"{parent_node.label}=>{row.Index}"
+
+            # Create and add new infection node
+            child_node = create_infection_node(row, parent_node)
+            tree.append(child_node)
+            leaf_lookup[child_node.label] = child_node
+
+            # Create and add a "prolonged" leaf version of the parent
+            prolonged_parent = extend_parent_node(parent_node)
+            tree.append(prolonged_parent)
+            leaf_lookup[parent_label] = prolonged_parent
+
+    return tree
 
 def phylogenetic_tree(seeded_simulation_output_dir):
     
