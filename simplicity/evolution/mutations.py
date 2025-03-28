@@ -5,6 +5,7 @@ Created on Thu Jun 1 11:15:10 2023
 
 @author: pietro
 """
+import simplicity.phenotype.update    as pheno
 import numpy as np
 import copy
 
@@ -57,7 +58,7 @@ def sub_events(rng, e, dt, IH_lineages):
     
     return events
 
-def select_positions(population,L_lin,rng,e,dt):
+def select_positions(population,L_lin,e,dt):
     '''
     Select positions of the pooled genome to mutate.
 
@@ -91,13 +92,9 @@ def select_positions(population,L_lin,rng,e,dt):
     sub_number: int
         number of substitution events happening
     '''
-    # # raise error if the vector of probabilites per site is not as long as 
-    # # the variant genome
-    # if L_lin != len(p_sites_var):
-    #     raise ValueError('p_sites_var must have L_lin lenght')
-    
+    rng = population.rng5
     # list of "active" lineages, coord map onto individuals
-    active_lineages = [[i, j] for i in population.infected_i for j 
+    active_lineages = [[i, j] for i in sorted(population.infected_i) for j 
                        in range(0,population.individuals[i]['IH_virus_number'])]
      
     # raise error if the lenght of active_variants is not same as variants_number       
@@ -122,7 +119,7 @@ def select_positions(population,L_lin,rng,e,dt):
 
 def map_to_lin(positions,L_lin):
     '''
-    Maps positions to be mutated onto active_variants.
+    Maps positions to be mutated onto active_variants (lineages).
 
     Parameters
     ----------
@@ -141,12 +138,12 @@ def map_to_lin(positions,L_lin):
         
 
     '''
-    sub_coord_varmap = []
+    sub_coord_linmap = []
     for position in positions:
         c = [int(np.floor(position/L_lin)),position%L_lin]
-        sub_coord_varmap.append(c)
+        sub_coord_linmap.append(c)
         
-    return sub_coord_varmap
+    return sub_coord_linmap
 
 def map_to_dic(active_lineages, positions, L_lin):
     '''
@@ -420,7 +417,8 @@ def update_lineages(population, sub_coord_dicmap):
         parent_lineage_genome = population.get_lineage_genome(parent_lineage_name)
         new_lineage_genome = copy.deepcopy(parent_lineage_genome)
         new_lineage_genome.append([coord[2],coord[3]])
-        
+        new_lineage_genome.sort(key=lambda x: x[0])  # sort by position
+
         population.phylogenetic_data.append(
                      {'Time_emergence'  : population.time,
                       'Lineage_name'    : new_lineage_name,
@@ -429,10 +427,73 @@ def update_lineages(population, sub_coord_dicmap):
                       'Host_type'       : population.individuals[coord[0]]['type']
                     })
         # print(f'Phylo data: {population.phylogenetic_data}')
+    mutated_ids = {coord[0] for coord in sub_coord_dicmap}
+
+    for idx in mutated_ids:
+        indiv = population.individuals[idx]
+        combined = sorted(zip(indiv['IH_lineages'], indiv['IH_virus_fitness']))
+        indiv['IH_lineages'], indiv['IH_virus_fitness'] = map(list, zip(*combined))
         
+def get_individuals_to_update(subst_coord):
+    # get indices of individuals that mutated to update their fitness scores
+    mutated_individuals = [i[0] for i in subst_coord]
+    mutated_individuals = sorted(set(mutated_individuals))
+    
+    return mutated_individuals
+
+def mutate(population, e, dt, phenotype_model, *args):
+    '''
+    Mutation model, mutates the viruses in the population.
+
+    Parameters
+    ----------
+    e : float
+        population nucleotide substitution rate.
+    dt : float
+        delta t - extrande time step (in years)
+
+    '''
+    L_lin = population.L_lin
+    # select number of substitutions and positions in pooled genome
+    select_pos = select_positions(population, L_lin, e, dt) 
+    
+    # if mutations are happening
+    if select_pos != 'No substitutions':
         
+        # positions in pooled genome
+        positions = select_pos[0] 
+        # vector of active variants
+        active_lineages = select_pos[1]
+        # number of substitutions happening
+        subst_number = select_pos[2]
         
+        # map substitutions to index of variants
+        subst_coord = map_to_dic(active_lineages, positions, L_lin)
         
+        # fetch the bases that will undergo substituion
+        subst_coord = fetch_bases(population, subst_coord)
+        # count number of each nitrogenous base to be mutated (for bulk update)
+        bases_count = get_subst_numbers(subst_coord, subst_number)
+        # use substitution matrix to select mutations that will happen
+        unassigned_subst = substitution(sub_matrix(), bases_count,population.rng5)
+        # assign the mutations to their relative genome
+        subst_coord = assign_sub(unassigned_subst, subst_coord)
+        # update variants in simulation with the corresponding substitution
+        update_lineages(population, subst_coord)
+        
+        # update fitness score of individuals and variants
+        
+        # print('--X----X----X----X----X----X--')
+        # print('Substitution coordinates: ', subst_coord)
+        individuals_to_update = get_individuals_to_update(subst_coord)
+        # print('Individuals to be updated: ', individuals_to_update)
+        update_fitness = pheno.update_fitness_factory(phenotype_model)
+        if args:
+            consensus = args[0]
+            update_fitness(population, individuals_to_update, consensus)
+        else:
+            update_fitness(population, individuals_to_update)
+
         
         
         

@@ -27,6 +27,8 @@ import simplicity.settings_manager as sm
 import simplicity.runners.serial
 import simplicity.runners.multiprocessing
 import os
+import pandas as pd
+import json
 
 def fixture_experiment_settings():
     # --------- Specify parameter values manually -----------------------------
@@ -42,8 +44,6 @@ def fixture_experiment_settings():
     #     'final_time': 365
     # }
     varying_params = {
-        'R': [0.8,1,1.3,1.5,2],
-        'diagnosis_rate': [0,0.05,0.1],
         'phenotype_model': ['linear', 'immune_waning']
     }
 
@@ -124,11 +124,132 @@ def test_experiment_output(experiment_name):
     print(f'TEST {experiment_name} OUTPUT -- SUCCESS.')
     print('##########################################')
     
-def test_experiment_local(runner:str, test_number:int):
-    test_experiment_output(test_run_experiment_local(runner, test_number))
+def safe_parse_list_of_dicts(val):
+    """Parse stringified list of dicts and round time_infection."""
+    if pd.isna(val) or str(val).strip() == "":
+        return []
+    try:
+        items = json.loads(val.replace("'", '"'))  
+        for item in items:
+            if "time_infection" in item:
+                item["time_infection"] = round(item["time_infection"], 10)
+        return items
+    except Exception:
+        return val  # fallback to raw string if it breaks
+
+def compare_csv_files(file1, file2, float_tol=1e-6, label=None):
+    try:
+        if os.path.getsize(file1) == 0 and os.path.getsize(file2) == 0:
+            return True
+        elif os.path.getsize(file1) == 0 or os.path.getsize(file2) == 0:
+            tag = label or f'{file1} vs {file2}'
+            print(f'[EMPTY FILE MISMATCH] {tag}')
+            return False
+
+        df1 = pd.read_csv(file1)
+        df2 = pd.read_csv(file2)
+    except Exception as e:
+        tag = label or f'{file1} vs {file2}'
+        print(f'[ERROR] Failed to read files: {tag}: {e}')
+        return False
+
+    if df1.shape != df2.shape:
+        tag = label or f'{file1} vs {file2}'
+        print(f'[SHAPE MISMATCH] {tag}: {df1.shape} != {df2.shape}')
+        return False
+
+    # Float rounding for numeric columns
+    for col in df1.columns:
+        if pd.api.types.is_float_dtype(df1[col]):
+            df1[col] = df1[col].round(10)
+            df2[col] = df2[col].round(10)
+
+    # Special handling for 'new_infections' column (rounding time)
+    if "new_infections" in df1.columns:
+        df1["new_infections"] = df1["new_infections"].apply(safe_parse_list_of_dicts)
+        df2["new_infections"] = df2["new_infections"].apply(safe_parse_list_of_dicts)
+
+    try:
+        pd.testing.assert_frame_equal(
+            df1, df2,
+            rtol=float_tol, atol=float_tol,
+            check_dtype=False
+        )
+        return True
+    except AssertionError as e:
+        tag = label or f'{file1} vs {file2}'
+        print(f'[DATA MISMATCH] {tag}')
+        print(str(e)[:500])  # Trim output
+        return False
+
     
+def compare_experiment_outputs(experiment_name_1, experiment_name_2):
+    print('')
+    print('----------------------------------------------------')
+    print(f'Comparing {experiment_name_1} vs {experiment_name_2}')
+    print('----------------------------------------------------')
+
+    dir1 = get_experiment_output_dir(experiment_name_1)
+    dir2 = get_experiment_output_dir(experiment_name_2)
+
+    files_to_compare = [
+        'final_time.csv',
+        'fitness_trajectory.csv',
+        'individuals_data.csv',
+        'lineage_frequency.csv',
+        'phylogenetic_data.csv',
+        'sequencing_data_regression.csv',
+        'sequencing_data.fasta',  
+        'simulation_trajectory.csv'
+    ]
+
+    differences_found = False
+
+    for folder in os.listdir(dir1):
+        sim_dir1 = os.path.join(dir1, folder)
+        sim_dir2 = os.path.join(dir2, folder)
+
+        for subfolder in os.listdir(sim_dir1):
+            seed_dir1 = os.path.join(sim_dir1, subfolder)
+            seed_dir2 = os.path.join(sim_dir2, subfolder)
+
+            for filename in files_to_compare:
+                file1 = os.path.join(seed_dir1, filename)
+                file2 = os.path.join(seed_dir2, filename)
+
+                # Build relative path from root of experiment dir
+                relative_path = os.path.join(folder, subfolder, filename)
+                
+                if not os.path.exists(file2):
+                    print(f'[MISSING FILE] {relative_path}')
+                    differences_found = True
+                    continue
+
+                if filename.endswith('.fasta'):
+                    with open(file1) as f1, open(file2) as f2:
+                        if f1.read() != f2.read():
+                            print(f'[FASTA MISMATCH] {relative_path}')
+                            differences_found = True
+                else:
+                    if not compare_csv_files(file1, file2, label=relative_path):
+                        print(f'[DATA MISMATCH] {relative_path}')
+                        differences_found = True
+
+    if not differences_found:
+        print('No differences found. Outputs match perfectly!')
+    else:
+        print('Differences detected in experiment outputs.')
+    print('----------------------------------------------------')
+    
+def main(runner:str, test_number:int, compare_to: int = None):
+    test_experiment_output(test_run_experiment_local(runner, test_number))
+    if compare_to:
+        current_experiment_name = f'test_local_experiment_{runner}_#{test_number}'
+        benchmark_experiment_name = f'test_local_experiment_serial_#{compare_to}'
+        compare_experiment_outputs(current_experiment_name, benchmark_experiment_name)
+
 ##### </actual test>
 
 if __name__ == "__main__":
-    # test_experiment_local('serial',4)
-    test_experiment_local('multiprocessing',3)
+    main('multiprocessing',1,compare_to=8)
+    

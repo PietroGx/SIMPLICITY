@@ -428,7 +428,23 @@
 	
 	Version 0.15.1
 	
-	* added R_eff and time_infectiousness plot for model check and validation                         
+	* added R_eff and time_infectiousness plot for model check and validation
+
+2026-29-03 pietro gerletti
+	
+	Version 0.16.0
+	
+	* Updated test local runme to compare experiment runs
+	* refactored extrande for modularity
+	* updated add_variant reaction
+	* updated infection reaction
+	* updated code to ensure randomness is  100% reproducible (e.g. sorting sets)
+	* refactored population class, now less responsibilities
+	* added population_model module (SIDR reactions)
+	* new refactored code passsed tests!!
+
+
+                         
                	                                    
 	                          
 	

@@ -239,7 +239,7 @@ def save_fitness_trajectory(simulation_output, seeded_simulation_output_dir):
     fitness_trajectory.to_csv(fitness_trajectory_file_path)
     
 def save_final_time(simulation_output, seeded_simulation_output_dir):
-    final_time = simulation_output.time
+    final_time = round(simulation_output.time,6)
     final_time_file_path = os.path.join(seeded_simulation_output_dir,
                                                "final_time.csv")
     with open(final_time_file_path, mode='w', newline='') as file:

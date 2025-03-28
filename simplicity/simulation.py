@@ -4,7 +4,7 @@
 @author: pietro
 @author: jbescudie
 """
-import simplicity.extrande               as e
+import simplicity.refactored_extrande    as e
 import simplicity.population             as pop
 from   simplicity.random             import randomgen
 import simplicity.output_manager         as om
