@@ -34,7 +34,7 @@ def write_standard_parameters_values():
         "diagnosis_rate": 0.1, # in percentage, will be converted to kd in model 
         "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
         "nucleotide_substitution_rate": 0.000275,  # e in theoretical model equations
-        "phenotype_model": 'immune waning',  # or 'distance from wt'
+        "phenotype_model": 'immune_waning',  # or 'linear'
         "sequencing_rate": 0.05,
         "max_runtime": 86000, 
         "seed": None,

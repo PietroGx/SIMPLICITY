@@ -8,8 +8,10 @@ Created on Tue Feb 18 22:01:47 2025
 
 ## Backlog
 - [x] function in dir_manager to list all simulation output folders (hardcoded into check_simulations.py)
-- [ ] give option to import simulation parameters from file for running an experiment
+- [x] give option to import simulation parameters from file for running an experiment
 - [ ] write unit_runs for running with/wo plotting (technical debt item 1)
+- [ ] Remove all that has to do with the term variants (now called lineages)
+- [ ] Check in active_variants number is calculated correctly
 
 ### Bug Fixes
 - [x] memory and runtime options need to be added to slurm runner to avoid Runtime and OOM errors
@@ -25,3 +27,4 @@ Created on Tue Feb 18 22:01:47 2025
 - [ ] tau_2 value hard coded into extrande. it should be passed and read from parameters, as maybe should all the other tau's values 
 - [ ] in tree builder line 43,78: node of tree will only store the first of the IH lineages (for correct tree lineage coloring).  
       If multiple lineages are stored, decide on coloring strategy.
+- [ ] We are not explicitely handling double substitutions in same spot in genome
