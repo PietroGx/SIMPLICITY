@@ -31,24 +31,35 @@ import os
 def fixture_experiment_settings():
     # --------- Specify parameter values manually -----------------------------
     
-    # # parameters value to get combinations from
+    # parameters value to get combinations from
     # varying_params = {
     #     'phenotype_model': ['distance from wt', 'immune waning']
+        
     # }
     # # parameters to keep fixed (but different from standard_value) across combinations
     # fixed_params = {
     #     'infected_individuals_at_start': 10,
     #     'final_time': 365
     # }
+    varying_params = {
+        'R': [0.8,1,1.3,1.5,2],
+        'diagnosis_rate': [0,0.05,0.1],
+        'phenotype_model': ['linear', 'immune_waning']
+    }
+
+    fixed_params = {
+        'infected_individuals_at_start': 10,
+        'final_time': 365
+    }
     
     # ---------- OR import them from file -------------------------------------
     
-    # leave empty if you only want to import parameters values from file
-    varying_params = {}
-    # import fixed parameters from user geenerated file. You can either create 
-    # it manually or use the provided script: generate_user_set_parameters_file.py
-    filename = 'standard_values.json'
-    fixed_params = sm.read_user_set_parameters_file(filename)
+    # # leave empty if you only want to import parameters values from file
+    # varying_params = {}
+    # # import fixed parameters from user geenerated file. You can either create 
+    # # it manually or use the provided script: generate_user_set_parameters_file.py
+    # filename = 'standard_values.json'
+    # fixed_params = sm.read_user_set_parameters_file(filename)
    
     # -------------------------------------------------------------------------
     n_seeds = 10
@@ -119,5 +130,5 @@ def test_experiment_local(runner:str, test_number:int):
 ##### </actual test>
 
 if __name__ == "__main__":
-    test_experiment_local('serial',1)
-    # test_experiment_local('multiprocessing',4)
+    # test_experiment_local('serial',4)
+    test_experiment_local('multiprocessing',3)

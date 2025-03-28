@@ -7,7 +7,7 @@
     "diagnosis_rate": 0.1,
     "IH_virus_emergence_rate": 0,
     "nucleotide_substitution_rate": 0.000275,
-    "phenotype_model": "immune waning",
+    "phenotype_model": "immune_waning",
     "sequencing_rate": 0.05,
     "max_runtime": 86000,
     "seed": null,

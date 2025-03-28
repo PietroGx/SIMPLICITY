@@ -424,7 +424,11 @@
 	* updated runme
 	* changed simulation settings files and folders naming (to shorten them up)
 	                                   
-	                             
+2026-28-03 pietro gerletti
+	
+	Version 0.15.1
+	
+	* added R_eff and time_infectiousness plot for model check and validation                         
                	                                    
 	                          
 	

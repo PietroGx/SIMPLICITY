@@ -21,11 +21,6 @@ def extrande_factory(phenotype_model, parameters,
     selected versin of extrande function
 
     '''
-    # check if label was passed correctly
-    if phenotype_model == 'distance from wt' or phenotype_model == 'immune waning':
-        pass
-    else:
-        raise ValueError('check the arguments of the factory')
     
     def beta(R,avg_infectious_time):
         # return infection rate
@@ -405,12 +400,12 @@ def extrande_factory(phenotype_model, parameters,
             
         return population # population after simulation is called simulation_output
     
-    if phenotype_model == 'distance from wt':
+    if phenotype_model == 'linear':
         # phenotype model: distance from wt
         # return extrande with simple phenotype model
         return extrande_0
         
-    elif phenotype_model == 'immune waning':
+    elif phenotype_model == 'immune_waning':
         # phenotype model: immune waning    
         # return extrande with immune-waning phenotype model
         return extrande_1

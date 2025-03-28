@@ -12,7 +12,7 @@ def get_individuals_to_update(subst_coord):
  
 def update_fitness_factory(type):
     
-    if type == "distance from wt":
+    if type == "linear":
         
         def update_fitness(population,individuals_to_update):
             # individuals - dictionary of individuals in the simulation
@@ -27,7 +27,7 @@ def update_fitness_factory(type):
         
         return update_fitness
     
-    elif type == "immune waning":
+    elif type == "immune_waning":
         
         def update_fitness(population,individuals_to_update,consensus):
             # individuals - dictionary of individuals in the simulation
