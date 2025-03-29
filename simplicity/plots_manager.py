@@ -151,7 +151,7 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     # Filter columns that reach at least the threshold at some point.
     filtered_df = pivot_df.loc[:, pivot_df.max() >= threshold]
     colors = [get_lineage_color(lineage_name, colormap_df) for lineage_name in filtered_df.columns]
-    filtered_df.plot(kind='area', stacked=False, color=colors,
+    filtered_df.plot(kind='area', stacked=True, color=colors,
                          alpha=0.5, ax=ax1)
     time_file_path = os.path.join(seeded_simulation_output_dir, 'final_time.csv')
     time_final = pd.read_csv(time_file_path, header=None).iloc[0, 0]

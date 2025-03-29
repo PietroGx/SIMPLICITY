@@ -97,6 +97,7 @@ class Population:
         self.reservoir_i    = set()    # set of indices of individuals in the reservoir
         self.susceptibles_i = set()    # set of susceptible individuals indices  
         self.infected_i     = set()    # set of infected individuals indices 
+        self.exclude_i      = set()    # set to store the newly infected individual (excludes it from states update at time of infection)
         self.diagnosed_i    = set()    # set of diagnosed individuals indices
         self.recovered_i    = set()    # set of recovered individuals indices
         
@@ -208,15 +209,16 @@ class Population:
         self.host_model.probabilities_t(delta_t)
         
         # draw random variables for each infected individual in the population
-        tau = self.rng3.uniform(size=len(self.infected_i))
+        infected_to_update = [i for i in self.infected_i if i not in self.exclude_i]
+        tau = self.rng3.uniform(size=len(infected_to_update))
         
-        i =0
-        for key in self.infected_i:
+        for i, key in enumerate(infected_to_update):
             state = self.individuals[key]['state_t']
             self.individuals[key]['state_t'] = self.individuals[key]['model'
-             ].update_state(self.individuals[key]['model'
-             ].probabilities[state],state,tau[i])
-            i += 1       
+                ].update_state(self.individuals[key]['model'
+                ].probabilities[state], state, tau[i])   
+        # reset exclude_i until next infection
+        self.exclude_i      = set() 
             
     def recovery(self):
         '''

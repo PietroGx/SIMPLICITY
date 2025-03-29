@@ -443,6 +443,12 @@
 	* added population_model module (SIDR reactions)
 	* new refactored code passsed tests!!
 
+2026-29-03 pietro gerletti
+	
+	Version 0.16.01
+	
+	* changed extrande steps order to ensure correctness of simulation
+
 
                          
                	                                    
