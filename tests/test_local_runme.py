@@ -245,11 +245,11 @@ def main(runner:str, test_number:int, compare_to: int = None):
     test_experiment_output(test_run_experiment_local(runner, test_number))
     if compare_to:
         current_experiment_name = f'test_local_experiment_{runner}_#{test_number}'
-        benchmark_experiment_name = f'test_local_experiment_serial_#{compare_to}'
+        benchmark_experiment_name = f'test_local_experiment_{runner}_#{compare_to}'
         compare_experiment_outputs(current_experiment_name, benchmark_experiment_name)
 
 ##### </actual test>
 
 if __name__ == "__main__":
-    main('multiprocessing',1,compare_to=8)
+    main('serial',1)#,compare_to=8)
     

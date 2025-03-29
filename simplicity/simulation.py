@@ -4,7 +4,7 @@
 @author: pietro
 @author: jbescudie
 """
-import simplicity.refactored_extrande    as e
+import simplicity.extrande    as e
 import simplicity.population             as pop
 from   simplicity.random             import randomgen
 import simplicity.output_manager         as om
@@ -25,7 +25,7 @@ class Simplicity:
         rng2 = randomgen(seeds_generator.integers(0,10000)) # for rejection sampling of reactions
         
         # use factory to assign simulation algorithm
-        self.extrande = e.extrande_factory(self.parameters["phenotype_model"], self.parameters, rng1, rng2, self.output_directory)
+        self.extrande = e.extrande_factory(self.parameters["phenotype_model"], self.parameters, rng1, rng2)
         
         # run simulation
         self.simulation_output = self.extrande(self.population)
