@@ -3,7 +3,7 @@ Created on Tue Jun  6 13:13:14 2023
 
 @author: pietro
 """
-import simplicity.host                as h
+import simplicity.intra_host_model    as h
 import simplicity.evolution.reference as ref
 from   simplicity.random          import randomgen
 import pandas as pd
@@ -24,9 +24,9 @@ class Population:
         # self.count_infections_from_long_shedders = 0
         
         # random number generator
-        self.rng3 = rng3
-        self.rng4 = rng4
-        self.rng5 = rng5
+        self.rng3 = rng3 # for intra-host model states update
+        self.rng4 = rng4 # for electing individuals|variants when reactions happen
+        self.rng5 = rng5 # for mutation model
         self.rng6 = rng6 # for synthetic sequencing data
         
         # compartments and population groups ---------------------------------
@@ -97,7 +97,6 @@ class Population:
         self.reservoir_i    = set()    # set of indices of individuals in the reservoir
         self.susceptibles_i = set()    # set of susceptible individuals indices  
         self.infected_i     = set()    # set of infected individuals indices 
-        self.exclude_i      = set()    # set to store the newly infected individual (excludes it from states update at time of infection)
         self.diagnosed_i    = set()    # set of diagnosed individuals indices
         self.recovered_i    = set()    # set of recovered individuals indices
         
@@ -141,6 +140,7 @@ class Population:
                      'new_infections'  : [],
                      
                      'state_t'     : 0,
+                     't_next_state': None,
                      'state'       : 'susceptible',
                      'model'       : self.host_model,
                      'type'        : 'normal',
@@ -165,16 +165,21 @@ class Population:
         # set individuals infected at the beginning of the simulation
         for i in range(I_0): # update data of individuals infected at the beginning of the simulation
             
-            dic[i]['parent'] = 'root'
-            dic[i]['t_infection'] = 0
-            dic[i]['t_infectious'] = 0
-            dic[i]['state_t'] = 5
-            dic[i]['state'] = 'infected'
-            dic[i]['IH_lineages'] = ['wt']
+            dic[i]['parent']       = 'root'
+            dic[i]['t_infection']  = 0
+            dic[i]['t_infectious'] = None
+            dic[i]['state_t']      = 0
+            # sample next jump time from exp dist.
+            state_t = dic[i]['state_t']
+            rate = - dic[i]['model'].A[state_t][state_t]
+            dic[i]['t_next_state'] = self.rng3.exponential(scale=1/rate) 
+            
+            dic[i]['state']        = 'infected'
+            dic[i]['IH_lineages']  = ['wt']
             
             self.susceptibles_i.remove(i)  
             self.infected_i.add(i)
-            
+
         # update lineage_frequency
         self.lineage_frequency.append({'Lineage_name'              :'wt',
                                        'Time_sampling'             :0,
@@ -201,99 +206,98 @@ class Population:
         # update the time 
         self.time = time
         
-    def update_states(self,delta_t):
+    def get_next_ih_transition(self):
+        ''' Get the next earliest time of an individual ih transition (for look ahead in extrande.)
         '''
-        Update intra-host model states for each individual in the simulation.
-        '''
-        # stores p_t for each state
-        self.host_model.probabilities_t(delta_t)
+        return min(
+        (self.individuals[i]['t_next_state'] for i in self.infected_i if self.individuals[i]['t_next_state'] is not None),
+        default=float('inf'))
+
+    def update_states(self):
+        """
+        Update intra-host state for all infected individuals using the jump process.
+        Handles:
+          - advancing intra-host state
+          - scheduling next transition
+          - tracking infectious and detectable status
+          - transitioning recovered individuals
+        """
         
-        # draw random variables for each infected individual in the population
-        infected_to_update = [i for i in self.infected_i if i not in self.exclude_i]
-        tau = self.rng3.uniform(size=len(infected_to_update))
+        to_update = [
+            i for i in sorted(self.infected_i)
+            if self.individuals[i]['t_next_state'] is not None and self.time >= self.individuals[i]['t_next_state']
+        ]
+
+        # Precompute transitions and rates
+        ids = []
+        scales = []
         
-        for i, key in enumerate(infected_to_update):
-            state = self.individuals[key]['state_t']
-            self.individuals[key]['state_t'] = self.individuals[key]['model'
-                ].update_state(self.individuals[key]['model'
-                ].probabilities[state], state, tau[i])   
-        # reset exclude_i until next infection
-        self.exclude_i      = set() 
-            
-    def recovery(self):
-        '''
-        Tag recovered individuals as such, update the infected and recovered
-        compartments and add the index of recovered individuals to recovered_i.
-        '''
-        indices_recovered = []
-
-        for i in self.infected_i:
-            if self.individuals[i]['state_t'] > 19:
-                # update individual info
-                self.individuals[i]['state'] = 'recovered'
-                self.individuals[i]['t_not_infectious'] = self.time
-                indices_recovered.append(i)
-
-                # update the active variants number
-                self.active_variants_n -= self.individuals[i]['IH_virus_number']
-
-                # update compartments
+        for i in to_update:
+            individual = self.individuals[i]
+            individual['state_t'] += 1  # Move to next intra-host state
+    
+            # Update recovered individuals (state 20 = end of process) 
+            if individual['state_t'] >= 20:
+                individual['state'] = 'recovered'
+                individual['t_not_infectious'] = self.time
+                individual['t_next_state'] = None
+    
+                # Update compartments
                 self.infected -= 1
                 self.recovered += 1
-                self.susceptibles += 1
-
-                # add a susceptible back in from reservoir
+                
+                # Update sets
+                self.infected_i.remove(i)
+                self.recovered_i.add(i)
+    
+                # Remove from infectious/detectable sets if present
+                self.infectious_normal_i.discard(i)
+                self.detectable_i.discard(i)
+    
+                # Update active virus count
+                self.active_variants_n -= individual['IH_virus_number']
+    
+                # Replace individual from reservoir
                 new_susceptible_index = self.reservoir_i.pop()
                 self.susceptibles_i.add(new_susceptible_index)
-
-        # Move recovered individuals from infected_i to recovered_i
-        for i in indices_recovered:
-            self.infected_i.remove(i)
-            self.recovered_i.add(i)
+                self.susceptibles += 1
+                continue  
     
-    def update_infectious(self):
-        '''
-        Update the list of currently infectious individuals of type 'normal'.
-        '''
-        prev_infectious = set(self.infectious_normal_i)
-        # Remove individuals who are no longer infectious
-        self.infectious_normal_i = {
-            i for i in self.infectious_normal_i
-            if self.individuals[i]['state_t'] < 19}
-        
-        # update end infectiousness time of non infectious patients
-        no_longer_infectious = prev_infectious - self.infectious_normal_i
-        for i in no_longer_infectious:
-            self.individuals[i]['t_not_infectious'] = self.time
+            
+            # Prepare for vectorized sampling of next intra-host transition time
+            rate = -individual['model'].A[individual['state_t']][individual['state_t']]
+            if rate > 0:
+               ids.append(i)
+               scales.append(1 / rate)
+            else:
+                raise ValueError(f"Invalid transition rate at state {individual['state_t']} for individual {i}")
     
-        # Add individuals to infectious index list and update their inf time
-        for i in self.infected_i - self.infectious_normal_i:
-            individual = self.individuals[i]
+            # Update infectious status (states 5–18) 
             if 4 < individual['state_t'] < 19 and individual['type'] == 'normal':
-                self.infectious_normal_i.add(i)
-                self.individuals[i]['t_infectious'] = self.time
-                
-        # Update counter
-        self.infectious_normal = len(self.infectious_normal_i)
-        
-    def update_detectables(self):
-        '''
-        Update the list of currently detectable individuals.
-        '''
-        # Remove individuals who are no longer detectable
-        self.detectable_i = {
-            i for i in self.detectable_i
-            if self.individuals[i]['state_t'] < 20}
+                if i not in self.infectious_normal_i:
+                    self.infectious_normal_i.add(i)
+                    individual['t_infectious'] = self.time
+            else:
+                if i in self.infectious_normal_i:
+                    self.infectious_normal_i.remove(i)
+                    individual['t_not_infectious'] = self.time
     
-        # Add individuals who should now be considered detectable
-        for i in self.infected_i - self.detectable_i:
-            person = self.individuals[i]
-            if 4 < person['state_t'] < 20:
+            # Update detectable status (states 5–19) 
+            if 4 < individual['state_t'] < 20:
                 self.detectable_i.add(i)
-    
-        # Update counter
+            else:
+                self.detectable_i.discard(i)
+        
+        # Vectorized sampling of next intra-host transition times
+        if ids:
+            samples = self.rng3.exponential(scale=np.array(scales))
+            for i, dt in zip(ids, samples):
+                self.individuals[i]['t_next_state'] = self.time + dt
+        
+        # Update compartments
+        self.infectious_normal = len(self.infectious_normal_i)
         self.detectables = len(self.detectable_i)
-    
+
     def update_trajectory(self):
         # update the system trajectory
         self.trajectory.append([self.time,

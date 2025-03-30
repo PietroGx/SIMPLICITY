@@ -449,6 +449,19 @@
 	
 	* changed extrande steps order to ensure correctness of simulation
 
+2026-29-03 pietro gerletti
+	
+	Version 0.16.02
+	
+	* Changed host to intra_host_model.py
+	* Refactored Intra-host Model: Matrix Exponential → Jump Process
+	* Each state transition now triggered by exponential waiting time (Exp(1/rate))
+	* State updates now occur only when t >= t_next_state
+	* Vectorized sampling of waiting times for all individuals that will transition in ih state
+	* Refactored update_states and joined together (update_state, recovery, infectious, detectables updates)
+	* Updated look-ahead time horizon to min 1h max = next ih update
+	
+	
 
                          
                	                                    

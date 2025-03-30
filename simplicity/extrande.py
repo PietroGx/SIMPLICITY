@@ -35,14 +35,15 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     last_consensus_snapshot = {"t_snapshot": 0, "consensus": []} if use_consensus else None
     
     def compute_upperbound(population):
-        propensities = SIDR.SIDR_propensities(population, beta, k_d, k_v, seq_rate)
-        a0 = sum(rate for rate, _ in propensities)
-        B = (beta + k_d + k_v) * population.infected
-        assert a0 <= B 
+        propensities, params = SIDR.SIDR_propensities(population, beta, k_d, k_v, seq_rate)
+        # a0 = sum(rate for rate, _ in propensities)
+        B = np.sum(params) * population.infected
+        # print(f"B = {B}")
         return B
     
-    def look_ahead(t, final_time):
-        return final_time - t
+    def look_ahead(population, t, final_time):
+        L =  min(final_time - t, population.get_next_ih_transition() - t)
+        return max(L, 0.0417) # either next IH state update or 1/24 = 1 hour
 
     def draw_delta_t(B):
         tau = rng1.uniform(0, 1)
@@ -50,12 +51,8 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         delta_t = round(delta_t, 10)
         return delta_t
 
-    def update_step(population, t, delta_t):
-        population.update_time(t)
-        population.update_states(delta_t)
-        population.recovery()
-        population.update_infectious()
-        population.update_detectables()
+    def update_step(population, t):
+        population.update_states()
     
     def update_fitness_step(population, t):
         individuals_to_update = sorted(population.infected_i)
@@ -95,7 +92,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
                 break
     
     def reaction_step(population, B):
-        reactions = SIDR.SIDR_propensities(population, beta, k_d, k_v, seq_rate)
+        reactions, _ = SIDR.SIDR_propensities(population, beta, k_d, k_v, seq_rate)
         tau_2 = rng2.uniform(0, B)
         fire_reaction(population, reactions, tau_2)
 
@@ -107,20 +104,22 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         return last_progress
 
     def check_stop_conditions(population, t, start_time):
+        
         if population.infected == 0:
-            print("\nNo infected left - ending simulation")
+            print("\n No infected left - ending simulation")
             return True
         if population.susceptibles == 0:
             print("\nNo susceptibles left - ending simulation")
             return True
-        if population.infectious_normal == 0:
-            print("\nNo infectious left - ending simulation")
-            return True
+        if t > 10.0:
+            if population.infectious_normal == 0:
+                print("\n No infectious left - ending simulation")
+                return True
         if len(population.reservoir_i) < 1000:
-            print("\nReservoir depleted - ending simulation")
+            print("\n Reservoir depleted - ending simulation")
             return True
         if time.time() - start_time > max_runtime:
-            print("\nMax runtime exceeded")
+            print("\n Max runtime exceeded")
             return True
         return False
 
@@ -145,40 +144,44 @@ def extrande_core_loop(parameters, population, helpers):
     start_time = time.time()
     t_day = 0
     last_progress = 0
-
-    population.update_infectious()
-    population.update_detectables()
-
+    
+    leap_counter = 0
+    extrande_counter = 0
+    
     while t < final_time:
         last_progress = helpers["report_progress"](t, final_time, last_progress)
 
-        L = helpers["look_ahead"](t, final_time)
+        L = helpers["look_ahead"](population, t, final_time)
         B = helpers["compute_upperbound"](population)
         delta_t = helpers["draw_delta_t"](B)
-            # delta_t_mutations = t - population.trajectory[-1][0] # time from last mutations update
-
+        
         if delta_t > L:
-            print('SKIPPING AHEAD L')
+            leap_counter +=1
             # update time
             t += L
             t = round(t, 10)
+            population.update_time(t)
             # mutations
             helpers["mutation_step"](population, L)
             # update system  (IH host model states)
-            helpers["update_step"](population, t, L)
+            helpers["update_step"](population, t)
         else:
+            extrande_counter+=1
             # update time
             t += delta_t
             t = round(t, 10)
+            population.update_time(t)
             # mutations
             helpers["mutation_step"](population, delta_t)
             # update fitness
             helpers["update_fitness_step"](population, t)
             # reactions
-            helpers['reaction_step'](population, B)
+            helpers["reaction_step"](population, B)
             # update system  (IH host model states)
-            helpers["update_step"](population, t, delta_t)
-        
+            helpers["update_step"](population, t)
+        # print(t)
+        # print(f"L = {L}, delta_t = {delta_t}")
+
         # update system trajectory
         population.update_trajectory()
         if math.floor(t) > t_day:
@@ -190,6 +193,10 @@ def extrande_core_loop(parameters, population, helpers):
 
     print("\n----------------------------------------")
     print("SIMPLICITY SIMULATION COMPLETED")
+    print("----------------------------------------\n")
+    print(f'Extrande counter: {extrande_counter}')
+    print(f'Leap counter: {leap_counter}')
+    print(f'Ratio (leap % over total steps): {leap_counter/(extrande_counter+leap_counter)}')
     print("----------------------------------------\n")
     return population
 

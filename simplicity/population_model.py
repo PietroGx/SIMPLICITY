@@ -8,11 +8,12 @@ Created on Fri Mar 28 12:51:33 2025
 import numpy as np
 
 def SIDR_propensities(population, beta, k_d, k_v, seq_rate):
+    propensities_params = [beta, k_d, k_v]
     return [
         (beta * population.infectious_normal, lambda: infection(population)),
         (k_d * population.detectables, lambda: diagnosis(population, seq_rate)),
         (k_v * population.infected, lambda: add_variant(population))
-    ]
+    ], propensities_params
 
 def diagnosis(population, seq_rate=0):
     '''
@@ -88,7 +89,7 @@ def infection(population):
 
     # select random patient to be infected
     new_infected_index = population.rng4.choice(susceptibles_list)
-    population.exclude_i = {new_infected_index} # excludes the newly infected individual from states update at time of infection
+
     # update the active variants number
     population.active_variants_n += population.individuals[new_infected_index]['IH_virus_number']
 
@@ -98,6 +99,13 @@ def infection(population):
 
     # time of infection
     population.individuals[new_infected_index]['t_infection'] = population.time
+    # state
+    population.individuals[new_infected_index]['state'] = 'infected'
+    # Sample first jump time from exponential distribution
+    rate = - population.individuals[new_infected_index]['model'].A[0][0]
+    population.individuals[new_infected_index]['t_next_state'] = (
+    population.time + population.rng3.exponential(scale=1 / rate)
+    )
     # parent
     population.individuals[new_infected_index]['parent'] = parent
 
@@ -120,9 +128,6 @@ def infection(population):
 
     # Update individual fitness (average of variants' fitness)
     population.individuals[new_infected_index]['fitness'] = round(np.average(fitness_sorted), 4)
-
-    # state
-    population.individuals[new_infected_index]['state'] = 'infected'
 
     # store infection info for R effective
     population.individuals[parent]['new_infections'].append({
