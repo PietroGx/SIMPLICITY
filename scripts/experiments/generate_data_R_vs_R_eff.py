@@ -18,7 +18,7 @@ def fixture_experiment_settings():
     varying_params = {
         'R': [0.8,1,1.3,1.5,2],
         'diagnosis_rate': [0,0.05,0.1],
-        'phenotype_model': ['distance from wt', 'immune waning']
+        'phenotype_model': ['linear', 'immune_waning']
     }
 
     fixed_params = {
@@ -26,7 +26,7 @@ def fixture_experiment_settings():
         'final_time': 365*3
     }
     
-    n_seeds = 300
+    n_seeds = 100
     
     return (varying_params,fixed_params,n_seeds)
 

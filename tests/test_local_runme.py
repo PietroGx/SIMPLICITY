@@ -242,7 +242,7 @@ def compare_experiment_outputs(experiment_name_1, experiment_name_2):
     print('----------------------------------------------------')
     
 def main(runner:str, test_number:int, compare_to: int = None):
-    test_experiment_output(test_run_experiment_local(runner, test_number))
+    # test_experiment_output(test_run_experiment_local(runner, test_number))
     if compare_to:
         current_experiment_name = f'test_local_experiment_{runner}_#{test_number}'
         benchmark_experiment_name = f'test_local_experiment_{runner}_#{compare_to}'
@@ -251,5 +251,10 @@ def main(runner:str, test_number:int, compare_to: int = None):
 ##### </actual test>
 
 if __name__ == "__main__":
-    main('serial',1)#,compare_to=8)
+    import time
+    start = time.time()
+    main('serial',19,compare_to=18)
+    elapsed = time.time() - start
+    mins, secs = divmod(elapsed, 60)
+    print(f"Test completed in {int(mins)} min {secs:.2f} sec")
     
