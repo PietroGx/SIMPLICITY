@@ -449,7 +449,7 @@
 	
 	* changed extrande steps order to ensure correctness of simulation
 
-2026-29-03 pietro gerletti
+2026-30-03 pietro gerletti
 	
 	Version 0.16.02
 	
@@ -461,6 +461,11 @@
 	* Refactored update_states and joined together (update_state, recovery, infectious, detectables updates)
 	* Updated look-ahead time horizon to min 1h max = next ih update
 	
+2026-31-03 pietro gerletti
+	
+	Version 0.16.03
+	
+	* added code to intra-host to debug intra host traverse time dependency on delta t
 	
 
                          
