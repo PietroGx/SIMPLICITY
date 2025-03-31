@@ -201,9 +201,223 @@ class Host:
             p_rec.append(p_i[20])
         
         return p_inf
+    
+    def simulate_trajectory(self, delta_t, tau_sampler=None):
+        """
+        Simulate the trajectory of a single individual over time,
+        using the intra-host model and rejection sampling.
+    
+        Parameters
+        ----------
+        delta_t : float
+            Time step between state updates
+        tau_sampler : callable
+            Function to sample random tau values from [0, 1). Defaults to np.random.rand.
+    
+        Returns
+        -------
+        trajectory : list of int
+            List of states visited at each time step
+        time_points : list of float
+            Corresponding time points
+        info : dict
+            Contains total duration, and durations in each phase category
+        """
+        if tau_sampler is None:
+            tau_sampler = np.random.rand
+    
+        state = 0
+        t = 0
+        trajectory = [state]
+        time_points = [t]
+    
+        while state < 20:
+            self.probabilities_t(delta_t)
+            p_t = self.probabilities[state]
+            tau = tau_sampler()
+            state = self.update_state(p_t, state, tau)
+            t += delta_t
+            trajectory.append(state)
+            time_points.append(t)
+    
+        # Analyze trajectory phases
+        total_time = time_points[-1]
+        detect_start = 5   # starts after pre-detection (n1 = 5)
+        infect_start = 5   # starts at pre-symptomatic (n1 + 1)
+        infect_end = 18    # end of infectious phase (n1 + n2 + n3)
         
+        info = {
+            "total_duration": total_time,
+            "detectable_duration": sum(
+                delta_t for s in trajectory if s >= detect_start
+            ),
+            "infectious_duration": sum(
+                delta_t for s in trajectory if infect_start <= s < infect_end
+            ),
+            "pre_infectious_duration": sum(
+                delta_t for s in trajectory if s < infect_start
+            )
+        }
+    
+        return trajectory, time_points, info
 
-        
+import numpy as np
+import matplotlib.pyplot as plt
+
+def run_simulations(delta_t, n_runs=1000):
+    """
+    Run multiple simulations of the intra-host model and aggregate durations.
+
+    Parameters
+    ----------
+    delta_t : float
+        Time step size for simulation
+    n_runs : int
+        Number of individuals to simulate
+
+    Returns
+    -------
+    durations : dict
+        Lists of durations for each category across simulations
+    """
+    host = Host()
+    durations = {
+        "total_duration": [],
+        "detectable_duration": [],
+        "infectious_duration": [],
+        "pre_infectious_duration": []
+    }
+
+    for _ in range(n_runs):
+        _, _, info = host.simulate_trajectory(delta_t)
+        for key in durations:
+            durations[key].append(info[key])
+
+    return durations
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from tqdm import tqdm
+
+def _simulate_single(delta_t):
+    host = Host()
+    _, _, info = host.simulate_trajectory(delta_t)
+    return info
+
+def run_simulations_parallel(delta_t, n_runs=1000, max_workers=None):
+    durations = {
+        "total_duration": [],
+        "detectable_duration": [],
+        "infectious_duration": [],
+        "pre_infectious_duration": []
+    }
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(_simulate_single, delta_t) for _ in range(n_runs)]
+
+        for future in tqdm(as_completed(futures), total=n_runs, desc=f"Δt={delta_t}"):
+            info = future.result()
+            for key in durations:
+                durations[key].append(info[key])
+
+    return durations
+
+
+def plot_duration_distributions(durations, delta_t):
+    """
+    Plot histograms for duration types from the simulations.
+
+    Parameters
+    ----------
+    durations : dict
+        Dictionary containing lists of durations per category
+    delta_t : float
+        Time step used in simulation (for title)
+    """
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+    axs = axs.flatten()
+    keys = list(durations.keys())
+    titles = ["Total Infection", "Detectability", "Infectiousness", "Pre-infectious"]
+
+    for i, key in enumerate(keys):
+        axs[i].hist(durations[key], bins=30, alpha=0.7, edgecolor='black')
+        axs[i].set_title(f"{titles[i]} Duration (Δt = {delta_t})")
+        axs[i].set_xlabel("Days")
+        axs[i].set_ylabel("Count")
+        axs[i].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+def collect_durations_for_deltas(delta_ts, n_runs=1000):
+    """
+    Run simulations for each delta_t and return all duration results.
+
+    Returns
+    -------
+    results : dict
+        { delta_t: {duration_key: list of values} }
+    """
+    results = {}
+    for dt in delta_ts:
+        durations = run_simulations(delta_t=dt, n_runs=n_runs)
+        results[dt] = durations
+    return results
+
+def plot_durations_from_results(results):
+    """
+    Plot mean durations for each delta_t using precomputed results.
+
+    Parameters
+    ----------
+    results : dict
+        Output from collect_durations_for_deltas
+    """
+    duration_keys = list(next(iter(results.values())).keys())
+    delta_ts = sorted(results.keys())
+
+    # Prepare data
+    means_by_category = {key: [] for key in duration_keys}
+
+    for dt in delta_ts:
+        for key in duration_keys:
+            means_by_category[key].append(np.mean(results[dt][key]))
+
+    # Plot
+    plt.figure(figsize=(10, 6))
+    for key, means in means_by_category.items():
+        plt.plot(delta_ts, means, marker='o', label=key.replace('_', ' ').title())
+
+    plt.xlabel("Δt (Time step in days)")
+    plt.ylabel("Mean Duration (days)")
+    plt.title(f"Effect of Δt on Estimated Durations")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+delta_ts = [0.01, 0.1, 1.0]
+results = {}
+
+for dt in delta_ts:
+    results[dt] = run_simulations_parallel(dt, n_runs=100)
+
+#%%
+
+# inspect results
+for dt in delta_ts:
+    print(f"\nΔt = {dt}")
+    for key, vals in results[dt].items():
+        print(f"  {key}: mean = {np.mean(vals):.2f}, std = {np.std(vals):.2f}")
+
+# plot aggregate duration trends
+plot_durations_from_results(results)
+
+# Plot distributions per delta_t
+for dt in delta_ts:
+    plot_duration_distributions(results[dt], delta_t=dt)
+plot_durations_from_results(results)
+
+
 
         
 
