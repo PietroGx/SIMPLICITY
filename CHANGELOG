@@ -466,6 +466,10 @@
 	Version 0.16.03
 	
 	* added code to intra-host to debug intra host traverse time dependency on delta t
+	* changed random to random_gen to avoid conflicts
+	* update intra_host.py (better matrix exponential, multiprocessing works)
+	* updated R_eff experiment script to test model
+	* updated look ahead function
 	
 
                          

@@ -5,7 +5,7 @@ Created on Tue Jun  6 13:13:14 2023
 """
 import simplicity.intra_host_model    as h
 import simplicity.evolution.reference as ref
-from   simplicity.random          import randomgen
+from   simplicity.random_gen          import randomgen
 import pandas as pd
 import numpy as np
 

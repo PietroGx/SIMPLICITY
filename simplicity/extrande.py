@@ -42,8 +42,9 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         return B
     
     def look_ahead(population, t, final_time):
-        L =  min(final_time - t, population.get_next_ih_transition() - t)
-        return max(L, 0.0417) # either next IH state update or 1/24 = 1 hour
+        # L =  min(final_time - t, population.get_next_ih_transition() - t)
+        # return max(L, 0.0417) # either next IH state update or 1/24 = 1 hour
+        return final_time - t
 
     def draw_delta_t(B):
         tau = rng1.uniform(0, 1)
