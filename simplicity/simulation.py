@@ -6,7 +6,7 @@
 """
 import simplicity.extrande               as e
 import simplicity.population             as pop
-from   simplicity.random             import randomgen
+from   simplicity.random_gen             import randomgen
 import simplicity.output_manager         as om
 import simplicity.plots_manager          as pm
 
