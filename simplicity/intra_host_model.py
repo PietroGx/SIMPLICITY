@@ -12,68 +12,6 @@ import scipy.linalg
 
 np.set_printoptions(precision=3, suppress=True)
 
-def method_wrapper(func):
-    def wrapper(self, *args):
-        return func(self, *args)
-    return wrapper
-
-def _get_A_matrix(tau_3):
-    '''
-    Generate the matrix that defines the intra-host model of SARS-CoV-2 
-    pathogenesis
-
-    Parameters
-    ----------
-    tau_3 : float
-        the model parameter that regulates the transition rate of individuals
-        in the infected compartment. The standard value is, like the others,
-        taken from the model of Van der Toorn et al. 
-        It can be modified to obtain a model of immunocompromised individuals 
-        that stay infected for a long time.
-
-    Returns
-    -------
-    A : matrix
-        21x21 matrix that defines the intra-host model
-
-    '''
-    # Model parameters
-    
-    # subphases number for each phase 
-    n_1 = 5   # pre-detection
-    n_2 = 1   # pre-symptomatic 
-    n_3 = 13  # infectious
-    n_4 = 1   # post-infectious
-    # last state is recovered
-    
-    # parameters for each sub-phase
-    tau_1 = 2.86 # pre-detection
-    tau_2 = 3.91 # pre-symptomatic (infectious)
-    #tau_3 = 7.5  # infectious
-    tau_4 = 8    # post-infectious
-    
-    compartments = [[n_1,tau_1],
-                    [n_2,tau_2],
-                    [n_3,tau_3],
-                    [n_4,tau_4]]
-    
-    # create empty matrix to be filled
-    dim = np.sum([i[0] for i in compartments])+1 # matrix dimensions
-    A = np.zeros((dim,dim))
-    # fill the matrix with the corresponding compartment parameters
-    start = 0
-    comp = 0
-    for c in compartments:
-        comp = comp + c[0]
-        r = c[0]/c[1]
-        for i in range(start,comp+1):
-            A[i][i] = -r
-            if A[i][i-1] == 0: 
-                A[i][i-1]= r
-            A[i][-1] = 0
-        start = start+c[0]
-    return A
-
 class Host:
     '''
     The class defines the intra-host model and the functions needed to solve it.
@@ -82,19 +20,83 @@ class Host:
         
         # setup intra-host model matrix and calculate matrix exponential
         self.A = self._get_A_matrix(tau_3)
-        self.A_ex = scipy.linalg.expm(self.A)
+        # self.A_ex = scipy.linalg.expm(self.A)
         
         # possible states of individual in the system
         self.states = np.arange(0,21,1) # state 20 is "healed"
         
-    # setup ODE system matrix A 
-    @method_wrapper
-    def _get_A_matrix(self, tau_3):
-        return _get_A_matrix(tau_3)
+    # setup matrix A 
+    def _get_A_matrix(self,tau_3):
+        '''
+        Generate the matrix that defines the intra-host model of SARS-CoV-2 
+        pathogenesis
+
+        Parameters
+        ----------
+        tau_3 : float
+            the model parameter that regulates the transition rate of individuals
+            in the infected compartment. The standard value is, like the others,
+            taken from the model of Van der Toorn et al. 
+            It can be modified to obtain a model of immunocompromised individuals 
+            that stay infected for a long time.
+
+        Returns
+        -------
+        A : matrix
+            21x21 matrix that defines the intra-host model
+
+        '''
+        # Model parameters
+        
+        # subphases number for each phase 
+        n_1 = 5   # pre-detection
+        n_2 = 1   # pre-symptomatic 
+        n_3 = 13  # infectious
+        n_4 = 1   # post-infectious
+        # last state is recovered
+        
+        # parameters for each sub-phase
+        tau_1 = 2.86 # pre-detection
+        tau_2 = 3.91 # pre-symptomatic (infectious)
+        #tau_3 = 7.5  # infectious
+        tau_4 = 8    # post-infectious
+        
+        compartments = [[n_1,tau_1],
+                        [n_2,tau_2],
+                        [n_3,tau_3],
+                        [n_4,tau_4]]
+        
+        # create empty matrix to be filled
+        dim = np.sum([i[0] for i in compartments])+1 # matrix dimensions
+        A = np.zeros((dim,dim))
+        # fill the matrix with the corresponding compartment parameters
+        start = 0
+        comp = 0
+        for c in compartments:
+            comp = comp + c[0]
+            r = c[0]/c[1]
+            for i in range(start,comp+1):
+                A[i][i] = -r
+                if A[i][i-1] == 0: 
+                    A[i][i-1]= r
+                A[i][-1] = 0
+            start = start+c[0]
+        return A
     
-    def _A_t(self,t):
-        # the method returns A**t
-        return(scipy.linalg.fractional_matrix_power(self.A_ex,t))
+    # def _A_t(self,t):
+    #     # the method returns A**t
+    #     return(scipy.linalg.fractional_matrix_power(self.A_ex,t))
+    
+    # def _A_t(self, t):
+    #     return scipy.linalg.expm(self.A * t)
+    
+    def _A_t(self, t):
+        if not hasattr(self, "_A_cache"):
+            self._A_cache = {}
+        if t not in self._A_cache:
+            self._A_cache[t] = scipy.linalg.expm(self.A * t)
+        return self._A_cache[t]
+
     
     def _p_t(self,A_t,state):
         '''
@@ -295,15 +297,18 @@ def run_simulations(delta_t, n_runs=1000):
 
     return durations
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 
-def _simulate_single(delta_t):
+
+from multiprocessing import Pool
+
+def _simulate_single(args):
+    delta_t = args
     host = Host()
     _, _, info = host.simulate_trajectory(delta_t)
     return info
 
-def run_simulations_parallel(delta_t, n_runs=1000, max_workers=None):
+def run_simulations_parallel(delta_t, n_runs=1000):
     durations = {
         "total_duration": [],
         "detectable_duration": [],
@@ -311,16 +316,14 @@ def run_simulations_parallel(delta_t, n_runs=1000, max_workers=None):
         "pre_infectious_duration": []
     }
 
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(_simulate_single, delta_t) for _ in range(n_runs)]
+    with Pool() as pool:
+        results = list(tqdm(pool.imap(_simulate_single, [delta_t]*n_runs), total=n_runs))
 
-        for future in tqdm(as_completed(futures), total=n_runs, desc=f"Δt={delta_t}"):
-            info = future.result()
-            for key in durations:
-                durations[key].append(info[key])
+    for info in results:
+        for key in durations:
+            durations[key].append(info[key])
 
     return durations
-
 
 def plot_duration_distributions(durations, delta_t):
     """
@@ -389,33 +392,41 @@ def plot_durations_from_results(results):
 
     plt.xlabel("Δt (Time step in days)")
     plt.ylabel("Mean Duration (days)")
-    plt.title(f"Effect of Δt on Estimated Durations")
+    plt.title("Effect of Δt on Estimated Durations")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
     plt.show()
 
-delta_ts = [0.01, 0.1, 1.0]
-results = {}
+ 
+def main():    
+    delta_ts = [0.001, 0.01,
+                0.1]
+    results = {}
 
-for dt in delta_ts:
-    results[dt] = run_simulations_parallel(dt, n_runs=100)
+    for dt in delta_ts:
+        results[dt] = run_simulations_parallel(dt, n_runs=1000)
 
-#%%
+    # inspect results
+    for dt in delta_ts:
+        print(f"\nΔt = {dt}")
+        for key, vals in results[dt].items():
+            print(f"  {key}: mean = {np.mean(vals):.2f}, std = {np.std(vals):.2f}")
 
-# inspect results
-for dt in delta_ts:
-    print(f"\nΔt = {dt}")
-    for key, vals in results[dt].items():
-        print(f"  {key}: mean = {np.mean(vals):.2f}, std = {np.std(vals):.2f}")
+    # plot aggregate duration trends
+    plot_durations_from_results(results)
+    
+    # Plot distributions per delta_t
+    for dt in delta_ts:
+        plot_duration_distributions(results[dt], delta_t=dt)
+    plot_durations_from_results(results)
+    
 
-# plot aggregate duration trends
-plot_durations_from_results(results)
+if __name__ == '__main__':
+    import multiprocessing 
+    multiprocessing.set_start_method("spawn", force=True)
+    main()
 
-# Plot distributions per delta_t
-for dt in delta_ts:
-    plot_duration_distributions(results[dt], delta_t=dt)
-plot_durations_from_results(results)
 
 
 
@@ -454,3 +465,4 @@ plot_durations_from_results(results)
 
 
 
+        
