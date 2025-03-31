@@ -292,7 +292,7 @@ class Population:
         if ids:
             samples = self.rng3.exponential(scale=np.array(scales))
             for i, dt in zip(ids, samples):
-                self.individuals[i]['t_next_state'] = self.time + dt
+                self.individuals[i]['t_next_state'] += dt
         
         # Update compartments
         self.infectious_normal = len(self.infectious_normal_i)

@@ -470,6 +470,8 @@
 	* update intra_host.py (better matrix exponential, multiprocessing works)
 	* updated R_eff experiment script to test model
 	* updated look ahead function
+	* updated how I assiign new jump time to intra host staates in update states()
+	* updated intra_host.py (cleaner and more efficient code)
 	
 
                          
