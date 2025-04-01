@@ -472,8 +472,13 @@
 	* updated look ahead function
 	* updated how I assiign new jump time to intra host staates in update states()
 	* updated intra_host.py (cleaner and more efficient code)
-	
 
+2026-01-04 pietro gerletti
+	
+	Version 0.16.04
+	
+	* updated intra-host model py file
+	* added both matrix and jump proces option to update intra-host  model
                          
                	                                    
 	                          

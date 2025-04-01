@@ -23,6 +23,8 @@ class Population:
         self.count_infections = 0
         # self.count_infections_from_long_shedders = 0
         
+        
+        
         # random number generator
         self.rng3 = rng3 # for intra-host model states update
         self.rng4 = rng4 # for electing individuals|variants when reactions happen
@@ -92,11 +94,13 @@ class Population:
         
         # individuals ---------------------------------------------------------
         self.individuals = {}              # store individuals data
-        self.host_model  = h.Host(tau_3)   # intra host model for normal individuals 
+        self.host_model  = h.Host(tau_3=tau_3)   # intra host model for normal individuals 
+        self.update_ih_mode = self.host_model.get_update_mode()
         
         self.reservoir_i    = set()    # set of indices of individuals in the reservoir
         self.susceptibles_i = set()    # set of susceptible individuals indices  
         self.infected_i     = set()    # set of infected individuals indices 
+        self.exclude_i      = set()    # set to store the newly infected individual (excludes it from states update at time of infection)
         self.diagnosed_i    = set()    # set of diagnosed individuals indices
         self.recovered_i    = set()    # set of recovered individuals indices
         
@@ -198,6 +202,13 @@ class Population:
        # print(f'{lineage_name} Genome: ', genome)
        return genome
    
+    # def get_next_ih_transition(self):
+    #     ''' Get the next earliest time of an individual ih transition (for look ahead in extrande.)
+    #     '''
+    #     return min(
+    #     (self.individuals[i]['t_next_state'] for i in self.infected_i if self.individuals[i]['t_next_state'] is not None),
+    #     default=float('inf'))
+    
     # -------------------------------------------------------------------------
     #                               Updates
     # -------------------------------------------------------------------------
@@ -206,14 +217,7 @@ class Population:
         # update the time 
         self.time = time
         
-    def get_next_ih_transition(self):
-        ''' Get the next earliest time of an individual ih transition (for look ahead in extrande.)
-        '''
-        return min(
-        (self.individuals[i]['t_next_state'] for i in self.infected_i if self.individuals[i]['t_next_state'] is not None),
-        default=float('inf'))
-
-    def update_states(self):
+    def _update_states_jump(self):
         """
         Update intra-host state for all infected individuals using the jump process.
         Handles:
@@ -297,7 +301,79 @@ class Population:
         # Update compartments
         self.infectious_normal = len(self.infectious_normal_i)
         self.detectables = len(self.detectable_i)
+    
+    def update_states_matrix(self, delta_t):
+        """
+        Matrix-based intra-host state update for all infected individuals.
+        Includes:
+          - advancing states via probabilities
+          - checking recovery
+          - updating compartments and sets
+          - updating infectious and detectable flags
+        """
+        # Compute transition probabilities for all states
+        all_probabilities = self.host_model.compute_all_probabilities(delta_t)
+    
+        # draw random variables for each infected individual in the population   
+        infected_to_update = [i for i in self.infected_i if i not in self.exclude_i]
+        taus = self.rng3.uniform(size=len(infected_to_update))
+    
+        for idx, i in enumerate(infected_to_update):
+            ind = self.individuals[i]
+            state = ind['state_t']
+            prob = all_probabilities[state]
+            new_state = self.host_model.update_state(prob, taus[idx])
+            ind['state_t'] = new_state
+    
+            # Recovery check
+            if new_state >= 20:
+                ind['state'] = 'recovered'
+                ind['t_not_infectious'] = self.time
+    
+                self.infected_i.remove(i)
+                self.recovered_i.add(i)
+    
+                self.infected -= 1
+                self.recovered += 1
+                self.susceptibles += 1
+    
+                self.active_variants_n -= ind['IH_virus_number']
+    
+                new_susceptible = self.reservoir_i.pop()
+                self.susceptibles_i.add(new_susceptible)
+    
+                self.infectious_normal_i.discard(i)
+                self.detectable_i.discard(i)
+                continue
+    
+            # Infectious update (5–18)
+            if 4 < new_state < 19 and ind['type'] == 'normal':
+                if i not in self.infectious_normal_i:
+                    self.infectious_normal_i.add(i)
+                    ind['t_infectious'] = self.time
+            else:
+                if i in self.infectious_normal_i:
+                    self.infectious_normal_i.remove(i)
+                    ind['t_not_infectious'] = self.time
+    
+            # Detectable update (5–19)
+            if 4 < new_state < 20:
+                self.detectable_i.add(i)
+            else:
+                self.detectable_i.discard(i)
+    
+        self.exclude_i = set()
+        self.infectious_normal = len(self.infectious_normal_i)
+        self.detectables = len(self.detectable_i)
 
+    def update_states(self, delta_t):
+        if self.update_ih_mode == "jump":
+            self._update_states_jump()
+        elif self.update_mode == "matrix":
+            self._update_states_matrix(delta_t)
+        else:
+            raise ValueError(f"Unknown update_mode: {self.update_mode}")
+    
     def update_trajectory(self):
         # update the system trajectory
         self.trajectory.append([self.time,

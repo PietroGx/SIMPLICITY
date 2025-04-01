@@ -89,6 +89,7 @@ def infection(population):
 
     # select random patient to be infected
     new_infected_index = population.rng4.choice(susceptibles_list)
+    population.exclude_i = {new_infected_index}
 
     # update the active variants number
     population.active_variants_n += population.individuals[new_infected_index]['IH_virus_number']
