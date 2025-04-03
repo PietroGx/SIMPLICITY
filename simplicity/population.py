@@ -94,7 +94,7 @@ class Population:
         
         # individuals ---------------------------------------------------------
         self.individuals = {}              # store individuals data
-        self.host_model  = h.Host(tau_3=tau_3)   # intra host model for normal individuals 
+        self.host_model  = h.Host(tau_3=tau_3,update_mode = 'matrix')   # intra host model for normal individuals 
         self.update_ih_mode = self.host_model.get_update_mode()
         
         self.reservoir_i    = set()    # set of indices of individuals in the reservoir
@@ -254,8 +254,7 @@ class Population:
                 self.infected_i.remove(i)
                 self.recovered_i.add(i)
     
-                # Remove from infectious/detectable sets if present
-                self.infectious_normal_i.discard(i)
+                # Remove from detectable sets if present
                 self.detectable_i.discard(i)
     
                 # Update active virus count
@@ -302,7 +301,7 @@ class Population:
         self.infectious_normal = len(self.infectious_normal_i)
         self.detectables = len(self.detectable_i)
     
-    def update_states_matrix(self, delta_t):
+    def _update_states_matrix(self, delta_t):
         """
         Matrix-based intra-host state update for all infected individuals.
         Includes:
@@ -316,6 +315,8 @@ class Population:
     
         # draw random variables for each infected individual in the population   
         infected_to_update = [i for i in self.infected_i if i not in self.exclude_i]
+        
+        # print(f"infectious {self.infectious_i}")
         taus = self.rng3.uniform(size=len(infected_to_update))
     
         for idx, i in enumerate(infected_to_update):
@@ -324,7 +325,7 @@ class Population:
             prob = all_probabilities[state]
             new_state = self.host_model.update_state(prob, taus[idx])
             ind['state_t'] = new_state
-    
+            # print(f'{i}: {state} -> {new_state}')
             # Recovery check
             if new_state >= 20:
                 ind['state'] = 'recovered'
@@ -367,9 +368,9 @@ class Population:
         self.detectables = len(self.detectable_i)
 
     def update_states(self, delta_t):
-        if self.update_ih_mode == "jump":
+        if self.host_model.update_mode == "jump":
             self._update_states_jump()
-        elif self.update_mode == "matrix":
+        elif self.host_model.update_mode == "matrix":
             self._update_states_matrix(delta_t)
         else:
             raise ValueError(f"Unknown update_mode: {self.update_mode}")
