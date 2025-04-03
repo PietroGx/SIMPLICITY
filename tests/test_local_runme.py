@@ -49,6 +49,7 @@ def fixture_experiment_settings():
 
     fixed_params = {
         'infected_individuals_at_start': 10,
+        # 'R' : 1.3,
         'final_time': 365
     }
     
@@ -62,7 +63,7 @@ def fixture_experiment_settings():
     # fixed_params = sm.read_user_set_parameters_file(filename)
    
     # -------------------------------------------------------------------------
-    n_seeds = 10
+    n_seeds = 3
     
     return (varying_params,fixed_params,n_seeds)
 
@@ -242,7 +243,7 @@ def compare_experiment_outputs(experiment_name_1, experiment_name_2):
     print('----------------------------------------------------')
     
 def main(runner:str, test_number:int, compare_to: int = None):
-    # test_experiment_output(test_run_experiment_local(runner, test_number))
+    test_experiment_output(test_run_experiment_local(runner, test_number))
     if compare_to:
         current_experiment_name = f'test_local_experiment_{runner}_#{test_number}'
         benchmark_experiment_name = f'test_local_experiment_{runner}_#{compare_to}'
@@ -253,7 +254,7 @@ def main(runner:str, test_number:int, compare_to: int = None):
 if __name__ == "__main__":
     import time
     start = time.time()
-    main('serial',19,compare_to=18)
+    main('serial',53)#,compare_to=36)
     elapsed = time.time() - start
     mins, secs = divmod(elapsed, 60)
     print(f"Test completed in {int(mins)} min {secs:.2f} sec")

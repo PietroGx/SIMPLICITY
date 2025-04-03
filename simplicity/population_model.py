@@ -9,11 +9,15 @@ import numpy as np
 
 def SIDR_propensities(population, beta, k_d, k_v, seq_rate):
     propensities_params = [beta, k_d, k_v]
-    return [
+    propensities = [
         (beta * population.infectious_normal, lambda: infection(population)),
         (k_d * population.detectables, lambda: diagnosis(population, seq_rate)),
         (k_v * population.infected, lambda: add_variant(population))
-    ], propensities_params
+    ]
+    # print('a1:',beta * population.infectious_normal)
+    # print('a2:',k_d * population.detectables)
+    # print('a3:',k_v * population.infected)
+    return propensities, propensities_params
 
 def diagnosis(population, seq_rate=0):
     '''

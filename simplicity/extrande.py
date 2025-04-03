@@ -52,8 +52,8 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         delta_t = round(delta_t, 10)
         return delta_t
 
-    def update_step(population, t):
-        population.update_states()
+    def update_step(population, delta_t):
+        population.update_states(delta_t)
     
     def update_fitness_step(population, t):
         individuals_to_update = sorted(population.infected_i)
@@ -84,18 +84,18 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     def fire_reaction(population, reactions, tau_2):
         a0 = sum(rate for rate, _ in reactions)
         if tau_2 > a0:
-            return  # thinning
+            return  1 # thinning
         threshold = 0
         for rate, action in reactions:
             threshold += rate
             if tau_2 <= threshold:
                 action()
-                break
+                return 0
     
     def reaction_step(population, B):
         reactions, _ = SIDR.SIDR_propensities(population, beta, k_d, k_v, seq_rate)
         tau_2 = rng2.uniform(0, B)
-        fire_reaction(population, reactions, tau_2)
+        return fire_reaction(population, reactions, tau_2)
 
     def report_progress(t, final_time, last_progress):
         progress = t / final_time
@@ -112,7 +112,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         if population.susceptibles == 0:
             print("\nNo susceptibles left - ending simulation")
             return True
-        if t > 10.0:
+        if t > 60.0:
             if population.infectious_normal == 0:
                 print("\n No infectious left - ending simulation")
                 return True
@@ -148,12 +148,14 @@ def extrande_core_loop(parameters, population, helpers):
     
     leap_counter = 0
     extrande_counter = 0
+    thinning_counter = 0
     
     while t < final_time:
         last_progress = helpers["report_progress"](t, final_time, last_progress)
 
         L = helpers["look_ahead"](population, t, final_time)
         B = helpers["compute_upperbound"](population)
+        # print(f'Upper bound: {B}')
         delta_t = helpers["draw_delta_t"](B)
         
         if delta_t > L:
@@ -162,24 +164,25 @@ def extrande_core_loop(parameters, population, helpers):
             t += L
             t = round(t, 10)
             population.update_time(t)
+            # update system  (IH host model states)
+            helpers["update_step"](population, delta_t)
             # mutations
             helpers["mutation_step"](population, L)
-            # update system  (IH host model states)
-            helpers["update_step"](population, t)
         else:
             extrande_counter+=1
             # update time
             t += delta_t
             t = round(t, 10)
             population.update_time(t)
+            # update system  (IH host model states)
+            helpers["update_step"](population, delta_t)
             # mutations
             helpers["mutation_step"](population, delta_t)
             # update fitness
             helpers["update_fitness_step"](population, t)
             # reactions
-            helpers["reaction_step"](population, B)
-            # update system  (IH host model states)
-            helpers["update_step"](population, t)
+            thinning_counter += helpers["reaction_step"](population, B)
+            
         # print(t)
         # print(f"L = {L}, delta_t = {delta_t}")
 
@@ -195,9 +198,10 @@ def extrande_core_loop(parameters, population, helpers):
     print("\n----------------------------------------")
     print("SIMPLICITY SIMULATION COMPLETED")
     print("----------------------------------------\n")
-    print(f'Extrande counter: {extrande_counter}')
-    print(f'Leap counter: {leap_counter}')
-    print(f'Ratio (leap % over total steps): {leap_counter/(extrande_counter+leap_counter)}')
+    # print(f'Extrande counter: {extrande_counter}')
+    # print(f'Leap counter: {leap_counter}')
+    print(f'Leaps Ratio (leaps/total steps): {leap_counter/(extrande_counter+leap_counter)}')
+    print(f'Thinning Ratio (thinning/total reactions firing): {thinning_counter/extrande_counter}')
     print("----------------------------------------\n")
     return population
 
