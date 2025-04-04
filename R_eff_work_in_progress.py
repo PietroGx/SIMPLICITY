@@ -73,8 +73,11 @@ def get_avg_infectious_duration(simulation_output_dir, state_filter):
 
         if df.empty or "state" not in df.columns:
             continue
-
-        filtered_df = df[df["state"] == state_filter]
+        if state_filter == 'recovered':
+            filtered_df = df[(df["state"] == state_filter) | (df["state_t"] == 19)]
+        else: 
+            filtered_df = df[(df["state"] == state_filter)]
+            
         if not filtered_df.empty:
             duration = (filtered_df["t_not_infectious"] - filtered_df["t_infectious"]).dropna()
             durations.extend(duration.tolist())
