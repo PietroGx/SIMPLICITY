@@ -486,7 +486,11 @@
 	
 	* added precomputation of matrix exponentials for ih model       
                	                                    
-	                          
+2026-04-04 pietro gerletti
+	
+	Version 0.16.06
+	
+	* fixed L/delta_t bug                          
 	
 	
 	

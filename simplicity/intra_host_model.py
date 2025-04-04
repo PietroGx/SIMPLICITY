@@ -51,7 +51,12 @@ class Host:
         '''
         Generate the intra-host transition matrix A.
         '''
-        n_1, n_2, n_3, n_4 = 5, 1, 13, 1
+        # subphases number for each phase 
+        n_1 = 5   # pre-detection
+        n_2 = 1   # pre-symptomatic
+        n_3 = 13  # infectious
+        n_4 = 1   # post-infectious
+        # last state is recovered
         compartments = [[n_1, tau_1], [n_2, tau_2], [n_3, tau_3], [n_4, tau_4]]
         dim = sum([n for n, _ in compartments]) + 1
         A = np.zeros((dim, dim))
