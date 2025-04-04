@@ -142,7 +142,7 @@ def plot_R_eff_vs_R(df):
     # Sort and map diagnosis rates to fixed jitter offsets
     diag_rates_sorted = sorted(df["diagnosis_rate"].unique())
     n_rates = len(diag_rates_sorted)
-    jitter_spacing = 0.02
+    jitter_spacing = 0.05
     jitter_offsets = {
         rate: (i - n_rates // 2) * jitter_spacing
         for i, rate in enumerate(diag_rates_sorted)
@@ -292,7 +292,13 @@ def plot_combined_summary(df,experiment_name):
         pheno_df = df[df["phenotype_model"] == phenotype]
 
         for d_rate in diagnosis_rates:
-            d_sub = pheno_df[pheno_df["diagnosis_rate"] == d_rate]
+            d_sub = pheno_df[pheno_df["diagnosis_rate"] == d_rate].copy()
+            # Convert error columns to numeric and fill missing values with 0
+            d_sub["R_eff_std"] = pd.to_numeric(d_sub["R_eff_std"], errors="coerce").fillna(0)
+            d_sub["recovered_std_duration"] = pd.to_numeric(d_sub["recovered_std_duration"], errors="coerce").fillna(0)
+            d_sub["diagnosed_std_duration"] = pd.to_numeric(d_sub["diagnosed_std_duration"], errors="coerce").fillna(0)
+            d_sub["delta_t_std"] = pd.to_numeric(d_sub["delta_t_std"], errors="coerce").fillna(0)
+
             jitter = jitter_offsets[d_rate]
             R_jittered = d_sub["R"] + jitter
 
@@ -301,7 +307,7 @@ def plot_combined_summary(df,experiment_name):
             ax.errorbar(
                 R_jittered,
                 d_sub["R_eff_avg"],
-                yerr=d_sub["R_eff_std"].fillna(0),
+                yerr=d_sub["R_eff_std"],
                 fmt='o',
                 capsize=3,
                 linestyle='None',
@@ -315,7 +321,7 @@ def plot_combined_summary(df,experiment_name):
             ax.errorbar(
                 R_jittered,
                 d_sub["recovered_avg_duration"],
-                yerr=d_sub["recovered_std_duration"].fillna(0),
+                yerr=d_sub["recovered_std_duration"],
                 fmt='o',
                 capsize=3,
                 linestyle='None',
@@ -328,7 +334,7 @@ def plot_combined_summary(df,experiment_name):
             ax.errorbar(
                 R_jittered,
                 d_sub["diagnosed_avg_duration"],
-                yerr=d_sub["diagnosed_std_duration"].fillna(0),
+                yerr=d_sub["diagnosed_std_duration"],
                 fmt='o',
                 capsize=3,
                 linestyle='None',
@@ -342,7 +348,7 @@ def plot_combined_summary(df,experiment_name):
             ax.errorbar(
                R_jittered, 
                d_sub["delta_t_avg"], 
-               yerr=d_sub["delta_t_std"].fillna(0),
+               yerr=d_sub["delta_t_std"],
                fmt='o', 
                capsize=3, 
                linestyle='None',
