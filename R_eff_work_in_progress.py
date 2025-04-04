@@ -104,13 +104,11 @@ def get_avg_delta_t(simulation_output_dir):
 
     return np.mean(all_dts), np.std(all_dts)
 
-
 def extract_simulation_summary(experiment_name):
     rows = []
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
 
     for sim_out_dir in simulation_output_dirs:
-        
         phenotype_model = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'phenotype_model')
         R = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'R')
         diagnosis_rate = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'diagnosis_rate')
@@ -118,6 +116,7 @@ def extract_simulation_summary(experiment_name):
         R_eff_avg, R_eff_std = get_avg_simulation_R_eff(sim_out_dir)
         recovered_avg, recovered_std = get_avg_infectious_duration(sim_out_dir, "recovered")
         diagnosed_avg, diagnosed_std = get_avg_infectious_duration(sim_out_dir, "diagnosed")
+        delta_t_avg, delta_t_std = get_avg_delta_t(sim_out_dir)
 
         rows.append({
             "phenotype_model": phenotype_model,
@@ -129,6 +128,8 @@ def extract_simulation_summary(experiment_name):
             "recovered_std_duration": recovered_std,
             "diagnosed_avg_duration": diagnosed_avg,
             "diagnosed_std_duration": diagnosed_std,
+            "delta_t_avg": delta_t_avg,
+            "delta_t_std": delta_t_std,
         })
 
     return pd.DataFrame(rows)
