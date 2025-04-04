@@ -490,7 +490,9 @@
 	
 	Version 0.16.06
 	
-	* fixed L/delta_t bug                          
+	* fixed L/delta_t bug    
+	* limited min max (0.04 - 1 day) step size for system state updates (not extrande steps)
+	
 	
 	
 	

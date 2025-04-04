@@ -60,7 +60,8 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     def update_step(population, delta_t):
         population.update_states(delta_t)
     
-    def update_fitness_step(population, t):
+    def update_fitness_step(population):
+        t = population.time
         individuals_to_update = sorted(population.infected_i)
         # calculate consensus every 5 simulation days and use it for fitness score (immune waning model)
         if use_consensus:
@@ -155,6 +156,9 @@ def extrande_core_loop(parameters, population, helpers):
     extrande_counter = 0
     thinning_counter = 0
     
+    min_update_threshold = 0.04  # minimum dt for intra-host update (1h step)
+    dt_accumulated = 0  # initialize accumulator
+    
     while t < final_time:
         last_progress = helpers["report_progress"](t, final_time, last_progress)
 
@@ -162,6 +166,7 @@ def extrande_core_loop(parameters, population, helpers):
         B = helpers["compute_upperbound"](population)
         # print(f'Upper bound: {B}')
         delta_t = helpers["draw_delta_t"](B)
+        dt_accumulated += delta_t
         
         if delta_t > L:
             leap_counter +=1
@@ -173,6 +178,8 @@ def extrande_core_loop(parameters, population, helpers):
             helpers["update_step"](population, L)
             # mutations
             helpers["mutation_step"](population, L)
+            # Reset dt_accumulated 
+            dt_accumulated = 0
         else:
             extrande_counter+=1
             # update time
@@ -180,11 +187,14 @@ def extrande_core_loop(parameters, population, helpers):
             t = round(t, 10)
             population.update_time(t)
             # update system  (IH host model states)
-            helpers["update_step"](population, delta_t)
-            # mutations
-            helpers["mutation_step"](population, delta_t)
-            # update fitness
-            helpers["update_fitness_step"](population, t)
+            # Only update the intra-host state if accumulated dt exceeds threshold:
+            if dt_accumulated >= min_update_threshold:
+                helpers["update_step"](population, dt_accumulated)
+                # mutations
+                helpers["mutation_step"](population, dt_accumulated)
+                # update fitness
+                helpers["update_fitness_step"](population)
+                dt_accumulated = 0  # reset accumulator
             # reactions
             thinning_counter += helpers["reaction_step"](population, B)
             
