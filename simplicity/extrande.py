@@ -41,10 +41,15 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         # print(f"B = {B}")
         return B
     
-    def look_ahead(population, t, final_time):
+    def look_ahead(t, final_time):
+        '''
+        We clamp the look ahead to 1 day: if extrande does a step bigger than a day
+        we need to update the ih model to make sure not to miss host transitions 
+        and skewer their intra-host trajectory
+        '''
         # L =  min(final_time - t, population.get_next_ih_transition() - t)
         # return max(L, 0.0417) # either next IH state update or 1/24 = 1 hour
-        return final_time - t
+        return min(1, final_time - t) 
 
     def draw_delta_t(B):
         tau = rng1.uniform(0, 1)
@@ -153,7 +158,7 @@ def extrande_core_loop(parameters, population, helpers):
     while t < final_time:
         last_progress = helpers["report_progress"](t, final_time, last_progress)
 
-        L = helpers["look_ahead"](population, t, final_time)
+        L = helpers["look_ahead"](t, final_time)
         B = helpers["compute_upperbound"](population)
         # print(f'Upper bound: {B}')
         delta_t = helpers["draw_delta_t"](B)
@@ -165,7 +170,7 @@ def extrande_core_loop(parameters, population, helpers):
             t = round(t, 10)
             population.update_time(t)
             # update system  (IH host model states)
-            helpers["update_step"](population, delta_t)
+            helpers["update_step"](population, L)
             # mutations
             helpers["mutation_step"](population, L)
         else:
