@@ -293,10 +293,14 @@ def plot_combined_summary(df,experiment_name):
 
         for d_rate in diagnosis_rates:
             d_sub = pheno_df[pheno_df["diagnosis_rate"] == d_rate].copy()
-            # Convert error columns to numeric and fill missing values with 0
+            # Convert average values and error values to numeric and fill missing entries
+            d_sub["R_eff_avg"] = pd.to_numeric(d_sub["R_eff_avg"], errors="coerce").fillna(0)
             d_sub["R_eff_std"] = pd.to_numeric(d_sub["R_eff_std"], errors="coerce").fillna(0)
+            d_sub["recovered_avg_duration"] = pd.to_numeric(d_sub["recovered_avg_duration"], errors="coerce").fillna(0)
             d_sub["recovered_std_duration"] = pd.to_numeric(d_sub["recovered_std_duration"], errors="coerce").fillna(0)
+            d_sub["diagnosed_avg_duration"] = pd.to_numeric(d_sub["diagnosed_avg_duration"], errors="coerce").fillna(0)
             d_sub["diagnosed_std_duration"] = pd.to_numeric(d_sub["diagnosed_std_duration"], errors="coerce").fillna(0)
+            d_sub["delta_t_avg"] = pd.to_numeric(d_sub["delta_t_avg"], errors="coerce").fillna(0)
             d_sub["delta_t_std"] = pd.to_numeric(d_sub["delta_t_std"], errors="coerce").fillna(0)
 
             jitter = jitter_offsets[d_rate]
