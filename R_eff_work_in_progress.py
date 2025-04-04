@@ -346,7 +346,8 @@ def plot_combined_summary(df,experiment_name):
             )
             ax.set_ylabel("Avg Δt (time step)")
             ax.set_xlabel("Input R")
-
+            ax.set_yscale('log')
+            
         # Titles at top of each column
         axes[0][col].set_title(f"Phenotype: {phenotype}")
 
