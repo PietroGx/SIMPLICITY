@@ -144,13 +144,13 @@ def select_seeded_simulations_to_plot(experiment_name, time_threshold, lineage_n
     return final_filtered_dirs, kept_seeds
 
 def main():
-    # # Set up the argument parser
-    # parser = argparse.ArgumentParser(description="Plot")
-    # parser.add_argument('experiment_name', type=str, help="experiment name")
-    # args = parser.parse_args()
-    experiment_name= 'test_local_experiment_serial_#1'#args.experiment_name
-    time_threshold = 10
-    lineage_number_threshold =  3
+    # Set up the argument parser
+    parser = argparse.ArgumentParser(description="Plot")
+    parser.add_argument('experiment_name', type=str, help="experiment name")
+    args = parser.parse_args()
+    experiment_name= args.experiment_name
+    time_threshold = 600
+    lineage_number_threshold =  30
     selected_ssods, seeds = select_seeded_simulations_to_plot(experiment_name, 
                                                        time_threshold, 
                                                        lineage_number_threshold)

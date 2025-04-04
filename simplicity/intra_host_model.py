@@ -412,37 +412,41 @@ def plot_state_timeline_summary(state_durations_dict, phase_durations_dict, titl
         ax = axs[idx]
         state_durations = state_durations_dict[key]
 
-        cumulative_time = 0  # track when each state "starts"
-        
-        for state in range(20):  # only plotting states 0–19
+        center_time = 0  # center of first state bar
+
+        prev_mean_dur = 0
+        for state in range(20):
             durations = state_durations.get(state, [])
             if not durations:
                 continue
             mean_dur = np.mean(durations)
             std_dur = np.std(durations)
             phase_label, color = get_phase_color(state)
-
-            # Draw the average residence time as a horizontal line
+        
+            start = center_time - mean_dur / 2
+            end = center_time + mean_dur / 2
+        
             ax.hlines(
                 y=state,
-                xmin=cumulative_time,
-                xmax=cumulative_time + mean_dur,
+                xmin=start,
+                xmax=end,
                 color=color,
                 linewidth=3,
-                label=phase_label if state in [0, 5, 19] else ""  # add legend entry once per phase
+                label=phase_label if state in [0, 5, 19] else ""
             )
-
-            # Add error bar
+        
             ax.errorbar(
-                x=cumulative_time + mean_dur / 2,
+                x=center_time,
                 y=state,
                 xerr=std_dur / 2,
                 fmt='none',
                 ecolor='black',
                 capsize=3
             )
-
-            cumulative_time += mean_dur  # move start time forward
+        
+            # advance center to the next state center
+            center_time += 0.5 * (prev_mean_dur + mean_dur)
+            prev_mean_dur = mean_dur
             
             # === Compute mean durations for each phase and total ===
             phases = phase_durations_dict.get(key, [])

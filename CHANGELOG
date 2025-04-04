@@ -480,11 +480,11 @@
 	* updated intra-host model py file
 	* added both matrix and jump proces option to update intra-host model
 
-2026-03-04 pietro gerletti
+2026-04-04 pietro gerletti
 	
 	Version 0.16.05
 	
-	* Corrected bug causing R to affect avg infection time                       
+	* added precomputation of matrix exponentials for ih model       
                	                                    
 	                          
 	
