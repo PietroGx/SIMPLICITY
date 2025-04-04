@@ -10,22 +10,33 @@ import scipy.linalg
 from multiprocessing import Pool
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import simplicity.output_manager as om
+import os
+import pickle
 
 class Host:
     '''
     This class defines the intra-host model of SARS-CoV-2 pathogenesis.
     '''
 
-    def __init__(self, tau_1=2.86, tau_2=3.91, tau_3=7.5, tau_4=8.0, update_mode = 'jump'):
+    def __init__(self, tau_1=2.86, tau_2=3.91, tau_3=7.5, tau_4=8.0, update_mode = 'matrix'):
+        
+        # set up the model matrix
         self.tau_1 = tau_1
         self.tau_2 = tau_2
         self.tau_3 = tau_3
         self.tau_4 = tau_4
         self.A = self._get_A_matrix(tau_1, tau_2, tau_3, tau_4)
-        self._A_cache = {}  # cache for expm(A * t)
-        self.states = np.arange(0, 21)
+        
+        # attributes for model solution
+        self.n_states = self.A.shape[0]
+        self.states = np.arange(0, self.n_states)
         self.update_mode = update_mode # either jump or matrix
-    
+        self.use_precomputed_matrix = False
+        if self.use_precomputed_matrix and update_mode == 'matrix':
+            self.exp_table = self._load_or_precompute_exponentials()
+            self.delta_t_not_in_table = []
+
     def get_update_mode(self):
         return self.update_mode
     
@@ -55,23 +66,46 @@ class Host:
             start += n
         return A
 
-    def get_A_t(self, delta_t, use_cache=False):
+    def get_A_t(self, delta_t):
         '''
-        Compute or retrieve matrix exponential expm(A * t).
-        Disable cache when use_cache=False.
+        Compute or retrieve matrix exponential expm(A * t) from the precomputed table.
         '''
-        if not use_cache:
+        if self.use_precomputed_matrix:
+            key = round(delta_t, 8)
+            try:
+                return self.exp_table[key]
+            except KeyError:
+                self.delta_t_not_in_table.append(key)
+                return scipy.linalg.expm(self.A * delta_t)
+        else:
             return scipy.linalg.expm(self.A * delta_t)
-        if delta_t not in self._A_cache:
-            self._A_cache[delta_t] = scipy.linalg.expm(self.A * delta_t)
-        return self._A_cache[delta_t]
+    
+    def _load_or_precompute_exponentials(self):
+        file_path = om.get_procomputed_matrix_table_filepath(self.tau_1,self.tau_2,self.tau_3,self.tau_4)
+        if os.path.exists(file_path):
+            with open(file_path, "rb") as f:
+                # print(f"Loaded matrix exponential table from {file_path}")
+                return pickle.load(f)
+        else:
+            print('Precomputing matrix exponentials...')
+            dts = self._generate_dts()
+            exp_table = {round(dt, 8): scipy.linalg.expm(self.A * dt) for dt in dts}
+            with open(file_path, "wb") as f:
+                pickle.dump(exp_table, f)
+                print(f"Saved {len(exp_table)} matrix exponentials to {file_path}")
+            return exp_table
 
     @staticmethod
-    def get_p_t(A_t, state):
+    def _generate_dts():
+        dts_small = np.logspace(-5, -2, 200, endpoint=False)
+        dts_large = np.linspace(0.01, 10, 100)
+        return np.concatenate([dts_small, dts_large])
+    
+    def get_p_t(self, A_t, state):
         '''
         Compute state probability vector p(t) for given A^t and state.
         '''
-        p0 = np.zeros(21)
+        p0 = np.zeros(self.n_states)
         p0[state] = 1
         return np.matmul(A_t, p0)
 
@@ -84,11 +118,11 @@ class Host:
         new_state = np.where(tau <= p_cum)[0][0]
         return new_state
 
-    def compute_all_probabilities(self, delta_t, use_cache=False):
+    def compute_all_probabilities(self, delta_t):
         '''
         Compute probability vectors for all initial  states.
         '''
-        A_t = self.get_A_t(delta_t, use_cache=use_cache)
+        A_t = self.get_A_t(delta_t)
         return [self.get_p_t(A_t, i) for i in self.states]
 
     def simulate_trajectory(self, delta_t, rng=None, exponential_dt=False):
@@ -118,8 +152,7 @@ class Host:
         
         while state < 20:
             dt = rng.exponential(delta_t) if exponential_dt else delta_t
-            use_cache = not exponential_dt
-            probabilities = self.compute_all_probabilities(dt, use_cache=use_cache)
+            probabilities = self.compute_all_probabilities(dt)
             p_t = probabilities[state]
             tau = rng.random()
             new_state = self.update_state(p_t, tau)
@@ -130,9 +163,6 @@ class Host:
             state = new_state
             
         return trajectory
-
-import pickle
-import os
 
 def save_results(filename, data):
     with open(filename, 'wb') as f:
@@ -333,7 +363,7 @@ def plot_infectious_duration_vs_step(fixed_phase_durations, exp_phase_durations,
     plt.show()
 
 
-def plot_state_timeline_summary(state_durations_dict, title_prefix=""):
+def plot_state_timeline_summary(state_durations_dict, phase_durations_dict, title_prefix=""):
     """
     Visualize average residence times for each state as a timeline-style plot (one per Δt or λ).
     Each state's duration is shown as a horizontal line, placed sequentially on the time axis.
@@ -363,12 +393,19 @@ def plot_state_timeline_summary(state_durations_dict, title_prefix=""):
     fig, axs = plt.subplots(2, 3, figsize=(14, 8), sharey=True)
     axs = axs.flatten()
     keys = list(state_durations_dict.keys())
+    
+    # compute global max time
+    max_total_time = 0
+    for durations in state_durations_dict.values():
+        total_time = sum(np.mean(durations[s]) for s in range(20) if durations.get(s))
+        max_total_time = max(max_total_time, total_time)
 
     for idx, key in enumerate(keys):
         ax = axs[idx]
         state_durations = state_durations_dict[key]
 
         cumulative_time = 0  # track when each state "starts"
+        
         for state in range(20):  # only plotting states 0–19
             durations = state_durations.get(state, [])
             if not durations:
@@ -398,12 +435,39 @@ def plot_state_timeline_summary(state_durations_dict, title_prefix=""):
             )
 
             cumulative_time += mean_dur  # move start time forward
-
+            
+            # === Compute mean durations for each phase and total ===
+            phases = phase_durations_dict.get(key, [])
+            if phases:
+                pre_mean   = np.mean([p["pre_infectious_duration"] for p in phases])
+                inf_mean   = np.mean([p["infectious_duration"] for p in phases])
+                det_mean   = np.mean([p["detectable_duration"] for p in phases])
+                total_mean = np.mean([p["total_duration"] for p in phases])
+            
+                # === Plot vertical lines for mean durations ===
+                # Pre-infectious duration
+                ax.axvline(pre_mean, color='blue', linestyle='--')
+                ax.text(pre_mean, 11, f"Pre: {pre_mean:.1f}", color='blue', ha='left', fontsize=8)
+            
+                # Infectious duration (cumulative from pre)
+                ax.axvline(inf_mean, color='red', linestyle='--')
+                ax.text(inf_mean, 9, f"Inf: {inf_mean:.1f}", color='red', ha='left', fontsize=8)
+            
+                # Detectable duration (cumulative from pre + inf)
+                ax.axvline(det_mean, color='green', linestyle='--')
+                ax.text(det_mean, 7, f"Det: {det_mean:.1f}", color='green', ha='left', fontsize=8)
+            
+                # Total duration (may differ slightly due to overlap)
+                ax.axvline(total_mean, color='black', linestyle=':', linewidth=1.5)
+                ax.text(total_mean, 5, f"Total: {total_mean:.1f}", color='black', ha='left', fontsize=8)
+                
+            
         ax.set_title(f"{title_prefix} Δt = {key}")
         ax.set_xlabel("Time (days)")
         ax.set_ylabel("State")
         ax.set_yticks(range(0, 20))
         ax.grid(True, axis='x')
+        ax.set_xlim(0, max_total_time)
         ax.legend()
 
     plt.suptitle("Timeline of Average State Residence Times (Phase Colored)", fontsize=14)
@@ -413,15 +477,15 @@ def plot_state_timeline_summary(state_durations_dict, title_prefix=""):
 
 
 def main():
-    fixed_dts   = [0.0001,0.001, 0.01, 0.1, 1.0]
-    exp_lambdas = [0.0001,0.001, 0.01, 0.1, 1.0]
+    fixed_dts   = [0.0001,0.001, 0.01, 0.1, 1.0, 10]
+    exp_lambdas = [0.0001,0.001, 0.01, 0.1, 1.0, 10]
     # fixed_dts   =  [1,2,4,8,10]
     # exp_lambdas =  [1,2,4,8,10]
-    n_runs = 100
+    n_runs = 10
 
     # File paths
-    fixed_results_file = '0_fixed_results.pkl'
-    exp_results_file = '0_exp_results.pkl'
+    fixed_results_file = 'fixed_results.pkl'
+    exp_results_file = 'exp_results.pkl'
 
     ## -----------------------------
     # Load or run simulations
@@ -494,31 +558,39 @@ def main():
     # Plotting
     # ----------------------------
 
-    print("\nPlotting: State Duration Stats (grid)...")
-    plot_state_duration_stats_grid(fixed_trajectories, fixed_dts, title_prefix="Fixed")
-    plot_state_duration_stats_grid(exp_trajectories, exp_lambdas, title_prefix="Exp")
+    # print("\nPlotting: State Duration Stats (grid)...")
+    # plot_state_duration_stats_grid(fixed_trajectories, fixed_dts, title_prefix="Fixed")
+    # plot_state_duration_stats_grid(exp_trajectories, exp_lambdas, title_prefix="Exp")
 
-    print("\nPlotting: Phase Duration Summary (scatter)...")
-    fixed_phase_for_plot = {
-        dt: {k: [d[k] for d in fixed_phase_durations[dt]] for k in fixed_phase_durations[dt][0]}
-        for dt in fixed_dts
-    }
-    exp_phase_for_plot = {
-        lmbda: {k: [d[k] for d in exp_phase_durations[lmbda]] for k in exp_phase_durations[lmbda][0]}
-        for lmbda in exp_lambdas
-    }
-    plot_duration_summary_scatter(fixed_phase_for_plot, exp_phase_for_plot, fixed_dts, exp_lambdas)
+    # print("\nPlotting: Phase Duration Summary (scatter)...")
+    # fixed_phase_for_plot = {
+    #     dt: {k: [d[k] for d in fixed_phase_durations[dt]] for k in fixed_phase_durations[dt][0]}
+    #     for dt in fixed_dts
+    # }
+    # exp_phase_for_plot = {
+    #     lmbda: {k: [d[k] for d in exp_phase_durations[lmbda]] for k in exp_phase_durations[lmbda][0]}
+    #     for lmbda in exp_lambdas
+    # }
+    # plot_duration_summary_scatter(fixed_phase_for_plot, exp_phase_for_plot, fixed_dts, exp_lambdas)
 
     print("\nPlotting: Average State Residence Time Timelines...")
-    plot_state_timeline_summary(fixed_state_durations, title_prefix="Fixed")
-    plot_state_timeline_summary(exp_state_durations, title_prefix="Exp")
+    plot_state_timeline_summary(fixed_state_durations, fixed_phase_durations, title_prefix="Fixed")
+    plot_state_timeline_summary(exp_state_durations, exp_phase_durations, title_prefix="Exp")
     
-    plot_infectious_duration_vs_step(
-    fixed_phase_durations=fixed_phase_durations,
-    exp_phase_durations=exp_phase_durations,
-    fixed_dts=fixed_dts,
-    exp_lambdas=exp_lambdas
-)
+    # plot_infectious_duration_vs_step(
+    # fixed_phase_durations=fixed_phase_durations,
+    # exp_phase_durations=exp_phase_durations,
+    # fixed_dts=fixed_dts,
+    # exp_lambdas=exp_lambdas
+    # )
+
+import cProfile
+import pstats
 
 if __name__ == '__main__':
-    main()
+    with cProfile.Profile() as pr:
+        main()  # or whatever your entry function is
+
+    stats = pstats.Stats(pr)
+    stats.strip_dirs()
+    stats.sort_stats("cumtime").print_stats(20)  # top 20 slowest calls

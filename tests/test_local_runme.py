@@ -254,7 +254,7 @@ def main(runner:str, test_number:int, compare_to: int = None):
 if __name__ == "__main__":
     import time
     start = time.time()
-    main('serial',53)#,compare_to=36)
+    main('serial',2)#,compare_to=53)
     elapsed = time.time() - start
     mins, secs = divmod(elapsed, 60)
     print(f"Test completed in {int(mins)} min {secs:.2f} sec")

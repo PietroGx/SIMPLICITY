@@ -780,7 +780,12 @@ def read_R_effective_dfs_csv(experiment_name, seeded_simulation_output_dir, wind
     R_effective_lineage_df = pd.read_csv(R_effective_lineage_csv_filepath,index_col=0)
     return R_effective_avg_df, R_effective_lineage_df
 
-
+def get_procomputed_matrix_table_filepath(tau_1,tau_2,tau_3,tau_4):
+    file_name = f"precomputed_A_exponentials_tau1={tau_1}_tau2={tau_2}_tau3={tau_3}_tau4={tau_4}.pkl"
+    data_dir = dm.get_data_dir()
+    return os.path.join(data_dir,file_name)
+    
+    
 
 
 
