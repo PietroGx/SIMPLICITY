@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import simplicity.output_manager as om
 import os
 import pickle
+from types import MethodType
 
 class Host:
     '''
@@ -32,10 +33,12 @@ class Host:
         self.n_states = self.A.shape[0]
         self.states = np.arange(0, self.n_states)
         self.update_mode = update_mode # either jump or matrix
-        self.use_precomputed_matrix = False
+        self.use_precomputed_matrix = True
         if self.use_precomputed_matrix and update_mode == 'matrix':
             self.exp_table = self._load_or_precompute_exponentials()
             self.delta_t_not_in_table = []
+       
+        self.get_A_t = self.factory_get_A_t()
 
     def get_update_mode(self):
         return self.update_mode
@@ -65,20 +68,25 @@ class Host:
                 A[i][-1] = 0
             start += n
         return A
-
-    def get_A_t(self, delta_t):
+    
+    def factory_get_A_t(self):
         '''
         Compute or retrieve matrix exponential expm(A * t) from the precomputed table.
         '''
+       
         if self.use_precomputed_matrix:
-            key = round(delta_t, 8)
-            try:
-                return self.exp_table[key]
-            except KeyError:
-                self.delta_t_not_in_table.append(key)
-                return scipy.linalg.expm(self.A * delta_t)
+            def get_A_t(self, delta_t):
+                key = round(delta_t, 8)
+                try:
+                    return self.exp_table[key]
+                except KeyError:
+                    self.delta_t_not_in_table.append(key)
+                    return scipy.linalg.expm(self.A * delta_t)
         else:
-            return scipy.linalg.expm(self.A * delta_t)
+            def get_A_t(self, delta_t):
+                return scipy.linalg.expm(self.A * delta_t)
+        
+        return MethodType(get_A_t, self)
     
     def _load_or_precompute_exponentials(self):
         file_path = om.get_procomputed_matrix_table_filepath(self.tau_1,self.tau_2,self.tau_3,self.tau_4)
@@ -477,11 +485,11 @@ def plot_state_timeline_summary(state_durations_dict, phase_durations_dict, titl
 
 
 def main():
-    fixed_dts   = [0.0001,0.001, 0.01, 0.1, 1.0, 10]
-    exp_lambdas = [0.0001,0.001, 0.01, 0.1, 1.0, 10]
+    fixed_dts   = [0.0001,0.001, 0.01, 0.1, 1.0]#, 10]
+    exp_lambdas = [0.0001,0.001, 0.01, 0.1, 1.0]#, 10]
     # fixed_dts   =  [1,2,4,8,10]
     # exp_lambdas =  [1,2,4,8,10]
-    n_runs = 10
+    n_runs = 100
 
     # File paths
     fixed_results_file = 'fixed_results.pkl'
@@ -583,14 +591,16 @@ def main():
     # fixed_dts=fixed_dts,
     # exp_lambdas=exp_lambdas
     # )
-
-import cProfile
-import pstats
-
 if __name__ == '__main__':
-    with cProfile.Profile() as pr:
-        main()  # or whatever your entry function is
+    main() 
+    
+# import cProfile
+# import pstats
 
-    stats = pstats.Stats(pr)
-    stats.strip_dirs()
-    stats.sort_stats("cumtime").print_stats(20)  # top 20 slowest calls
+# if __name__ == '__main__':
+#     with cProfile.Profile() as pr:
+#         main()  # or whatever your entry function is
+
+#     stats = pstats.Stats(pr)
+#     stats.strip_dirs()
+#     stats.sort_stats("cumtime").print_stats(20)  # top 20 slowest calls

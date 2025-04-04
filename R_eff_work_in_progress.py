@@ -83,31 +83,27 @@ def get_avg_infectious_duration(simulation_output_dir, state_filter):
 
     return np.mean(durations), np.std(durations)
 
+def get_avg_delta_t(simulation_output_dir):
+    """
+    Computes the average and std of delta_t (time step differences) across all runs.
+    """
+    ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
+    all_dts = []
 
-# def extract_simulation_summary(experiment_name):
-#     rows = []
-#     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    for ssod in ssod_list:
+        df = om.read_simulation_trajectory(ssod)
 
-#     for sim_out_dir in simulation_output_dirs:
-        
-#         phenotype_model = sm.get_parameter_value_from_simulation_output_dir(
-#                                                 sim_out_dir, 'phenotype_model')
-#         R = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'R')
-#         diagnosis_rate = sm.get_parameter_value_from_simulation_output_dir(
-#                                                  sim_out_dir, 'diagnosis_rate')
-        
-#         R_eff_avg, R_eff_std = get_avg_simulation_R_eff(sim_out_dir) 
+        if df.empty or "time" not in df.columns:
+            continue
 
-#         rows.append({
-#             "phenotype_model": phenotype_model,
-#             "R": R,
-#             "diagnosis_rate": diagnosis_rate,
-#             "R_eff_avg": R_eff_avg,
-#             "R_eff_std": R_eff_std,
-#         })
+        dts = df["time"].diff().dropna()
+        all_dts.extend(dts.tolist())
 
-#     df = pd.DataFrame(rows)
-#     return df
+    if not all_dts:
+        return None, None
+
+    return np.mean(all_dts), np.std(all_dts)
+
 
 def extract_simulation_summary(experiment_name):
     rows = []
@@ -229,6 +225,44 @@ def plot_infectious_durations(df):
     plt.tight_layout()
     plt.show()
 
+def plot_avg_deltat_vs_R(df):
+    sns.set(style="whitegrid")
+
+    phenotype_models = sorted(df["phenotype_model"].unique())
+    diagnosis_rates = sorted(df["diagnosis_rate"].unique())
+    colors = sns.color_palette("tab10", n_colors=len(diagnosis_rates))
+    color_map = {d: c for d, c in zip(diagnosis_rates, colors)}
+
+    fig, axes = plt.subplots(1, len(phenotype_models), figsize=(7 * len(phenotype_models), 5), sharey=True)
+
+    if len(phenotype_models) == 1:
+        axes = [axes]
+
+    for ax, phenotype in zip(axes, phenotype_models):
+        pheno_df = df[df["phenotype_model"] == phenotype]
+
+        for d_rate in diagnosis_rates:
+            subset = pheno_df[pheno_df["diagnosis_rate"] == d_rate]
+
+            ax.errorbar(
+                subset["R"],
+                subset["delta_t_avg"],
+                yerr=subset["delta_t_std"],
+                fmt='o',
+                label=f"d_rate={d_rate}",
+                capsize=3,
+                linestyle='None',
+                color=color_map[d_rate]
+            )
+
+        ax.set_title(f"Phenotype: {phenotype}")
+        ax.set_xlabel("R")
+
+    axes[0].set_ylabel("Average Δt (time step)")
+    axes[0].legend(title="Diagnosis rate")
+    plt.tight_layout()
+    plt.show()
+
 
 def plot_combined_summary(df,experiment_name):
     sns.set(style="whitegrid")
@@ -250,7 +284,7 @@ def plot_combined_summary(df,experiment_name):
     color_map = {d: c for d, c in zip(diagnosis_rates, colors)}
 
     # Create subplot grid: 3 rows (R_eff, recovered, diagnosed) x 2 phenotypes
-    fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(14, 12), sharex='col')
+    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(14, 16), sharex='col')
 
     for col, phenotype in enumerate(phenotype_models):
         pheno_df = df[df["phenotype_model"] == phenotype]
@@ -299,6 +333,16 @@ def plot_combined_summary(df,experiment_name):
                 color=color_map[d_rate]
             )
             ax.set_ylabel("Avg duration (diagnosed)")
+            ax.set_xlabel("Input R")
+            
+            # -- Row 3: Δt --
+            ax = axes[3][col]
+            ax.errorbar(
+               R_jittered, d_sub["delta_t_avg"], yerr=d_sub["delta_t_std"],
+               fmt='o', capsize=3, linestyle='None',
+               color=color_map[d_rate]
+            )
+            ax.set_ylabel("Avg Δt (time step)")
             ax.set_xlabel("Input R")
 
         # Titles at top of each column
