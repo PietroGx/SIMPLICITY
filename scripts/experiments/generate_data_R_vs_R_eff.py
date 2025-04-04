@@ -17,17 +17,16 @@ def fixture_experiment_settings():
     
     varying_params = {
         'R': [0.8,1,2,4,8],
-        # 'diagnosis_rate': [0],
+        'diagnosis_rate': [0,0.1,0.2],
         'phenotype_model': ['linear', 'immune_waning']
     }
 
     fixed_params = {
         'infected_individuals_at_start': 100,
-        'diagnosis_rate': 0,
         'final_time': 365*3
     }
     
-    n_seeds = 50
+    n_seeds = 200
     
     return (varying_params,fixed_params,n_seeds)
 

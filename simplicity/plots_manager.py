@@ -199,6 +199,7 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     
     # Align the y-axis labels
     fig.align_ylabels([ax2, ax3])
+    # save plot
     plt.tight_layout()
     experiment_name = dm.get_experiment_foldername_from_SSOD(seeded_simulation_output_dir)
     so_foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)

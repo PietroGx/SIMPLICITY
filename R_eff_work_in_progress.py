@@ -301,7 +301,7 @@ def plot_combined_summary(df,experiment_name):
             ax.errorbar(
                 R_jittered,
                 d_sub["R_eff_avg"],
-                yerr=d_sub["R_eff_std"],
+                yerr=d_sub["R_eff_std"].fillna(0),
                 fmt='o',
                 capsize=3,
                 linestyle='None',
@@ -315,7 +315,7 @@ def plot_combined_summary(df,experiment_name):
             ax.errorbar(
                 R_jittered,
                 d_sub["recovered_avg_duration"],
-                yerr=d_sub["recovered_std_duration"],
+                yerr=d_sub["recovered_std_duration"].fillna(0),
                 fmt='o',
                 capsize=3,
                 linestyle='None',
@@ -328,7 +328,7 @@ def plot_combined_summary(df,experiment_name):
             ax.errorbar(
                 R_jittered,
                 d_sub["diagnosed_avg_duration"],
-                yerr=d_sub["diagnosed_std_duration"],
+                yerr=d_sub["diagnosed_std_duration"].fillna(0),
                 fmt='o',
                 capsize=3,
                 linestyle='None',
@@ -340,8 +340,12 @@ def plot_combined_summary(df,experiment_name):
             # -- Row 3: Δt --
             ax = axes[3][col]
             ax.errorbar(
-               R_jittered, d_sub["delta_t_avg"], yerr=d_sub["delta_t_std"],
-               fmt='o', capsize=3, linestyle='None',
+               R_jittered, 
+               d_sub["delta_t_avg"], 
+               yerr=d_sub["delta_t_std"].fillna(0),
+               fmt='o', 
+               capsize=3, 
+               linestyle='None',
                color=color_map[d_rate]
             )
             ax.set_ylabel("Avg Δt (time step)")
