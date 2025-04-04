@@ -109,7 +109,7 @@ def extract_simulation_summary(experiment_name):
     rows = []
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
 
-     for sim_out_dir in tqdm(simulation_output_dirs, desc="Extracting summaries"):
+    for sim_out_dir in tqdm(simulation_output_dirs, desc="Extracting summaries"):
         phenotype_model = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'phenotype_model')
         R = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'R')
         diagnosis_rate = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'diagnosis_rate')
