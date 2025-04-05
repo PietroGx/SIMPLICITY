@@ -327,13 +327,16 @@ class Population:
             ind['state_t'] = new_state
             # print(f'{i}: {state} -> {new_state}')
             # Recovery check
-            if new_state >= 20:
+            if new_state == 20:
                 ind['state'] = 'recovered'
-                ind['t_not_infectious'] = self.time
+                if ind['t_not_infectious'] is None:
+                    ind['t_not_infectious'] = self.time
     
                 self.infected_i.remove(i)
+                self.infectious_normal_i.discard(i)
+                self.detectable_i.discard(i)
                 self.recovered_i.add(i)
-    
+                
                 self.infected -= 1
                 self.recovered += 1
                 self.susceptibles += 1
@@ -346,22 +349,33 @@ class Population:
                 self.infectious_normal_i.discard(i)
                 self.detectable_i.discard(i)
                 continue
-    
-            # Infectious update (5–18)
-            if 4 < new_state < 19 and ind['type'] == 'normal':
-                if i not in self.infectious_normal_i:
-                    self.infectious_normal_i.add(i)
-                    ind['t_infectious'] = self.time
-            else:
-                if i in self.infectious_normal_i:
-                    self.infectious_normal_i.remove(i)
-                    ind['t_not_infectious'] = self.time
-    
+            
+            elif new_state <= 4:
+                continue
+            
             # Detectable update (5–19)
             if 4 < new_state < 20:
                 self.detectable_i.add(i)
             else:
                 self.detectable_i.discard(i)
+            
+            # Infectious update (5–18)
+            if 4 < new_state < 19 and ind['type'] == 'normal':
+                if i not in self.infectious_normal_i:
+                    self.infectious_normal_i.add(i)
+                    if ind['t_infectious'] is None:
+                        ind['t_infectious'] = self.time
+                    else:
+                        raise ValueError(f' individual {i} t_non_inf already set!!')
+            else:
+                if new_state != 19:
+                    raise ValueError('State here should be 19 only')
+                if i in self.infectious_normal_i:
+                    self.infectious_normal_i.remove(i)
+                    if ind['t_not_infectious'] is None:
+                        ind['t_not_infectious'] = self.time
+                    else:
+                        raise ValueError(f' individual {i} t_non_inf already set!!')
     
         self.exclude_i = set()
         self.infectious_normal = len(self.infectious_normal_i)

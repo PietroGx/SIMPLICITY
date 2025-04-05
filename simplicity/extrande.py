@@ -156,7 +156,7 @@ def extrande_core_loop(parameters, population, helpers):
     extrande_counter = 0
     thinning_counter = 0
     
-    min_update_threshold = 1  # minimum dt for intra-host update (1h step)
+    min_update_threshold = 0.04  # minimum dt for intra-host update (1h step)
     dt_accumulated = 0  # initialize accumulator
     
     while t < final_time:
