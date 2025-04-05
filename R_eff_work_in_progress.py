@@ -87,6 +87,27 @@ def get_avg_infectious_duration(simulation_output_dir, state_filter):
 
     return np.mean(durations), np.std(durations)
 
+def get_avg_infection_duration(simulation_output_dir, state_filter):
+    ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
+    durations = []
+
+    for ssod in ssod_list:
+        df = om.read_individuals_data(ssod)
+
+        if df.empty or "state" not in df.columns:
+            continue
+        
+        filtered_df = df[(df["state"] == state_filter)]
+            
+        if not filtered_df.empty:
+            duration = (filtered_df["t_not_infected"] - filtered_df["t_infection"]).dropna()
+            durations.extend(duration.tolist())
+
+    if not durations:
+        return None, None
+
+    return np.mean(durations), np.std(durations)
+
 def get_avg_delta_t(simulation_output_dir):
     """
     Computes the average and std of delta_t (time step differences) across all runs.
@@ -118,8 +139,15 @@ def extract_simulation_summary(experiment_name):
         diagnosis_rate = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'diagnosis_rate')
         
         R_eff_avg, R_eff_std = get_avg_simulation_R_eff(sim_out_dir)
-        recovered_avg, recovered_std = get_avg_infectious_duration(sim_out_dir, "recovered")
-        diagnosed_avg, diagnosed_std = get_avg_infectious_duration(sim_out_dir, "diagnosed")
+
+        # Recovered: durations
+        recovered_avg_infectious, recovered_std_infectious = get_avg_infectious_duration(sim_out_dir, "recovered")
+        recovered_avg_infection, recovered_std_infection = get_avg_infection_duration(sim_out_dir, "recovered")
+
+        # Diagnosed: duration in infectious state
+        diagnosed_avg_infectious, diagnosed_std_infectious = get_avg_infectious_duration(sim_out_dir, "diagnosed")
+
+        # Step sizes
         delta_t_avg, delta_t_std = get_avg_delta_t(sim_out_dir)
 
         rows.append({
@@ -128,16 +156,21 @@ def extract_simulation_summary(experiment_name):
             "diagnosis_rate": diagnosis_rate,
             "R_eff_avg": R_eff_avg,
             "R_eff_std": R_eff_std,
-            "recovered_avg_duration": recovered_avg,
-            "recovered_std_duration": recovered_std,
-            "diagnosed_avg_duration": diagnosed_avg,
-            "diagnosed_std_duration": diagnosed_std,
+
+            "recovered_avg_infectious": recovered_avg_infectious,
+            "recovered_std_infectious": recovered_std_infectious,
+            "recovered_avg_infection": recovered_avg_infection,
+            "recovered_std_infection": recovered_std_infection,
+
+            "diagnosed_avg_infectious": diagnosed_avg_infectious,
+            "diagnosed_std_infectious": diagnosed_std_infectious,
+
             "delta_t_avg": delta_t_avg,
             "delta_t_std": delta_t_std,
         })
-      
 
     return pd.DataFrame(rows)
+
 
 
 def plot_R_eff_vs_R(df):
@@ -270,14 +303,118 @@ def plot_avg_deltat_vs_R(df):
     plt.show()
 
 
-def plot_combined_summary(df,experiment_name):
+# def plot_combined_summary(df,experiment_name):
+#     sns.set(style="whitegrid")
+
+#     # Get sorted values
+#     phenotype_models = sorted(df["phenotype_model"].unique())
+#     diagnosis_rates = sorted(df["diagnosis_rate"].unique())
+
+#     # Fixed jitter offsets per diagnosis_rate
+#     n_rates = len(diagnosis_rates)
+#     jitter_spacing = 0.02
+#     jitter_offsets = {
+#         rate: (i - n_rates // 2) * jitter_spacing
+#         for i, rate in enumerate(diagnosis_rates)
+#     }
+
+#     # Colors for diagnosis rates
+#     colors = sns.color_palette("tab10", n_colors=n_rates)
+#     color_map = {d: c for d, c in zip(diagnosis_rates, colors)}
+
+#     # Create subplot grid: 3 rows (R_eff, recovered, diagnosed) x 2 phenotypes
+#     fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(14, 16), sharex='col')
+
+#     for col, phenotype in enumerate(phenotype_models):
+#         pheno_df = df[df["phenotype_model"] == phenotype]
+
+#         for d_rate in diagnosis_rates:
+#             d_sub = pheno_df[pheno_df["diagnosis_rate"] == d_rate].copy()
+#             # Convert average values and error values to numeric and fill missing entries
+#             d_sub["R_eff_avg"] = pd.to_numeric(d_sub["R_eff_avg"], errors="coerce").fillna(0)
+#             d_sub["R_eff_std"] = pd.to_numeric(d_sub["R_eff_std"], errors="coerce").fillna(0)
+#             d_sub["recovered_avg_duration"] = pd.to_numeric(d_sub["recovered_avg_duration"], errors="coerce").fillna(0)
+#             d_sub["recovered_std_duration"] = pd.to_numeric(d_sub["recovered_std_duration"], errors="coerce").fillna(0)
+#             d_sub["diagnosed_avg_duration"] = pd.to_numeric(d_sub["diagnosed_avg_duration"], errors="coerce").fillna(0)
+#             d_sub["diagnosed_std_duration"] = pd.to_numeric(d_sub["diagnosed_std_duration"], errors="coerce").fillna(0)
+#             d_sub["delta_t_avg"] = pd.to_numeric(d_sub["delta_t_avg"], errors="coerce").fillna(0)
+#             d_sub["delta_t_std"] = pd.to_numeric(d_sub["delta_t_std"], errors="coerce").fillna(0)
+
+#             jitter = jitter_offsets[d_rate]
+#             R_jittered = d_sub["R"] + jitter
+
+#             # --- Row 0: R_eff ---
+#             ax = axes[0][col]
+#             ax.errorbar(
+#                 R_jittered,
+#                 d_sub["R_eff_avg"],
+#                 yerr=d_sub["R_eff_std"],
+#                 fmt='o',
+#                 capsize=3,
+#                 linestyle='None',
+#                 label=f"d_rate={d_rate}",
+#                 color=color_map[d_rate]
+#             )
+#             ax.set_ylabel("Observed R_eff")
+
+#             # --- Row 1: Recovered durations ---
+#             ax = axes[1][col]
+#             ax.errorbar(
+#                 R_jittered,
+#                 d_sub["recovered_avg_duration"],
+#                 yerr=d_sub["recovered_std_duration"],
+#                 fmt='o',
+#                 capsize=3,
+#                 linestyle='None',
+#                 color=color_map[d_rate]
+#             )
+#             ax.set_ylabel("Avg duration (recovered)")
+
+#             # --- Row 2: Diagnosed durations ---
+#             ax = axes[2][col]
+#             ax.errorbar(
+#                 R_jittered,
+#                 d_sub["diagnosed_avg_duration"],
+#                 yerr=d_sub["diagnosed_std_duration"],
+#                 fmt='o',
+#                 capsize=3,
+#                 linestyle='None',
+#                 color=color_map[d_rate]
+#             )
+#             ax.set_ylabel("Avg duration (diagnosed)")
+#             ax.set_xlabel("Input R")
+            
+#             # -- Row 3: Δt --
+#             ax = axes[3][col]
+#             ax.errorbar(
+#                R_jittered, 
+#                d_sub["delta_t_avg"], 
+#                yerr=d_sub["delta_t_std"],
+#                fmt='o', 
+#                capsize=3, 
+#                linestyle='None',
+#                color=color_map[d_rate]
+#             )
+#             ax.set_ylabel("Avg Δt (time step)")
+#             ax.set_xlabel("Input R")
+#             ax.set_yscale('log')
+            
+#         # Titles at top of each column
+#         axes[0][col].set_title(f"Phenotype: {phenotype}")
+
+#     # Legend in top-right subplot
+#     axes[0][1].legend(title="Diagnosis rate")
+
+#     plt.tight_layout()
+#     plt.savefig(f'R_eff_time_inf_{experiment_name}_check.png')
+#     plt.close()
+    
+def plot_combined_summary(df, experiment_name):
     sns.set(style="whitegrid")
 
-    # Get sorted values
     phenotype_models = sorted(df["phenotype_model"].unique())
     diagnosis_rates = sorted(df["diagnosis_rate"].unique())
 
-    # Fixed jitter offsets per diagnosis_rate
     n_rates = len(diagnosis_rates)
     jitter_spacing = 0.02
     jitter_offsets = {
@@ -285,97 +422,77 @@ def plot_combined_summary(df,experiment_name):
         for i, rate in enumerate(diagnosis_rates)
     }
 
-    # Colors for diagnosis rates
     colors = sns.color_palette("tab10", n_colors=n_rates)
     color_map = {d: c for d, c in zip(diagnosis_rates, colors)}
 
-    # Create subplot grid: 3 rows (R_eff, recovered, diagnosed) x 2 phenotypes
-    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(14, 16), sharex='col')
+    # 6 rows: R_eff, recovered infection, recovered infectious, diagnosed infectious, Δt
+    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(14, 20), sharex='col')
 
     for col, phenotype in enumerate(phenotype_models):
         pheno_df = df[df["phenotype_model"] == phenotype]
 
         for d_rate in diagnosis_rates:
             d_sub = pheno_df[pheno_df["diagnosis_rate"] == d_rate].copy()
-            # Convert average values and error values to numeric and fill missing entries
-            d_sub["R_eff_avg"] = pd.to_numeric(d_sub["R_eff_avg"], errors="coerce").fillna(0)
-            d_sub["R_eff_std"] = pd.to_numeric(d_sub["R_eff_std"], errors="coerce").fillna(0)
-            d_sub["recovered_avg_duration"] = pd.to_numeric(d_sub["recovered_avg_duration"], errors="coerce").fillna(0)
-            d_sub["recovered_std_duration"] = pd.to_numeric(d_sub["recovered_std_duration"], errors="coerce").fillna(0)
-            d_sub["diagnosed_avg_duration"] = pd.to_numeric(d_sub["diagnosed_avg_duration"], errors="coerce").fillna(0)
-            d_sub["diagnosed_std_duration"] = pd.to_numeric(d_sub["diagnosed_std_duration"], errors="coerce").fillna(0)
-            d_sub["delta_t_avg"] = pd.to_numeric(d_sub["delta_t_avg"], errors="coerce").fillna(0)
-            d_sub["delta_t_std"] = pd.to_numeric(d_sub["delta_t_std"], errors="coerce").fillna(0)
+            
+            # Ensure all numeric and fill missing
+            for col_name in [
+                "R_eff_avg", "R_eff_std",
+                "recovered_avg_infection", "recovered_std_infection",
+                "recovered_avg_infectious", "recovered_std_infectious",
+                "diagnosed_avg_infectious", "diagnosed_std_infectious",
+                "delta_t_avg", "delta_t_std"
+            ]:
+                d_sub[col_name] = pd.to_numeric(d_sub[col_name], errors="coerce").fillna(0)
 
             jitter = jitter_offsets[d_rate]
             R_jittered = d_sub["R"] + jitter
 
-            # --- Row 0: R_eff ---
-            ax = axes[0][col]
-            ax.errorbar(
-                R_jittered,
-                d_sub["R_eff_avg"],
-                yerr=d_sub["R_eff_std"],
-                fmt='o',
-                capsize=3,
-                linestyle='None',
-                label=f"d_rate={d_rate}",
-                color=color_map[d_rate]
-            )
-            ax.set_ylabel("Observed R_eff")
+            # # Row 0: R_eff
+            # ax = axes[0][col]
+            # ax.errorbar(R_jittered, d_sub["R_eff_avg"], yerr=d_sub["R_eff_std"], fmt='o', capsize=3,
+            #             linestyle='None', label=f"d_rate={d_rate}", color=color_map[d_rate])
+            # ax.set_ylabel("Observed R_eff")
 
-            # --- Row 1: Recovered durations ---
+            # Row 1: Recovered infection duration
             ax = axes[1][col]
-            ax.errorbar(
-                R_jittered,
-                d_sub["recovered_avg_duration"],
-                yerr=d_sub["recovered_std_duration"],
-                fmt='o',
-                capsize=3,
-                linestyle='None',
-                color=color_map[d_rate]
-            )
-            ax.set_ylabel("Avg duration (recovered)")
+            ax.errorbar(R_jittered, d_sub["recovered_avg_infection"],
+                        yerr=d_sub["recovered_std_infection"], fmt='o', capsize=3,
+                        linestyle='None', color=color_map[d_rate])
+            ax.set_ylabel("Infection duration (recovered)")
 
-            # --- Row 2: Diagnosed durations ---
+            # Row 2: Recovered infectious duration
             ax = axes[2][col]
-            ax.errorbar(
-                R_jittered,
-                d_sub["diagnosed_avg_duration"],
-                yerr=d_sub["diagnosed_std_duration"],
-                fmt='o',
-                capsize=3,
-                linestyle='None',
-                color=color_map[d_rate]
-            )
-            ax.set_ylabel("Avg duration (diagnosed)")
-            ax.set_xlabel("Input R")
-            
-            # -- Row 3: Δt --
+            ax.errorbar(R_jittered, d_sub["recovered_avg_infectious"],
+                        yerr=d_sub["recovered_std_infectious"], fmt='o', capsize=3,
+                        linestyle='None', color=color_map[d_rate])
+            ax.set_ylabel("Infectious duration (recovered)")
+
+            # Row 3: Diagnosed infectious duration
             ax = axes[3][col]
-            ax.errorbar(
-               R_jittered, 
-               d_sub["delta_t_avg"], 
-               yerr=d_sub["delta_t_std"],
-               fmt='o', 
-               capsize=3, 
-               linestyle='None',
-               color=color_map[d_rate]
-            )
-            ax.set_ylabel("Avg Δt (time step)")
+            ax.errorbar(R_jittered, d_sub["diagnosed_avg_infectious"],
+                        yerr=d_sub["diagnosed_std_infectious"], fmt='o', capsize=3,
+                        linestyle='None', color=color_map[d_rate])
+            ax.set_ylabel("Infectious duration (diagnosed)")
+            ax.set_xlabel("Input R")
+
+            # Row 4: Δt (step size)
+            ax = axes[4][col]
+            ax.errorbar(R_jittered, d_sub["delta_t_avg"], yerr=d_sub["delta_t_std"],
+                        fmt='o', capsize=3, linestyle='None', color=color_map[d_rate])
+            ax.set_ylabel("Avg Δt (step size)")
             ax.set_xlabel("Input R")
             ax.set_yscale('log')
-            
-        # Titles at top of each column
+            y_vals = d_sub["delta_t_avg"] - d_sub["delta_t_std"]
+            min_y = y_vals[y_vals > 0].min() * 0.5 if not y_vals.empty else 1e-3
+            ax.set_ylim(bottom=min_y)
+
         axes[0][col].set_title(f"Phenotype: {phenotype}")
 
-    # Legend in top-right subplot
     axes[0][1].legend(title="Diagnosis rate")
-
     plt.tight_layout()
     plt.savefig(f'R_eff_time_inf_{experiment_name}_check.png')
     plt.close()
-    
+
 import argparse
 
 def main():

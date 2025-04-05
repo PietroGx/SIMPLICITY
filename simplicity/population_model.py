@@ -9,10 +9,12 @@ import numpy as np
 
 def SIDR_propensities(population, beta, k_d, k_v, seq_rate):
     propensities_params = [beta, k_d, k_v]
+    # system propensities
+    # reaction_id, reaction_rate, action
     propensities = [
-        (beta * population.infectious_normal, lambda: infection(population)),
-        (k_d * population.detectables, lambda: diagnosis(population, seq_rate)),
-        (k_v * population.infected, lambda: add_variant(population))
+        ('infection',      beta * population.infectious_normal, lambda: infection(population)),
+        ('diagnosis',      k_d * population.detectables,        lambda: diagnosis(population, seq_rate)),
+        ('add_ih_lineage', k_v * population.infected,           lambda: add_variant(population))
     ]
     # print('a1:',beta * population.infectious_normal)
     # print('a2:',k_d * population.detectables)
@@ -54,14 +56,21 @@ def diagnosis(population, seq_rate=0):
     # set patient as diagnosed
     population.individuals[diagnosed_individual_i]['t_not_infectious'] = population.time
     population.individuals[diagnosed_individual_i]['state'] = 'diagnosed'
+   
+    if population.individuals[diagnosed_individual_i]['t_not_infected'] is None:
+        population.individuals[diagnosed_individual_i]['t_not_infected'] = population.time
+    else:
+        raise ValueError('Individual already recovered!!')
     
     # remove individual index from detectable_i, infectious_i, infected_i and add to diagnosed_i
+    
     if diagnosed_individual_i in population.infectious_normal_i:
         population.infectious_normal_i.remove(diagnosed_individual_i)
         population.infectious_normal -= 1
     
     population.detectable_i.remove(diagnosed_individual_i)
     population.detectables -= 1
+    
     # update diagnosed and infected
     population.infected_i.discard(diagnosed_individual_i)
     population.diagnosed_i.add(diagnosed_individual_i)
@@ -70,7 +79,6 @@ def diagnosis(population, seq_rate=0):
     population.susceptibles += 1
     new_susceptible_index = population.reservoir_i.pop()
     population.susceptibles_i.add(new_susceptible_index)
-
 
 def infection(population):
     '''

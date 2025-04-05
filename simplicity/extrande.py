@@ -14,6 +14,68 @@ import simplicity.evolution.reference as ref
 import simplicity.phenotype.consensus as c
 import simplicity.phenotype.update as pheno
 import simplicity.tuning.diagnosis_rate as dr
+from tqdm import tqdm
+
+class ProgressReporter:
+    def __init__(self, total_time, simulation_id):
+        self.total_time = total_time
+        self.current_time = 0
+        self.step_size = 0
+        
+        self.leap_counter = 0
+        self.reactions_counter = 0
+        self.thinning_counter = 0
+        self.reaction_id = None
+
+        self.start_wall = time.time()
+
+        self.pbar = tqdm(
+                    total=total_time,
+                    desc=f"RUNNING SIMPLICITY SIMULATION:  {simulation_id}",
+                    unit="step",
+                    bar_format="{l_bar}{bar}| {n:.2f}/{total_fmt} {unit} {postfix}",
+                    position=1,
+                    leave=False
+                    )
+
+    def update(self, population, delta_t, reaction_id=None, event_type=None):
+        self.step_size = delta_t
+        self.reaction_id = reaction_id
+        self.current_time += delta_t
+        self.infected = population.infected
+
+        # Count thinning vs accepted events
+        if event_type == "leap":
+            self.leap_counter += 1
+        elif event_type == "reaction":
+            self.reactions_counter += 1
+            if reaction_id == "thinning":
+                self.thinning_counter += 1
+
+        # Compute leap and thinning percentage
+        total_events = self.leap_counter + self.reactions_counter
+        leap_pct     =  100 * self.leap_counter / total_events if total_events > 0 else 0
+        thinning_pct = 100 * self.thinning_counter / self.reactions_counter if self.reactions_counter > 0 else 0
+
+        # Elapsed CPU time
+        cpu_time = time.time() - self.start_wall
+
+        # Update tqdm
+        self.pbar.update(delta_t)
+        self.pbar.set_postfix({
+            "time": f"{self.current_time:.2f}",
+            "step": f"{self.step_size:.2e}",
+            "leap%": f"{leap_pct:.1f}%",
+            "thin%": f"{thinning_pct:.1f}%",
+            "last react": self.reaction_id if self.reaction_id is not None else "-",
+            "infected": self.infected,
+            "CPU(s)": f"{cpu_time:.1f}",
+            "Time left": f"{(cpu_time / self.current_time * (self.total_time - self.current_time)):.0f}s"
+        })
+
+    def close(self):
+        self.pbar.close()
+
 
 def get_helpers(phenotype_model, parameters, rng1, rng2):
     """
@@ -87,51 +149,36 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         else:
             evo.mutate(population, e, delta_t_y, phenotype_model)
     
-    def fire_reaction(population, reactions, tau_2):
-        a0 = sum(rate for rate, _ in reactions)
+    def fire_reaction(population, propensities, tau_2):
+        a0 = sum(rate for _, rate, _ in propensities)
         if tau_2 > a0:
-            return  1 # thinning
+            return 'thinning' # thinning
         threshold = 0
-        for rate, action in reactions:
+        for reaction_id, rate, action in propensities:
             threshold += rate
             if tau_2 <= threshold:
                 action()
-                return 0
+                return reaction_id
     
     def reaction_step(population, B):
-        reactions, _ = SIDR.SIDR_propensities(population, beta, k_d, k_v, seq_rate)
+        propensities, _ = SIDR.SIDR_propensities(population, beta, k_d, k_v, seq_rate)
         tau_2 = rng2.uniform(0, B)
-        return fire_reaction(population, reactions, tau_2)
-
-    def report_progress(t, final_time, last_progress):
-        progress = t / final_time
-        if progress >= last_progress + 0.1:
-            print(f"Progress: {progress*100:.0f}% (t = {t:.2f})")
-            return progress
-        return last_progress
-
+        return fire_reaction(population, propensities, tau_2)
+    
     def check_stop_conditions(population, t, start_time):
-        
         if population.infected == 0:
-            print("\n No infected left - ending simulation")
-            return True
+            return "No infected left - ending simulation"
         if population.susceptibles == 0:
-            print("\nNo susceptibles left - ending simulation")
-            return True
-        if t > 60.0:
-            if population.infectious_normal == 0:
-                print("\n No infectious left - ending simulation")
-                return True
+            return "No susceptibles left - ending simulation"
+        if t > 60.0 and population.infectious_normal == 0:
+            return "No infectious left - ending simulation"
         if len(population.reservoir_i) < 1000:
-            print("\n Reservoir depleted - ending simulation")
-            return True
+            return "Reservoir depleted - ending simulation"
         if time.time() - start_time > max_runtime:
-            print("\n Max runtime exceeded")
-            return True
-        return False
+            return "Max runtime exceeded"
+        return None
 
     return {
-    "report_progress": report_progress,
     "compute_upperbound": compute_upperbound,
     "look_ahead": look_ahead,
     "draw_delta_t": draw_delta_t,
@@ -142,7 +189,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     "reaction_step": reaction_step,
     }
 
-def extrande_core_loop(parameters, population, helpers):
+def extrande_core_loop(parameters, population, helpers, sim_id):
     """
     Core extrande loop.
     """
@@ -150,38 +197,37 @@ def extrande_core_loop(parameters, population, helpers):
     final_time = parameters['final_time']
     start_time = time.time()
     t_day = 0
-    last_progress = 0
     
-    leap_counter = 0
-    extrande_counter = 0
-    thinning_counter = 0
+    reporter = ProgressReporter(total_time=final_time, simulation_id=sim_id)
     
     min_update_threshold = 0.04  # minimum dt for intra-host update (1h step)
     dt_accumulated = 0  # initialize accumulator
     
     while t < final_time:
-        last_progress = helpers["report_progress"](t, final_time, last_progress)
 
         L = helpers["look_ahead"](t, final_time)
         B = helpers["compute_upperbound"](population)
-        # print(f'Upper bound: {B}')
+        
         delta_t = helpers["draw_delta_t"](B)
         dt_accumulated += delta_t
         
+        reaction_id = None
+        
         if delta_t > L:
-            leap_counter +=1
+            event_type = 'leap'
             # update time
-            t += L
+            delta_t = L
+            t += delta_t
             t = round(t, 10)
             population.update_time(t)
             # update system  (IH host model states)
-            helpers["update_step"](population, L)
+            helpers["update_step"](population, delta_t)
             # mutations
-            helpers["mutation_step"](population, L)
+            helpers["mutation_step"](population, delta_t)
             # Reset dt_accumulated 
             dt_accumulated = 0
         else:
-            extrande_counter+=1
+            event_type = 'reaction'
             # update time
             t += delta_t
             t = round(t, 10)
@@ -196,10 +242,9 @@ def extrande_core_loop(parameters, population, helpers):
                 helpers["update_fitness_step"](population)
                 dt_accumulated = 0  # reset accumulator
             # reactions
-            thinning_counter += helpers["reaction_step"](population, B)
-            
-        # print(t)
-        # print(f"L = {L}, delta_t = {delta_t}")
+            reaction_id = helpers["reaction_step"](population, B)
+        # update progress bar
+        reporter.update(population, delta_t, reaction_id, event_type)
 
         # update system trajectory
         population.update_trajectory()
@@ -207,23 +252,24 @@ def extrande_core_loop(parameters, population, helpers):
             t_day += 1
             population.update_lineage_frequency_t(t)
         # break if conditions met
-        if helpers["check_stop_conditions"](population, t, start_time):
+        reason = helpers["check_stop_conditions"](population, t, start_time)
+        if reason:
             break
 
-    print("\n----------------------------------------")
-    print("SIMPLICITY SIMULATION COMPLETED")
-    print("----------------------------------------\n")
-    # print(f'Extrande counter: {extrande_counter}')
-    # print(f'Leap counter: {leap_counter}')
-    print(f'Leaps Ratio (leaps/total steps): {leap_counter/(extrande_counter+leap_counter)}')
-    print(f'Thinning Ratio (thinning/total reactions firing): {thinning_counter/extrande_counter}')
-    print("----------------------------------------\n")
+    reporter.close()
+    if reason:
+        tqdm.write(f"\n {reason}")
+    else:
+        tqdm.write("\n----------------------------------------")
+        tqdm.write("SIMPLICITY SIMULATION COMPLETED")
+        tqdm.write("----------------------------------------\n")
+    tqdm.write('')
     return population
 
-def extrande_factory(phenotype_model, parameters, rng1, rng2):
+def extrande_factory(phenotype_model, parameters, sim_id, rng1, rng2):
     
     def extrande_generic(population):
         helpers = get_helpers(phenotype_model, parameters, rng1, rng2)
-        return extrande_core_loop(parameters, population, helpers)
+        return extrande_core_loop(parameters, population, helpers, sim_id)
 
     return extrande_generic

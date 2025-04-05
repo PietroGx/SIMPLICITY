@@ -83,9 +83,9 @@ def test_run_experiment_local(runner:str, test_number:int):
     else:
         raise ValueError('Runner must be either "serial" or "multiprocessing" ')
     print('')
-    print('##########################################')
+    print('----------------------------------------------------')
     print(f'testing local {runner} runner')
-    print('##########################################')
+    print('----------------------------------------------------')
     experiment_name = f'test_local_experiment_{runner}_#{test_number}'
     try:
         run_experiment(experiment_name, 
@@ -97,14 +97,10 @@ def test_run_experiment_local(runner:str, test_number:int):
         raise RuntimeError(f'The code did not pass the running test. Error: {e}')
     print('')
     print(f'TEST LOCAL {runner} RUNNER {test_number} -- SUCCESS.')
-    print('##########################################')
+    print('############################################')
     return experiment_name
 
 def test_experiment_output(experiment_name):
-    print('')
-    print('##########################################')
-    print(f'testing {experiment_name} output')
-    print('##########################################')
     # get experiment output directory
     directory = get_experiment_output_dir(experiment_name)
     # loop over each simulation output folder
@@ -123,7 +119,7 @@ def test_experiment_output(experiment_name):
             check_output_file(seed_directory, 'simulation_trajectory.csv')
     print('')
     print(f'TEST {experiment_name} OUTPUT -- SUCCESS.')
-    print('##########################################')
+    print('----------------------------------------------------')
     
 def safe_parse_list_of_dicts(val):
     """Parse stringified list of dicts and round time_infection."""
@@ -254,7 +250,7 @@ def main(runner:str, test_number:int, compare_to: int = None):
 if __name__ == "__main__":
     import time
     start = time.time()
-    main('serial',10)#,compare_to=4)
+    main('serial',30)#,compare_to=4)
     elapsed = time.time() - start
     mins, secs = divmod(elapsed, 60)
     print(f"Test completed in {int(mins)} min {secs:.2f} sec")

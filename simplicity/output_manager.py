@@ -164,7 +164,6 @@ def save_sequencing_dataset(simulation_output, output_path):
             writer.writerows(sequencing_data_dic)
     except:
             if simulation_output.sequencing_data == []:
-                print('')
                 print('No individuals sequenced during simulation, not saving FASTA file')
                 print('')
             else: 

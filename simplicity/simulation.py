@@ -11,10 +11,11 @@ import simplicity.output_manager         as om
 import simplicity.plots_manager          as pm
 
 class Simplicity:
-    def __init__(self, parameters, output_directory):
+    def __init__(self, parameters, output_directory, sim_id):
         self.parameters       = parameters
         self.output_directory = output_directory
         self.population       = pop.create_population(parameters)
+        self.sim_id  = sim_id
        
     def run(self):
         assert not hasattr(self, "simulation_output"), "cannot run simulation twice"
@@ -25,47 +26,49 @@ class Simplicity:
         rng2 = randomgen(seeds_generator.integers(0,10000)) # for rejection sampling of reactions
         
         # use factory to assign simulation algorithm
-        self.extrande = e.extrande_factory(self.parameters["phenotype_model"], self.parameters, rng1, rng2)
+        self.extrande = e.extrande_factory(self.parameters["phenotype_model"], 
+                                           self.parameters, self.sim_id,
+                                           rng1, rng2)
         
         # run simulation
         self.simulation_output = self.extrande(self.population)
         
         # simulation data output
-        print('Saving simulation trajectory data...')
+        # print('Saving simulation trajectory data...')
         om.save_simulation_trajectory(self.simulation_output, 
                                       self.output_directory)
-        print('DONE.')
-        print('')
-        print('Saving lineage frequency data...')
+        # print('DONE.')
+        # print('')
+        # print('Saving lineage frequency data...')
         om.save_lineage_frequency(self.simulation_output, 
                                       self.output_directory)
-        print('DONE.')
-        print('')
-        print('Saving sequencing dataset...')
+        # print('DONE.')
+        # print('')
+        # print('Saving sequencing dataset...')
         om.save_sequencing_dataset(self.simulation_output, 
                                       self.output_directory)
-        print('DONE.')
-        print('')
-        print('Saving lineage individuals data...')
+        # print('DONE.')
+        # print('')
+        # print('Saving lineage individuals data...')
         om.save_individuals_data(self.simulation_output, 
                                       self.output_directory)
-        print('DONE.')
-        print('')
-        print('Saving phylogenetic data...')
+        # print('DONE.')
+        # print('')
+        # print('Saving phylogenetic data...')
         om.save_phylogenetic_data(self.simulation_output, 
                                       self.output_directory)
-        print('DONE.')
-        print('')
-        print('Saving fitness trajectory data...')
+        # print('DONE.')
+        # print('')
+        # print('Saving fitness trajectory data...')
         om.save_fitness_trajectory(self.simulation_output, 
                                       self.output_directory)
-        print('DONE.')
-        print('')
-        print('Saving final time datapoint...')
+        # print('DONE.')
+        # print('')
+        # print('Saving final time datapoint...')
         om.save_final_time(self.simulation_output, 
                                       self.output_directory)
-        print('DONE.')
-        print('')
+        # print('DONE.')
+        # print('')
         
         
     def plot(self):
