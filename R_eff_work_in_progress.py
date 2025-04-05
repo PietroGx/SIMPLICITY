@@ -455,6 +455,7 @@ def plot_combined_summary(df, experiment_name):
 
             # Row 1: Recovered infection duration
             ax = axes[0][col]
+            label = f"d_rate={d_rate}" if col == 0 else None  # Only assign label once per rate
             ax.errorbar(R_jittered, d_sub["recovered_avg_infection"],
                         yerr=d_sub["recovered_std_infection"], fmt='o', capsize=3,
                         linestyle='None', color=color_map[d_rate])
@@ -464,21 +465,21 @@ def plot_combined_summary(df, experiment_name):
             ax = axes[1][col]
             ax.errorbar(R_jittered, d_sub["recovered_avg_infectious"],
                         yerr=d_sub["recovered_std_infectious"], fmt='o', capsize=3,
-                        linestyle='None', color=color_map[d_rate])
+                        linestyle='None', color=color_map[d_rate], label=None)
             ax.set_ylabel("Infectious duration (recovered)")
 
             # Row 3: Diagnosed infectious duration
             ax = axes[2][col]
             ax.errorbar(R_jittered, d_sub["diagnosed_avg_infectious"],
                         yerr=d_sub["diagnosed_std_infectious"], fmt='o', capsize=3,
-                        linestyle='None', color=color_map[d_rate])
+                        linestyle='None', color=color_map[d_rate], label=None)
             ax.set_ylabel("Infectious duration (diagnosed)")
             ax.set_xlabel("Input R")
 
             # Row 4: Δt (step size)
             ax = axes[3][col]
             ax.errorbar(R_jittered, d_sub["delta_t_avg"], yerr=d_sub["delta_t_std"],
-                        fmt='o', capsize=3, linestyle='None', color=color_map[d_rate])
+                        fmt='o', capsize=3, linestyle='None', color=color_map[d_rate], label=None)
             ax.set_ylabel("Avg Δt (step size)")
             ax.set_xlabel("Input R")
             ax.set_yscale('log')
@@ -493,8 +494,10 @@ def plot_combined_summary(df, experiment_name):
             ax.set_ylim(bottom=min_y)
 
         axes[0][col].set_title(f"Phenotype: {phenotype}")
-
-    axes[0][1].legend(title="Diagnosis rate")
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    if handles:
+        axes[0][1].legend(handles, labels, title="Diagnosis rate")
+        
     plt.tight_layout()
     plt.savefig(f'R_eff_time_inf_{experiment_name}_check.png')
     plt.close()
