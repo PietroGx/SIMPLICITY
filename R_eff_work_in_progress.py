@@ -483,7 +483,13 @@ def plot_combined_summary(df, experiment_name):
             ax.set_xlabel("Input R")
             ax.set_yscale('log')
             y_vals = d_sub["delta_t_avg"] - d_sub["delta_t_std"]
-            min_y = y_vals[y_vals > 0].min() * 0.5 if not y_vals.empty else 1e-3
+            y_vals = y_vals[(y_vals > 0) & (~y_vals.isna())]
+            
+            if not y_vals.empty:
+                min_y = max(y_vals.min() * 0.5, 1e-6)
+            else:
+                min_y = 1e-3  # fallback lower limit
+                
             ax.set_ylim(bottom=min_y)
 
         axes[0][col].set_title(f"Phenotype: {phenotype}")
