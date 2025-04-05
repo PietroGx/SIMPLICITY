@@ -454,21 +454,21 @@ def plot_combined_summary(df, experiment_name):
             # ax.set_ylabel("Observed R_eff")
 
             # Row 1: Recovered infection duration
-            ax = axes[1][col]
+            ax = axes[0][col]
             ax.errorbar(R_jittered, d_sub["recovered_avg_infection"],
                         yerr=d_sub["recovered_std_infection"], fmt='o', capsize=3,
                         linestyle='None', color=color_map[d_rate])
             ax.set_ylabel("Infection duration (recovered)")
 
             # Row 2: Recovered infectious duration
-            ax = axes[2][col]
+            ax = axes[1][col]
             ax.errorbar(R_jittered, d_sub["recovered_avg_infectious"],
                         yerr=d_sub["recovered_std_infectious"], fmt='o', capsize=3,
                         linestyle='None', color=color_map[d_rate])
             ax.set_ylabel("Infectious duration (recovered)")
 
             # Row 3: Diagnosed infectious duration
-            ax = axes[3][col]
+            ax = axes[2][col]
             ax.errorbar(R_jittered, d_sub["diagnosed_avg_infectious"],
                         yerr=d_sub["diagnosed_std_infectious"], fmt='o', capsize=3,
                         linestyle='None', color=color_map[d_rate])
@@ -476,7 +476,7 @@ def plot_combined_summary(df, experiment_name):
             ax.set_xlabel("Input R")
 
             # Row 4: Δt (step size)
-            ax = axes[4][col]
+            ax = axes[3][col]
             ax.errorbar(R_jittered, d_sub["delta_t_avg"], yerr=d_sub["delta_t_std"],
                         fmt='o', capsize=3, linestyle='None', color=color_map[d_rate])
             ax.set_ylabel("Avg Δt (step size)")
