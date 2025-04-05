@@ -55,9 +55,7 @@ def run_experiment(experiment_name: str,
                    simplicity_runner: types.ModuleType,
                    plot_trajectory:bool,
                    archive_experiment=False):
-    print('')
-    print('##########################################')
-    print('')
+    
     # setup experiment files directories
     dm.create_directories(experiment_name)
     # set parameters 
@@ -69,7 +67,8 @@ def run_experiment(experiment_name: str,
     sm.read_settings_and_write_simulation_parameters(experiment_name)
     # write seeded simulation parameters files
     sm.write_seeded_simulation_parameters(experiment_name)
-    
+    print('')
+    print('-------------------------------------------------------------------')
     # let one of simplicity.runners run each seeded simulation
     simplicity_runner.run_seeded_simulations(experiment_name, 
                                              run_seeded_simulation,
@@ -79,9 +78,9 @@ def run_experiment(experiment_name: str,
         om.archive_experiment(experiment_name)
     
     print('')
-    print('##########################################')
+    print('-------------------------------------------------------------------')
     print(f'EXPERIMENT {experiment_name} EXECUTED SUCCESSFULLY.')
-    print('##########################################')
+    print('###################################################################')
 
 if __name__ == "__main__":
     

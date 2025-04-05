@@ -139,6 +139,7 @@ class Population:
                      't_infection' : None,
                      't_infectious': None,
                      't_not_infectious': None,
+                     't_not_infected': None,
                      
                      'parent'      : None,
                      'new_infections'  : [],
@@ -331,7 +332,12 @@ class Population:
                 ind['state'] = 'recovered'
                 if ind['t_not_infectious'] is None:
                     ind['t_not_infectious'] = self.time
-    
+                
+                if ind['t_not_infected'] is None:
+                    ind['t_not_infected'] = self.time
+                else:
+                    raise ValueError('Individual already recovered!!')
+                
                 self.infected_i.remove(i)
                 self.infectious_normal_i.discard(i)
                 self.detectable_i.discard(i)

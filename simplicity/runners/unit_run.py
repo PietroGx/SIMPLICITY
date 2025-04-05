@@ -15,14 +15,18 @@ def run_seeded_simulation(seeded_simulation_parameters_path: str,
     import simplicity.output_manager   as om
     parameters       = sm.read_seeded_simulation_parameters(experiment_name, seeded_simulation_parameters_path)
     output_directory = om.setup_output_directory           (experiment_name, seeded_simulation_parameters_path)
+    # create simulation id
+    seed = parameters['seed']
+    sim_name = sm.generate_filename_from_params(parameters)
+    sim_id = f'{experiment_name}: {sim_name}: {seed}'
+    
     # </settings and output managers>
 
     ## <simplicity core>        
     import simplicity.simulation       as sim
-    simulation = sim.Simplicity       (parameters, output_directory)
+    simulation = sim.Simplicity       (parameters, output_directory, sim_id)
     simulation.run()
     ## </simplicity core>        
     if plot_trajectory:    
         simulation.plot()
     
-    print(f"run_seeded_simulation: experiment_name={experiment_name}")
