@@ -152,7 +152,7 @@ class Population:
                      
                      'IH_lineages'   : [],
                      'lineages_number': 1,
-                     
+                     'inherited_lineage': None,
                      'fitness'     : 1,
                      'IH_virus_fitness' : [1],
                      'IH_virus_number'    : 1,
@@ -181,6 +181,7 @@ class Population:
             
             dic[i]['state']        = 'infected'
             dic[i]['IH_lineages']  = ['wt']
+            dic[i]['inherited_lineage']  = 'wt'
             
             self.susceptibles_i.remove(i)  
             self.infected_i.add(i)

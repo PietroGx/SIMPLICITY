@@ -111,8 +111,8 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     
     # Create the subplots using the gridspec indices
     ax2 = fig.add_subplot(gs[0, 0])  
-    ax1 = fig.add_subplot(gs[1, 0],sharex=ax2) 
-    ax3 = fig.add_subplot(gs[2, 0],sharex=ax2) 
+    ax1 = fig.add_subplot(gs[2, 0],sharex=ax2) 
+    ax3 = fig.add_subplot(gs[1, 0],sharex=ax2) 
     
     # Adjust subplot parameters
     fig.subplots_adjust(
@@ -151,7 +151,7 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     # Filter columns that reach at least the threshold at some point.
     filtered_df = pivot_df.loc[:, pivot_df.max() >= threshold]
     colors = [get_lineage_color(lineage_name, colormap_df) for lineage_name in filtered_df.columns]
-    filtered_df.plot(kind='area', stacked=True, color=colors,
+    filtered_df.plot(kind='area', stacked=False, color=colors,
                          alpha=0.5, ax=ax1)
     time_file_path = os.path.join(seeded_simulation_output_dir, 'final_time.csv')
     time_final = pd.read_csv(time_file_path, header=None).iloc[0, 0]
@@ -1112,28 +1112,6 @@ def plot_infection_tree(root,
                     nodeattrfunc=nodeattrfunc,
                     edgeattrfunc=edgeattrfunc,
                     ).to_picture(tree_plot_filepath)
-   
-    # work in progress: infection tree clustering
-    # elif tree_subtype == 'cluster_lin':
-       
-    #     def nodenamefunc(node):
-    #         return node.lineage 
-        
-    #     def nodeattrfunc(node):
-            
-    #         return 'color="{}", label="{}",'.format(get_node_color(node, 
-    #                                                                   coloring, 
-    #                                                                   tree_data, 
-    #                                                                   lineages), 
-    #                                                    node.lineage)
-    #     def edgeattrfunc(node, child):
-    #         if node.lineage == child.lineage:
-    #             return 'color=transparent'
-    #     DotExporter(root,
-    #                 nodeattrfunc=nodeattrfunc,
-    #                 nodenamefunc=nodenamefunc,
-    #                 edgeattrfunc=edgeattrfunc,
-    #                 ).to_picture(tree_plot_filepath) 
         
 def plot_phylogenetic_tree(root,
                            phylogenetic_data,

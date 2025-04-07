@@ -575,31 +575,31 @@ def main():
     # Plotting
     # ----------------------------
 
-    # print("\nPlotting: State Duration Stats (grid)...")
-    # plot_state_duration_stats_grid(fixed_trajectories, fixed_dts, title_prefix="Fixed")
-    # plot_state_duration_stats_grid(exp_trajectories, exp_lambdas, title_prefix="Exp")
+    print("\nPlotting: State Duration Stats (grid)...")
+    plot_state_duration_stats_grid(fixed_trajectories, fixed_dts, title_prefix="Fixed")
+    plot_state_duration_stats_grid(exp_trajectories, exp_lambdas, title_prefix="Exp")
 
-    # print("\nPlotting: Phase Duration Summary (scatter)...")
-    # fixed_phase_for_plot = {
-    #     dt: {k: [d[k] for d in fixed_phase_durations[dt]] for k in fixed_phase_durations[dt][0]}
-    #     for dt in fixed_dts
-    # }
-    # exp_phase_for_plot = {
-    #     lmbda: {k: [d[k] for d in exp_phase_durations[lmbda]] for k in exp_phase_durations[lmbda][0]}
-    #     for lmbda in exp_lambdas
-    # }
-    # plot_duration_summary_scatter(fixed_phase_for_plot, exp_phase_for_plot, fixed_dts, exp_lambdas)
+    print("\nPlotting: Phase Duration Summary (scatter)...")
+    fixed_phase_for_plot = {
+        dt: {k: [d[k] for d in fixed_phase_durations[dt]] for k in fixed_phase_durations[dt][0]}
+        for dt in fixed_dts
+    }
+    exp_phase_for_plot = {
+        lmbda: {k: [d[k] for d in exp_phase_durations[lmbda]] for k in exp_phase_durations[lmbda][0]}
+        for lmbda in exp_lambdas
+    }
+    plot_duration_summary_scatter(fixed_phase_for_plot, exp_phase_for_plot, fixed_dts, exp_lambdas)
 
     print("\nPlotting: Average State Residence Time Timelines...")
     plot_state_timeline_summary(fixed_state_durations, fixed_phase_durations, title_prefix="Fixed")
     plot_state_timeline_summary(exp_state_durations, exp_phase_durations, title_prefix="Exp")
     
-    # plot_infectious_duration_vs_step(
-    # fixed_phase_durations=fixed_phase_durations,
-    # exp_phase_durations=exp_phase_durations,
-    # fixed_dts=fixed_dts,
-    # exp_lambdas=exp_lambdas
-    # )
+    plot_infectious_duration_vs_step(
+    fixed_phase_durations=fixed_phase_durations,
+    exp_phase_durations=exp_phase_durations,
+    fixed_dts=fixed_dts,
+    exp_lambdas=exp_lambdas
+    )
 if __name__ == '__main__':
     main() 
     
