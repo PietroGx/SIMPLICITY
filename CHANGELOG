@@ -500,7 +500,12 @@
 	* update SIDR to add reactions labels 
 	* added progress bar to simulation and cleaned code output
 	* added plot of avg infection time
+
+2026-07-04 pietro gerletti
 	
+	Version 0.16.08
+	
+	* added infection tree (transmission chain), subtree filtering by lineage and plot with his infections
 	
 	
 	

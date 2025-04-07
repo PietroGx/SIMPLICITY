@@ -126,6 +126,7 @@ def infection(population):
     index = population.rng4.integers(0, population.individuals[parent]['IH_virus_number'])
     transmitted_lineage = population.individuals[parent]['IH_lineages'][index]
     transmitted_fitness = population.individuals[parent]['IH_virus_fitness'][index]
+    population.individuals[new_infected_index]['inherited_lineage']  = transmitted_lineage
 
     # Append transmitted lineage + fitness
     new_lineages = population.individuals[new_infected_index]['IH_lineages']
@@ -138,14 +139,16 @@ def infection(population):
     lineages_sorted, fitness_sorted = zip(*combined)
     population.individuals[new_infected_index]['IH_lineages'] = list(lineages_sorted)
     population.individuals[new_infected_index]['IH_virus_fitness'] = list(fitness_sorted)
-
+    
+   
     # Update individual fitness (average of variants' fitness)
     population.individuals[new_infected_index]['fitness'] = round(np.average(fitness_sorted), 4)
 
     # store infection info for R effective
     population.individuals[parent]['new_infections'].append({
         'time_infection': population.time,
-        'transmitted_lineage': transmitted_lineage
+        'transmitted_lineage': transmitted_lineage,
+        'individual_infected': new_infected_index
     })
 
     # update susceptibles and infected 

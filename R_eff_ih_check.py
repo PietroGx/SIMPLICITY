@@ -505,7 +505,7 @@ def plot_combined_summary(df, experiment_name):
 import argparse
 
 def main():
-    parser = argparse.ArgumentParser(description="Plot R_eff and infectious durations from simulation outputs.")
+    parser = argparse.ArgumentParser(description="Plot infectious durations from simulation outputs.")
     parser.add_argument("experiment_name", type=str, help="Name of the experiment")
     args = parser.parse_args()
 

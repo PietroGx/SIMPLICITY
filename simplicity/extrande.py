@@ -86,6 +86,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     ih_tau_2 = 3.91
     tau_inf = parameters['tau_3'] + ih_tau_2
     beta = R / tau_inf
+    print(f'R: {R} Beta: {beta}')
     k_d = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate"], parameters["tau_3"])
     k_v = parameters["IH_virus_emergence_rate"]
     e = np.sum([parameters["nucleotide_substitution_rate"]] * len(ref.get_reference()))
@@ -193,6 +194,7 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
     """
     Core extrande loop.
     """
+    print(f'{sim_id}')
     t = parameters['t_0']
     final_time = parameters['final_time']
     start_time = time.time()
@@ -259,10 +261,10 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
     reporter.close()
     if reason:
         tqdm.write(f"\n {reason}")
-    else:
-        tqdm.write("\n----------------------------------------")
-        tqdm.write("SIMPLICITY SIMULATION COMPLETED")
-        tqdm.write("----------------------------------------\n")
+    
+    tqdm.write("\n----------------------------------------")
+    tqdm.write("SIMPLICITY SIMULATION COMPLETED")
+    tqdm.write("----------------------------------------\n")
     tqdm.write('')
     return population
 
