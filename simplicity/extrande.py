@@ -224,6 +224,8 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
             population.update_time(t)
             # update system  (IH host model states)
             helpers["update_step"](population, delta_t)
+            
+            population.DEBUG_update_ih.append([t,L,True])
             # mutations
             helpers["mutation_step"](population, delta_t)
             # Reset dt_accumulated 
@@ -238,6 +240,7 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
             # Only update the intra-host state if accumulated dt exceeds threshold:
             if dt_accumulated >= min_update_threshold:
                 helpers["update_step"](population, dt_accumulated)
+                population.DEBUG_update_ih.append([t,dt_accumulated,False])
                 # mutations
                 helpers["mutation_step"](population, dt_accumulated)
                 # update fitness

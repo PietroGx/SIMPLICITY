@@ -23,7 +23,7 @@ class Population:
         self.count_infections = 0
         # self.count_infections_from_long_shedders = 0
         
-        
+        self.DEBUG_update_ih = []
         
         # random number generator
         self.rng3 = rng3 # for intra-host model states update
@@ -518,6 +518,19 @@ class Population:
         
         return df
     
+    def DEBUG_update_ih_to_df(self):
+        sim_time = [step[0] for step in self.DEBUG_update_ih]
+        delta_t = [step[1] for step in self.DEBUG_update_ih]
+        leap = [step[2] for step in self.DEBUG_update_ih]
+        
+        # Create a pandas DataFrame
+        df = pd.DataFrame({
+            'sim_time': sim_time,
+            'delta_t': delta_t,
+            'leap': leap
+        })
+        
+        return df
     # def R_effective_trajectory_to_df(self):
     #     times = [item[0] for item in self.R_effective_trajectory]
     #     parents = [item[1] for item in self.R_effective_trajectory]
