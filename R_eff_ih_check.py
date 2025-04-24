@@ -468,20 +468,25 @@ def plot_avg_deltat_update_vs_R(df_summary,experiment_name):
 
 def get_all_debug_update_ih(experiment_name):
     """
-    Aggregates DEBUG_update_ih data from all simulation output dirs in the experiment.
+    Aggregates DEBUG_update_ih data from all seeded simulation output dirs
+    in all experiments under the given experiment_name.
     """
-    ssods = dm.get_simulation_output_dirs(experiment_name)
+    sim_out_dirs = dm.get_simulation_output_dirs(experiment_name)
     all_dfs = []
 
-    for ssod in ssods:
-        df = om.read_DEBUG_update_ih(ssod)
-        df["ssod"] = ssod
-        all_dfs.append(df)
+    for sim_out_dir in sim_out_dirs:
+        ssods = dm.get_seeded_simulation_output_dirs(sim_out_dir)
+        for ssod in ssods:
+            df = om.read_DEBUG_update_ih(ssod)
+            if not df.empty:
+                df["ssod"] = ssod
+                all_dfs.append(df)
 
     if not all_dfs:
         return pd.DataFrame()
 
     return pd.concat(all_dfs, ignore_index=True)
+
 
 def plot_debug_deltat_timeseries(experiment_name):
     """
