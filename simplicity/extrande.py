@@ -202,7 +202,7 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
     
     reporter = ProgressReporter(total_time=final_time, simulation_id=sim_id)
     
-    min_update_threshold = 0.04  # minimum dt for intra-host update (1h step)
+    min_update_threshold = 1 # 0.04  # minimum dt for intra-host update (1h step)
     dt_accumulated = 0  # initialize accumulator
     
     while t < final_time:

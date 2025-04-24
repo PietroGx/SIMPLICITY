@@ -26,7 +26,7 @@ def fixture_experiment_settings():
         'final_time': 365*3
     }
     
-    n_seeds = 5
+    n_seeds = 50
     
     return (varying_params,fixed_params,n_seeds)
 
