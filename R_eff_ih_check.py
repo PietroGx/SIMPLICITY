@@ -502,12 +502,11 @@ def plot_debug_deltat_timeseries(experiment_name):
         return
     
     df_debug["sim_out_dir"] = df_debug["ssod"].apply(os.path.dirname)
-    print(df_debug["sim_out_dir"])
     # Add metadata
-    df_debug["phenotype_model"] = df_debug["ssod"].apply(
+    df_debug["phenotype_model"] = df_debug["sim_out_dir"].apply(
         lambda s: sm.get_parameter_value_from_simulation_output_dir(s, "phenotype_model")
     )
-    df_debug["R"] = df_debug["ssod"].apply(
+    df_debug["R"] = df_debug["sim_out_dir"].apply(
         lambda s: sm.get_parameter_value_from_simulation_output_dir(s, "R")
     )
 
