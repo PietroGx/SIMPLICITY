@@ -59,7 +59,7 @@ def get_avg_simulation_R_eff(simulation_output_dir):
         all_infection_counts.extend(infection_counts.tolist())  # Flatten into one list
         
     if not all_infection_counts:
-        return None
+        return None, None
     R_eff_avg = np.mean(all_infection_counts)
     R_eff_std = np.std(all_infection_counts)
     return R_eff_avg, R_eff_std
@@ -129,6 +129,29 @@ def get_avg_delta_t(simulation_output_dir):
 
     return np.mean(all_dts), np.std(all_dts)
 
+def get_avg_debug_delta_t(simulation_output_dir):
+    """
+    Computes the average and std of delta_t (from DEBUG_update_ih logs)
+    across all runs in the given simulation output directory.
+    """
+    ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
+    all_dts = []
+
+    for ssod in ssod_list:
+        df = om.read_DEBUG_update_ih(ssod)
+
+        if df.empty or "delta_t" not in df.columns:
+            continue
+
+        dts = df["delta_t"].dropna()
+        all_dts.extend(dts.tolist())
+
+    if not all_dts:
+        return None, None
+
+    return np.mean(all_dts), np.std(all_dts)
+
+
 def extract_simulation_summary(experiment_name):
     rows = []
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
@@ -149,6 +172,10 @@ def extract_simulation_summary(experiment_name):
 
         # Step sizes
         delta_t_avg, delta_t_std = get_avg_delta_t(sim_out_dir)
+        
+        # delta_t_updates_ih
+        delta_t_update_avg, delta_t_update_std = get_avg_debug_delta_t(sim_out_dir)
+
 
         rows.append({
             "phenotype_model": phenotype_model,
@@ -167,11 +194,12 @@ def extract_simulation_summary(experiment_name):
 
             "delta_t_avg": delta_t_avg,
             "delta_t_std": delta_t_std,
+            
+            "delta_t_update_avg": delta_t_update_avg,
+            "delta_t_update_std": delta_t_update_std
         })
 
     return pd.DataFrame(rows)
-
-
 
 def plot_R_eff_vs_R(df):
     sns.set(style="whitegrid")
@@ -303,112 +331,6 @@ def plot_avg_deltat_vs_R(df):
     plt.show()
 
 
-# def plot_combined_summary(df,experiment_name):
-#     sns.set(style="whitegrid")
-
-#     # Get sorted values
-#     phenotype_models = sorted(df["phenotype_model"].unique())
-#     diagnosis_rates = sorted(df["diagnosis_rate"].unique())
-
-#     # Fixed jitter offsets per diagnosis_rate
-#     n_rates = len(diagnosis_rates)
-#     jitter_spacing = 0.02
-#     jitter_offsets = {
-#         rate: (i - n_rates // 2) * jitter_spacing
-#         for i, rate in enumerate(diagnosis_rates)
-#     }
-
-#     # Colors for diagnosis rates
-#     colors = sns.color_palette("tab10", n_colors=n_rates)
-#     color_map = {d: c for d, c in zip(diagnosis_rates, colors)}
-
-#     # Create subplot grid: 3 rows (R_eff, recovered, diagnosed) x 2 phenotypes
-#     fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(14, 16), sharex='col')
-
-#     for col, phenotype in enumerate(phenotype_models):
-#         pheno_df = df[df["phenotype_model"] == phenotype]
-
-#         for d_rate in diagnosis_rates:
-#             d_sub = pheno_df[pheno_df["diagnosis_rate"] == d_rate].copy()
-#             # Convert average values and error values to numeric and fill missing entries
-#             d_sub["R_eff_avg"] = pd.to_numeric(d_sub["R_eff_avg"], errors="coerce").fillna(0)
-#             d_sub["R_eff_std"] = pd.to_numeric(d_sub["R_eff_std"], errors="coerce").fillna(0)
-#             d_sub["recovered_avg_duration"] = pd.to_numeric(d_sub["recovered_avg_duration"], errors="coerce").fillna(0)
-#             d_sub["recovered_std_duration"] = pd.to_numeric(d_sub["recovered_std_duration"], errors="coerce").fillna(0)
-#             d_sub["diagnosed_avg_duration"] = pd.to_numeric(d_sub["diagnosed_avg_duration"], errors="coerce").fillna(0)
-#             d_sub["diagnosed_std_duration"] = pd.to_numeric(d_sub["diagnosed_std_duration"], errors="coerce").fillna(0)
-#             d_sub["delta_t_avg"] = pd.to_numeric(d_sub["delta_t_avg"], errors="coerce").fillna(0)
-#             d_sub["delta_t_std"] = pd.to_numeric(d_sub["delta_t_std"], errors="coerce").fillna(0)
-
-#             jitter = jitter_offsets[d_rate]
-#             R_jittered = d_sub["R"] + jitter
-
-#             # --- Row 0: R_eff ---
-#             ax = axes[0][col]
-#             ax.errorbar(
-#                 R_jittered,
-#                 d_sub["R_eff_avg"],
-#                 yerr=d_sub["R_eff_std"],
-#                 fmt='o',
-#                 capsize=3,
-#                 linestyle='None',
-#                 label=f"d_rate={d_rate}",
-#                 color=color_map[d_rate]
-#             )
-#             ax.set_ylabel("Observed R_eff")
-
-#             # --- Row 1: Recovered durations ---
-#             ax = axes[1][col]
-#             ax.errorbar(
-#                 R_jittered,
-#                 d_sub["recovered_avg_duration"],
-#                 yerr=d_sub["recovered_std_duration"],
-#                 fmt='o',
-#                 capsize=3,
-#                 linestyle='None',
-#                 color=color_map[d_rate]
-#             )
-#             ax.set_ylabel("Avg duration (recovered)")
-
-#             # --- Row 2: Diagnosed durations ---
-#             ax = axes[2][col]
-#             ax.errorbar(
-#                 R_jittered,
-#                 d_sub["diagnosed_avg_duration"],
-#                 yerr=d_sub["diagnosed_std_duration"],
-#                 fmt='o',
-#                 capsize=3,
-#                 linestyle='None',
-#                 color=color_map[d_rate]
-#             )
-#             ax.set_ylabel("Avg duration (diagnosed)")
-#             ax.set_xlabel("Input R")
-            
-#             # -- Row 3: Δt --
-#             ax = axes[3][col]
-#             ax.errorbar(
-#                R_jittered, 
-#                d_sub["delta_t_avg"], 
-#                yerr=d_sub["delta_t_std"],
-#                fmt='o', 
-#                capsize=3, 
-#                linestyle='None',
-#                color=color_map[d_rate]
-#             )
-#             ax.set_ylabel("Avg Δt (time step)")
-#             ax.set_xlabel("Input R")
-#             ax.set_yscale('log')
-            
-#         # Titles at top of each column
-#         axes[0][col].set_title(f"Phenotype: {phenotype}")
-
-#     # Legend in top-right subplot
-#     axes[0][1].legend(title="Diagnosis rate")
-
-#     plt.tight_layout()
-#     plt.savefig(f'R_eff_time_inf_{experiment_name}_check.png')
-#     plt.close()
-    
 def plot_combined_summary(df, experiment_name):
     sns.set(style="whitegrid")
 
@@ -502,9 +424,124 @@ def plot_combined_summary(df, experiment_name):
     plt.savefig(f'R_eff_time_inf_{experiment_name}_check.png')
     plt.close()
 
-import argparse
+
+def plot_avg_deltat_update_vs_R(df_summary,experiment_name):
+    """
+    Plot average delta_t from DEBUG_update_ih files vs R, grouped by phenotype_model.
+    """
+    sns.set(style="whitegrid")
+    df = df_summary
+    phenotype_models = sorted(df["phenotype_model"].unique())
+    diagnosis_rates = sorted(df["diagnosis_rate"].unique())
+    colors = sns.color_palette("tab10", n_colors=len(diagnosis_rates))
+    color_map = {d: c for d, c in zip(diagnosis_rates, colors)}
+
+    fig, axes = plt.subplots(1, len(phenotype_models), figsize=(7 * len(phenotype_models), 5), sharey=True)
+
+    if len(phenotype_models) == 1:
+        axes = [axes]
+
+    for ax, phenotype in zip(axes, phenotype_models):
+        pheno_df = df[df["phenotype_model"] == phenotype]
+
+        for d_rate in diagnosis_rates:
+            subset = pheno_df[pheno_df["diagnosis_rate"] == d_rate]
+
+            ax.errorbar(
+                subset["R"],
+                subset["delta_t_update_avg"],
+                yerr=subset["delta_t_update_std"],
+                fmt='o',
+                label=f"d_rate={d_rate}",
+                capsize=3,
+                linestyle='None',
+                color=color_map[d_rate]
+            )
+
+        ax.set_title(f"Phenotype: {phenotype}")
+        ax.set_xlabel("R")
+
+    axes[0].set_ylabel("Average Δt (DEBUG_update_ih)")
+    plt.tight_layout()
+    plt.savefig(f"avg_deltat_update_vs_R_{experiment_name}.png")
+    plt.close()
+
+def get_all_debug_update_ih(experiment_name):
+    """
+    Aggregates DEBUG_update_ih data from all simulation output dirs in the experiment.
+    """
+    ssods = dm.get_simulation_output_dirs(experiment_name)
+    all_dfs = []
+
+    for ssod in ssods:
+        df = om.read_DEBUG_update_ih(ssod)
+        df["ssod"] = ssod
+        all_dfs.append(df)
+
+    if not all_dfs:
+        return pd.DataFrame()
+
+    return pd.concat(all_dfs, ignore_index=True)
+
+def plot_debug_deltat_timeseries(experiment_name):
+    """
+    Extracts and plots delta_t vs sim_time from DEBUG_update_ih across all simulations.
+    - One subplot per (phenotype, R) in a grid: rows = R, cols = phenotype
+    """
+    print("Loading DEBUG_update_ih data...")
+    df_debug = get_all_debug_update_ih(experiment_name)
+
+    if df_debug.empty:
+        print("No DEBUG data found. Skipping timeseries plot.")
+        return
+
+    # Add metadata
+    df_debug["phenotype_model"] = df_debug["ssod"].apply(
+        lambda s: sm.get_parameter_value_from_simulation_output_dir(s, "phenotype_model")
+    )
+    df_debug["R"] = df_debug["ssod"].apply(
+        lambda s: sm.get_parameter_value_from_simulation_output_dir(s, "R")
+    )
+
+    phenotype_models = sorted(df_debug["phenotype_model"].unique())
+    R_values = sorted(df_debug["R"].unique())
+    n_rows = len(R_values)
+    n_cols = len(phenotype_models)
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 3.5 * n_rows), sharex=True)
+
+    if n_rows == 1 and n_cols == 1:
+        axes = np.array([[axes]])
+    elif n_rows == 1:
+        axes = axes[np.newaxis, :]
+    elif n_cols == 1:
+        axes = axes[:, np.newaxis]
+
+    for i_r, R in enumerate(R_values):
+        for j_p, phenotype in enumerate(phenotype_models):
+            ax = axes[i_r, j_p]
+            subset = df_debug[(df_debug["phenotype_model"] == phenotype) & (df_debug["R"] == R)]
+            top_10_ssods = sorted(subset["ssod"].unique())[:10]
+
+            for ssod in top_10_ssods:
+                sim_df = subset[subset["ssod"] == ssod]
+                ax.plot(sim_df["sim_time"], sim_df["delta_t"], alpha=0.8, lw=1)
+
+            if i_r == n_rows - 1:
+                ax.set_xlabel("Simulation Time")
+            if j_p == 0:
+                ax.set_ylabel(f"Δt (R={R})")
+
+            ax.set_title(f"Phenotype: {phenotype}" if i_r == 0 else "")
+
+    fig.suptitle("Δt vs Simulation Time — First 10 Runs per R/Phenotype", fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.savefig(f"delta_t_update_timeseries_all_{experiment_name}.png")
+    plt.close()
+
 
 def main():
+    import argparse
     parser = argparse.ArgumentParser(description="Plot infectious durations from simulation outputs.")
     parser.add_argument("experiment_name", type=str, help="Name of the experiment")
     args = parser.parse_args()
@@ -516,6 +553,32 @@ def main():
 
     print("Generating plots...")
     plot_combined_summary(df_summary,experiment_name)
+    plot_avg_deltat_update_vs_R(df_summary,experiment_name)
+    plot_debug_deltat_timeseries(experiment_name)
+
+    print("All plots complete.")
 
 if __name__ == "__main__":
     main()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
