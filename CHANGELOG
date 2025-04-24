@@ -508,6 +508,51 @@
 	* added infection tree (transmission chain), subtree filtering by lineage and plot with his infections
 	
 	
+2026-24-04 pietro gerletti
+	
+	Version 0.16.09
+	
+	* added delta_t_ih_updates debugger (writing csv file with relevant info)
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	
