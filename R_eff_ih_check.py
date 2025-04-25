@@ -15,69 +15,48 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 
-def R_eff_trajectory(ssod, time_window):
-    df = om.read_individuals_data(ssod)
-    final_time = om.read_final_time(ssod)
-
-    trajectory = []
-
-    for t in range(time_window, final_time + 1):
-        window_start = t - time_window
-        window_end = t  # exclusive
-
-        # Select individuals whose entire infectious period is within the window
-        in_window = df[
-            (df['t_infectious'] >= window_start) &
-            (df['t_not_infectious'] <= window_end)
-        ]
-
-        if not in_window.empty:
-            avg_secondary = in_window['new_infections'].apply(
-                lambda x: len(x) if isinstance(x, (list, tuple)) else 0
-            ).mean()
-        else:
-            avg_secondary = np.nan  # or 0, depending on how you want to handle gaps
-
-        trajectory.append((t, avg_secondary))
-
-    # Convert to DataFrame
-    return pd.DataFrame(trajectory, columns=["t", "R_eff"])
-
-def get_avg_simulation_R_eff(simulation_output_dir):
-    
+def get_avg_simulation_R_eff(simulation_output_dir, min_final_time=None):
     ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
     all_infection_counts = []
-    
+
     for ssod in ssod_list:
+        if min_final_time is not None:
+            final_time = om.read_final_time(ssod)
+            if final_time is None or final_time < min_final_time:
+                continue
+
         df = om.read_individuals_data(ssod)
-        
         if df.empty or "new_infections" not in df.columns:
             print(f"Skipping {ssod}: missing or empty 'new_infections'")
             continue
-        
+
         infection_counts = df["new_infections"].apply(lambda x: len(x) if isinstance(x, (list, tuple)) else 0)
-        all_infection_counts.extend(infection_counts.tolist())  # Flatten into one list
-        
+        all_infection_counts.extend(infection_counts.tolist())
+
     if not all_infection_counts:
         return None, None
-    R_eff_avg = np.mean(all_infection_counts)
-    R_eff_std = np.std(all_infection_counts)
-    return R_eff_avg, R_eff_std
 
-def get_avg_infectious_duration(simulation_output_dir, state_filter):
+    return np.mean(all_infection_counts), np.std(all_infection_counts)
+
+def get_avg_infectious_duration(simulation_output_dir, state_filter, min_final_time=None):
     ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
     durations = []
 
     for ssod in ssod_list:
-        df = om.read_individuals_data(ssod)
+        if min_final_time is not None:
+            final_time = om.read_final_time(ssod)
+            if final_time is None or final_time < min_final_time:
+                continue
 
+        df = om.read_individuals_data(ssod)
         if df.empty or "state" not in df.columns:
             continue
+
         if state_filter == 'recovered':
             filtered_df = df[(df["state"] == state_filter) | (df["state_t"] == 19)]
-        else: 
+        else:
             filtered_df = df[(df["state"] == state_filter)]
-            
+
         if not filtered_df.empty:
             duration = (filtered_df["t_not_infectious"] - filtered_df["t_infectious"]).dropna()
             durations.extend(duration.tolist())
@@ -87,18 +66,21 @@ def get_avg_infectious_duration(simulation_output_dir, state_filter):
 
     return np.mean(durations), np.std(durations)
 
-def get_avg_infection_duration(simulation_output_dir, state_filter):
+def get_avg_infection_duration(simulation_output_dir, state_filter, min_final_time=None):
     ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
     durations = []
 
     for ssod in ssod_list:
-        df = om.read_individuals_data(ssod)
+        if min_final_time is not None:
+            final_time = om.read_final_time(ssod)
+            if final_time is None or final_time < min_final_time:
+                continue
 
+        df = om.read_individuals_data(ssod)
         if df.empty or "state" not in df.columns:
             continue
-        
+
         filtered_df = df[(df["state"] == state_filter)]
-            
         if not filtered_df.empty:
             duration = (filtered_df["t_not_infected"] - filtered_df["t_infection"]).dropna()
             durations.extend(duration.tolist())
@@ -108,16 +90,17 @@ def get_avg_infection_duration(simulation_output_dir, state_filter):
 
     return np.mean(durations), np.std(durations)
 
-def get_avg_delta_t(simulation_output_dir):
-    """
-    Computes the average and std of delta_t (time step differences) across all runs.
-    """
+def get_avg_delta_t(simulation_output_dir, min_final_time=None):
     ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
     all_dts = []
 
     for ssod in ssod_list:
-        df = om.read_simulation_trajectory(ssod)
+        if min_final_time is not None:
+            final_time = om.read_final_time(ssod)
+            if final_time is None or final_time < min_final_time:
+                continue
 
+        df = om.read_simulation_trajectory(ssod)
         if df.empty or "time" not in df.columns:
             continue
 
@@ -129,17 +112,17 @@ def get_avg_delta_t(simulation_output_dir):
 
     return np.mean(all_dts), np.std(all_dts)
 
-def get_avg_debug_delta_t(simulation_output_dir):
-    """
-    Computes the average and std of delta_t (from DEBUG_update_ih logs)
-    across all runs in the given simulation output directory.
-    """
+def get_avg_debug_delta_t(simulation_output_dir, min_final_time=None):
     ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
     all_dts = []
 
     for ssod in ssod_list:
-        df = om.read_DEBUG_update_ih(ssod)
+        if min_final_time is not None:
+            final_time = om.read_final_time(ssod)
+            if final_time is None or final_time < min_final_time:
+                continue
 
+        df = om.read_DEBUG_update_ih(ssod)
         if df.empty or "delta_t" not in df.columns:
             continue
 
@@ -151,8 +134,7 @@ def get_avg_debug_delta_t(simulation_output_dir):
 
     return np.mean(all_dts), np.std(all_dts)
 
-
-def extract_simulation_summary(experiment_name):
+def extract_simulation_summary(experiment_name, min_final_time=None):
     rows = []
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
 
@@ -160,22 +142,13 @@ def extract_simulation_summary(experiment_name):
         phenotype_model = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'phenotype_model')
         R = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'R')
         diagnosis_rate = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'diagnosis_rate')
-        
-        R_eff_avg, R_eff_std = get_avg_simulation_R_eff(sim_out_dir)
 
-        # Recovered: durations
-        recovered_avg_infectious, recovered_std_infectious = get_avg_infectious_duration(sim_out_dir, "recovered")
-        recovered_avg_infection, recovered_std_infection = get_avg_infection_duration(sim_out_dir, "recovered")
-
-        # Diagnosed: duration in infectious state
-        diagnosed_avg_infectious, diagnosed_std_infectious = get_avg_infectious_duration(sim_out_dir, "diagnosed")
-
-        # Step sizes
-        delta_t_avg, delta_t_std = get_avg_delta_t(sim_out_dir)
-        
-        # delta_t_updates_ih
-        delta_t_update_avg, delta_t_update_std = get_avg_debug_delta_t(sim_out_dir)
-
+        R_eff_avg, R_eff_std = get_avg_simulation_R_eff(sim_out_dir, min_final_time=min_final_time)
+        recovered_avg_infectious, recovered_std_infectious = get_avg_infectious_duration(sim_out_dir, "recovered", min_final_time)
+        recovered_avg_infection, recovered_std_infection = get_avg_infection_duration(sim_out_dir, "recovered", min_final_time)
+        diagnosed_avg_infectious, diagnosed_std_infectious = get_avg_infectious_duration(sim_out_dir, "diagnosed", min_final_time)
+        delta_t_avg, delta_t_std = get_avg_delta_t(sim_out_dir, min_final_time)
+        delta_t_update_avg, delta_t_update_std = get_avg_debug_delta_t(sim_out_dir, min_final_time)
 
         rows.append({
             "phenotype_model": phenotype_model,
@@ -194,12 +167,13 @@ def extract_simulation_summary(experiment_name):
 
             "delta_t_avg": delta_t_avg,
             "delta_t_std": delta_t_std,
-            
+
             "delta_t_update_avg": delta_t_update_avg,
             "delta_t_update_std": delta_t_update_std
         })
 
     return pd.DataFrame(rows)
+
 
 def plot_R_eff_vs_R(df):
     sns.set(style="whitegrid")
@@ -556,7 +530,7 @@ def main():
     experiment_name = args.experiment_name
 
     print(f"Extracting simulation summary for: {experiment_name}")
-    df_summary = extract_simulation_summary(experiment_name)
+    df_summary = extract_simulation_summary(experiment_name, min_final_time=50)
 
     print("Generating plots...")
     plot_combined_summary(df_summary,experiment_name)
