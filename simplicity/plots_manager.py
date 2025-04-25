@@ -901,23 +901,63 @@ def plot_IH_lineage_distribution(experiment_name):
 # -----------------------------------------------------------------------------
 #                       Simulations final times histogram
 # -----------------------------------------------------------------------------
-def plot_histograms(experiment_name, final_times_data_frames):
-    ''' plot histograms of simulation final times.
-    Called from statistics_simulation_lenght.py
+# def plot_histograms(experiment_name, final_times_data_frames):
+#     ''' plot histograms of simulation final times.
+#     Called from statistics_simulation_lenght.py
+#     '''
+#     num_folders = len(final_times_data_frames.columns)
+#     fig, axes = plt.subplots(num_folders, 1, figsize=(10, 5 * num_folders), squeeze=False)
+    
+#     for ax, (folder_name, data) in zip(axes.flatten(), final_times_data_frames.items()):
+#         ax.hist(data, bins=30, edgecolor='black')
+#         ax.set_title(f'Histogram for {folder_name}')
+#         ax.set_xlabel('Last Time Value')
+#         ax.set_ylabel('Frequency')
+    
+#     plt.tight_layout()
+#     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name),
+#                              'simulations_lenght_histogram.png'))
+
+def plot_histograms(experiment_name, final_times_data_frames, r_order=None):
+    ''' 
+    Plot histograms of simulation final times.
+    Plots are ordered by R if r_order is provided.
+    All subplots share the same x-axis limits.
     '''
     num_folders = len(final_times_data_frames.columns)
-    fig, axes = plt.subplots(num_folders, 1, figsize=(10, 5 * num_folders), squeeze=False)
-    
+
+    # Determine global min and max for x-axis
+    all_values = []
+    for col in final_times_data_frames.columns:
+        all_values.extend(final_times_data_frames[col].dropna().values)
+    if not all_values:
+        print("No data to plot.")
+        return
+    global_min, global_max = min(all_values), max(all_values)
+
+    # Apply R-ordering if provided
+    if r_order:
+        ordered_columns = list(final_times_data_frames.columns)
+        col_to_r = {col: r for col, r in zip(ordered_columns, r_order)}
+        ordered_columns = sorted(ordered_columns, key=lambda col: col_to_r[col])
+        final_times_data_frames = final_times_data_frames[ordered_columns]
+
+    fig, axes = plt.subplots(num_folders, 1, figsize=(10, 4.5 * num_folders), squeeze=False)
+
     for ax, (folder_name, data) in zip(axes.flatten(), final_times_data_frames.items()):
-        ax.hist(data, bins=30, edgecolor='black')
+        ax.hist(data.dropna(), bins=30, edgecolor='black')
+        ax.set_xlim(global_min, global_max)
         ax.set_title(f'Histogram for {folder_name}')
-        ax.set_xlabel('Last Time Value')
+        ax.set_xlabel('Final Time Value')
         ax.set_ylabel('Frequency')
-    
+
     plt.tight_layout()
-    plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name),
-                             'simulations_lenght_histogram.png'))
-   
+    out_path = os.path.join(dm.get_experiment_dir(experiment_name), 'simulations_length_histogram.png')
+    plt.savefig(out_path)
+    plt.close()
+    print(f"Saved histogram plot to {out_path}")
+
+
 # -----------------------------------------------------------------------------
 #                              Lineages colors 
 # -----------------------------------------------------------------------------
