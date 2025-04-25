@@ -519,6 +519,7 @@
 	Version 0.16.10
 	
 	* updated plot_his_simulations_length.py for better visualization
+	* updated R_eff_ih_check.py to filter simulations by final time 
 	
 	
 	
