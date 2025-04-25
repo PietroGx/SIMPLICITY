@@ -514,7 +514,11 @@
 	
 	* added delta_t_ih_updates debugger (writing csv file with relevant info)
 	
+2026-24-04 pietro gerletti
 	
+	Version 0.16.10
+	
+	* updated plot_his_simulations_length.py for better visualization
 	
 	
 	

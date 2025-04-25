@@ -5,52 +5,81 @@ Created on Thu Feb  6 13:28:55 2025
 
 @author: pietro
 """
+
+
 import os
 import glob
 import pandas as pd
 import simplicity.dir_manager as dm
-import argparse
+import simplicity.settings_manager as sm
 import simplicity.plots_manager as pm
+import argparse
 
 def load_data(experiment_name):
-    
+    """
+    Loads final_time.csv values for each seeded simulation.
+    Sorts the columns by R value and returns a DataFrame + metadata.
+    """
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    dic = {}
-    
-    seeded_simulations_folders = glob.glob(os.path.join(experiment_output_dir, '*/'))
-    # iterate over each seeded simulation folder and extract final times 
-    for seeded_simulations_folder_path in seeded_simulations_folders:
+    data = []
+
+    # Get all sim_out_dirs (e.g., phenotype_model_R folders)
+    sim_out_dirs = glob.glob(os.path.join(experiment_output_dir, '*/'))
+
+    for sim_out_dir in sim_out_dirs:
         final_times = []
-        for seeded_simulation_path in glob.glob(os.path.join(seeded_simulations_folder_path, '*/')):
-            final_time_file = os.path.join(seeded_simulation_path, 'final_time.csv')
-            # Check if the final_time.csv exists in the subfolder
+        # Get all ssods within this sim_out_dir
+        for ssod in glob.glob(os.path.join(sim_out_dir, '*/')):
+            final_time_file = os.path.join(ssod, 'final_time.csv')
             if os.path.exists(final_time_file):
-                # Load the value from final_time.csv 
                 try:
                     with open(final_time_file, 'r') as f:
-                       final_time_value = f.readline().strip()
-                       final_times.append(float(final_time_value))  
-                       
+                        final_time_value = f.readline().strip()
+                        final_times.append(float(final_time_value))  
                 except Exception as e:
                     print(f"Error reading {final_time_file}: {e}")
         
-        dic[os.path.basename(os.path.normpath(seeded_simulations_folder_path))] = final_times
- 
-    df = pd.DataFrame(dic)
-    
+        # Try to get R value from sim_out_dir
+        try:
+            R_val = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, "R")
+        except:
+            R_val = None
+        
+        sim_dir_name = os.path.basename(os.path.normpath(sim_out_dir))
+        data.append({
+            "sim_dir": sim_dir_name,
+            "R": R_val,
+            "final_times": final_times
+        })
+
+    # Sort the data by R
+    sorted_data = sorted(data, key=lambda x: x["R"] if x["R"] is not None else float('inf'))
+
+    # Build the DataFrame (columns are sim_dir names)
+    df = pd.DataFrame({
+        entry["sim_dir"]: entry["final_times"]
+        for entry in sorted_data
+    })
+
+    # Store R values for ordering in plotting
+    df.attrs["R_order"] = [entry["R"] for entry in sorted_data]
+
     return df
 
 def plot_histograms(experiment_name):
-    final_times_data_frames = load_data(experiment_name)
-    pm.plot_histograms(experiment_name,final_times_data_frames)
+    """
+    Loads data and passes to plots_manager to create histograms ordered by R.
+    """
+    final_times_df = load_data(experiment_name)
+    r_order = final_times_df.attrs.get("R_order", None)
+    pm.plot_histograms(experiment_name, final_times_df, r_order=r_order)
 
 def main():
-    # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run script to plot simulation lenght histogram")
-    parser.add_argument('experiment_name', type=str, help="experiment name")
+    parser = argparse.ArgumentParser(description="Plot histogram of simulation lengths.")
+    parser.add_argument('experiment_name', type=str, help="Name of the experiment")
     args = parser.parse_args()
-    # Run the script with the provided parameter
+
     plot_histograms(args.experiment_name)
-    
+
 if __name__ == "__main__":
     main()
