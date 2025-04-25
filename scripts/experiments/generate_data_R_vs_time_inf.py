@@ -17,12 +17,13 @@ def fixture_experiment_settings():
     
     varying_params = {
         'R': [0.8,1,2,4,8],
-        'diagnosis_rate': [0],#,0.1,0.2],
+        'diagnosis_rate': [0,0.1,0.2],
         'phenotype_model': ['linear', 'immune_waning']
     }
 
     fixed_params = {
-        'infected_individuals_at_start': 100,
+        'population_size': 10000,
+        'infected_individuals_at_start': 1,
         'final_time': 365*3
     }
     
