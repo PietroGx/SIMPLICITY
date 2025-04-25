@@ -16,9 +16,9 @@ experiment_name =  'generate_data_R_vs_time_inf'
 def fixture_experiment_settings():
     
     varying_params = {
-        'R': [0.8,1,2,4,8],
-        'diagnosis_rate': [0,0.1,0.2],
-        'phenotype_model': ['linear', 'immune_waning']
+        'R': [0.8,1,2,4],
+        'diagnosis_rate': [0,0.1],
+        'phenotype_model': ['immune_waning']
     }
 
     fixed_params = {
@@ -27,7 +27,7 @@ def fixture_experiment_settings():
         'final_time': 365*3
     }
     
-    n_seeds = 50
+    n_seeds = 100
     
     return (varying_params,fixed_params,n_seeds)
 
