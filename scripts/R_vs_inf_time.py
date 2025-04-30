@@ -128,7 +128,7 @@ def extract_simulation_summary(experiment_name, min_final_time=None):
         recovered_avg_infection, recovered_std_infection = get_avg_infection_duration(sim_out_dir, "recovered", min_final_time)
         diagnosed_avg_infectious, diagnosed_std_infectious = get_avg_infectious_duration(sim_out_dir, "diagnosed", min_final_time)
         delta_t_avg, delta_t_std = get_avg_delta_t(sim_out_dir, min_final_time)
-        delta_t_update_avg, delta_t_update_std = get_avg_debug_delta_t(sim_out_dir, min_final_time)
+        # delta_t_update_avg, delta_t_update_std = get_avg_debug_delta_t(sim_out_dir, min_final_time)
 
         rows.append({
             "phenotype_model": phenotype_model,
@@ -146,8 +146,8 @@ def extract_simulation_summary(experiment_name, min_final_time=None):
             "delta_t_avg": delta_t_avg,
             "delta_t_std": delta_t_std,
 
-            "delta_t_update_avg": delta_t_update_avg,
-            "delta_t_update_std": delta_t_update_std
+            # "delta_t_update_avg": delta_t_update_avg,
+            # "delta_t_update_std": delta_t_update_std
         })
 
     return pd.DataFrame(rows)
