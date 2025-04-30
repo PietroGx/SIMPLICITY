@@ -23,7 +23,7 @@ def fixture_experiment_settings():
 
     fixed_params = {
         'population_size': 10000,
-        'infected_individuals_at_start': 1,
+        'infected_individuals_at_start': 50,
         'final_time': 365*3
     }
     
