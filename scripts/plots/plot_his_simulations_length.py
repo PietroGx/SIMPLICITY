@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Feb  6 13:28:55 2025
-
-@author: pietro
-"""
 
 
 import os
@@ -18,7 +13,7 @@ import argparse
 def load_data(experiment_name):
     """
     Loads final_time.csv values for each seeded simulation.
-    Sorts the columns by R value and returns a DataFrame + metadata.
+    Sorts the columns by R value and returns a DataFrame.
     """
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     data = []

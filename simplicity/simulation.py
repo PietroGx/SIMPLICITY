@@ -69,8 +69,8 @@ class Simplicity:
                                       self.output_directory)
         # print('DONE.')
         # print('')
-        om.save_DEBUG_update_ih(self.simulation_output, 
-                                      self.output_directory)
+        # om.save_DEBUG_update_ih(self.simulation_output, 
+        #                               self.output_directory)
         
     def plot(self):
         assert hasattr(self, "simulation_output"), "simulation has not run yet. Hint: see Simplicity.run"
