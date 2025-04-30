@@ -12,6 +12,7 @@ Created on Tue Feb 18 22:01:47 2025
 - [ ] write unit_runs for running with/wo plotting (technical debt item 1)
 - [ ] Remove all that has to do with the term variants (now called lineages)
 - [ ] Check in active_variants number is calculated correctly
+- [ ] Move filtered tree plot to plot_manager and fix time sync
 
 ### Bug Fixes
 - [x] memory and runtime options need to be added to slurm runner to avoid Runtime and OOM errors

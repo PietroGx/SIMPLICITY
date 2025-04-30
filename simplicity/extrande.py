@@ -202,7 +202,7 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
     
     reporter = ProgressReporter(total_time=final_time, simulation_id=sim_id)
     
-    min_update_threshold = 0.04  # minimum dt for intra-host update (1h step)
+    min_update_threshold = 0.16  # minimum dt for intra-host update (4h step)
     dt_accumulated = 0  # initialize accumulator
     
     while t < final_time:
@@ -211,7 +211,6 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
         B = helpers["compute_upperbound"](population)
         
         delta_t = helpers["draw_delta_t"](B)
-        dt_accumulated += delta_t
         
         reaction_id = None
         
@@ -222,30 +221,32 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
             t += delta_t
             t = round(t, 10)
             population.update_time(t)
+            dt_accumulated += delta_t
             # update system  (IH host model states)
-            helpers["update_step"](population, delta_t)
-            
-            population.DEBUG_update_ih.append([t,L,True])
-            # mutations
-            helpers["mutation_step"](population, delta_t)
-            # Reset dt_accumulated 
-            dt_accumulated = 0
+            # Only update the intra-host state if accumulated dt exceeds threshold:
+            if dt_accumulated >= min_update_threshold:
+                helpers["update_step"](population, dt_accumulated)
+                # population.DEBUG_update_ih.append([t,dt_accumulated,False])
+                # mutations
+                helpers["mutation_step"](population, dt_accumulated)
+                dt_accumulated = 0  # reset accumulator
         else:
             event_type = 'reaction'
             # update time
             t += delta_t
             t = round(t, 10)
             population.update_time(t)
+            dt_accumulated += delta_t
             # update system  (IH host model states)
             # Only update the intra-host state if accumulated dt exceeds threshold:
             if dt_accumulated >= min_update_threshold:
                 helpers["update_step"](population, dt_accumulated)
-                population.DEBUG_update_ih.append([t,dt_accumulated,False])
+                # population.DEBUG_update_ih.append([t,dt_accumulated,False])
                 # mutations
                 helpers["mutation_step"](population, dt_accumulated)
-                # update fitness
-                helpers["update_fitness_step"](population)
                 dt_accumulated = 0  # reset accumulator
+            # update fitness
+            helpers["update_fitness_step"](population)
             # reactions
             reaction_id = helpers["reaction_step"](population, B)
         # update progress bar

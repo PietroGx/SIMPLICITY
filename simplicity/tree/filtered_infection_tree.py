@@ -7,12 +7,12 @@ Created on Sun Apr  6 14:09:22 2025
 """
 
 import simplicity.output_manager as om
-ssod = 'Data/test_local_experiment_serial_#10/04_Output/NSR_0p0001_init_3_R_1p1/seed_0009'
-df = om.read_individuals_data(ssod)
-
 from anytree import Node
 from ete3 import Tree, TreeStyle, TextFace, NodeStyle
 import copy
+import simplicity.plots_manager as pm
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 
 # ---------------------------
 # 1) Build the Infection Tree Using Transmitted Lineage Info
@@ -26,14 +26,12 @@ def create_individual_node(row, parent):
     
     - Branch length is computed as the difference between t_infection times.
     - The node's final (current) lineage is row.IH_lineages[0].
-    - The node's inherited_lineage is set by looking in the parent's new_infections list
-      for the event where the parent's transmitted_lineage corresponds to this child (matching individual_infected).
+
     """
     branch_length = row.t_infection - (parent.t_infection if parent is not None else 0)
     if branch_length < 0:
         raise ValueError(f"Negative branch length for individual {row.Index} (t_infection={row.t_infection}) vs parent's t_infection={parent.t_infection}")
     
-    # Since new_infections is already a list (via ast.literal_eval), use it directly.
     if parent is not None and hasattr(parent, "new_infections"):
         parent_new_infections = parent.new_infections
     else:
@@ -46,7 +44,7 @@ def create_individual_node(row, parent):
             inherited = event.get('transmitted_lineage')
             break
 
-    current_lineage = row.IH_lineages[0]  # keep as specified
+    current_lineage = row.IH_lineages[0]  # need to update for multiple lineages
     
     node = Node(
         name=str(row.Index),         # internal name for bookkeeping
@@ -63,7 +61,7 @@ def create_individual_node(row, parent):
         lineage=current_lineage       # final (current) lineage
     )
     node.inherited_lineage = inherited  # store parent's transmitted lineage
-    # Directly store new_infections (already a list) if present.
+    # Directly store new_infections if present.
     node.new_infections = row.new_infections if hasattr(row, "new_infections") else []
     return node
 
@@ -73,8 +71,7 @@ def infection_tree(data):
     
     Each CSV row represents one infection event.
     The 'parent' column is used to attach nodes.
-    For each transmission event, the node's inherited_lineage is determined
-    from the parent's new_infections.
+
     """
     # Create the root node.
     root = Node(
@@ -91,7 +88,7 @@ def infection_tree(data):
         lineage='wt'
     )
     root.inherited_lineage = None  # Patient zero did not inherit from anyone.
-    # Optionally, if the root row has new_infections, store it.
+    # If the root row has new_infections, store it.
     if 'new_infections' in data.columns:
         root.new_infections = data.iloc[0].new_infections
     else:
@@ -125,8 +122,6 @@ def infection_tree(data):
 def anytree_to_ete(node):
     """
     Recursively converts an anytree Node into an ete3 Tree.
-    Copies the label (for display), branch length (distance), and selected metadata,
-    including inherited_lineage.
     """
     t = Tree()
     t.name = node.label  # display label (individual ID)
@@ -177,8 +172,6 @@ def filter_by_transmitted_lineage(ete_tree, target_lineage):
     subtree.prune(list(nodes_to_keep), preserve_branch_length=True)
     
     return subtree
-
-
 
 # ---------------------------
 # 4) Plotting with ete3
@@ -251,18 +244,16 @@ def plot_infection_tree_ete(anytree_root, target_lineage=None, layout="r",
     else:
         ete_tree.show(tree_style=ts)
 
-
-# ---------------------------
-# 5) Main Usage
-# ---------------------------
-
+# ---------------------------------------------------------------------------------
 # Build the infection tree from your imported dataframe.
+ssod = 'Data/test_local_experiment_serial_#10/04_Output/NSR_0p0001_init_3_R_1p1/seed_0009'
+df = om.read_individuals_data(ssod)
 anytree_root = infection_tree(df)
 
 # Specify target lineage for filtering: we want the full transmission chain
 # where a child inherited the specified lineage from its parent.
 lineage_name = "wt.0.0"
-import simplicity.plots_manager as pm
+
 colors_df = pm.make_lineages_colormap(ssod)
 color = colors_df[colors_df['Lineage_name'] == lineage_name]['Color'].iloc[0]
 # 1. Plot the full tree in rectangular mode.
@@ -272,42 +263,15 @@ color = colors_df[colors_df['Lineage_name'] == lineage_name]['Color'].iloc[0]
 plot_infection_tree_ete(anytree_root, target_lineage=lineage_name, layout="r", color=color,
                         outfile=f"infection_tree_filtered_{lineage_name}.png")
 
-
-# import matplotlib.pyplot as plt
-
-# # Specify the target inherited lineage to filter for.
-# target_lineage = "wt.0"
-
-# # Filter the dataframe: only include rows where the inherited_lineage equals target_lineage.
-# # (Make sure that 'inherited_lineage' is present in your df.)
-# filtered_df = df[df['inherited_lineage'] == target_lineage]
-
-# plt.figure(figsize=(10, 6))
-# plt.hist(filtered_df['t_infection'], bins=50, color='skyblue', edgecolor='black')
-# plt.xlabel("Time of Infection")
-# plt.ylabel("Number of New Infections")
-# plt.title(f"Histogram of New Infections Over Simulation Time (Inherited Lineage: {target_lineage})")
-# plt.show()
-
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-
-# --------------------------
+# --------------------------------------------------------------------------------
 # Prepare the histogram data
-# --------------------------
-# For this example, we filter the dataframe to a subset if needed.
-# Here we assume 'filtered_df' has a column 't_infection' that contains infection times.
-# If you don't already have a filtered dataframe, you can use:
-
 filtered_df = df[df['inherited_lineage'] == lineage_name]
 
 # Determine the x-axis limits from the data
 xmin = filtered_df['t_infection'].min()
 xmax = filtered_df['t_infection'].max()
 
-# --------------------------
 # Create combined plot with two subplots (histogram above, tree image below)
-# --------------------------
 fig, (ax_hist, ax_tree) = plt.subplots(2, 1, figsize=(10, 8))
 
 # Plot the histogram on the top subplot
@@ -320,10 +284,8 @@ ax_hist.set_xlim(0,xmax)
 outfile=f"infection_tree_filtered_{lineage_name}.png"
 tree_img = mpimg.imread(outfile)
 # Here we set the extent so that the image's x-axis corresponds to [xmin, xmax]
-# The y-extent is arbitrary (0 to 1 here) since we only care about the x-axis for time synchronization.
 ax_tree.imshow(tree_img, extent=[xmin, xmax, 0, 1], aspect='auto')
 ax_tree.axis('off')  # Turn off axis labels and ticks for the tree image
-
 ax_tree.set_xlabel("Time of Infection")
 
 plt.tight_layout()

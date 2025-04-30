@@ -4,6 +4,10 @@
 Created on Thu Mar 27 09:18:31 2025
 
 @author: pietro
+
+This script contains a set of functions used to analyse and plot the relationship
+between the infection rate in the model and the observed average infection time.
+
 """
 
 import simplicity.output_manager as om
@@ -14,29 +18,6 @@ import simplicity.settings_manager as sm
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
-
-def get_avg_simulation_R_eff(simulation_output_dir, min_final_time=None):
-    ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
-    all_infection_counts = []
-
-    for ssod in ssod_list:
-        if min_final_time is not None:
-            final_time = om.read_final_time(ssod)
-            if final_time is None or final_time < min_final_time:
-                continue
-
-        df = om.read_individuals_data(ssod)
-        if df.empty or "new_infections" not in df.columns:
-            print(f"Skipping {ssod}: missing or empty 'new_infections'")
-            continue
-
-        infection_counts = df["new_infections"].apply(lambda x: len(x) if isinstance(x, (list, tuple)) else 0)
-        all_infection_counts.extend(infection_counts.tolist())
-
-    if not all_infection_counts:
-        return None, None
-
-    return np.mean(all_infection_counts), np.std(all_infection_counts)
 
 def get_avg_infectious_duration(simulation_output_dir, state_filter, min_final_time=None):
     ssod_list = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
@@ -53,7 +34,7 @@ def get_avg_infectious_duration(simulation_output_dir, state_filter, min_final_t
             continue
 
         if state_filter == 'recovered':
-            filtered_df = df[(df["state"] == state_filter) | (df["state_t"] == 19)]
+            filtered_df = df[(df["state"] == state_filter)]
         else:
             filtered_df = df[(df["state"] == state_filter)]
 
@@ -143,7 +124,6 @@ def extract_simulation_summary(experiment_name, min_final_time=None):
         R = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'R')
         diagnosis_rate = sm.get_parameter_value_from_simulation_output_dir(sim_out_dir, 'diagnosis_rate')
 
-        R_eff_avg, R_eff_std = get_avg_simulation_R_eff(sim_out_dir, min_final_time=min_final_time)
         recovered_avg_infectious, recovered_std_infectious = get_avg_infectious_duration(sim_out_dir, "recovered", min_final_time)
         recovered_avg_infection, recovered_std_infection = get_avg_infection_duration(sim_out_dir, "recovered", min_final_time)
         diagnosed_avg_infectious, diagnosed_std_infectious = get_avg_infectious_duration(sim_out_dir, "diagnosed", min_final_time)
@@ -154,8 +134,6 @@ def extract_simulation_summary(experiment_name, min_final_time=None):
             "phenotype_model": phenotype_model,
             "R": R,
             "diagnosis_rate": diagnosis_rate,
-            "R_eff_avg": R_eff_avg,
-            "R_eff_std": R_eff_std,
 
             "recovered_avg_infectious": recovered_avg_infectious,
             "recovered_std_infectious": recovered_std_infectious,
@@ -174,55 +152,6 @@ def extract_simulation_summary(experiment_name, min_final_time=None):
 
     return pd.DataFrame(rows)
 
-
-def plot_R_eff_vs_R(df):
-    sns.set(style="whitegrid")
-
-    # Sort and map diagnosis rates to fixed jitter offsets
-    diag_rates_sorted = sorted(df["diagnosis_rate"].unique())
-    n_rates = len(diag_rates_sorted)
-    jitter_spacing = 0.05
-    jitter_offsets = {
-        rate: (i - n_rates // 2) * jitter_spacing
-        for i, rate in enumerate(diag_rates_sorted)
-    }
-
-    phenotype_models = sorted(df["phenotype_model"].unique())
-    n_phenotypes = len(phenotype_models)
-
-    # Create subplots (1 row, n_phenotypes columns)
-    fig, axes = plt.subplots(1, n_phenotypes, figsize=(7 * n_phenotypes, 6), sharey=True)
-
-    if n_phenotypes == 1:
-        axes = [axes]  # ensure axes is always iterable
-
-    for ax, phenotype in zip(axes, phenotype_models):
-        subset = df[df["phenotype_model"] == phenotype]
-
-        for diag_rate in diag_rates_sorted:
-            
-            # add jitter to better separate d_rates 
-            diag_subset = subset[subset["diagnosis_rate"] == diag_rate]
-            jitter = jitter_offsets[diag_rate]
-            R_jittered = diag_subset["R"] + jitter
-
-            ax.errorbar(
-                R_jittered,
-                diag_subset["R_eff_avg"],
-                yerr=diag_subset["R_eff_std"],
-                fmt='o',
-                capsize=3,
-                linestyle='None',
-                label=f"diagnosis_rate = {diag_rate}"
-            )
-
-        ax.set_title(f"Phenotype: {phenotype}")
-        ax.set_xlabel("Input R")
-
-    axes[0].set_ylabel("Observed R_eff")
-    axes[0].legend(title="Diagnosis Rate")
-    plt.tight_layout()
-    plt.show()
 
 def plot_infectious_durations(df):
     sns.set(style="whitegrid")
@@ -342,12 +271,6 @@ def plot_combined_summary(df, experiment_name):
 
             jitter = jitter_offsets[d_rate]
             R_jittered = d_sub["R"] + jitter
-
-            # # Row 0: R_eff
-            # ax = axes[0][col]
-            # ax.errorbar(R_jittered, d_sub["R_eff_avg"], yerr=d_sub["R_eff_std"], fmt='o', capsize=3,
-            #             linestyle='None', label=f"d_rate={d_rate}", color=color_map[d_rate])
-            # ax.set_ylabel("Observed R_eff")
 
             # Row 1: Recovered infection duration
             ax = axes[0][col]

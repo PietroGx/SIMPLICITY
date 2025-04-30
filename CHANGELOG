@@ -522,6 +522,21 @@
 	* updated R_eff_ih_check.py to filter simulations by final time 
 	* changed ih update min delta_t size to 0.04
 	
+2026-28-04 pietro gerletti
+	
+	Version 0.16.11
+	
+	* changed ih update min delta_t size to 0.16 (4h)
+	* renamed and moved R_eff_ih_check.py to scripts (R_vs_time_inf.py)
+	* updated tree related files 
+	
+2026-30-04 pietro gerletti
+	
+	Version 0.16.12
+	
+	* removed ih timestep debugger
+	* updated extrande (ih dt accumulator also in leap step)
+	* 
 	
 	
 	

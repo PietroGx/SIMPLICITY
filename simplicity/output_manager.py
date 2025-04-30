@@ -201,22 +201,17 @@ def read_lineage_frequency(seeded_simulation_output_dir):
     df = pd.read_csv(lineage_frequency_file_path)
     return df
 
+# def save_DEBUG_update_ih(simulation_output, seeded_simulation_output_dir):
+#     df = simulation_output.DEBUG_update_ih_to_df()
+#     DEBUG_update_ih_file_path = os.path.join(seeded_simulation_output_dir,
+#                                                "DEBUG_update_ih.csv")
+#     df.to_csv(DEBUG_update_ih_file_path, index=False)
 
-
-def save_DEBUG_update_ih(simulation_output, seeded_simulation_output_dir):
-    df = simulation_output.DEBUG_update_ih_to_df()
-    DEBUG_update_ih_file_path = os.path.join(seeded_simulation_output_dir,
-                                               "DEBUG_update_ih.csv")
-    df.to_csv(DEBUG_update_ih_file_path, index=False)
-
-def read_DEBUG_update_ih(seeded_simulation_output_dir):
-    DEBUG_update_ih_file_path = os.path.join(seeded_simulation_output_dir,
-                                               "DEBUG_update_ih.csv")
-    df = pd.read_csv(DEBUG_update_ih_file_path)
-    return df
-
-
-
+# def read_DEBUG_update_ih(seeded_simulation_output_dir):
+#     DEBUG_update_ih_file_path = os.path.join(seeded_simulation_output_dir,
+#                                                "DEBUG_update_ih.csv")
+#     df = pd.read_csv(DEBUG_update_ih_file_path)
+#     return df
 
 def save_individuals_data(simulation_output, seeded_simulation_output_dir):
     individuals_data = simulation_output.individuals_data_to_df()
