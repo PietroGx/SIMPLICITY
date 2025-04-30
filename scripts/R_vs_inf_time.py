@@ -261,7 +261,7 @@ def plot_combined_summary(df, experiment_name):
             
             # Ensure all numeric and fill missing
             for col_name in [
-                "R_eff_avg", "R_eff_std",
+                # "R_eff_avg", "R_eff_std",
                 "recovered_avg_infection", "recovered_std_infection",
                 "recovered_avg_infectious", "recovered_std_infectious",
                 "diagnosed_avg_infectious", "diagnosed_std_infectious",
