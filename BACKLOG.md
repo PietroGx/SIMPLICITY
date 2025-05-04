@@ -9,10 +9,10 @@ Created on Tue Feb 18 22:01:47 2025
 ## Backlog
 - [x] function in dir_manager to list all simulation output folders (hardcoded into check_simulations.py)
 - [x] give option to import simulation parameters from file for running an experiment
-- [ ] write unit_runs for running with/wo plotting (technical debt item 1)
-- [ ] Remove all that has to do with the term variants (now called lineages)
-- [ ] Check in active_variants number is calculated correctly
+- [x] Remove all that has to do with the term variants (now called lineages)
+- [x] Check in active_variants number is calculated correctly
 - [ ] Move filtered tree plot to plot_manager and fix time sync
+- [ ] write unit_runs for running with/wo plotting (technical debt item 1)
 
 ### Bug Fixes
 - [x] memory and runtime options need to be added to slurm runner to avoid Runtime and OOM errors

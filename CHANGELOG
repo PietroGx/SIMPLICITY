@@ -536,8 +536,14 @@
 	
 	* removed ih timestep debugger
 	* updated extrande (ih dt accumulator also in leap step)
-	* 
+	* updated update_fitness to improve immune waning model (now we account for the initial phase in which the population is not yet exposed to the virus)
+
+2026-04-05 pietro gerletti
 	
+	Version 0.17.00
+	
+	* renamed: IH_virus_number > IH_lineages_number, lineages_number > IH_unique_lineages_number, IH_virus_max > IH_lineages_max, IH_virus_fitness > IH_lineages_fitness_score, fitness > fitness_score 
+	* 
 	
 	
 	

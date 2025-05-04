@@ -27,11 +27,12 @@ class Population:
         
         # random number generator
         self.rng3 = rng3 # for intra-host model states update
-        self.rng4 = rng4 # for electing individuals|variants when reactions happen
+        self.rng4 = rng4 # for electing individuals|lineages when reactions happen
         self.rng5 = rng5 # for mutation model
         self.rng6 = rng6 # for synthetic sequencing data
         
         # compartments and population groups ---------------------------------
+        self.size = size
         self.susceptibles = size-I_0 # number of susceptible individuals
         self.infected     = I_0 # compartment - number of infected individuals
         self.diagnosed    = 0   # compartment - number of diagnosed individuals
@@ -51,7 +52,7 @@ class Population:
         
         self.ref_genome      = ref.get_reference()  # sequence of reference genome
         self.L_lin           = len(self.ref_genome) # lenght of reference genome
-        self.active_variants_n = I_0                # number of IH viruses in the 
+        self.active_lineages_n = I_0                # number of IH viruses in the 
                                                     # infected population
         
         # Phylogenetic tree data ----------------------------------------------
@@ -137,26 +138,29 @@ class Population:
             
             dic[i] = {
                      't_infection' : None,
-                     't_infectious': None,
-                     't_not_infectious': None,
                      't_not_infected': None,
                      
-                     'parent'      : None,
-                     'new_infections'  : [],
+                     't_infectious': None,
+                     't_not_infectious': None,
                      
+                     'type'        : 'normal',
+                     'model'       : self.host_model,
                      'state_t'     : 0,
                      't_next_state': None,
                      'state'       : 'susceptible',
-                     'model'       : self.host_model,
-                     'type'        : 'normal',
+                     
+                     'parent'      : None,
+                     'inherited_lineage': None,
+                     'new_infections'  : [],
                      
                      'IH_lineages'   : [],
-                     'lineages_number': 1,
-                     'inherited_lineage': None,
-                     'fitness'     : 1,
-                     'IH_virus_fitness' : [1],
-                     'IH_virus_number'    : 1,
-                     'IH_virus_max': self.rng3.integers(1,6)
+                     'IH_unique_lineages_number': 1,
+                     'IH_lineages_number'    : 1,
+                     'IH_lineages_max': self.rng3.integers(1,6),
+                     'IH_lineages_fitness_score' : [1],
+                     'IH_lineages_trajectory': {}, # lineage name : [ih_time_start, ih_time_end]
+                     
+                     'fitness_score'     : 1
                     }
             # add index of individuals to either susceptibles indices or to 
             # reservoir indices (the simulaiton starts with a pool of susceptibles)
@@ -182,6 +186,7 @@ class Population:
             dic[i]['state']        = 'infected'
             dic[i]['IH_lineages']  = ['wt']
             dic[i]['inherited_lineage']  = 'wt'
+            dic[i]['IH_lineages_trajectory']['wt'] = [0]
             
             self.susceptibles_i.remove(i)  
             self.infected_i.add(i)
@@ -260,7 +265,7 @@ class Population:
                 self.detectable_i.discard(i)
     
                 # Update active virus count
-                self.active_variants_n -= individual['IH_virus_number']
+                self.active_lineages_n -= individual['IH_lineages_number']
     
                 # Replace individual from reservoir
                 new_susceptible_index = self.reservoir_i.pop()
@@ -348,7 +353,7 @@ class Population:
                 self.recovered += 1
                 self.susceptibles += 1
     
-                self.active_variants_n -= ind['IH_virus_number']
+                self.active_lineages_n -= ind['IH_lineages_number']
     
                 new_susceptible = self.reservoir_i.pop()
                 self.susceptibles_i.add(new_susceptible)
@@ -412,7 +417,7 @@ class Population:
         def compute_mean_fitness(individuals, infected_i):
             value = []
             for i in infected_i:
-                    value.append(individuals[i]['fitness'])
+                    value.append(individuals[i]['fitness_score'])
                     
             return [np.mean(value),np.std(value)]
      
@@ -494,6 +499,7 @@ class Population:
         # return population dictionary as data frame
         df = pd.DataFrame(self.individuals).transpose()
         filtered_df = df[~df['state'].str.contains('susceptible')]
+        filtered_df = filtered_df.drop('t_next_state', axis=1)
         return filtered_df
     
     def phylogenetic_data_to_df(self):
@@ -550,7 +556,7 @@ def create_population(parameters):
     seeds_generator=randomgen(seed+10000) # add to the seed so that rng3 and 4 differ from rng1 and 2 in Simplicity class
     # random number generators for population
     rng3 = randomgen(seeds_generator.integers(0,10000)) # for intra-host model states update
-    rng4 = randomgen(seeds_generator.integers(0,10000)) # for electing individuals|variants when reactions happen
+    rng4 = randomgen(seeds_generator.integers(0,10000)) # for electing individuals|lineages when reactions happen
     rng5 = randomgen(seeds_generator.integers(0,10000)) # for mutation model
     rng6 = randomgen(seeds_generator.integers(0,10000)) # for synthetic sequencing data
     
