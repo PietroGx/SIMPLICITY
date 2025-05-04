@@ -144,7 +144,7 @@ def phylogenetic_tree(seeded_simulation_output_dir):
                            and node.leaf == True][0]
            
             time_distance = row.Time_emergence - parent_node.time_emergence
-            # add new variant
+            # add new lineage
             tree.append(anytree.Node(
                         name           = row.Lineage_name, 
                         parent         = parent_node,

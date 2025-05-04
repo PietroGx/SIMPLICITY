@@ -225,7 +225,7 @@ def read_individuals_data(seeded_simulation_output_dir):
                                         "individuals_data.csv")
     df = pd.read_csv(trajectory_file_path, index_col=0)
     df['IH_lineages'] = df['IH_lineages'].apply(ast.literal_eval)
-    df['IH_virus_fitness'] = df['IH_virus_fitness'].apply(ast.literal_eval) 
+    df['IH_lineages_fitness_score'] = df['IH_lineages_fitness_score'].apply(ast.literal_eval) 
     df['new_infections'] = df['new_infections'].apply(ast.literal_eval)
     return df
 
@@ -294,19 +294,19 @@ def get_IH_lineages_data_simulation(simulation_output_dir):
     # get individuals dataframe 
     data = get_all_individuals_data_for_simulation_output_dir(simulation_output_dir)
     # keep only needed columns
-    data = data[['IH_virus_number', 'lineages_number']]
+    data = data[['IH_lineages_number', 'IH_unique_lineages_number']]
 
-    # DataFrames with all possible IH_virus_number and lineages_numbervalues (1 to 5)
-    IH_virus_number_values = pd.DataFrame({'IH_virus_number': [1, 2, 3, 4, 5]})
-    lineages_number_values = pd.DataFrame({'lineages_number': [1, 2, 3, 4, 5]})
+    # DataFrames with all possible IH_lineages_number and IH_unique_lineages_numbervalues (1 to 5)
+    IH_lineages_number_values = pd.DataFrame({'IH_lineages_number': [1, 2, 3, 4, 5]})
+    IH_unique_lineages_number_values = pd.DataFrame({'IH_unique_lineages_number': [1, 2, 3, 4, 5]})
 
     # Calculate the counts of each value for each type
-    ih_virus_count = data.groupby(['IH_virus_number']).size().reset_index(name='ih_virus_count')
-    ih_lineage_count = data.groupby(['lineages_number']).size().reset_index(name='ih_lineage_count')
+    ih_virus_count = data.groupby(['IH_lineages_number']).size().reset_index(name='ih_virus_count')
+    ih_lineage_count = data.groupby(['IH_unique_lineages_number']).size().reset_index(name='ih_lineage_count')
 
-    # Merge with the IH_virus_number_values DataFrame, filling NaNs with 0
-    ih_virus_count = pd.merge(IH_virus_number_values, ih_virus_count, on='IH_virus_number', how='left').fillna({'ih_virus_count': 0})
-    ih_lineage_count = pd.merge(lineages_number_values, ih_lineage_count, on='lineages_number', how='left').fillna({'ih_lineage_count': 0})
+    # Merge with the IH_lineages_number_values DataFrame, filling NaNs with 0
+    ih_virus_count = pd.merge(IH_lineages_number_values, ih_virus_count, on='IH_lineages_number', how='left').fillna({'ih_virus_count': 0})
+    ih_lineage_count = pd.merge(IH_unique_lineages_number_values, ih_lineage_count, on='IH_unique_lineages_number', how='left').fillna({'ih_lineage_count': 0})
 
     # Normalize counts by the total count
     ih_virus_count['ih_virus_count'] = ih_virus_count['ih_virus_count'] / ih_virus_count['ih_virus_count'].sum()

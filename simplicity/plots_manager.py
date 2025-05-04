@@ -139,7 +139,7 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     ax2.set_ylabel('N individuals', fontsize=15)
     ax2.legend(loc='upper left', fontsize=15)
     
-    # ----------------- variants frequency subplot ----------------------------
+    # ----------------- lineages frequency subplot ----------------------------
     lineage_frequency_df = om.read_lineage_frequency(seeded_simulation_output_dir)
     
     # get lineages colormap
@@ -863,9 +863,9 @@ def plot_IH_lineage_distribution(experiment_name):
     fig, axes  = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
     df = om.get_IH_lineages_data_experiment(experiment_name)
     
-    ax0 = sns.barplot(x='IH_virus_number', y='ih_virus_count', data=df, hue='IH_virus_emergence_rate', 
+    ax0 = sns.barplot(x='IH_lineages_number', y='ih_virus_count', data=df, hue='IH_virus_emergence_rate', 
                 ax=axes[0], dodge=True, palette="Set2", alpha=0.7)
-    ax1 = sns.barplot(x='lineages_number', y='ih_lineage_count', data=df, hue='IH_virus_emergence_rate',
+    ax1 = sns.barplot(x='IH_unique_lineages_number', y='ih_lineage_count', data=df, hue='IH_virus_emergence_rate',
                 ax=axes[1], dodge=True, palette="Set2",alpha=0.7)
     
     # Loop through each bar and set the edgecolor to match the bar color
@@ -883,12 +883,12 @@ def plot_IH_lineage_distribution(experiment_name):
         patch.set_edgecolor(color)
         patch.set_linewidth(1)
     
-    axes[0].set_title('Count of IH_virus_number')
-    axes[0].set_xlabel('IH_virus_number')
+    axes[0].set_title('Count of IH_lineages_number')
+    axes[0].set_xlabel('IH_lineages_number')
     axes[0].set_ylabel('Count')
 
-    axes[1].set_title('Count of lineages_number')
-    axes[1].set_xlabel('lineages_number')
+    axes[1].set_title('Count of unique lineages_number')
+    axes[1].set_xlabel('Unique lineages_number')
     axes[1].set_ylabel('Count')
     
     

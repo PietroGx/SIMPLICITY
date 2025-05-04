@@ -14,7 +14,7 @@ def SIDR_propensities(population, beta, k_d, k_v, seq_rate):
     propensities = [
         ('infection',      beta * population.infectious_normal, lambda: infection(population)),
         ('diagnosis',      k_d * population.detectables,        lambda: diagnosis(population, seq_rate)),
-        ('add_ih_lineage', k_v * population.infected,           lambda: add_variant(population))
+        ('add_ih_lineage', k_v * population.infected,           lambda: add_lineage(population))
     ]
     # print('a1:',beta * population.infectious_normal)
     # print('a2:',k_d * population.detectables)
@@ -49,8 +49,8 @@ def diagnosis(population, seq_rate=0):
             ])
             i += 1
 
-    # update the active variants number
-    population.active_variants_n -= population.individuals[diagnosed_individual_i]['IH_virus_number']
+    # update the active lineages number
+    population.active_lineages_n -= population.individuals[diagnosed_individual_i]['IH_lineages_number']
     
     population.diagnosed += 1
     # set patient as diagnosed
@@ -90,7 +90,7 @@ def infection(population):
     susceptibles_list = sorted(population.susceptibles_i)
 
     # select random patient to be the transmitter
-    fitness_inf = [population.individuals[i]['fitness'] for i in infectious_i_list]
+    fitness_inf = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
     fitsum = np.sum(fitness_inf)
 
     if fitsum > 0:
@@ -103,8 +103,8 @@ def infection(population):
     new_infected_index = population.rng4.choice(susceptibles_list)
     population.exclude_i = {new_infected_index}
 
-    # update the active variants number
-    population.active_variants_n += population.individuals[new_infected_index]['IH_virus_number']
+    # update the active lineages number
+    population.active_lineages_n += population.individuals[new_infected_index]['IH_lineages_number']
 
     # Move individual from susceptibles to infected
     population.susceptibles_i.discard(new_infected_index)
@@ -123,14 +123,14 @@ def infection(population):
     population.individuals[new_infected_index]['parent'] = parent
 
     # Select random lineage from parent
-    index = population.rng4.integers(0, population.individuals[parent]['IH_virus_number'])
+    index = population.rng4.integers(0, population.individuals[parent]['IH_lineages_number'])
     transmitted_lineage = population.individuals[parent]['IH_lineages'][index]
-    transmitted_fitness = population.individuals[parent]['IH_virus_fitness'][index]
+    transmitted_fitness = population.individuals[parent]['IH_lineages_fitness_score'][index]
     population.individuals[new_infected_index]['inherited_lineage']  = transmitted_lineage
 
     # Append transmitted lineage + fitness
     new_lineages = population.individuals[new_infected_index]['IH_lineages']
-    new_fitness = population.individuals[new_infected_index]['IH_virus_fitness']
+    new_fitness = population.individuals[new_infected_index]['IH_lineages_fitness_score']
     new_lineages.append(transmitted_lineage)
     new_fitness.append(transmitted_fitness)
 
@@ -138,11 +138,11 @@ def infection(population):
     combined = sorted(zip(new_lineages, new_fitness))
     lineages_sorted, fitness_sorted = zip(*combined)
     population.individuals[new_infected_index]['IH_lineages'] = list(lineages_sorted)
-    population.individuals[new_infected_index]['IH_virus_fitness'] = list(fitness_sorted)
+    population.individuals[new_infected_index]['IH_lineages_fitness_score'] = list(fitness_sorted)
     
    
-    # Update individual fitness (average of variants' fitness)
-    population.individuals[new_infected_index]['fitness'] = round(np.average(fitness_sorted), 4)
+    # Update individual fitness (average of lineage's fitness)
+    population.individuals[new_infected_index]['fitness_score'] = round(np.average(fitness_sorted), 4)
 
     # store infection info for R effective
     population.individuals[parent]['new_infections'].append({
@@ -155,38 +155,38 @@ def infection(population):
     population.susceptibles -= 1
     population.infected += 1
 
-def add_variant(population):
-    """Adds a new variant to a randomly selected infected individual, 
+def add_lineage(population):
+    """Adds a new lineage to a randomly selected infected individual, 
     duplicating an existing lineage or replacing one if at max capacity."""
     # Convert set to list for sampling
     infected_list = sorted(population.infected_i)
     individual_index = population.rng4.choice(infected_list)
 
     individual = population.individuals[individual_index]
-    virus_n = individual['IH_virus_number']
-    virus_max = individual['IH_virus_max']
+    IH_lineage_n = individual['IH_lineages_number']
+    IH_lineages_max = individual['IH_lineages_max']
 
     # Add a duplicate lineage if under max capacity 
-    if virus_n < virus_max:
-        idx = population.rng4.integers(0, virus_n)
+    if IH_lineage_n < IH_lineages_max:
+        idx = population.rng4.integers(0, IH_lineage_n)
         individual['IH_lineages'].append(individual['IH_lineages'][idx])
-        individual['IH_virus_fitness'].append(individual['IH_virus_fitness'][idx])
-        individual['IH_virus_number'] += 1
-        population.active_variants_n += 1
-    # Replace one variant (delete + duplicate) if at max
-    elif virus_n == virus_max and virus_max > 1:
+        individual['IH_lineages_fitness_score'].append(individual['IH_lineages_fitness_score'][idx])
+        individual['IH_lineages_number'] += 1
+        population.active_lineages_n += 1
+    # Replace one lineage (delete + duplicate) if at max
+    elif IH_lineage_n == IH_lineages_max and IH_lineages_max > 1:
         # Randomly delete one
-        delete_idx = population.rng4.integers(0, virus_n)
+        delete_idx = population.rng4.integers(0, IH_lineage_n)
         individual['IH_lineages'].pop(delete_idx)
-        individual['IH_virus_fitness'].pop(delete_idx)
+        individual['IH_lineages_fitness_score'].pop(delete_idx)
         # Duplicate another
-        idx = population.rng4.integers(0, virus_n - 1)  # now virus_n - 1 after deletion
+        idx = population.rng4.integers(0, IH_lineage_n - 1)  # now virus_n - 1 after deletion
         individual['IH_lineages'].append(individual['IH_lineages'][idx])
-        individual['IH_virus_fitness'].append(individual['IH_virus_fitness'][idx])
+        individual['IH_lineages_fitness_score'].append(individual['IH_lineages_fitness_score'][idx])
 
-    # Keep IH_lineages and IH_virus_fitness sorted
-    combined = sorted(zip(individual['IH_lineages'], individual['IH_virus_fitness']))
-    individual['IH_lineages'], individual['IH_virus_fitness'] = map(list, zip(*combined))
+    # Keep IH_lineages and IH_lineages_fitness_score sorted
+    combined = sorted(zip(individual['IH_lineages'], individual['IH_lineages_fitness_score']))
+    individual['IH_lineages'], individual['IH_lineages_fitness_score'] = map(list, zip(*combined))
 
     # update individual fitness
-    individual['fitness'] = round(np.average(individual['IH_virus_fitness']), 4)
+    individual['fitness_score'] = round(np.average(individual['IH_lineages_fitness_score']), 4)
