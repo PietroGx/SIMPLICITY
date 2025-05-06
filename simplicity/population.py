@@ -186,7 +186,7 @@ class Population:
             dic[i]['state']        = 'infected'
             dic[i]['IH_lineages']  = ['wt']
             dic[i]['inherited_lineage']  = 'wt'
-            dic[i]['IH_lineages_trajectory']['wt'] = [0]
+            dic[i]['IH_lineages_trajectory']['wt'] = {'ih_birth':None,'ih_death':None}
             
             self.susceptibles_i.remove(i)  
             self.infected_i.add(i)
@@ -459,45 +459,27 @@ class Population:
             self.consensus_snapshot.append([self.get_lineage_genome(lineage_name),
                                                 frequency,
                                                 t])
-    # def update_R_effective_trajectory(self):
-    #     for individual_index in self.infectious_normal_i:
-    #         try:
-    #             if self.time == self.last_infection['time_infection'] and individual_index == self.last_infection['transmitter_index']:
-    #                 lineage_transmitted = self.last_infection['transmitted_lineage']
-    #                 new_infections_at_t = 1
-    #                 # store infection info for R effective
-    #                 self.R_effective_trajectory.append([self.time,
-    #                                            individual_index,
-    #                                            lineage_transmitted,
-    #                                            new_infections_at_t])
-                
-    #             else:
-    #                 new_infections_at_t = 0
-    #                 individual_lineages = self.individuals[individual_index]['IH_lineages']
-    #                 # store infection info for R effective
-    #                 for IH_lineage_index in range(0,len(individual_lineages)):
-    #                     self.R_effective_trajectory.append([self.time,
-    #                                                 individual_index,
-    #                                                 individual_lineages[IH_lineage_index],
-    #                                                 new_infections_at_t])
-    #         except:
-    #             if self.last_infection == {}:
-    #                 new_infections_at_t = 0
-    #                 individual_lineages = self.individuals[individual_index]['IH_lineages']
-    #                 # store infection info for R effective
-    #                 for IH_lineage_index in range(0,len(individual_lineages)):
-    #                     self.R_effective_trajectory.append([self.time,
-    #                                                 individual_index,
-    #                                                 individual_lineages[IH_lineage_index],
-    #                                                 new_infections_at_t])
-                
-    #             else:
-    #                 raise ValueError('There is something wrong with R_effective_trajectory')
-    # -------------------------------------------------------------------------
-    
+            
+# -----------------------------------------------------------------------------
+
+    def update_ih_lineages_trajectories(self):
+        individuals_data = pd.DataFrame(self.individuals).transpose()
+        for idx, row in individuals_data.iterrows():
+            lineage_traj_dic = row['IH_lineages_trajectory']  
+        
+            for lineage in lineage_traj_dic:
+                if lineage_traj_dic[lineage].get('ih_birth') is None:
+                    lineage_traj_dic[lineage]['ih_birth'] = row['t_infectious']
+                if lineage_traj_dic[lineage].get('ih_death') is None:
+                    lineage_traj_dic[lineage]['ih_death'] = row['t_not_infectious']
+        
+            # Optional: reassign if you're not sure mutation is enough
+            individuals_data.at[idx, 'IH_lineages_trajectory'] = lineage_traj_dic
+        return individuals_data
+        
     def individuals_data_to_df(self):
         # return population dictionary as data frame
-        df = pd.DataFrame(self.individuals).transpose()
+        df = self.update_ih_lineages_trajectories()
         filtered_df = df[~df['state'].str.contains('susceptible')]
         filtered_df = filtered_df.drop('t_next_state', axis=1)
         return filtered_df

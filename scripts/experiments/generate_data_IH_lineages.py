@@ -5,13 +5,6 @@
 @author: pietro
 
 If you want to change any parameter, you can specify them in the parameters dictionary below. 
-For each parameter, specify a list of values that you would like to use for the 
-simulation. If you want to change more than one parameter at the time, consider 
-that you need to enter the same number of values for each parameter, e.g. :
-    par 1 = [value1, value2]
-    par 2 = [value3, value4]
-This will run a simulation with par 1 = value1 and par 2 = value 3, and a simulation
-with par 1 = value2 and par 2 = value4. 
 
 Each simulation will be repeated n_seeds time with a different random seed.
 
@@ -22,18 +15,18 @@ import argparse
 
 experiment_name =  'generate_data_IH_lineages'
 
-## fixture  experiment settings (sm.write_settings arguments)
 def fixture_experiment_settings():
     
-    parameters      = {'IH_virus_emergence_rate':[0,
-                                                  0.01,
-                                                  0.1,
-                                                  1
-                                ]
-                       }
+    # parameters value to get combinations from
+    varying_params = {
+        'IH_virus_emergence_rate':[0, 0.01, 0.1, 1]
+    }
+    # parameters to keep fixed (but different from standard_value) across combinations
+    fixed_params = {}
+    
     n_seeds = 100
-
-    return (parameters, n_seeds)
+    
+    return (varying_params,fixed_params,n_seeds)
 
 def main():
     # Set up the argument parser

@@ -4,15 +4,7 @@
 
 @author: pietro
 
-    
 If you want to change any parameter, you can specify them in the parameters dictionary below. 
-For each parameter, specify a list of values that you would like to use for the 
-simulation. If you want to change more than one parameter at the time, consider 
-that you need to enter the same number of values for each parameter, e.g. :
-    par 1 = [value1, value2]
-    par 2 = [value3, value4]
-This will run a simulation with par 1 = value1 and par 2 = value 3, and a simulation
-with par 1 = value2 and par 2 = value4. 
 
 Each simulation will be repeated n_seeds time with a different random seed.
 
@@ -20,30 +12,22 @@ The set of all simulations is what we call an experiment.
 """
 from experiment_script_runner import run_experiment_script
 import argparse
-import itertools
 import numpy as np 
 
 experiment_name = 'generate_data_R_diagnosis_rate_parameter_space'
 
 def fixture_experiment_settings():
+   
+    varying_params = {
+        'R': [1, 1.25, 1.5, 2],
+        'diagnosis_rate': [round(num, 2) for num in np.arange(0.01, 0.11, 0.01)]
+    }
 
-    R_values       = [1,1.25,1.5,2]
-    diagnosis_rates = [round(num, 2) for num in np.arange(0.01,0.11,0.01)]
-    
-    
-    R_for_parameters = list(itertools.chain.from_iterable(
-                               [[x] * len(diagnosis_rates) for x in R_values]))
-    
-    
-    d_rates_for_parameters = list(itertools.chain.from_iterable([diagnosis_rates] * len(R_values)))
-    
-    parameters      = {'R': R_for_parameters,
-                       'diagnosis_rate': d_rates_for_parameters
-                       }
-    
-    n_seeds = 100
+    fixed_params = {}
 
-    return (parameters, n_seeds)
+    n_seeds = 100 
+
+    return varying_params, fixed_params, n_seeds
 
 def main():
     # Set up the argument parser

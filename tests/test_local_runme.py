@@ -50,8 +50,8 @@ def fixture_experiment_settings():
     fixed_params = {
         'population_size':1000,
         "nucleotide_substitution_rate": 0.0001,
-        'infected_individuals_at_start': 3,
-        'R' : 1.15,
+        'infected_individuals_at_start': 1,
+        'R' : 1.3,
         'final_time': 365
     }
     
@@ -65,7 +65,7 @@ def fixture_experiment_settings():
     # fixed_params = sm.read_user_set_parameters_file(filename)
    
     # -------------------------------------------------------------------------
-    n_seeds = 3
+    n_seeds = 20
     
     return (varying_params,fixed_params,n_seeds)
 
@@ -252,7 +252,7 @@ def main(runner:str, test_number:int, compare_to: int = None):
 if __name__ == "__main__":
     import time
     start = time.time()
-    main('serial',2)#,compare_to=4)
+    main('serial',8)#,compare_to=4)
     elapsed = time.time() - start
     mins, secs = divmod(elapsed, 60)
     print(f"Test completed in {int(mins)} min {secs:.2f} sec")

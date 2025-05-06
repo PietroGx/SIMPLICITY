@@ -19,6 +19,7 @@ import simplicity.tuning.evolutionary_rate as er
 import glob
 import ast
 import numpy as np
+from tqdm import tqdm
 
 def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
     """
@@ -227,6 +228,7 @@ def read_individuals_data(seeded_simulation_output_dir):
     df['IH_lineages'] = df['IH_lineages'].apply(ast.literal_eval)
     df['IH_lineages_fitness_score'] = df['IH_lineages_fitness_score'].apply(ast.literal_eval) 
     df['new_infections'] = df['new_infections'].apply(ast.literal_eval)
+    df['IH_lineages_trajectory'] = df['IH_lineages_trajectory'].apply(ast.literal_eval)
     return df
 
 def save_phylogenetic_data(simulation_output, seeded_simulation_output_dir):
@@ -649,147 +651,175 @@ def export_tree(tree,
 # -----------------------------------------------------------------------------
 #                                R effective 
 # -----------------------------------------------------------------------------
-def get_filtered_lineages(seeded_simulation_output_dir, threshold):
-    lineage_frequency_df = read_lineage_frequency(seeded_simulation_output_dir)
-    # Filter lineage_names that have ever reached or exceeded the threshold
-    filtered_lineages = lineage_frequency_df[lineage_frequency_df["Frequency_at_t"] >= threshold]["Lineage_name"].unique()
-    return list(filtered_lineages)
+def filter_lineage_frequency_df(lineage_frequency_df, threshold):
+    """
+    Filters the lineage frequency DataFrame by threshold.
 
-def get_R_effective_dfs(seeded_simulation_output_dir, window_size, threshold):
-    ''' Process R_effective_trajectory data to get avg R effective and 
-        lineage avg R effective over a time period (window_size) and
-        filtering lineages under a relative occurence threshold.
-    '''
-    # ------------------- define R effective df function ----------------------
-    def get_R_effective_avg_df(R_eff_data, window_size):
-        ''' compute average new infections by parent (individual) in a (sliding) time window
-        '''
-        df = R_eff_data
-        r_eff = []
-        # individual_infections_df = []
-        for t in np.arange(0,max(df["Time"]),1):
-            window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
-            if not window_df.empty:
-                # Group by individual and sum infections
-                individual_infections = window_df.groupby('Individual')['Infections_at_t'].sum()
-                
-                # print(individual_infections[individual_infections >= 1])
-                # individual_infections = individual_infections.reset_index()
-                # individual_infections.insert(0, "Time", t)
-                # print(individual_infections)
-                # individual_infections_df.append(individual_infections)
-                
-                # Compute the average number of infections per unique individual
-                avg_infections = individual_infections.mean() if not individual_infections.empty else 0  
-                r_eff.append((t, avg_infections))
-        # individual_infections_df_check = pd.concat(individual_infections_df, ignore_index=True)  # Concatenate all the dataframes
-        # individual_infections_df_check.to_csv(f'{seeded_simulation_output_dir}/individuals_infections.csv')
-        return pd.DataFrame(r_eff, columns=["Time", "R_effective"])
-    
-    # ------------- define R effective lineage df function ---------------------
-    def get_R_effective_lineage_df(R_eff_data, window_size):
-        ''' compute average new infections by parent in a (sliding) time window
-            for each lineage in the df (each parent transmits a lineage)
-        '''
-        df = R_eff_data
-        r_lineage = []
-        for t in np.arange(0,max(df["Time"]),1):
-            window_df = df[(df["Time"] >= t - window_size) & (df["Time"] <= t)]
-            if not window_df.empty:
-                # Sum the infections per individual within each lineage
-                infections_per_individual = window_df.groupby(["Lineage", "Individual"])["Infections_at_t"].sum().reset_index()
-                # Compute the average infections per individual for each lineage
-                avg_infections_per_lineage = infections_per_individual.groupby("Lineage")["Infections_at_t"].mean().reset_index()
-                # Add the time column and update
-                avg_infections_per_lineage.insert(0, "Time", t)
-                r_lineage.append(avg_infections_per_lineage)
+    Args:
+        lineage_frequency_df: raw DataFrame from read_lineage_frequency()
+        threshold: float, minimum frequency a lineage must reach at any time
 
-        result_df = pd.concat(r_lineage, ignore_index=True)  # Concatenate all the dataframes
-        result_df.columns = ["Time", 'Lineage', "Lineage R_effective"]
-        return result_df
-    
-    # ----------- define filtering function for R eff lineage data ------------   
-    def get_R_eff_lineage_filtered(R_effective_lineage_df, threshold):
-        ''' Filter R_effective_lineage_df data by occurrence threshold.
-        '''
-        # Get filtered lineages based on the threshold
-        filtered_lineages = get_filtered_lineages(seeded_simulation_output_dir, threshold)
-        
-        # Filter the dataframe to keep only the lineages in filtered_lineages
-        filtered_df = R_effective_lineage_df[R_effective_lineage_df["Lineage"].isin(filtered_lineages)]
-        
-        # Pivot the DataFrame for plotting
-        pivot_R_effective_lineage_df = filtered_df.pivot(index="Time", columns='Lineage', values="Lineage R_effective")
-        return pivot_R_effective_lineage_df
+    Returns:
+        filtered_df: pivoted and filtered DataFrame (Time_sampling x Lineage)
+    """
+    pivot_df = lineage_frequency_df.pivot(
+        index='Time_sampling',
+        columns='Lineage_name',
+        values='Frequency_at_t'
+    )
 
-    # -------------------------------------------------------------------------
-    # import R effective data
-    R_eff_data = read_R_effective_trajectory(seeded_simulation_output_dir)
-    # R effective avg
-    R_effective_avg_df = get_R_effective_avg_df(R_eff_data, window_size)
-    # R effective lineage
-    R_effective_lineage_df = get_R_effective_lineage_df(R_eff_data, window_size)
-    # R effective filtered
-    R_effective_lineage_df_filtered = get_R_eff_lineage_filtered(R_effective_lineage_df, threshold)
-    return R_effective_avg_df, R_effective_lineage_df_filtered
+    selected_lineages = pivot_df.columns[pivot_df.max() >= threshold].tolist()
+    filtered_df = pivot_df[selected_lineages]
 
-def get_R_effective_avg_csv_filepath(experiment_name, 
-                                     seeded_simulation_output_dir, 
-                                     window_size, threshold):
+    return filtered_df, selected_lineages
+
+def get_r_effective_population_csv_filepath(experiment_name, 
+                                            seeded_simulation_output_dir,
+                                            window_size, threshold):
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
     seed = os.path.basename(seeded_simulation_output_dir)
-    filename = f'{experiment_name}_{foldername}_{seed}_R_effective_avg_win_{window_size}_ts_{threshold}.csv'
-    return os.path.join(experiment_output_dir,filename)
+    filename = f"{experiment_name}_{foldername}_{seed}_r_effective_population_win_{window_size}_ts_{threshold}.csv"
+    return os.path.join(experiment_output_dir, filename)
 
-def get_R_effective_lineage_csv_filepath(experiment_name, 
-                                         seeded_simulation_output_dir, 
-                                         window_size, threshold):
+def get_r_effective_lineages_csv_filepath(experiment_name, 
+                                          seeded_simulation_output_dir, 
+                                          window_size, threshold):
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
     seed = os.path.basename(seeded_simulation_output_dir)
-    filename = f'{experiment_name}_{foldername}_{seed}_R_effective_lineage_win_{window_size}_ts_{threshold}.csv'
-    return os.path.join(experiment_output_dir,filename)
+    filename = f"{experiment_name}_{foldername}_{seed}_r_effective_lineages_win_{window_size}_ts_{threshold}.csv"
+    return os.path.join(experiment_output_dir, filename)
 
-def write_R_effective_dfs_csv(experiment_name, seeded_simulation_output_dir, window_size, threshold):
-    print('')
-    print('Writing R_effective trajectory csv files...')
-    # get csv filepaths
-    R_effective_avg_csv_filepath = get_R_effective_avg_csv_filepath(experiment_name, 
-                                                                    seeded_simulation_output_dir, 
-                                                                    window_size, threshold)
-    R_effective_lineage_csv_filepath = get_R_effective_lineage_csv_filepath(experiment_name, 
-                                                                    seeded_simulation_output_dir, 
-                                                                    window_size, threshold)
-    # create dataframes if they don't exist already
-    if os.path.exists(R_effective_avg_csv_filepath) and os.path.exists(R_effective_lineage_csv_filepath):
-        print('')
-        print("R_effective csv files already exist, skipping file writing.")
-    else:
-        try:
-            R_effective_avg_df, R_effective_lineage_df = get_R_effective_dfs(seeded_simulation_output_dir, 
-                                                                             window_size, threshold)
-            # save dataframes
-            R_effective_avg_df.to_csv(R_effective_avg_csv_filepath)
-            R_effective_lineage_df.to_csv(R_effective_lineage_csv_filepath)
-            print('')
-            print(f"R_effective csv files written to {experiment_name} output folder.")
-        except:
-            print('')
-            print('Could not create R_effective trajectory dataframe, try lowering the threshold.')
+def get_r_effective_population_traj(ssod, time_window):
+    """
+    Compute and return the population-level R_effective trajectory as a pandas Series.
+    """
+    df = read_individuals_data(ssod)
+    final_time = read_final_time(ssod)
 
-def read_R_effective_dfs_csv(experiment_name, seeded_simulation_output_dir, window_size, threshold):
-    # get csv filepaths
-    R_effective_avg_csv_filepath = get_R_effective_avg_csv_filepath(experiment_name, 
-                                                                    seeded_simulation_output_dir, 
-                                                                    window_size, threshold)
-    R_effective_lineage_csv_filepath = get_R_effective_lineage_csv_filepath(experiment_name, 
-                                                                    seeded_simulation_output_dir, 
-                                                                    window_size, threshold)
-    # read csv into df
-    R_effective_avg_df = pd.read_csv(R_effective_avg_csv_filepath,index_col=0)
-    R_effective_lineage_df = pd.read_csv(R_effective_lineage_csv_filepath,index_col=0)
-    return R_effective_avg_df, R_effective_lineage_df
+    timeline = np.arange(0, final_time, 1)
+    r_effective = []
+
+    for t in tqdm(timeline, desc="Computing R_effective (population)"):
+        window_start = t - time_window
+
+        births = df[
+            (df['t_infectious'] > window_start) & (df['t_infectious'] <= t)
+        ].shape[0]
+
+        deaths = df[
+            (df['t_not_infectious'] > window_start) & (df['t_not_infectious'] <= t)
+        ].shape[0]
+
+        r = births / deaths if deaths > 0 else float('nan')
+        r_effective.append((t, r))
+
+    return pd.Series([r for _, r in r_effective], index=[t for t, _ in r_effective], name='R_effective')
+
+def get_r_effective_lineages_traj(ssod, time_window, threshold):
+    """
+    Compute and return the lineage-level R_effective trajectories as a dictionary of Series.
+    """
+    
+    def flatten_lineage_events(individuals_df):
+        """
+        Convert nested IH_lineages_trajectory dicts into a flat DataFrame.
+        Returns: DataFrame with columns: individual_id, lineage, ih_birth, ih_death
+        """
+        rows = []
+
+        for ind_id, row in individuals_df.iterrows():
+            traj = row.get('IH_lineages_trajectory', {})
+            for lineage, event in traj.items():
+                rows.append({
+                    'individual_id': ind_id,
+                    'lineage': lineage,
+                    'ih_birth': event.get('ih_birth'),
+                    'ih_death': event.get('ih_death')
+                })
+
+        return pd.DataFrame(rows)
+    
+    individuals_df = read_individuals_data(ssod)
+    final_time = read_final_time(ssod)
+    # Read and filter lineage frequency
+    lineage_freq_df = read_lineage_frequency(ssod)
+    _, filtered_lineages = filter_lineage_frequency_df(lineage_freq_df, threshold)
+    
+    flat_df = flatten_lineage_events(individuals_df)
+    timeline = np.arange(0, final_time, 1)
+    lineage_r_dict = {}
+
+    for lineage in tqdm(filtered_lineages, desc="Computing R_effective (lineages)"):
+        r_series = []
+        sub = flat_df[flat_df['lineage'] == lineage]
+
+        for t in timeline:
+            window_start = t - time_window
+
+            births = sub[
+                (sub['ih_birth'] > window_start) & (sub['ih_birth'] <= t)
+            ].shape[0]
+
+            deaths = sub[
+                (sub['ih_death'] > window_start) & (sub['ih_death'] <= t)
+            ].shape[0]
+
+            r = births / deaths if deaths > 0 else float('nan')
+            r_series.append((t, r))
+
+        lineage_r_dict[lineage] = pd.Series(
+            [r for _, r in r_series],
+            index=[t for t, _ in r_series],
+            name=f'R_eff_{lineage}'
+        )
+
+    return lineage_r_dict
+
+def write_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir, 
+                                time_window, threshold):
+    """
+    Compute and write R_effective (population + lineage) trajectories to CSV.
+    """
+    # Compute R_effective
+    r_effective_population_traj = get_r_effective_population_traj(seeded_simulation_output_dir, time_window)
+    r_effective_lineages_traj = get_r_effective_lineages_traj(seeded_simulation_output_dir, time_window, threshold)
+
+    # Get filepaths
+    pop_fp = get_r_effective_population_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
+    line_fp = get_r_effective_lineages_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
+
+    # Save
+    r_effective_population_traj.to_csv(pop_fp, header=True)
+    pd.DataFrame(r_effective_lineages_traj).to_csv(line_fp)
+
+    print(f"R_effective CSVs saved to:\n- {pop_fp}\n- {line_fp}")
+    
+def read_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir, 
+                               time_window, threshold):
+    """
+    Read R_effective (population + lineage) trajectories from CSV.
+    
+    Returns:
+        - r_effective_population_traj: pd.Series
+        - r_effective_lineages_traj: dict of {lineage_name: pd.Series}
+    """
+    pop_fp = get_r_effective_population_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
+    line_fp = get_r_effective_lineages_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
+
+    # Read population R_eff
+    r_eff_pop = pd.read_csv(pop_fp, index_col=0)
+    if isinstance(r_eff_pop, pd.DataFrame):
+        r_eff_pop = r_eff_pop.iloc[:, 0]
+
+    # Read lineage R_eff
+    df_line = pd.read_csv(line_fp, index_col=0)
+    r_eff_lin_dict = {lineage: df_line[lineage] for lineage in df_line.columns}
+
+    return r_eff_pop, r_eff_lin_dict
+
+# -----------------------------------------------------------------------------
 
 def get_procomputed_matrix_table_filepath(tau_1,tau_2,tau_3,tau_4):
     file_name = f"precomputed_A_exponentials_tau1={tau_1}_tau2={tau_2}_tau3={tau_3}_tau4={tau_4}.pkl"

@@ -56,6 +56,7 @@ def diagnosis(population, seq_rate=0):
     # set patient as diagnosed
     population.individuals[diagnosed_individual_i]['t_not_infectious'] = population.time
     population.individuals[diagnosed_individual_i]['state'] = 'diagnosed'
+
    
     if population.individuals[diagnosed_individual_i]['t_not_infected'] is None:
         population.individuals[diagnosed_individual_i]['t_not_infected'] = population.time
@@ -114,11 +115,14 @@ def infection(population):
     population.individuals[new_infected_index]['t_infection'] = population.time
     # state
     population.individuals[new_infected_index]['state'] = 'infected'
-    # Sample first jump time from exponential distribution
-    rate = - population.individuals[new_infected_index]['model'].A[0][0]
-    population.individuals[new_infected_index]['t_next_state'] = (
-    population.time + population.rng3.exponential(scale=1 / rate)
-    )
+    
+    if population.update_ih_mode == 'jump':
+        # Sample first jump time from exponential distribution
+        rate = - population.individuals[new_infected_index]['model'].A[0][0]
+        population.individuals[new_infected_index]['t_next_state'] = (
+        population.time + population.rng3.exponential(scale=1 / rate)
+        )
+        
     # parent
     population.individuals[new_infected_index]['parent'] = parent
 
@@ -126,8 +130,11 @@ def infection(population):
     index = population.rng4.integers(0, population.individuals[parent]['IH_lineages_number'])
     transmitted_lineage = population.individuals[parent]['IH_lineages'][index]
     transmitted_fitness = population.individuals[parent]['IH_lineages_fitness_score'][index]
+    # assign transmitted lineage
     population.individuals[new_infected_index]['inherited_lineage']  = transmitted_lineage
-
+    # update lineage trajectory
+    population.individuals[new_infected_index]['IH_lineages_trajectory'][transmitted_lineage] = {'ih_birth':None,'ih_death':None}
+    
     # Append transmitted lineage + fitness
     new_lineages = population.individuals[new_infected_index]['IH_lineages']
     new_fitness = population.individuals[new_infected_index]['IH_lineages_fitness_score']
@@ -177,12 +184,16 @@ def add_lineage(population):
     elif IH_lineage_n == IH_lineages_max and IH_lineages_max > 1:
         # Randomly delete one
         delete_idx = population.rng4.integers(0, IH_lineage_n)
-        individual['IH_lineages'].pop(delete_idx)
+        deleted_lineage = individual['IH_lineages'].pop(delete_idx)
         individual['IH_lineages_fitness_score'].pop(delete_idx)
+        # update lineage trajectory
+        if deleted_lineage not in individual['IH_lineages']:
+            individual['IH_lineages_trajectory'][deleted_lineage]['ih_death'] = population.time
         # Duplicate another
         idx = population.rng4.integers(0, IH_lineage_n - 1)  # now virus_n - 1 after deletion
         individual['IH_lineages'].append(individual['IH_lineages'][idx])
         individual['IH_lineages_fitness_score'].append(individual['IH_lineages_fitness_score'][idx])
+        
 
     # Keep IH_lineages and IH_lineages_fitness_score sorted
     combined = sorted(zip(individual['IH_lineages'], individual['IH_lineages_fitness_score']))
