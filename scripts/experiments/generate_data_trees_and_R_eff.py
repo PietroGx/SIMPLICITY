@@ -4,14 +4,6 @@
 
 @author: pietro
    
-For each parameter, specify a list of values that you would like to use for the 
-simulation. If you want to change more than one parameter at the time, consider 
-that you need to enter the same number of values for each parameter, e.g. :
-    par 1 = [value1, value2]
-    par 2 = [value3, value4]
-This will run a simulation with par 1 = value1 and par 2 = value 3, and a simulation
-with par 1 = value2 and par 2 = value4. 
-
 Each simulation will be repeated n_seeds time with a different random seed.
 
 The set of all simulations is what we call an experiment.
@@ -23,13 +15,18 @@ experiment_name =  'generate_data_trees_and_R_eff'
 
 def fixture_experiment_settings():
     
-    parameters      = {'phenotype_model':['distance from wt', 'immune waning'],
-                       'infected_individuals_at_start': [10]*2,
-                       'final_time':[365*3]*2
-                       }
+    varying_params = {
+        'phenotype_model': ['distance from wt', 'immune waning']
+    }
+
+    fixed_params = {
+        'infected_individuals_at_start': 10,
+        'final_time': 365 * 3
+    }
+
     n_seeds = 300
 
-    return (parameters, n_seeds)
+    return varying_params, fixed_params, n_seeds
 
 def main():
     # Set up the argument parser

@@ -92,7 +92,7 @@ def plot_trajectory(seeded_simulation_output_dir):
     plt.ylim(0)
     plt.tight_layout()
     plt.legend()
-    
+
 def plot_simulation(seeded_simulation_output_dir, threshold):
     '''
     joins plots of population trajectory and lineages frequency in a single 
@@ -147,10 +147,11 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
     # save lineages colors tab
     plot_lineages_colors_tab(seeded_simulation_output_dir)
    
-    pivot_df = lineage_frequency_df.pivot(index='Time_sampling', columns='Lineage_name', values='Frequency_at_t')
-    # Filter columns that reach at least the threshold at some point.
-    filtered_df = pivot_df.loc[:, pivot_df.max() >= threshold]
+    # filter lineages_df by threshold
+    filtered_df,_ = om.filter_lineage_frequency_df(lineage_frequency_df, threshold)
+    # get colors
     colors = [get_lineage_color(lineage_name, colormap_df) for lineage_name in filtered_df.columns]
+    # plot
     filtered_df.plot(kind='area', stacked=False, color=colors,
                          alpha=0.5, ax=ax1)
     time_file_path = os.path.join(seeded_simulation_output_dir, 'final_time.csv')
@@ -1300,118 +1301,127 @@ def plot_circular_tree(ete_root,
 #                              R effective plots
 # -----------------------------------------------------------------------------
 
-def plot_infections_hist(R_eff_data, colormap_df, ax, window_size):
+def plot_infections_hist(individuals_df, ax, colormap_df, bin_size):
     """
-    Plots a stacked bar histogram of the infections over a timeframe =window_size
-    on the given ax. Used for ax1b plot in plot_R_effective().
-    Note: lineages is the list of all lineages in the simulation and is needed 
-    to assign a unique color to each lineage.
+    Plot stacked histogram of infections per lineage over time using `inherited_lineage`.
     """
-    df = R_eff_data
-    # Define bin edges based on window size
-    max_time = df['Time'].max()
-    bin_edges = np.arange(0, max_time, window_size)
-    # Compute bin centers and adjust bar width 
+    df = individuals_df[individuals_df['t_infection'].notnull()].copy()
+    df = df[df['inherited_lineage'].notnull()]
+
+    max_time = df['t_infection'].max()
+    bin_edges = np.arange(0, max_time + bin_size, bin_size)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     bin_width = (bin_edges[1] - bin_edges[0]) * 0.97
-    # Sort lineages for stacking order
-    lineages_cat = sorted(df['Lineage'].unique())
-    # Initialize the bottom for stacking
+
     bottom = np.zeros(len(bin_centers))
-    # Create stacked bars for each lineage
-    for lineage in lineages_cat:
-        subset = df[(df['Lineage'] == lineage) & (df['Infections_at_t'] == 1)]
-        counts, _ = np.histogram(subset['Time'], bins=bin_edges)
-        # color barstack
+
+    for lineage in sorted(df['inherited_lineage'].unique()):
+        lineage_df = df[df['inherited_lineage'] == lineage]
+        counts, _ = np.histogram(lineage_df['t_infection'], bins=bin_edges)
         color = get_lineage_color(lineage, colormap_df)
-        ax.bar(
-            bin_centers, 
-            counts, 
-            width=bin_width, 
-            bottom=bottom, 
-            color=color, 
-            alpha=0.7, 
-            label=lineage
+        ax.bar(bin_centers, counts, width=bin_width, bottom=bottom, color=color, alpha=0.7, label=lineage)
+        bottom += counts
+
+    ax.set_ylim(0, bottom.max() * 1.2)
+    ax.set_ylabel("Infections in time window")
+
+def plot_combined_r_effective(experiment_name, seeded_simulation_output_dir, window_size, threshold):
+    """
+    Create a two-panel plot:
+    - Top: population-level Rₑ and infection histogram
+    - Bottom: lineage-specific Rₑ (filtered by frequency threshold)
+
+    Data is loaded or computed from CSV using output_manager functions.
+    """
+    # Load individuals
+    individuals_df = om.read_individuals_data(seeded_simulation_output_dir)
+
+    # Load or compute R_effective trajectories
+    try:
+        r_effective_population_traj, r_effective_lineages_traj = om.read_r_effective_trajs_csv(
+            experiment_name, seeded_simulation_output_dir, window_size, threshold
         )
-        bottom += counts  # raise the bottom for the next category
-    # Set y-limits 
-    max_stacked = bottom.max()
-    ax.set_ylim(0, max_stacked * 1.2)
-    
-
-def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size, threshold):
-    ''' Plot average R_effective and lineage (filtered by threshold of occurence) R_effective
-        calculated over a window_size time window.
-    '''
-    print('')
-    print('plot_R_effective: importing files needed for plot')
-    # import R effective data
-    R_eff_data = om.read_R_effective_trajectory(seeded_simulation_output_dir)
-    # import R effective procesed data
-    R_effective_avg_df, R_effective_lineage_df = om.read_R_effective_dfs_csv(experiment_name, 
-                                                                          seeded_simulation_output_dir, 
-                                                                          window_size, threshold)
-    # get lineages colormap
-    colormap_df = make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow')
-    
-    # create figure
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
-    R_effective_avg_label = f'R_effective calculated over previous {window_size}d'
-    # Subplot 1: Infections count his + avg R effective------------------------
-   
-    # Create secondary y-axis for binned infections counts
-    ax1b = ax1.twinx()
-    ax1.set_zorder(ax1b.get_zorder() + 1)  # Bring ax1 forward
-    ax1.patch.set_visible(False)  # Hide ax1 background to prevent it from covering ax1b
-    # plot infections histogram
-    plot_infections_hist(R_eff_data, colormap_df, ax1b, window_size)
-    ax1b.set_ylabel('Infections in time window')
-    # Plot avg R effective
-    ax1.plot(R_effective_avg_df['Time'], R_effective_avg_df['R_effective'], 
-             color='black', label=R_effective_avg_label)
-    
-    # Plot hline
-    # Compute the overall average of the sliding window values
-    R_avg = R_effective_avg_df["R_effective"].mean()
-    total_time_range = [0, max(R_effective_avg_df['Time'])]
-    ax1.hlines(R_avg, *total_time_range, colors='red', linestyles='dashed', 
-               label=f'Overall avg {R_avg}')
-    
-    ax1.set_title('Average R_effective in simulation')
-    ax1.set_xlabel('Time (days)')
-    ax1.set_ylabel(f'Average R_effective over {window_size} d')
-    ax1.legend(loc='upper left')
-    # ax1b.legend(loc='upper right')
-
-    # Subplot 2: lineage R effective ------------------------------------------
-    colors = [get_lineage_color(lineage_name, colormap_df) for lineage_name in R_effective_lineage_df.columns.to_list()]
-    R_effective_lineage_df.plot(ax=ax2, color=colors) 
-    # remove df plot labels from legend
-    for line in ax2.get_lines():
-        line.set_label('_nolegend_')
-        
-    # Plot avg R_effective
-    ax2.plot(R_effective_avg_df['Time'], R_effective_avg_df['R_effective'], 
-             color='black', label=R_effective_avg_label, zorder=-1)
-    
-    ax2.set_title(f'Average lineage R_effective (filtered by prevalence >{threshold*100}%)')
-    ax2.set_xlabel('Time (days)')
-    ax2.set_ylabel(f'Average R_effective over {window_size} d')
-    ax2.legend(loc='upper left')
+        print("Rₑ data loaded from CSV.")
+    except FileNotFoundError:
+        print("Rₑ CSVs not found. Computing and saving...")
+        om.write_r_effective_trajs_csv(
+            experiment_name,
+            seeded_simulation_output_dir,
+            window_size,
+            threshold
+        )
+        r_effective_population_traj, r_effective_lineages_traj = om.read_r_effective_trajs_csv(
+            experiment_name, seeded_simulation_output_dir, window_size, threshold
+        )
     # -------------------------------------------------------------------------
-    # set axis limits
-    ax1.set_xlim(0,max(R_effective_avg_df['Time']))
-    ax2.set_xlim(0,max(R_effective_avg_df['Time']))
-    # ax1.set_ylim(0,max(R_effective_lineage_df.max())*1.2)
-    ax2.set_ylim(min(R_effective_lineage_df.min()),max(R_effective_lineage_df.max())*1.2)
-    # save plot
+    # Prepare colormap
+    colormap_df = make_lineages_colormap(seeded_simulation_output_dir)
+
+    # Set up figure
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    
+    # -------------------------------------------------------------------------
+    # Population R_eff + histogram
+    ax1b = ax1.twinx()
+    ax1.set_zorder(ax1b.get_zorder() + 1)
+    ax1.patch.set_visible(False)
+    
+    bin_size = 7 # days
+    plot_infections_hist(individuals_df, ax1b, colormap_df, bin_size)
+
+    label_avg = f"Rₑ (window={window_size}d)"
+    ax1.plot(r_effective_population_traj.index, r_effective_population_traj.values,
+             color='black', label=label_avg)
+
+    R_avg = r_effective_population_traj.mean()
+    ax1.axhline(R_avg, color='red', linestyle='--', label=f"Overall avg Rₑ = {R_avg:.2f}")
+
+    ax1.set_ylabel("Population Rₑ")
+    ax1.legend(loc='upper left')
+    ax1.set_title("Average Rₑ and Infections Histogram")
+    # -------------------------------------------------------------------------
+    # Lineage-specific R_eff
+    lineage_freq_df = om.read_lineage_frequency(seeded_simulation_output_dir)
+    _, filtered_lineages = om.filter_lineage_frequency_df(lineage_freq_df, threshold)
+
+    for lineage in filtered_lineages:
+        if lineage not in r_effective_lineages_traj:
+            continue
+        r_series = r_effective_lineages_traj[lineage]
+        color = get_lineage_color(lineage, colormap_df)
+        ax2.plot(r_series.index, r_series.values, label=lineage, color=color)
+
+    # Overplot average
+    ax2.plot(r_effective_population_traj.index, r_effective_population_traj.values,
+             color='black', label=label_avg, zorder=100)
+
+    ax2.set_title(f"Lineage Rₑ (filtered, > {threshold * 100:.0f}% prevalence)")
+    ax2.set_xlabel("Time (days)")
+    ax2.set_ylabel("Lineage Rₑ")
+    ax2.legend(loc='upper left', fontsize='small', ncol=2)
+
+    # Formatting
+    ax1.set_xlim(0, r_effective_population_traj.index.max())
+    ax2.set_ylim(bottom=0)
+    ax1.spines['top'].set_visible(False)
+    ax1b.spines['top'].set_visible(False)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    
     plt.tight_layout()
-    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
+
+    # Save to file
+    output_dir = dm.get_experiment_plots_dir(experiment_name)
     foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
     seed = os.path.basename(seeded_simulation_output_dir)
-    plt.savefig(os.path.join(experiment_plots_dir, 
-                             f"{experiment_name}_{foldername}_{seed}_R_effective.png"))
+    filename = f"{experiment_name}_{foldername}_{seed}_combined_R_effective.png"
+    filepath = os.path.join(output_dir, filename)
+
+    plt.savefig(filepath)
     plt.close()
+
+    print(f"Combined Rₑ plot saved to:\n- {filepath}")
+
 
 
 

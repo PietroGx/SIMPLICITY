@@ -22,7 +22,6 @@ import numpy as np
 experiment_name =  'generate_data_OSR_fit'
 
 def fixture_experiment_settings():
-
     # number of values for NSR
     nucleotide_substitution_rate_num_values = 15
     
@@ -30,16 +29,19 @@ def fixture_experiment_settings():
     values = np.logspace(np.log10(1e-5), np.log10(0.01), 
                          num=nucleotide_substitution_rate_num_values)
     nucleotide_substitution_rate_values = values.tolist()
-    # mapped_sim_lenght = np.logspace(np.log10(3650), np.log10(365), num=nucleotide_substitution_rate_num_values).tolist()
-
+    # parameters value to get combinations from
+    varying_params = {
+        'nucleotide_substitution_rate': nucleotide_substitution_rate_values
+    }
+    # parameters to keep fixed (but different from standard_value) across combinations
+    fixed_params = {
+        'infected_individuals_at_start': 100,
+        'final_time': 365*3
+    }
     
-    parameters      = {'nucleotide_substitution_rate': nucleotide_substitution_rate_values,
-                       'infected_individuals_at_start': [100]*nucleotide_substitution_rate_num_values,
-                       'final_time': [365*3]*nucleotide_substitution_rate_num_values
-                       }
     n_seeds = 100
-
-    return (parameters, n_seeds)
+    
+    return (varying_params,fixed_params,n_seeds)
 
 def main():
     # Set up the argument parser

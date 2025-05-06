@@ -543,10 +543,14 @@
 	Version 0.17.00
 	
 	* renamed: IH_virus_number > IH_lineages_number, lineages_number > IH_unique_lineages_number, IH_virus_max > IH_lineages_max, IH_virus_fitness > IH_lineages_fitness_score, fitness > fitness_score 
-	* 
+	* added intra host lineage trajectories
+	* added plots for R_effective
 	
+2026-06-05 pietro gerletti
 	
+	Version 0.17.01
 	
+	* Prepared the files to rerun the experiments for the publication
 	
 	
 	

@@ -410,6 +410,14 @@ def update_lineages(population, sub_coord_dicmap):
         # rename the IH lineage after new mutation introduced (in individual)
         population.phylodots, new_lineage_name = get_lineage_name(population.phylodots,parent_lineage_name)
         population.individuals[coord[0]]['IH_lineages'][coord[1]] = new_lineage_name
+        # update lineage ih trajectories
+        population.individuals[coord[0]]['IH_lineages_trajectory'][new_lineage_name] = {}
+        population.individuals[coord[0]]['IH_lineages_trajectory'][new_lineage_name]['ih_birth'] = population.time
+        population.individuals[coord[0]]['IH_lineages_trajectory'][new_lineage_name]['ih_death'] = None
+        if parent_lineage_name not in population.individuals[coord[0]]['IH_lineages']:
+            population.individuals[coord[0]]['IH_lineages_trajectory'][parent_lineage_name]['ih_death'] = population.time
+            
+    
         # update lineages count inside individual
         population.individuals[coord[0]]['IH_unique_lineages_number'] = len(
             set(population.individuals[coord[0]]['IH_lineages']))

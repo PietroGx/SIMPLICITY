@@ -12,18 +12,16 @@ experiment_name = 'generate_data_tau_3_impact_on_OSR'
 
 def fixture_experiment_settings():
     
-    parameters      = {'tau_3':[3.25, 
-                                7.5,
-                                15,
-                                30,
-                                60,
-                                120
-                                ],
-                       'final_time':[365*3]*6
-                       }
+    # parameters value to get combinations from
+    varying_params = {
+        'tau_3':[3.25, 7.5, 15, 30, 60, 120]
+    }
+    # parameters to keep fixed (but different from standard_value) across combinations
+    fixed_params = {'final_time': 365*3}
+    
     n_seeds = 300
-
-    return (parameters, n_seeds)
+    
+    return (varying_params,fixed_params,n_seeds)
 
 def main():
     # Set up the argument parser
