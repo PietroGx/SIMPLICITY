@@ -4,14 +4,6 @@
 
 @author: pietro
    
-For each parameter, specify a list of values that you would like to use for the 
-simulation. If you want to change more than one parameter at the time, consider 
-that you need to enter the same number of values for each parameter, e.g. :
-    par 1 = [value1, value2]
-    par 2 = [value3, value4]
-This will run a simulation with par 1 = value1 and par 2 = value 3, and a simulation
-with par 1 = value2 and par 2 = value4. 
-
 Each simulation will be repeated n_seeds time with a different random seed.
 
 The set of all simulations is what we call an experiment.
@@ -26,7 +18,7 @@ def fixture_experiment_settings():
     nucleotide_substitution_rate_num_values = 15
     
     # Generate values spaced logarithmically between 10^-5 and 10^-2
-    values = np.logspace(np.log10(1e-5), np.log10(0.01), 
+    values = np.logspace(np.log10(1e-6), np.log10(0.001), 
                          num=nucleotide_substitution_rate_num_values)
     nucleotide_substitution_rate_values = values.tolist()
     # parameters value to get combinations from
