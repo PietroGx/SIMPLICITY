@@ -74,6 +74,7 @@ def fit_models(experiment_name, model_types, data_type):
             plot_fit(experiment_name, fit_result, model_type, **kwargs)
         except Exception as e:
             print(e)
+            raise ValueError(e)
             
         print('')
         print('###############################################################')
