@@ -226,7 +226,7 @@ def inverse_log_regressor(OSR, params):
 
 #     return x, lower_curve, upper_curve
 
-def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percentile=95, aic_threshold=-12000):
+def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percentile=95, aic_threshold=-10000):
     """
     Compute the confidence intervals using bootstrapping with a progress bar, and reject bad fits.
     
