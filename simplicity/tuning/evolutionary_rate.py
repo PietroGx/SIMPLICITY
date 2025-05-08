@@ -227,6 +227,12 @@ def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percen
 
     # Get unique x values for the plot and CI
     unique_x = np.unique(x)
+    print('')
+    print('unique_x')
+    print(unique_x)
+    print('')
+    print('bootstrap_results')
+    print(bootstrap_results[0])
 
     # Initialize arrays for lower and upper CI
     lower_curve = np.zeros_like(unique_x)
