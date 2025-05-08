@@ -139,6 +139,7 @@ def fit_observed_substitution_rate_regressor(experiment_name,
     
     # Print the fit results
     print(fit_result.fit_report())
+    print(fit_result.best_fit)
     # save fit results
     om.write_fit_results_csv(experiment_name, model_type, fit_result)
     return fit_result
