@@ -9,6 +9,7 @@ import sklearn.linear_model
 import numpy as np
 import lmfit
 import simplicity.output_manager as om
+from tqdm import tqdm
 
 def tempest_regression(sequencing_data_df):
     '''
@@ -205,7 +206,7 @@ def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percen
     bootstrap_results = []
 
     # resample the data and fit the model multiple times
-    for _ in range(num_bootstrap):
+    for _ in tqdm(range(num_bootstrap), desc="Bootstrapping fit for CI", ncols=100):
         # Resample data with replacement
         resampled_indices = np.random.choice(range(len(x)), size=len(x), replace=True)
         x_resampled = x[resampled_indices]
