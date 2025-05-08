@@ -552,7 +552,11 @@
 	
 	* Prepared the files to rerun the experiments for the publication
 	
+2026-08-05 pietro gerletti
 	
+	Version 0.17.02
+	
+	* removed the C parameter from exp curve fit 
 	
 	
 	
