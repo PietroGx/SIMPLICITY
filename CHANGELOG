@@ -557,6 +557,7 @@
 	Version 0.17.02
 	
 	* removed the C parameter from exp curve fit 
+	* added the C parameter to exp curve fit 
 	
 	
 	
