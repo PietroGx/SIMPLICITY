@@ -139,7 +139,7 @@ def fit_observed_substitution_rate_regressor(experiment_name,
     
     # Print the fit results
     print(fit_result.fit_report())
-    print(fit_result.best_fit)
+    # print(fit_result.best_fit)
     # save fit results
     om.write_fit_results_csv(experiment_name, model_type, fit_result)
     return fit_result
@@ -225,11 +225,15 @@ def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percen
         model, params = factory_model_lmfit(model_type)
         fit_result_resampled = model.fit(y_resampled_sorted, params, x=x_resampled_sorted)
         
-        # Store the fitted curve for this bootstrap iteration
-        bootstrap_results.append(fit_result_resampled.best_fit)
+        # Store the unique x values and the corresponding best_fit y values for this bootstrap iteration
+        unique_x_resampled = np.unique(x_resampled_sorted)
+        best_fit_unique = fit_result_resampled.best_fit[np.isin(x_resampled_sorted, unique_x_resampled)]
+
+        
+        # Store the unique x values and the best_fit corresponding to them
+        bootstrap_results.append((unique_x_resampled, best_fit_unique))
     
-    # Convert the list of bootstrap results into a numpy array
-    bootstrap_results = np.array(bootstrap_results)
+
 
     # Get unique x values for the plot and CI
     unique_x = np.unique(x)
@@ -239,19 +243,20 @@ def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percen
     print('')
     print('bootstrap_results')
     print(bootstrap_results[0])
-
-    # Initialize arrays for lower and upper CI
-    lower_curve = np.zeros_like(unique_x)
-    upper_curve = np.zeros_like(unique_x)
+    
+    # Now, we will compute the lower and upper bounds for the confidence intervals
+    lower_curve = np.zeros_like(unique_x_resampled)
+    upper_curve = np.zeros_like(unique_x_resampled)
 
     # Calculate the lower and upper percentiles for the CI for each unique x value
-    for i, x_val in enumerate(unique_x):
+    for i, x_val in enumerate(unique_x_resampled):
         # Get the corresponding y-values for this unique x[i] across the bootstrap iterations
-        y_values_at_x = bootstrap_results[:, np.where(x == x_val)[0][0]]
+        y_values_at_x = [best_fit[np.where(unique_x_resampled == x_val)[0][0]] for _, best_fit in bootstrap_results]
 
         # Calculate the percentiles for each unique x[i]
         lower_curve[i] = np.percentile(y_values_at_x, (100 - ci_percentile) / 2)
         upper_curve[i] = np.percentile(y_values_at_x, 100 - (100 - ci_percentile) / 2)
+   
 
     print(f"Completed bootstrapping with {num_bootstrap} samples")
     
