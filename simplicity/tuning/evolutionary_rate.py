@@ -183,6 +183,47 @@ def inverse_log_regressor(OSR, params):
     
     return NSR
     
+
+def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percentile=95):
+    """
+    Compute the confidence intervals using bootstrapping.
     
+    Parameters:
+    - model_type: Type of model being used.
+    - fit_result: Fitted result from the model (used for initial parameters).
+    - x: Independent variable (nucleotide_substitution_rate).
+    - y: Dependent variable (observed_substitution_rate).
+    - num_bootstrap: Number of bootstrap resampling iterations (default 1000).
+    - ci_percentile: Percentile for the confidence interval (default 95%).
+    
+    Returns:
+    - x: x values for plotting.
+    - lower_curve: Lower bound of the CI.
+    - upper_curve: Upper bound of the CI.
+    """
+    
+    bootstrap_results = []
+
+    # resample the data and fit the model multiple times
+    for _ in range(num_bootstrap):
+        # Resample data with replacement
+        resampled_indices = np.random.choice(range(len(x)), size=len(x), replace=True)
+        x_resampled = x[resampled_indices]
+        y_resampled = y[resampled_indices]
+        
+        # Refit the model on the resampled data
+        model, params = factory_model_lmfit(model_type)
+        fit_result_resampled = model.fit(y_resampled, params, x=x_resampled)
+        
+        bootstrap_results.append(fit_result_resampled.best_fit)
+    
+    bootstrap_results = np.array(bootstrap_results)
+
+    # Calculate the lower and upper percentiles for the CI
+    lower_curve = np.percentile(bootstrap_results, (100 - ci_percentile) / 2, axis=0)
+    upper_curve = np.percentile(bootstrap_results, 100 - (100 - ci_percentile) / 2, axis=0)
+
+    return x, lower_curve, upper_curve
+
     
     
