@@ -625,7 +625,20 @@ def confidence_interval_fit(model_type, fit_result, df, num_bootstrap=1000, ci_p
     # Extract x and y values from the DataFrame
     x = df['nucleotide_substitution_rate'].values
     y = df['observed_substitution_rate'].values
-
+    
+    print(f"Length of x: {len(x)}")
+    print(f"Length of y: {len(y)}")
+    
+    # Ensure that both x and y have the same length
+    if len(x) != len(y):
+        # Handle the mismatch, for example by dropping NaN values
+        valid_indices = np.where(np.isfinite(x) & np.isfinite(y))[0]  # Only keep rows where both x and y are finite
+        x = x[valid_indices]
+        y = y[valid_indices]
+    
+    print(f"Length of x: {len(x)}")
+    print(f"Length of y: {len(y)}")
+    
     # Call the bootstrap CI function from the evolutionary_rate module
     x, lower_curve, upper_curve = er.bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap, ci_percentile)
 
