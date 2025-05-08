@@ -216,9 +216,14 @@ def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percen
         x_resampled = x[resampled_indices]
         y_resampled = y[resampled_indices]
         
-        # Refit the model on the resampled data
+        # Sort the resampled data by x values
+        sorted_indices = np.argsort(x_resampled)  # Get the sorted indices for x_resampled
+        x_resampled_sorted = x_resampled[sorted_indices]
+        y_resampled_sorted = y_resampled[sorted_indices]
+
+        # Refit the model on the sorted resampled data
         model, params = factory_model_lmfit(model_type)
-        fit_result_resampled = model.fit(y_resampled, params, x=x_resampled)
+        fit_result_resampled = model.fit(y_resampled_sorted, params, x=x_resampled_sorted)
         
         # Store the fitted curve for this bootstrap iteration
         bootstrap_results.append(fit_result_resampled.best_fit)
