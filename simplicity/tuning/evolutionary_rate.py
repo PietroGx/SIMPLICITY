@@ -185,102 +185,10 @@ def inverse_log_regressor(OSR, params):
     return NSR
     
 
-# def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percentile=95):
-#     """
-#     Compute the confidence intervals using bootstrapping.
-    
-#     Parameters:
-#     - model_type: Type of model being used.
-#     - fit_result: Fitted result from the model (used for initial parameters).
-#     - x: Independent variable (nucleotide_substitution_rate).
-#     - y: Dependent variable (observed_substitution_rate).
-#     - num_bootstrap: Number of bootstrap resampling iterations (default 1000).
-#     - ci_percentile: Percentile for the confidence interval (default 95%).
-    
-#     Returns:
-#     - x: x values for plotting.
-#     - lower_curve: Lower bound of the CI.
-#     - upper_curve: Upper bound of the CI.
-#     """
-    
-#     bootstrap_results = []
 
-#     # resample the data and fit the model multiple times
-#     for _ in tqdm(range(num_bootstrap), desc="Bootstrapping fit for CI", ncols=100):
-#         # Resample data with replacement
-#         resampled_indices = np.random.choice(range(len(x)), size=len(x), replace=True)
-#         x_resampled = x[resampled_indices]
-#         y_resampled = y[resampled_indices]
-        
-#         # Refit the model on the resampled data
-#         model, params = factory_model_lmfit(model_type)
-#         fit_result_resampled = model.fit(y_resampled, params, x=x_resampled)
-        
-#         bootstrap_results.append(fit_result_resampled.best_fit)
-    
-#     bootstrap_results = np.array(bootstrap_results)
-
-#     # Calculate the lower and upper percentiles for the CI
-#     lower_curve = np.percentile(bootstrap_results, (100 - ci_percentile) / 2, axis=0)
-#     upper_curve = np.percentile(bootstrap_results, 100 - (100 - ci_percentile) / 2, axis=0)
-
-#     return x, lower_curve, upper_curve
-
-# def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percentile=95, aic_threshold=-10000):
-#     """
-#     Compute the confidence intervals using bootstrapping with a progress bar, and reject bad fits.
-    
-#     Parameters:
-#     - model_type: Type of model being used.
-#     - fit_result: Fitted result from the model (used for initial parameters).
-#     - x: Independent variable (nucleotide_substitution_rate).
-#     - y: Dependent variable (observed_substitution_rate).
-#     - num_bootstrap: Number of bootstrap resampling iterations (default 1000).
-#     - ci_percentile: Percentile for the confidence interval (default 95%).
-#     - aic_threshold: Optional AIC threshold to reject bad fits.
-    
-#     Returns:
-#     - x: x values for plotting.
-#     - lower_curve: Lower bound of the CI.
-#     - upper_curve: Upper bound of the CI.
-#     """
-#     bootstrap_results = []
-#     accepted_aics = []  # List to store the AICs of accepted bootstrap fits
-#     bootstrap_size = int(0.9*len(x))
-    
-#     for _ in tqdm(range(num_bootstrap), desc="Bootstrapping", ncols=100):
-#         # Resample data 
-#         resampled_indices = np.random.choice(len(x), size=bootstrap_size, replace=False)
-#         x_resampled = x[resampled_indices]
-#         y_resampled = y[resampled_indices]
-        
-#         # Refit the model on the resampled data
-#         model, params = factory_model_lmfit(model_type)
-#         fit_result_resampled = model.fit(y_resampled, params, x=x_resampled)
-        
-#         # If an AIC threshold is set, reject fits with poor AIC values
-#         if aic_threshold is not None and fit_result_resampled.aic > aic_threshold:
-#             continue  # Skip this iteration if AIC is too high
-
-#         # Store the fitted curve and accepted AIC
-#         bootstrap_results.append(fit_result_resampled.best_fit)
-#         accepted_aics.append(fit_result_resampled.aic)
-    
-#     # Convert the list of bootstrap results into a numpy array
-#     bootstrap_results = np.array(bootstrap_results)
-
-#     # Calculate the lower and upper percentiles for the CI
-#     lower_curve = np.percentile(bootstrap_results, (100 - ci_percentile) / 2, axis=0)
-#     upper_curve = np.percentile(bootstrap_results, 100 - (100 - ci_percentile) / 2, axis=0)
-#     print('')
-#     print(f"Accepted {len(accepted_aics)} bootstrap samples based on AIC threshold")
-    
-#     return x, lower_curve, upper_curve
-
-    
 def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percentile=95, bootstrap_fraction=0.9):
     """
-    Compute the confidence intervals using bootstrapping, ensuring that CI is calculated for each x value.
+    Compute the confidence intervals using bootstrapping, ensuring correct handling of repeated x values.
     
     Parameters:
     - model_type: Type of model being used.
@@ -292,7 +200,7 @@ def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percen
     - bootstrap_fraction: Fraction of data to use in each bootstrap sample (default 0.9).
     
     Returns:
-    - x: x values for plotting.
+    - x: Unique x values for plotting.
     - lower_curve: Lower bound of the CI.
     - upper_curve: Upper bound of the CI.
     """
@@ -303,7 +211,7 @@ def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percen
     # Perform bootstrapping: resample the data and fit the model multiple times
     for _ in tqdm(range(num_bootstrap), desc="Bootstrapping", ncols=100):
         # Resample data with replacement (but without replacement inside the bootstrap sample)
-        resampled_indices = np.random.choice(len(x), size=bootstrap_size, replace=False)  # Bootstrap without replacement
+        resampled_indices = np.random.choice(len(x), size=bootstrap_size, replace=True)  # Bootstrap with replacement
         x_resampled = x[resampled_indices]
         y_resampled = y[resampled_indices]
         
@@ -317,21 +225,23 @@ def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percen
     # Convert the list of bootstrap results into a numpy array
     bootstrap_results = np.array(bootstrap_results)
 
-    # Initialize arrays for lower and upper CI
-    lower_curve = np.zeros_like(x)
-    upper_curve = np.zeros_like(x)
-    print('')
-    print('BEST FIT CHECK')
-    print(bootstrap_results[0])
-    # Calculate the lower and upper percentiles for the CI for each x value
-    for i in range(len(x)):
-        # Get all the corresponding y-values for this x[i] across the bootstrap iterations
-        y_values_at_x = bootstrap_results[:, i]
+    # Get unique x values for the plot and CI
+    unique_x = np.unique(x)
 
-        # Calculate the percentiles for each x[i]
+    # Initialize arrays for lower and upper CI
+    lower_curve = np.zeros_like(unique_x)
+    upper_curve = np.zeros_like(unique_x)
+
+    # Calculate the lower and upper percentiles for the CI for each unique x value
+    for i, x_val in enumerate(unique_x):
+        # Get the corresponding y-values for this unique x[i] across the bootstrap iterations
+        y_values_at_x = bootstrap_results[:, np.where(x == x_val)[0][0]]
+
+        # Calculate the percentiles for each unique x[i]
         lower_curve[i] = np.percentile(y_values_at_x, (100 - ci_percentile) / 2)
         upper_curve[i] = np.percentile(y_values_at_x, 100 - (100 - ci_percentile) / 2)
 
     print(f"Completed bootstrapping with {num_bootstrap} samples")
     
-    return x, lower_curve, upper_curve
+    return unique_x, lower_curve, upper_curve
+
