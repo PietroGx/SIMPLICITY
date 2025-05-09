@@ -1025,7 +1025,7 @@ def plot_OSR_and_IH_lineages_by_parameter(experiment_name,
                 data=df_osr, palette=palette_dict, hue_order=unique_param_values, width=0.6)
     axes[0].set_xlabel(parameter)
     axes[0].set_ylabel('Observed substitution rate')
-    axes[0].set_title(f'{parameter} vs Observed Substitution Rate')
+    axes[0].set_title('Infectious time vs Observed Substitution Rate')
     axes[0].grid(True)
     axes[0].legend_.remove()
 
@@ -1033,15 +1033,15 @@ def plot_OSR_and_IH_lineages_by_parameter(experiment_name,
     sns.barplot(ax=axes[1], x='IH_unique_lineages_number', y='ih_lineage_count', 
                 hue='tau_3', data=df_lineage, palette=palette_dict, hue_order=unique_param_values, 
                 dodge=True, alpha=0.8)
-    axes[1].set_xlabel('IH_unique_lineages_number')
-    axes[1].set_ylabel('Proportion')
+    axes[1].set_xlabel('Intra host lineages number')
+    axes[1].set_ylabel('Frequency')
     axes[1].set_title('Intra Host Lineage Distribution')
-    axes[1].legend(title=parameter, bbox_to_anchor=(1.05, 1), loc='upper left')
+    axes[1].legend(title= 'Infectious time parameter', bbox_to_anchor=(1.05, 1), loc='upper left')
 
     plt.tight_layout()
     output_path = os.path.join(experiment_plots_dir, f"{experiment_name}_{parameter}_OSR_and_IH_lineages.png")
     plt.savefig(output_path)
-    print(f'Figure saved in: {output_path}')
+    print(f'Figure saved under: {output_path}')
     plt.close()
 
 # -----------------------------------------------------------------------------

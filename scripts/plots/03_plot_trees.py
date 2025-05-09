@@ -8,6 +8,7 @@ import simplicity.tree.tree_builder as tb
 import simplicity.output_manager as om
 import simplicity.plots_manager as pm
 import simplicity.dir_manager as dm
+from tqdm import tqdm
 
 def generate_and_plot_trees(experiment_name,seeded_simulation_output_dir):
     ''' Generate and plot infection and phylogenetic tree of seeded simulation.
@@ -114,8 +115,8 @@ def select_seeded_simulations_to_plot(experiment_name, time_threshold, lineage_n
     filtered_dirs = []
     seed_pattern = re.compile(r"seed_(\d+)")
     seeds_per_dir = {}
-
-    for ssod_list in all_ssods:
+   
+    for ssod_list in tqdm(all_ssods, desc="Filtering directories for tree building"):
         for ssod in ssod_list:
             final_time = om.read_final_time(ssod)
             if final_time > time_threshold:
@@ -151,7 +152,7 @@ def main():
     
     experiment_name= args.experiment_name
     time_threshold = 100
-    lineage_number_threshold =  3
+    lineage_number_threshold =  10
     selected_ssods, seeds = select_seeded_simulations_to_plot(experiment_name, 
                                                        time_threshold, 
                                                        lineage_number_threshold)
