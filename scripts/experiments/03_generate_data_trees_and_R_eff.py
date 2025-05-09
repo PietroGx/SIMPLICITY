@@ -16,7 +16,7 @@ experiment_name =  'generate_data_trees_and_R_eff'
 def fixture_experiment_settings():
     
     varying_params = {
-        'phenotype_model': ['distance from wt', 'immune waning']
+        'phenotype_model': ['linear', 'immune_waning']
     }
 
     fixed_params = {

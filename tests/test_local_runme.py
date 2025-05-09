@@ -35,7 +35,7 @@ def fixture_experiment_settings():
     
     # parameters value to get combinations from
     # varying_params = {
-    #     'phenotype_model': ['distance from wt', 'immune waning']
+    #     'phenotype_model': ['immune_waning', 'linear']
         
     # }
     # # parameters to keep fixed (but different from standard_value) across combinations
