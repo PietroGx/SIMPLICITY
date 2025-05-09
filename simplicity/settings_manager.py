@@ -27,18 +27,17 @@ def write_standard_parameters_values():
     filename= get_standard_parameters_values_file_path()
     standard_values = {
         "population_size": 1000,
-        "infected_individuals_at_start": 100,
+        "infected_individuals_at_start": 10,
         "final_time": 365,
         "tau_3": 7.5,
-        "R": 1.3,
+        "R": 1.1,
         "diagnosis_rate": 0.1, # in percentage, will be converted to kd in model 
         "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
-        "nucleotide_substitution_rate": 0.000275,  # e in theoretical model equations
+        "nucleotide_substitution_rate":  4.0112730277780845e-05,  # e in theoretical model equations
         "phenotype_model": 'immune_waning',  # or 'linear'
         "sequencing_rate": 0.05,
         "max_runtime": 86000, 
-        "seed": None,
-        "F": 1.25
+        "seed": None
     }
     with open(filename, "w") as file:
         json.dump(standard_values, file, indent=4)
