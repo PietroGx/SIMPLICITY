@@ -57,7 +57,7 @@ def create_individual_node(row, parent):
         t_not_infectious=row.t_not_infectious,
         state=row.state,
         infection_type=row.type,
-        fitness=row.fitness,
+        fitness_score=row.fitness_score,
         lineage=current_lineage       # final (current) lineage
     )
     node.inherited_lineage = inherited  # store parent's transmitted lineage
@@ -83,7 +83,7 @@ def infection_tree(data):
         t_infection=0,
         t_infectious=0,
         t_not_infectious=0,
-        fitness=0,
+        fitness_score=0,
         infection_type='normal',
         lineage='wt'
     )

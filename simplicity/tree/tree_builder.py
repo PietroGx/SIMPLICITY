@@ -27,7 +27,7 @@ def create_infection_node(row, parent_node):
         
         state=row.state,
         infection_type=row.type,
-        fitness=row.fitness,
+        fitness_score=row.fitness_score,
         lineage=row.IH_lineages[0]
     )
 
@@ -46,7 +46,7 @@ def extend_parent_node(parent_node):
         
         state=parent_node.state,
         infection_type=parent_node.infection_type,
-        fitness=parent_node.fitness,
+        fitness_score=parent_node.fitness_score,
         lineage=parent_node.lineage
     )
 
@@ -67,7 +67,7 @@ def infection_tree(seeded_simulation_output_dir):
         t_infectious=0,
         t_not_infectious=0,
         
-        fitness=0,
+        fitness_score=0,
         infection_type='normal',
         lineage='wt'
     )
