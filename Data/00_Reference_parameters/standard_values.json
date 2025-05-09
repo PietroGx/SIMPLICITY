@@ -10,5 +10,5 @@
     "phenotype_model": "immune_waning",
     "sequencing_rate": 0.05,
     "max_runtime": 86000,
-    "seed": null,
+    "seed": null
 }
