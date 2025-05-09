@@ -9,7 +9,7 @@ import sklearn.linear_model
 import numpy as np
 import lmfit
 import simplicity.output_manager as om
-from tqdm import tqdm
+# from tqdm import tqdm
 
 def tempest_regression(sequencing_data_df):
     '''
@@ -186,6 +186,30 @@ def inverse_log_regressor(OSR, params):
     
     return NSR
     
+def inverse_exp_regressor(OSR, params):
+    """
+    Computes the inverse of the exponential regression function y = A * x**B + C
+
+    Parameters:
+        OSR (float or np.ndarray): Observed substitution rate
+        params (dict): A dictionary containing the parameters 'A', 'B', and 'C'.
+
+    Returns:
+        float or np.ndarray: The computed nucleotide substitution rate value(s).
+    """
+    A = params.get('A', 1)
+    B = params.get('B', 1)
+    C = params.get('C', 0)
+    
+    if A == 0 or B == 0:
+        raise ValueError("Parameters A and B must be non-zero.")
+    
+    # Ensure OSR - C > 0 to avoid complex numbers
+    if np.any(OSR - C <= 0):
+        raise ValueError("Invalid OSR: OSR must be greater than C for all entries.")
+
+    NSR = ((OSR - C) / A) ** (1 / B)
+    return NSR
 
 
 # def bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap=1000, ci_percentile=95, bootstrap_fraction=0.9):
