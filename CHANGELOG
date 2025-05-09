@@ -564,8 +564,13 @@
 	* updated om.create_combined_sequencing_df
 	* removed CI from plot 
 	* updated plot OSR fit
+
+2026-08-05 pietro gerletti
 	
+	Version 0.18.00
 	
+	* updated generate_user_set_parameters_file.py
+	* updated standard best_fit parameter values
 	
 	
 	

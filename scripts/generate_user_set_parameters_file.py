@@ -34,14 +34,14 @@ def get_NSR():
         print('Entering setup of substitution rate for SIMPLICITY')
         print('-----')
         print('')
-        check_experiment_run = input("Did you run generate_data_OSR_fit.py? (y/n/q): ").strip().lower()
-        check_fit_run = input("Did you run plot_OSR_fit.py? (y/n/q): ").strip().lower()
+        check_experiment_run = input("Did you run scripts/experiments/generate_data_OSR_fit.py? (y/n/q): ").strip().lower()
+        check_fit_run = input("Did you run scripts/plots/plot_OSR_fit.py or scripts/fit_observed_evolutionary_rate_regressor.py? (y/n/q): ").strip().lower()
         
         if check_experiment_run == "y" and check_fit_run == "y":
             experiment_name = input("Enter the name of the experiment used for the observed substitution rate (OSR) fit: ")
             print('')
             print('The observed substitution rate (OSR) value should be within the range obtained from the fitting.')
-            print(f'If you are unsure, check the fit plot (Data/{experiment_name}/figure3A_OSR_log_fit.png)')
+            print(f'If you are unsure, check the fit plot (Data/{experiment_name}/05_Plots/figure4_OSR_exp_fit.png)')
             
             while True:
                 OSR = input("Enter the desired observed substitution rate (OSR) value: ")
