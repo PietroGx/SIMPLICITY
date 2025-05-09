@@ -13,8 +13,8 @@ import argparse
 def fit_models(experiment_name, model_types, data_type):
     
     parameter = 'nucleotide_substitution_rate'
-    min_seq_number = 10
-    min_sim_lenght = 90
+    min_seq_number = 0
+    min_sim_lenght = 0
     
     if data_type == 'combined_rate':
         # build the dataframe needed for the fit
