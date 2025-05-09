@@ -364,7 +364,8 @@ def filter_files_by_min_sequences(files, min_seq_number):
             if len(df) >= min_seq_number:
                 filtered_files.append(file)
         except Exception as e:
-            print(f"Error reading CSV file {file}: {e}")
+            pass
+            # print(f"Error reading CSV file {file}: {e}")
     
     print(f'Keeping files with at least {min_seq_number} sequences')
     print('')
