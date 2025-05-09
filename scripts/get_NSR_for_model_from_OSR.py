@@ -15,7 +15,7 @@ def get_NSR_for_model_from_OSR(experiment_name, OSR):
     params = fit_results_params_df.to_dict()
 
     NSR = er.inverse_exp_regressor(OSR, params)
-    print(f'nucleotide substitution rate for simulations: {NSR:.5f}')
+    print(f'nucleotide substitution rate for simulations: {NSR:.8f}')
     return NSR
 
 def main():
