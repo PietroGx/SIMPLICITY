@@ -191,8 +191,7 @@ def write_simulation_parameters(file_path,
                                 max_runtime, 
                                 phenotype_model,
                                 sequencing_rate,
-                                seed,
-                                F
+                                seed
                                 ):
     settings = {
         "population_size": population_size,
