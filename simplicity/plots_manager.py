@@ -448,7 +448,8 @@ def plot_OSR_fit(experiment_name,
     
     # get lower and upper confidence interval for fit results
     x_data = data['nucleotide_substitution_rate']
-    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, df=data)
+    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result)
+
     
     # plot on each axis of subplots in a loop
     for a in ax:
@@ -554,7 +555,7 @@ def plot_OSR_fit_figure(experiment_name,
     
     # get lower and upper confidence interval for fit results
     x_data = data['nucleotide_substitution_rate']
-    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, df=data)
+    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result)
     
     
     # Fill between the upper and lower curves for the confidence interval region
