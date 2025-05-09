@@ -151,8 +151,8 @@ def main():
     args = parser.parse_args()
     
     experiment_name= args.experiment_name
-    time_threshold = 100
-    lineage_number_threshold =  10
+    time_threshold = 365
+    lineage_number_threshold = 30
     selected_ssods, seeds = select_seeded_simulations_to_plot(experiment_name, 
                                                        time_threshold, 
                                                        lineage_number_threshold)
