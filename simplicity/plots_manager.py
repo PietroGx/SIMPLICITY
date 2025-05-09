@@ -448,15 +448,15 @@ def plot_OSR_fit(experiment_name,
     
     # get lower and upper confidence interval for fit results
     x_data = data['nucleotide_substitution_rate']
-    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data)
+    # x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data)
 
     
     # plot on each axis of subplots in a loop
     for a in ax:
-        # Fill between the upper and lower curves for the confidence interval region
-        a.fill_between(x,lower_curve, upper_curve, 
-                       color=line_color, alpha=0.3, label='95% Confidence Interval',
-                       zorder=-1)
+        # # Fill between the upper and lower curves for the confidence interval region
+        # a.fill_between(x,lower_curve, upper_curve, 
+        #                color=line_color, alpha=0.3, label='95% Confidence Interval',
+        #                zorder=-1)
         # scatterplot Estimated OSR - single simulation
         sns.scatterplot(x=parameter, y='observed_substitution_rate', 
                         label='Estimated OSR - single simulation', data=data,
@@ -478,7 +478,7 @@ def plot_OSR_fit(experiment_name,
                         color=scatter_color_2, alpha=1, ax=a,
                         zorder=3)
         # Add horizontal lines 
-        a.hlines(y=[1e-5, 1e-2], xmin=0, xmax=x_data.max(), colors=['r', 'r'], linestyles='--')
+        # a.hlines(y=[1e-5, 1e-2], xmin=0, xmax=x_data.max(), colors=['r', 'r'], linestyles='--')
         # Set y-axis limits
         a.set_ylim(0.000009, 0.02)
         
@@ -555,13 +555,13 @@ def plot_OSR_fit_figure(experiment_name,
     
     # get lower and upper confidence interval for fit results
     x_data = data['nucleotide_substitution_rate']
-    x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data)
+    # x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data)
     
     
-    # Fill between the upper and lower curves for the confidence interval region
-    ax.fill_between(x,lower_curve, upper_curve, 
-                   color=line_color, alpha=0.3, label='95% Confidence Interval',
-                   zorder=-1)
+    # # Fill between the upper and lower curves for the confidence interval region
+    # ax.fill_between(x,lower_curve, upper_curve, 
+    #                color=line_color, alpha=0.3, label='95% Confidence Interval',
+    #                zorder=-1)
     # scatterplot Estimated OSR - single simulation
     sns.scatterplot(x=parameter, y='observed_substitution_rate', 
                     label='Estimated OSR - single simulation', data=data,
@@ -595,46 +595,32 @@ def plot_OSR_fit_figure(experiment_name,
     plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
         f"Figure4_OSR_{model_type}_fit.png"))
     
-def confidence_interval_fit(model_type, fit_result, x):
-    params_lower = {}
-    params_upper = {}
+# def confidence_interval_fit(model_type, fit_result, x):
+#     params_lower = {}
+#     params_upper = {}
     
-    print('------------------------------------------------------------------')
-    print(f'{model_type}')
-    for param in fit_result.params:
-        param_value = fit_result.params[param].value
-        param_stderr = fit_result.params[param].stderr if fit_result.params[param].stderr else 0
+    
+#     # print(f'{model_type}')
+#     for param in fit_result.params:
+#         param_value = fit_result.params[param].value
+#         param_stderr = fit_result.params[param].stderr if fit_result.params[param].stderr else 0
         
-        print(f'CI std : {param} - {param_value} - {param_stderr}')
-        ci_lower = param_value - 1.96 * param_stderr
-        ci_upper = param_value + 1.96 * param_stderr
+#         # print(f'CI std : {param} - {param_value} - {param_stderr}')
+#         ci_lower = param_value - 1.96 * param_stderr
+#         ci_upper = param_value + 1.96 * param_stderr
         
-        params_lower[param] = ci_lower
-        params_upper[param] = ci_upper
+#         params_lower[param] = ci_lower
+#         params_upper[param] = ci_upper
     
-    print('------------------------------------------------------------------')
-    def remove_duplicates_array(arr):
-        _, idx = np.unique(arr, return_index=True)
-        return arr[np.sort(idx)]
+#     def remove_duplicates_array(arr):
+#         _, idx = np.unique(arr, return_index=True)
+#         return arr[np.sort(idx)]
 
-    x = remove_duplicates_array(x)
+#     x = remove_duplicates_array(x)
 
-    # Create the upper and lower bound curves for confidence intervals
-    upper_curve = er.evaluate_model(model_type, params_upper, x)
-    lower_curve = er.evaluate_model(model_type, params_lower, x)
-    return x, lower_curve, upper_curve
-
-# def confidence_interval_fit(model_type, fit_result, df, num_bootstrap=1000, ci_percentile=95):
-#     '''
-#     Plot confidence intervals for the fitted model by calling the bootstrap CI function.
-#     '''
-#     # Extract x and y values from the DataFrame
-#     x = df['nucleotide_substitution_rate'].values
-#     y = df['observed_substitution_rate'].values
-    
-#     # Call the bootstrap CI function from the evolutionary_rate module
-#     x, lower_curve, upper_curve = er.bootstrap_fit_ci(model_type, fit_result, x, y, num_bootstrap, ci_percentile)
-
+#     # Create the upper and lower bound curves for confidence intervals
+#     upper_curve = er.evaluate_model(model_type, params_upper, x)
+#     lower_curve = er.evaluate_model(model_type, params_lower, x)
 #     return x, lower_curve, upper_curve
 
 
