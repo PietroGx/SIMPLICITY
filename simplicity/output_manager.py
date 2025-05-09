@@ -348,7 +348,6 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
         except Exception as e:
             print(f"Error reading final_time: {e}")
     print(f'Keeping files with simulation lenght >= {min_sim_lenght}')
-    print('')
     # print(filtered_files)
     return filtered_files
 
@@ -371,6 +370,7 @@ def create_combined_sequencing_df(seeeded_simulations_output_directory,
 
     filtered_csv_files = filter_sequencing_files_by_simulation_lenght(csv_files, min_sim_lenght)
     print(f'Keeping files with at least {min_seq_number} sequences')
+    print('')
     data_frames = []
     # Concatenate all DataFrames into one
     for csv_file in filtered_csv_files:
@@ -381,7 +381,7 @@ def create_combined_sequencing_df(seeeded_simulations_output_directory,
            if len(df) >= min_seq_number:
                data_frames.append(df)
        except: pass # skip empty files
-       
+    print('Total kept files: ', len(data_frames))
     try:
         combined_df = pd.concat(data_frames, ignore_index=True)
         return combined_df
