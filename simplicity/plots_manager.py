@@ -918,8 +918,8 @@ def plot_IH_lineage_distribution_simulation(experiment_name):
         ax = axes[i]
 
         sns.barplot(
-            x='IH_lineages_number', y='ih_virus_count', 
-            data=df, hue='IH_virus_emergence_rate',
+            x='IH_unique_lineages_number', y='ih_lineage_count', 
+            data=df,
             ax=ax, dodge=True, palette="Set2", alpha=0.7
         )
 
