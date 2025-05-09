@@ -16,7 +16,7 @@ def main():
     args = parser.parse_args()
     
     parameter = 'tau_3'
-    min_seq_number = 10
+    min_seq_number = 5
     min_sim_lenght = 100
     
     # build the dataframe needed for the plot
