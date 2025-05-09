@@ -33,8 +33,13 @@ def main():
                                       parameter, 
                                       min_seq_number, 
                                       min_sim_lenght)
-    # plot ih cariability
+    # plot ih variability
     pm.plot_IH_lineage_distribution_grouped_by_simulation(args.experiment_name)
+    
+    pm.plot_OSR_and_IH_lineages_by_parameter(args.experiment_name, 
+                                               parameter, 
+                                               min_seq_number, 
+                                               min_sim_lenght)
     
 if __name__ == "__main__":
     main()

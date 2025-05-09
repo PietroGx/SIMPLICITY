@@ -983,7 +983,65 @@ def plot_IH_lineage_distribution_grouped_by_simulation(experiment_name):
     plt.savefig(output_path)
     plt.close()
 
+def plot_OSR_and_IH_lineages_by_parameter(experiment_name, 
+                                           parameter='tau_3', 
+                                           min_seq_number=0, 
+                                           min_sim_lenght=0):
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
 
+    # ===== LEFT: OSR vs parameter (boxplot) =====
+    df_osr = om.read_OSR_vs_parameter_csv(experiment_name, 
+                                           parameter,
+                                           min_seq_number,
+                                           min_sim_lenght)
+
+    # ===== RIGHT: Normalized IH lineage barplot by simulation =====
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    all_data = []
+    for sim_dir in simulation_output_dirs:
+        df = om.get_IH_lineages_data_simulation(sim_dir)[['IH_unique_lineages_number', 'ih_lineage_count']]
+        tau_3 = sm.get_parameter_value_from_simulation_output_dir(sim_dir, parameter)
+        df['tau_3'] = tau_3
+
+        total = df['ih_lineage_count'].sum()
+        df['ih_lineage_count'] = df['ih_lineage_count'] / total if total > 0 else 0
+
+        all_data.append(df)
+
+    df_lineage = pd.concat(all_data, axis=0)
+    df_lineage['IH_unique_lineages_number'] = pd.Categorical(df_lineage['IH_unique_lineages_number'], 
+                                                              categories=[1, 2, 3, 4, 5], ordered=True)
+
+    # ===== Shared color palette =====
+    unique_param_values = sorted(df_lineage['tau_3'].unique())
+    palette = sns.color_palette("coolwarm", n_colors=len(unique_param_values))
+    palette_dict = dict(zip(unique_param_values, palette))
+
+    # ===== Create figure =====
+    fig, axes = plt.subplots(ncols=2, figsize=(14, 6))
+
+    # --- Left: Boxplot
+    sns.boxplot(ax=axes[0], x=parameter, y='observed_substitution_rate', hue=parameter, 
+                data=df_osr, palette=palette_dict, hue_order=unique_param_values, width=0.6)
+    axes[0].set_xlabel(parameter)
+    axes[0].set_ylabel('Observed substitution rate')
+    axes[0].set_title(f'{parameter} vs Observed Substitution Rate')
+    axes[0].grid(True)
+    axes[0].legend_.remove()
+
+    # --- Right: Histogram (barplot)
+    sns.barplot(ax=axes[1], x='IH_unique_lineages_number', y='ih_lineage_count', 
+                hue='tau_3', data=df_lineage, palette=palette_dict, hue_order=unique_param_values, 
+                dodge=True, alpha=0.8)
+    axes[1].set_xlabel('IH_unique_lineages_number')
+    axes[1].set_ylabel('Proportion')
+    axes[1].set_title('Unique IH Lineage Distribution by Simulation')
+    axes[1].legend(title=parameter, bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.tight_layout()
+    output_path = os.path.join(experiment_plots_dir, f"{experiment_name}_{parameter}_OSR_and_IH_lineages.png")
+    plt.savefig(output_path)
+    plt.close()
 
 # -----------------------------------------------------------------------------
 #                       Simulations final times histogram
