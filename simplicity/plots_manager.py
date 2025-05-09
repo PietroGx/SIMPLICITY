@@ -1159,12 +1159,12 @@ def plot_lineages_colors_tab(seeded_simulation_output_dir):
 #                              Trees plots
 # -----------------------------------------------------------------------------
 
-def get_fitness_color(fitness, nodes_data):
+def get_fitness_color(fitness_score, nodes_data):
     cmap = matplotlib.pyplot.get_cmap('cool')
     
     # Normalize the value
-    norm = matplotlib.colors.Normalize(vmin=nodes_data.fitness.min(), vmax=nodes_data.fitness.max())
-    normalized_value = norm(fitness)
+    norm = matplotlib.colors.Normalize(vmin=nodes_data.fitness_score.min(), vmax=nodes_data.fitness_score.max())
+    normalized_value = norm(fitness_score)
     hexcolor = matplotlib.colors.rgb2hex(cmap(normalized_value))
     
     return hexcolor
@@ -1187,7 +1187,7 @@ def get_node_color(node,
         color = get_state_color(node.state)
         return color
     if coloring == 'fitness':
-        color = get_fitness_color(node.fitness, tree_data)
+        color = get_fitness_color(node.fitness_score, tree_data)
         return color
     if coloring == 'lineage':
         color = get_lineage_color(node.lineage, colormap_df)
@@ -1203,15 +1203,15 @@ def tree_fitness_legend(tree_data, tree_type, tree_plot_filepath):
         'infection' or 'phylogenetic' 
     '''
     # Create a dummy invisible image.
-    d = np.linspace(0, tree_data.fitness.max(),
-                    int(tree_data.fitness.max())).reshape(1, -1)
+    d = np.linspace(0, tree_data.fitness_score.max(),
+                    int(tree_data.fitness_score.max())).reshape(1, -1)
     d = np.vstack((d, d))
 
     fig, ax = matplotlib.pyplot.subplots(figsize=(6, 2))
     fig.subplots_adjust(bottom=0.5, top=0.99, left=0.01, right=0.8)
 
     # Set the extent to cover the range of data
-    extent = [0, tree_data.fitness.max(), 0, 1]
+    extent = [0, tree_data.fitness_score.max(), 0, 1]
 
     # The imshow plots the dummy data.
     ax.imshow(d, aspect='auto',
@@ -1219,7 +1219,7 @@ def tree_fitness_legend(tree_data, tree_type, tree_plot_filepath):
                     extent=extent)
 
     # Set the ticks at the beginning and end of the color bar
-    ax.set_xticks([0, tree_data.fitness.max()])
+    ax.set_xticks([0, tree_data.fitness_score.max()])
     # ax.set_xticks(np.arange(0,data.fitness.max(),10))
     # Set the labels "low" and "high" for the ticks
     ax.set_xticklabels(["low", "high"])
