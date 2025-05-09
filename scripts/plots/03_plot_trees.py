@@ -156,7 +156,7 @@ def main():
     selected_ssods, seeds = select_seeded_simulations_to_plot(experiment_name, 
                                                        time_threshold, 
                                                        lineage_number_threshold)
-    for selected_ssod in selected_ssods:
+    for selected_ssod in tqdm(selected_ssods, desc="Building trees"):
         generate_and_plot_trees(experiment_name, selected_ssod)
     print('Tree plotting completed.')
     print(f'Selected seeds: {seeds}')
