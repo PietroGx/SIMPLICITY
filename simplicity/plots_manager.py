@@ -905,25 +905,48 @@ def plot_IH_lineage_distribution(experiment_name):
     fig_path = os.path.join(experiment_output_dir,'IH variability plot.png')
     plt.savefig(fig_path)
 
+def plot_IH_lineage_distribution_simulation(experiment_name):
+    fig, axes  = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
+    df = om.get_IH_lineages_data_experiment(experiment_name)
+    
+    ax0 = sns.barplot(x='IH_lineages_number', y='ih_virus_count', data=df, hue='IH_virus_emergence_rate', 
+                ax=axes[0], dodge=True, palette="Set2", alpha=0.7)
+    ax1 = sns.barplot(x='IH_unique_lineages_number', y='ih_lineage_count', data=df, hue='IH_virus_emergence_rate',
+                ax=axes[1], dodge=True, palette="Set2",alpha=0.7)
+    
+    # Loop through each bar and set the edgecolor to match the bar color
+    for patch in ax0.patches:
+        # Get the color of the bar
+        color = patch.get_facecolor()
+        # Set the edgecolor to the same as the facecolor
+        patch.set_edgecolor(color)
+        patch.set_linewidth(1)
+        
+    for patch in ax1.patches:
+        # Get the color of the bar
+        color = patch.get_facecolor()
+        # Set the edgecolor to the same as the facecolor
+        patch.set_edgecolor(color)
+        patch.set_linewidth(1)
+    
+    axes[0].set_title('Count of IH_lineages_number')
+    axes[0].set_xlabel('IH_lineages_number')
+    axes[0].set_ylabel('Count')
+
+    axes[1].set_title('Count of unique lineages_number')
+    axes[1].set_xlabel('Unique lineages_number')
+    axes[1].set_ylabel('Count')
+    
+    
+    plt.suptitle('Histogram of IH virus and lineage distribution')
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    fig_path = os.path.join(experiment_output_dir,'IH variability plot.png')
+    plt.savefig(fig_path)
+
 # -----------------------------------------------------------------------------
 #                       Simulations final times histogram
 # -----------------------------------------------------------------------------
-# def plot_histograms(experiment_name, final_times_data_frames):
-#     ''' plot histograms of simulation final times.
-#     Called from statistics_simulation_lenght.py
-#     '''
-#     num_folders = len(final_times_data_frames.columns)
-#     fig, axes = plt.subplots(num_folders, 1, figsize=(10, 5 * num_folders), squeeze=False)
-    
-#     for ax, (folder_name, data) in zip(axes.flatten(), final_times_data_frames.items()):
-#         ax.hist(data, bins=30, edgecolor='black')
-#         ax.set_title(f'Histogram for {folder_name}')
-#         ax.set_xlabel('Last Time Value')
-#         ax.set_ylabel('Frequency')
-    
-#     plt.tight_layout()
-#     plt.savefig(os.path.join(dm.get_experiment_dir(experiment_name),
-#                              'simulations_lenght_histogram.png'))
 
 def plot_histograms(experiment_name, final_times_data_frames, r_order=None):
     ''' 
