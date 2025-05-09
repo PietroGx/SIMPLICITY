@@ -973,7 +973,7 @@ def plot_IH_lineage_distribution_grouped_by_simulation(experiment_name):
         alpha=0.8
     )
 
-    ax.set_title('Unique IH Lineage Distribution by Simulation (Normalized)', fontsize=14)
+    ax.set_title('Intra Host Lineage Distribution', fontsize=14)
     ax.set_xlabel('IH_unique_lineages_number')
     ax.set_ylabel('Proportion')
     ax.legend(title='tau_3', bbox_to_anchor=(1.05, 1), loc='upper left')
@@ -1035,12 +1035,13 @@ def plot_OSR_and_IH_lineages_by_parameter(experiment_name,
                 dodge=True, alpha=0.8)
     axes[1].set_xlabel('IH_unique_lineages_number')
     axes[1].set_ylabel('Proportion')
-    axes[1].set_title('Unique IH Lineage Distribution by Simulation')
+    axes[1].set_title('Intra Host Lineage Distribution')
     axes[1].legend(title=parameter, bbox_to_anchor=(1.05, 1), loc='upper left')
 
     plt.tight_layout()
     output_path = os.path.join(experiment_plots_dir, f"{experiment_name}_{parameter}_OSR_and_IH_lineages.png")
     plt.savefig(output_path)
+    print(f'Figure saved in: {output_path}')
     plt.close()
 
 # -----------------------------------------------------------------------------
