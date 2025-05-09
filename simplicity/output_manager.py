@@ -386,8 +386,10 @@ def create_combined_sequencing_df(seeeded_simulations_output_directory,
     csv_files = glob.glob(os.path.join(seeeded_simulations_output_directory,'**',
                                        'sequencing_data_regression.csv'),
                                         recursive=True)
+    print(len(csv_files))
     filtered_csv_files = filter_sequencing_files_by_simulation_lenght(csv_files, min_sim_lenght)
-    filtered_csv_files = filter_files_by_min_sequences(filtered_csv_files, min_seq_number)
+    print(len(filtered_csv_files))
+    # filtered_csv_files = filter_files_by_min_sequences(filtered_csv_files, min_seq_number)
     
     data_frames = []
     # Concatenate all DataFrames into one
@@ -398,6 +400,7 @@ def create_combined_sequencing_df(seeeded_simulations_output_directory,
         print('No sequencing data available to plot! Check filter settings!')
         print('')
         return None
+
 
 def get_combined_OSR_vs_parameter_csv_file_path(experiment_name,
                                                 parameter,
