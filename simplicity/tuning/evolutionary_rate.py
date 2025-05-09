@@ -94,7 +94,8 @@ def factory_model_lmfit(model_type: str):
     elif model_type == 'exp':
         model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
-        params = model.make_params(A=1, B=1, C=1)
+        params = model.make_params(A=0.9, B=0.7, C=0.5)
+
         return model, params 
     
     elif model_type == 'double_log':
