@@ -207,8 +207,7 @@ def write_simulation_parameters(file_path,
         "max_runtime": max_runtime,
         "phenotype_model": phenotype_model,
         "sequencing_rate": sequencing_rate,
-        "seed": seed,
-        "F": F
+        "seed": seed
     }
     
     # Serialize the dictionary to a JSON-formatted string and write it to a file
@@ -229,7 +228,7 @@ def generate_filename_from_params(params: dict):
     "phenotype_model": "pheno"
     # excluded: max_runtime, sequencing_rate, seed, F
 }
-    exclude  = {"max_runtime", "sequencing_rate", "seed", "F"}
+    exclude  = {"max_runtime", "sequencing_rate", "seed"}
     parts = []
     for key, value in params.items():
         if key in exclude:
@@ -303,8 +302,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                     settings["max_runtime"],
                                     settings["phenotype_model"],
                                     settings["sequencing_rate"],
-                                    settings["seed"],
-                                    settings["F"]
+                                    settings["seed"]
                                     )
 
     print(f"Simulation parameters written to directory: {simulation_parameters_file_path}")
