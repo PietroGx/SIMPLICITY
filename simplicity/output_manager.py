@@ -349,6 +349,7 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
             print(f"Error reading final_time: {e}")
     print(f'Keeping files with simulation lenght >= {min_sim_lenght}')
     print('')
+    print(filtered_files)
     return filtered_files
 
 def filter_files_by_min_sequences(files, min_seq_number):
