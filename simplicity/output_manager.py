@@ -352,24 +352,6 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
     # print(filtered_files)
     return filtered_files
 
-def filter_files_by_min_sequences(files, min_seq_number):
-    """
-    Filters CSV files by min_seq_number sequences.
-    """
-    filtered_files = []
-    
-    for file in files:
-        try:
-            df = pd.read_csv(file)
-            if len(df) >= min_seq_number:
-                filtered_files.append(file)
-        except Exception as e:
-            print(f"Error reading CSV file {file}: {e}")
-    
-    print(f'Keeping files with at least {min_seq_number} sequences')
-    print('')
-    return filtered_files
-
 def create_combined_sequencing_df(seeeded_simulations_output_directory, 
                                   min_seq_number=0,
                                   min_sim_lenght=0):
@@ -386,13 +368,20 @@ def create_combined_sequencing_df(seeeded_simulations_output_directory,
     csv_files = glob.glob(os.path.join(seeeded_simulations_output_directory,'**',
                                        'sequencing_data_regression.csv'),
                                         recursive=True)
-    print(len(csv_files))
+
     filtered_csv_files = filter_sequencing_files_by_simulation_lenght(csv_files, min_sim_lenght)
-    print(len(filtered_csv_files))
-    # filtered_csv_files = filter_files_by_min_sequences(filtered_csv_files, min_seq_number)
-    
+    print(f'Keeping files with at least {min_seq_number} sequences')
     data_frames = []
     # Concatenate all DataFrames into one
+    for csv_file in filtered_csv_files:
+       # Read each CSV file into a DataFrame
+       try:
+           df = pd.read_csv(csv_file)
+           # only add df if they contain at least min_seq_number sequences
+           if len(df) >= min_seq_number:
+               data_frames.append(df)
+       except: pass # skip empty files
+       
     try:
         combined_df = pd.concat(data_frames, ignore_index=True)
         return combined_df
