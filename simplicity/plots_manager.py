@@ -599,17 +599,20 @@ def confidence_interval_fit(model_type, fit_result, x):
     params_lower = {}
     params_upper = {}
     
+    print('------------------------------------------------------------------')
+    print(f'{model_type}')
     for param in fit_result.params:
         param_value = fit_result.params[param].value
         param_stderr = fit_result.params[param].stderr if fit_result.params[param].stderr else 0
-        print(f'{model_type}')
-        print('CI std : {param} - {param_value} - {param_stderr}')
+        
+        print(f'CI std : {param} - {param_value} - {param_stderr}')
         ci_lower = param_value - 1.96 * param_stderr
         ci_upper = param_value + 1.96 * param_stderr
         
         params_lower[param] = ci_lower
         params_upper[param] = ci_upper
-        
+    
+    print('------------------------------------------------------------------')
     def remove_duplicates_array(arr):
         _, idx = np.unique(arr, return_index=True)
         return arr[np.sort(idx)]
