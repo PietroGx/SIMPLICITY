@@ -17,7 +17,8 @@ def fixture_experiment_settings():
         'tau_3':[3.25, 7.5, 15, 30, 60, 120]
     }
     # parameters to keep fixed (but different from standard_value) across combinations
-    fixed_params = {'final_time': 365*3}
+    fixed_params = {'final_time': 365*3,
+                    'IH_virus_emergence_rate': 0.1}
     
     n_seeds = 300
     
