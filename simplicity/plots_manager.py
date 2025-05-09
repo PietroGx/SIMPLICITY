@@ -906,43 +906,48 @@ def plot_IH_lineage_distribution(experiment_name):
     plt.savefig(fig_path)
 
 def plot_IH_lineage_distribution_simulation(experiment_name):
-    fig, axes  = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
-    df = om.get_IH_lineages_data_experiment(experiment_name)
-    
-    ax0 = sns.barplot(x='IH_lineages_number', y='ih_virus_count', data=df, hue='IH_virus_emergence_rate', 
-                ax=axes[0], dodge=True, palette="Set2", alpha=0.7)
-    ax1 = sns.barplot(x='IH_unique_lineages_number', y='ih_lineage_count', data=df, hue='IH_virus_emergence_rate',
-                ax=axes[1], dodge=True, palette="Set2",alpha=0.7)
-    
-    # Loop through each bar and set the edgecolor to match the bar color
-    for patch in ax0.patches:
-        # Get the color of the bar
-        color = patch.get_facecolor()
-        # Set the edgecolor to the same as the facecolor
-        patch.set_edgecolor(color)
-        patch.set_linewidth(1)
-        
-    for patch in ax1.patches:
-        # Get the color of the bar
-        color = patch.get_facecolor()
-        # Set the edgecolor to the same as the facecolor
-        patch.set_edgecolor(color)
-        patch.set_linewidth(1)
-    
-    axes[0].set_title('Count of IH_lineages_number')
-    axes[0].set_xlabel('IH_lineages_number')
-    axes[0].set_ylabel('Count')
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    num_sims = len(simulation_output_dirs)
+    ncols = 2
+    nrows = math.ceil(num_sims / ncols)
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(7 * ncols, 5 * nrows))
+    axes = axes.flatten()  # Flatten in case of a single row/col
 
-    axes[1].set_title('Count of unique lineages_number')
-    axes[1].set_xlabel('Unique lineages_number')
-    axes[1].set_ylabel('Count')
-    
-    
-    plt.suptitle('Histogram of IH virus and lineage distribution')
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    for i, simulation_output_dir in enumerate(simulation_output_dirs):
+        df = om.get_IH_lineages_data_simulation(simulation_output_dir)
+        ax = axes[i]
+
+        sns.barplot(
+            x='IH_lineages_number', y='ih_virus_count', 
+            data=df, hue='IH_virus_emergence_rate',
+            ax=ax, dodge=True, palette="Set2", alpha=0.7
+        )
+
+        # Beautify bars
+        for patch in ax.patches:
+            color = patch.get_facecolor()
+            patch.set_edgecolor(color)
+            patch.set_linewidth(1)
+
+        sim_id = os.path.basename(simulation_output_dir)
+        ax.set_title(f'Simulation: {sim_id}')
+        ax.set_xlabel('IH_lineages_number')
+        ax.set_ylabel('Proportion')
+
+        # Optional: shrink legend
+        ax.legend(title='Emergence Rate', fontsize=9, title_fontsize=10)
+
+    # Hide any unused axes
+    for j in range(i + 1, len(axes)):
+        fig.delaxes(axes[j])
+
+    plt.suptitle('IH Lineage Distribution by Simulation', fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    fig_path = os.path.join(experiment_output_dir,'IH variability plot.png')
+    fig_path = os.path.join(experiment_output_dir, 'IH_variability_by_simulation.png')
     plt.savefig(fig_path)
+    plt.close(fig)
+
 
 # -----------------------------------------------------------------------------
 #                       Simulations final times histogram
