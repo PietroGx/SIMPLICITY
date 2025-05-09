@@ -12,17 +12,17 @@ import simplicity.settings_manager as sm
 import simplicity.output_manager as om
 
 def get_NSR_for_model_from_OSR(experiment_name, OSR):
-    model_type = 'log'
+    model_type = 'exp'
     fit_results_params_df = om.read_fit_results_csv(experiment_name, model_type)
     params = fit_results_params_df.to_dict()
-    NSR = er.inverse_log_regressor(OSR, params)
+    NSR = er.inverse_exp_regressor(OSR, params)
    
     return NSR
 
 def get_NSR_for_model_from_OSR_using_reference_file(OSR):
     fit_results_params_df = sm.read_OSR_NSR_regressor_parameters()
     params = fit_results_params_df.to_dict()
-    NSR = er.inverse_log_regressor(OSR, params)
+    NSR = er.inverse_exp_regressor(OSR, params)
     return NSR
 
 def get_NSR():
@@ -42,6 +42,7 @@ def get_NSR():
             print('')
             print('The observed substitution rate (OSR) value should be within the range obtained from the fitting.')
             print(f'If you are unsure, check the fit plot (Data/{experiment_name}/05_Plots/figure4_OSR_exp_fit.png)')
+
             
             while True:
                 OSR = input("Enter the desired observed substitution rate (OSR) value: ")

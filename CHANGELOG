@@ -571,6 +571,7 @@
 	
 	* updated generate_user_set_parameters_file.py
 	* updated standard best_fit parameter values
+	* added inverse_exp_regressor function
 	
 	
 	
