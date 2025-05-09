@@ -563,6 +563,7 @@
 	* back to stderr CI for OSR fit plots
 	* updated om.create_combined_sequencing_df
 	* removed CI from plot 
+	* updated plot OSR fit
 	
 	
 	
