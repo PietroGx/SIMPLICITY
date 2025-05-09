@@ -561,6 +561,7 @@
 	* added bootstrapping CI calculation for model fit 
 	* updated bootstrap function
 	* back to stderr CI for OSR fit plots
+	* updated om.create_combined_sequencing_df 
 	
 	
 	
