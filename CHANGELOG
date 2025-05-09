@@ -560,6 +560,7 @@
 	* added the C parameter to exp curve fit 
 	* added bootstrapping CI calculation for model fit 
 	* updated bootstrap function
+	* back to stderr CI for OSR fit plots
 	
 	
 	
