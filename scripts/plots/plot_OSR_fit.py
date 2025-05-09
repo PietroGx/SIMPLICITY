@@ -14,8 +14,8 @@ def plot_fit_log_model(experiment_name):
     
     parameter = 'nucleotide_substitution_rate'
     min_seq_number = 30
-    min_sim_lenght = 0
-    model_type = 'log'
+    min_sim_lenght = 100
+    model_type = 'exp'
     weights = None
     
     # build the dataframe needed for the fit
