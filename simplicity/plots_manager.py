@@ -602,6 +602,8 @@ def confidence_interval_fit(model_type, fit_result, x):
     for param in fit_result.params:
         param_value = fit_result.params[param].value
         param_stderr = fit_result.params[param].stderr if fit_result.params[param].stderr else 0
+        print(f'{model_type}')
+        print('CI std : {param} - {param_value} - {param_stderr}')
         ci_lower = param_value - 1.96 * param_stderr
         ci_upper = param_value + 1.96 * param_stderr
         
