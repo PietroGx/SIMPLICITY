@@ -34,7 +34,7 @@ def main():
                                       min_seq_number, 
                                       min_sim_lenght)
     # plot ih cariability
-    pm.plot_IH_lineage_distribution_simulation(args.experiment_name)
+    pm.plot_IH_lineage_distribution_grouped_by_simulation(args.experiment_name)
     
 if __name__ == "__main__":
     main()

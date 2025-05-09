@@ -320,31 +320,15 @@ def plot_combined_OSR_vs_parameter(experiment_name,
     ''' Plot observed substituion rate (tempest regression) against desired parameter values
     '''
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
-    # # import combined regression data
-    # df_combined = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
-    #                                            parameter,
-    #                                            min_seq_number,
-    #                                            min_sim_lenght)
-    # import single simulations regression data
+
     df = om.read_OSR_vs_parameter_csv(experiment_name, 
                                         parameter,
                                         min_seq_number,
                                         min_sim_lenght)
-    # # Plot target parameter vs OSR as a line plot with points
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(df_combined[parameter],  df_combined['observed_substitution_rate'], 
-    #          marker='o', 
-    #          color='black', 
-    #          linestyle='-', 
-    #          label=f'{experiment_name}_{parameter} vs observed_substitution_rate')
 
     # Boxplot for each X position
     sns.boxplot(x=df[parameter], y=df['observed_substitution_rate'], hue=df[parameter], 
                 palette="coolwarm", width=0.6, showfliers=True)
-    
-    # # Scatterplot overlaid on top
-    # sns.stripplot(x=df[parameter], y=df['observed_substitution_rate'], 
-    #               color='black', alpha=0.5, jitter=True)
     
     plt.xlabel(parameter)
     plt.ylabel('Observed substitution rate')
@@ -947,6 +931,58 @@ def plot_IH_lineage_distribution_simulation(experiment_name):
     fig_path = os.path.join(experiment_output_dir, 'IH_variability_by_simulation.png')
     plt.savefig(fig_path)
     plt.close(fig)
+
+def plot_IH_lineage_distribution_grouped_by_simulation(experiment_name):
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    plot_output_dir = dm.get_experiment_plots_dir(experiment_name)
+
+    all_data = []
+
+    for sim_dir in simulation_output_dirs:
+        df = om.get_IH_lineages_data_simulation(sim_dir)[['IH_unique_lineages_number', 'ih_lineage_count']]
+        tau_3 = sm.get_parameter_value_from_simulation_output_dir(sim_dir, 'tau_3')
+        df['tau_3'] = tau_3
+
+        # Normalize ih_lineage_count
+        total = df['ih_lineage_count'].sum()
+        df['ih_lineage_count'] = df['ih_lineage_count'] / total if total > 0 else 0
+
+        all_data.append(df)
+
+    full_df = pd.concat(all_data, axis=0)
+
+    # Ensure IH_unique_lineages_number is categorical with fixed order 1–5
+    full_df['IH_unique_lineages_number'] = pd.Categorical(
+        full_df['IH_unique_lineages_number'],
+        categories=[1, 2, 3, 4, 5],
+        ordered=True
+    )
+
+    # Sort hue order
+    tau_3_order = sorted(full_df['tau_3'].unique())
+
+    plt.figure(figsize=(10, 6))
+    ax = sns.barplot(
+        x='IH_unique_lineages_number',
+        y='ih_lineage_count',
+        hue='tau_3',
+        data=full_df,
+        palette=sns.color_palette("coolwarm", n_colors=len(tau_3_order)),
+        hue_order=tau_3_order,
+        dodge=True,
+        alpha=0.8
+    )
+
+    ax.set_title('Unique IH Lineage Distribution by Simulation (Normalized)', fontsize=14)
+    ax.set_xlabel('IH_unique_lineages_number')
+    ax.set_ylabel('Proportion')
+    ax.legend(title='tau_3', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+
+    output_path = os.path.join(plot_output_dir, f'{experiment_name}_IH_unique_lineages_by_tau_3.png')
+    plt.savefig(output_path)
+    plt.close()
+
 
 
 # -----------------------------------------------------------------------------
