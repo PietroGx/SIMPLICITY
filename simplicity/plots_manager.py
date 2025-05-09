@@ -935,7 +935,7 @@ def plot_IH_lineage_distribution_simulation(experiment_name):
         ax.set_ylabel('Proportion')
 
         # Optional: shrink legend
-        ax.legend(title='Emergence Rate', fontsize=9, title_fontsize=10)
+        ax.legend(title='Intra-host lineages', fontsize=9, title_fontsize=10)
 
     # Hide any unused axes
     for j in range(i + 1, len(axes)):
