@@ -1454,7 +1454,7 @@ def plot_infections_hist(individuals_df, ax, colormap_df, bin_size):
     ax.set_ylim(0, bottom.max() * 1.2)
     ax.set_ylabel("Infections in time window")
 
-def plot_combined_r_effective(experiment_name, seeded_simulation_output_dir, window_size, threshold):
+def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size, threshold):
     """
     Create a two-panel plot:
     - Top: population-level Rₑ and infection histogram
