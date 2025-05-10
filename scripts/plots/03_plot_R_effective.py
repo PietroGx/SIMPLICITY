@@ -20,10 +20,6 @@ def select_and_plot_R_effective(experiment_name, window_size, lin_threshold, sel
                     seeded_simulation_output_dir = ssod
                     print('')
                     print(f'Processing {ssod} R_effective data...')
-                    # process R effective data and write csv files needed for plot
-                    om.write_R_effective_dfs_csv(experiment_name, 
-                                                 seeded_simulation_output_dir, 
-                                                 window_size, lin_threshold)
                     try:
                         pm.plot_R_effective(experiment_name, 
                                             seeded_simulation_output_dir, 
