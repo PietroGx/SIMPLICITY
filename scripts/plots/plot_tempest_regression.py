@@ -50,8 +50,8 @@ def main():
     args = parser.parse_args()
     
     parameter = 'nucleotide_substitution_rate'
-    min_seq_number = 20
-    min_sim_lenght = 0
+    min_seq_number = 30
+    min_sim_lenght = 100
     
     # Run the script with the provided parameter
     plot_regressions(args.experiment_name, 
