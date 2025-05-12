@@ -248,8 +248,7 @@ def plot_tempest_regression(sequencing_data_df,
     # Show legend
     ax.legend(handles=handles)
    
-def plot_figure_tempest_regression():
-    experiment_name = 'generate_data_OSR_fit_#1'
+def plot_figure_tempest_regression(experiment_name):
     parameter = 'nucleotide_substitution_rate'
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
