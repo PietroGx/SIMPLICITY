@@ -21,12 +21,6 @@ def plot_regressions(experiment_name, parameter, min_seq_number, min_sim_lenght)
                                 parameter, 
                                 min_seq_number,
                                 min_sim_lenght)
-    # # plot combined OSR vs parameter 
-    # pm.plot_combined_OSR_vs_parameter(experiment_name, 
-    #                                     parameter,  
-    #                                     min_seq_number,
-    #                                     min_sim_lenght)
-    print('')
     print('##################################################################')
     print('################## Plot combined regressions #####################')
     print('##################################################################')
@@ -37,7 +31,8 @@ def plot_regressions(experiment_name, parameter, min_seq_number, min_sim_lenght)
                                         min_sim_lenght)
     
     y_axis_max = max(combined_OSR_vs_parameter_df['observed_substitution_rate'])*1.2
-    pm.plot_combined_tempest_regressions(experiment_name, parameter, min_sim_lenght, y_axis_max)
+    pm.plot_combined_tempest_regressions(experiment_name, parameter, min_seq_number, 
+                                         min_sim_lenght, y_axis_max)
     
 
 def main():
@@ -59,7 +54,7 @@ def main():
                                 min_seq_number,
                                 min_sim_lenght)
     
-    pm.plot_figure_tempest_regression(experiment_name)
+    pm.plot_figure_tempest_regression(args.experiment_name)
     print('Plotting completed.')
     
 if __name__ == "__main__":
