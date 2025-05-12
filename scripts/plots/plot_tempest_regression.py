@@ -59,7 +59,7 @@ def main():
                                 min_seq_number,
                                 min_sim_lenght)
     
-    pm.plot_figure_tempest_regression()
+    pm.plot_figure_tempest_regression(experiment_name)
     print('Plotting completed.')
     
 if __name__ == "__main__":
