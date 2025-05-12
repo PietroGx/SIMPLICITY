@@ -252,9 +252,11 @@ def plot_figure_tempest_regression(experiment_name):
     parameter = 'nucleotide_substitution_rate'
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
-    simulation_output_dir = simulation_output_dirs[7]
+    simulation_output_dir = simulation_output_dirs[0]
     param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
-    sequencing_data_df = om.create_combined_sequencing_df(simulation_output_dir, min_sim_lenght=0)
+    sequencing_data_df = om.create_combined_sequencing_df(simulation_output_dir, 
+                                                          min_seq_number=30,
+                                                          min_sim_lenght=100)
     
     fig, ax = plt.subplots(1, 1, figsize=(8,8))
     
