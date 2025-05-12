@@ -274,7 +274,7 @@ def plot_figure_tempest_regression(experiment_name):
         # ax.set_ylim(0, 1)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(experiment_plots_dir, f"{experiment_name}_figure_combined_tempest_regression.png"))
+    plt.savefig(os.path.join(experiment_plots_dir, f"{experiment_name}_figure3_tempest_regression.png"))
     
 def plot_combined_tempest_regressions(experiment_name, parameter, 
                                       min_seq_number=0,min_sim_lenght=0, 
