@@ -26,11 +26,11 @@ with open('LICENSE') as f:
 
 setup(
     name='simplicity',
-    version='0.18.00',
+    version='1.0.0',
     description='Stochastic sIMulation of SARS-CoV-2 sPread and evoLutIon aCcountIng for within-hosT dYnamics (SIMPLICITY)',
     long_description=readme,
     author='Pietro Gerletti, Jean-Baptiste Escudié',
-    author_email='pietro.gerletti@pm.me',
+    author_email='simplicity.founder544@passmail.com',
     url='https://github.com/PietroGx/SIMPLICITY',
     license=license,
     packages=['simplicity'] 
