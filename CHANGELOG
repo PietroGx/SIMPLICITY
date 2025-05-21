@@ -260,14 +260,14 @@
 	* updated plot_trajectory in plot manager
 	* created psedocode of fetch_seeded_simulation_parameters_from_job_id
 	
-2026-25-02 pietro gerletti
+2025-25-02 pietro gerletti
 
 	Version 0.7.1
 	
 	* updated standard parameters values 
 	* updated plot_IH_lineage_distribution to save figure
 	
-2026-28-02 pietro gerletti
+2025-28-02 pietro gerletti
 
 	Version 0.7.2
 	
@@ -277,13 +277,13 @@
 	* added spline to the fitting 
 	* added weights to the fitting
 
-2026-28-02 pietro gerletti
+2025-28-02 pietro gerletti
 
 	Version 0.7.3
 	
 	* updating tempest plots and scripts
 
-2026-01-03 pietro gerletti
+2025-01-03 pietro gerletti
 
 	Version 0.8.0
 	
@@ -294,7 +294,7 @@
 	* added read_final_time to output_manager
 	* added functionality to filter by min_sim_lenght in build_observed_evolutionary_rates_vs_parameter_df
 
-2026-02-03 pietro gerletti
+2025-02-03 pietro gerletti
 
 	Version 0.8.1
 	
@@ -307,7 +307,7 @@
     * finished refactoring of tempest regression results csv writing and reading 
     * added option to filter sequencing data for tempest regression by number of sequences present in the file 
 
-2026-03-03 pietro gerletti
+2025-03-03 pietro gerletti
 
 	Version 0.8.2
 	
@@ -315,7 +315,7 @@
 	* updated script for simulating OER fit data (running for 3 years, updated er range)
 	* updating phenotype model weights plot function
 	
-2026-04-03 pietro gerletti
+2025-04-03 pietro gerletti
 
 	Version 0.8.3
 	
@@ -324,7 +324,7 @@
 	* now fit_observed_evolutionary_rate_regressor saves the fit results to a file 
 	* added inverse_log_regressor to evolutionary_rate.py (get e from OER after fit)
 	
-2026-05-03 pietro gerletti
+2025-05-03 pietro gerletti
 
 	Version 0.9.0
 	
@@ -335,7 +335,7 @@
 	* added function to write generated user set parameters json file 
 	* added Data/00_reference_parameters to repo
 
-2026-06-03 pietro gerletti
+2025-06-03 pietro gerletti
 
 	Version 0.9.1
 	
@@ -344,14 +344,14 @@
 	* added get_experiment_plots_dir to dir_manager
 	* now simulation saves all the consensus sequences generated over a simulation in the population class
 	
-2026-07-03 pietro gerletti
+2025-07-03 pietro gerletti
 	
 	Version 0.10.0
 	
 	* changed NAMES: molecular_substituion rate (MSR) to nucleotide substitution rate (NSR)
 	* added plot tau3/OSR
 
-2026-12-03 pietro gerletti
+2025-12-03 pietro gerletti
 	
 	Version 0.11.0
 	
@@ -360,7 +360,7 @@
 	* added plot_lineages_colors_tab, get_lineage_color, make_lineages_colormap to plot manager
 	* added circular tree plot with ete3 to plot manager
 	
-2026-13-03 pietro gerletti
+2025-13-03 pietro gerletti
 	
 	Version 0.11.1
 	
@@ -369,7 +369,7 @@
 	* polished plot manager and output manager for better readability
 	* added script to plot R effective plots for selected seeds folders
 
-2026-13-03 pietro gerletti
+2025-13-03 pietro gerletti
 	
 	Version 0.12.0
 	
@@ -378,7 +378,7 @@
 	* added lineage colors to simulation trajectory plot
 	* changed how lineage_frequency is stored and saved
 	
-2026-18-03 pietro gerletti
+2025-18-03 pietro gerletti
 	
 	Version 0.13.0
 	
@@ -387,7 +387,7 @@
 	* refactored population class, evolution.mutations module and phenotype.update module (only working with lineages names, genomes now stored in population.phylogenetic_data)
 	* updated plot_manager: now lineages color are based on lineage time of emergence and have unique labels
 	
-2026-19-03 pietro gerletti
+2025-19-03 pietro gerletti
 	
 	Version 0.13.1
 	
@@ -396,7 +396,7 @@
 	* added script to sort plots by seed number
 	* prepared new experiment to run (generate_data_trees_and_R_eff)
 
-2026-20-03 pietro gerletti
+2025-20-03 pietro gerletti
 	
 	Version 0.14.0
 	
@@ -404,13 +404,13 @@
 	* Updated tree_plotting script to automatically filter by seeds shared by simulations after filtering
 	* added average R line to R_effective plot
 	
-2026-20-03 pietro gerletti
+2025-20-03 pietro gerletti
 	
 	Version 0.14.1
 	
 	* Working on fixing R effective plot.
 	
-2026-27-03 pietro gerletti
+2025-27-03 pietro gerletti
 	
 	Version 0.15.0
 	
@@ -424,13 +424,13 @@
 	* updated runme
 	* changed simulation settings files and folders naming (to shorten them up)
 	                                   
-2026-28-03 pietro gerletti
+2025-28-03 pietro gerletti
 	
 	Version 0.15.1
 	
 	* added R_eff and time_infectiousness plot for model check and validation
 
-2026-29-03 pietro gerletti
+2025-29-03 pietro gerletti
 	
 	Version 0.16.0
 	
@@ -443,13 +443,13 @@
 	* added population_model module (SIDR reactions)
 	* new refactored code passsed tests!!
 
-2026-29-03 pietro gerletti
+2025-29-03 pietro gerletti
 	
 	Version 0.16.01
 	
 	* changed extrande steps order to ensure correctness of simulation
 
-2026-30-03 pietro gerletti
+2025-30-03 pietro gerletti
 	
 	Version 0.16.02
 	
@@ -461,7 +461,7 @@
 	* Refactored update_states and joined together (update_state, recovery, infectious, detectables updates)
 	* Updated look-ahead time horizon to min 1h max = next ih update
 	
-2026-31-03 pietro gerletti
+2025-31-03 pietro gerletti
 	
 	Version 0.16.03
 	
@@ -473,27 +473,27 @@
 	* updated how I assiign new jump time to intra host staates in update states()
 	* updated intra_host.py (cleaner and more efficient code)
 
-2026-01-04 pietro gerletti
+2025-01-04 pietro gerletti
 	
 	Version 0.16.04
 	
 	* updated intra-host model py file
 	* added both matrix and jump proces option to update intra-host model
 
-2026-04-04 pietro gerletti
+2025-04-04 pietro gerletti
 	
 	Version 0.16.05
 	
 	* added precomputation of matrix exponentials for ih model       
                	                                    
-2026-04-04 pietro gerletti
+2025-04-04 pietro gerletti
 	
 	Version 0.16.06
 	
 	* fixed L/delta_t bug    
 	* limited min max (0.04 - 1 day) step size for system state updates (not extrande steps)
 
-2026-05-04 pietro gerletti
+202533-05-04 pietro gerletti
 	
 	Version 0.16.07
 	
@@ -501,20 +501,20 @@
 	* added progress bar to simulation and cleaned code output
 	* added plot of avg infection time
 
-2026-07-04 pietro gerletti
+2025-07-04 pietro gerletti
 	
 	Version 0.16.08
 	
 	* added infection tree (transmission chain), subtree filtering by lineage and plot with his infections
 	
 	
-2026-24-04 pietro gerletti
+2025-24-04 pietro gerletti
 	
 	Version 0.16.09
 	
 	* added delta_t_ih_updates debugger (writing csv file with relevant info)
 	
-2026-24-04 pietro gerletti
+2025-24-04 pietro gerletti
 	
 	Version 0.16.10
 	
@@ -522,7 +522,7 @@
 	* updated R_eff_ih_check.py to filter simulations by final time 
 	* changed ih update min delta_t size to 0.04
 	
-2026-28-04 pietro gerletti
+2025-28-04 pietro gerletti
 	
 	Version 0.16.11
 	
@@ -530,7 +530,7 @@
 	* renamed and moved R_eff_ih_check.py to scripts (R_vs_time_inf.py)
 	* updated tree related files 
 	
-2026-30-04 pietro gerletti
+2025-30-04 pietro gerletti
 	
 	Version 0.16.12
 	
@@ -538,7 +538,7 @@
 	* updated extrande (ih dt accumulator also in leap step)
 	* updated update_fitness to improve immune waning model (now we account for the initial phase in which the population is not yet exposed to the virus)
 
-2026-04-05 pietro gerletti
+2025-04-05 pietro gerletti
 	
 	Version 0.17.00
 	
@@ -546,13 +546,13 @@
 	* added intra host lineage trajectories
 	* added plots for R_effective
 	
-2026-06-05 pietro gerletti
+2025-06-05 pietro gerletti
 	
 	Version 0.17.01
 	
 	* Prepared the files to rerun the experiments for the publication
 	
-2026-08-05 pietro gerletti
+2025-08-05 pietro gerletti
 	
 	Version 0.17.02
 	
@@ -565,7 +565,7 @@
 	* removed CI from plot 
 	* updated plot OSR fit
 
-2026-08-05 pietro gerletti
+2025-08-05 pietro gerletti
 	
 	Version 0.18.00
 	
@@ -575,7 +575,11 @@
 	* added plot for IH lineage variability  vs inf period (tau_3/OSR/IH_variability)
 	* 
 	
+2025-21-05 pietro gerletti
 	
+	Version 1.0.0
+	
+	* updated license
 	
 	
 	
