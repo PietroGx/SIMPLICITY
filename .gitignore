@@ -1,0 +1,2 @@
+# Ignore built Sphinx HTML docs
+docs/build/
