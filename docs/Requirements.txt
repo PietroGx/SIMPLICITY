@@ -1,0 +1,16 @@
+biopython
+anytree
+matplotlib
+numpy
+scipy
+pandas
+scikit-learn
+lmfit
+seaborn
+tqdm
+ete3
+graphviz
+memory-profiler
+sphinx
+sphinx-rtd-theme
+myst-parser
