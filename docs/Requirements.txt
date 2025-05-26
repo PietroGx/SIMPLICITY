@@ -9,7 +9,6 @@ lmfit
 seaborn
 tqdm
 ete3
-graphviz
 memory-profiler
 sphinx
 sphinx-rtd-theme
