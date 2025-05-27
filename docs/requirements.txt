@@ -1,15 +1,24 @@
-biopython
-anytree
-matplotlib
-numpy
-scipy
-pandas
-scikit-learn
-lmfit
-seaborn
-tqdm
-ete3
-memory-profiler
-sphinx
-sphinx-rtd-theme
-myst-parser
+# --- Core scientific stack ---
+numpy==1.26.4
+scipy==1.15.1
+pandas==2.2.3
+matplotlib==3.10.0
+seaborn==0.13.2
+scikit-learn==1.6.1
+
+# --- Domain-specific libraries ---
+biopython==1.78
+lmfit==1.3.2
+ete3==3.1.3
+
+# --- Utilities ---
+tqdm==4.67.1
+memory-profiler==0.61.0
+anytree==2.12.1
+uncertainties==3.2.2
+python-graphviz==0.20.3
+
+# --- Sphinx and documentation ---
+sphinx==7.3.7
+sphinx-rtd-theme==3.0.2
+myst-parser==4.0.1
