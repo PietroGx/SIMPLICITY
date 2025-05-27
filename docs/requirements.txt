@@ -16,8 +16,6 @@ tqdm==4.67.1
 memory-profiler==0.61.0
 anytree==2.12.1
 uncertainties==3.2.2
-graphviz
-python-graphviz==0.20.3
 
 # --- Sphinx and documentation ---
 sphinx==7.3.7
