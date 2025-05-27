@@ -262,16 +262,18 @@ def plot_infection_tree_ete(anytree_root, target_lineage=None, layout="r",
 
 # ---------------------------------------------------------------------------------
 # Build the infection tree from your imported dataframe.
-ssod = 'Data/test_local_experiment_serial_#10/04_Output/NSR_0p0001_init_3_R_1p1/seed_0009'
+ssod = 'Data/Tree_data/04_Output/T_1095/seed_0007'
 df = om.read_individuals_data(ssod)
 anytree_root = infection_tree(df)
 
 # Specify target lineage for filtering: we want the full transmission chain
 # where a child inherited the specified lineage from its parent.
-lineage_name = "wt.0.0"
+lineage_name = "wt.7"
 
 colors_df = pm.make_lineages_colormap(ssod)
 color = colors_df[colors_df['Lineage_name'] == lineage_name]['Color'].iloc[0]
+
+
 # 1. Plot the full tree in rectangular mode.
 # plot_infection_tree_ete(anytree_root, target_lineage=None, layout="r", outfile='tree_linear.png')
 
@@ -280,6 +282,7 @@ plot_infection_tree_ete(anytree_root, target_lineage=lineage_name, layout="r", c
                         outfile=f"infection_tree_filtered_{lineage_name}.png")
 
 # --------------------------------------------------------------------------------
+import numpy as np
 # Prepare the histogram data
 filtered_df = df[df['inherited_lineage'] == lineage_name]
 
@@ -295,6 +298,8 @@ ax_hist.hist(filtered_df['t_infection'], bins=20, color=color, edgecolor='black'
 ax_hist.set_ylabel("New Infections")
 ax_hist.set_title("Infection Histogram and Transmission Tree")
 ax_hist.set_xlim(0,xmax)
+ax_hist.set_xticks(np.arange(0, xmax + 1, 7))
+
 
 # Load the tree image and display it on the bottom subplot
 outfile=f"infection_tree_filtered_{lineage_name}.png"
