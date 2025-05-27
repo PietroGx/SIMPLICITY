@@ -5,7 +5,7 @@ SIMPLICITY stands for Stochastic sIMulation of SARS-CoV-2 sPreading and evoLutIo
 
 [![Documentation Status](https://readthedocs.org/projects/simplicity/badge/?version=latest)](https://simplicity.readthedocs.io/en/latest/)
 [![License](https://img.shields.io/github/license/PietroGx/SIMPLICITY)](LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/)
 
 ---
 
