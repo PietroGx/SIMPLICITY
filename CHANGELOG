@@ -573,7 +573,6 @@
 	* updated standard best_fit parameter values
 	* added inverse_exp_regressor function
 	* added plot for IH lineage variability  vs inf period (tau_3/OSR/IH_variability)
-	* 
 	
 2025-21-05 pietro gerletti
 	
@@ -581,9 +580,19 @@
 	
 	* updated license
 	
-	
-	
-	
+2025-27-05 pietro gerletti
+
+    Version 1.0.1
+
+    * Standardized all plotting functions to comply with journal formatting
+    * Unified text size, font, and axis styling across all figures.
+    * Removed top and right plot spines.
+    * Applied apply_standard_axis_style() to all matplotlib axes.
+    * Replaced default save format with TIFF (300 dpi, bbox_inches='tight') 
+    * Verified and cleaned axis labels; updated units and text per figure
+    * Added printed confirmation of saved figure path 
+
+
 	
 	
 	

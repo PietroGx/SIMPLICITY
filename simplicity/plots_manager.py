@@ -25,6 +25,9 @@ import os
 import math
 import matplotlib
 import matplotlib.colors as mcolors
+from matplotlib.ticker import FuncFormatter
+from matplotlib.gridspec import GridSpec
+from sklearn.linear_model import LinearRegression
 # matplotlib.use('Agg')
 import anytree
 from anytree.exporter import DotExporter
@@ -40,191 +43,259 @@ import simplicity.tuning.diagnosis_rate    as dr
 import simplicity.tuning.evolutionary_rate as er
 import simplicity.phenotype.weight         as pheno_weight
 
+def apply_plos_rcparams():
+    plt.rcParams.update({
+        'savefig.dpi': 300,
+        'font.size': 8,
+        'axes.labelsize': 8,
+        'axes.titlesize': 8,
+        'xtick.labelsize': 8,
+        'ytick.labelsize': 8,
+        'legend.fontsize': 8,
+        'font.family': 'sans-serif',
+        'font.sans-serif': ['Arial'],  # PLOS-compatible font
+        'pdf.fonttype': 42,            # Embed fonts in PDF
+        'ps.fonttype': 42,
+        'figure.dpi': 300
+    })
+
+apply_plos_rcparams()
+
+def apply_standard_axis_style(ax, has_secondary_y=False):
+    """
+    Apply PLOS-compliant style to an axis:
+    - 8pt font (inherited via rcParams)
+    - No top/right spines unless `has_secondary_y` is True
+    """
+    ax.spines['top'].set_visible(False)
+    if not has_secondary_y:
+        ax.spines['right'].set_visible(False)
+
+    # Ensure ticks and labels are 8pt (in case rcParams missed it)
+    ax.tick_params(labelsize=8)
+    ax.title.set_fontsize(8)
+    ax.xaxis.label.set_fontsize(8)
+    ax.yaxis.label.set_fontsize(8)
+
+def save_plos_figure(fig, filepath):
+    """
+    Save figure as high-resolution TIFF (PLOS compatible).
+    """
+    fig.savefig(filepath, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
 # -----------------------------------------------------------------------------
 #                        Simplicity simulation plots
 # -----------------------------------------------------------------------------
 
 def plot_fitness(simulation_output):
     """
-    Plots the fitness trajectory with mean and standard deviation.
-    
+    Plot the average fitness trajectory of a simulation over time.
+
+    This figure displays the mean fitness and its standard deviation 
+    (as a shaded area) across time steps of the simulation.
+
+    Parameters
+    ----------
+    simulation_output : object
+        A simulation output object containing a `.fitness_trajectory` attribute,
+        which is a list of (time, (mean, std)) tuples.
     """
+
     # Extract time, mean, and standard deviation data
     times = [coord[0] for coord in simulation_output.fitness_trajectory]
     means = [coord[1][0] for coord in simulation_output.fitness_trajectory]
     stds  = [coord[1][1] for coord in simulation_output.fitness_trajectory]
 
-    # Create a plot
-    plt.figure(figsize=(10, 6))
-    plt.plot(times, means, linestyle='-', color='g', label='Mean fitness')
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Plot mean fitness trajectory
+    ax.plot(times, means, linestyle='-', color='green', label='Mean fitness')
 
     # Add shaded area for standard deviation
-    plt.fill_between(times, 
-                     [m - s for m, s in zip(means, stds)], 
-                     [m + s for m, s in zip(means, stds)], 
-                     color='green', alpha=0.3, label='Standard Deviation')
+    ax.fill_between(times, 
+                    [m - s for m, s in zip(means, stds)], 
+                    [m + s for m, s in zip(means, stds)], 
+                    color='green', alpha=0.3, label='Standard deviation')
 
-    # Add labels and title
-    plt.xlabel('Time')
-    plt.ylabel('Average fitness')
-    plt.title('Average fitness during simulation')
-    plt.xlim(left=0)
-    plt.ylim(bottom=0)
+    # Axis labels and title
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Average fitness')
+    ax.set_title('Average fitness during simulation')
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    # Style axis to comply with PLOS figure standards
+    apply_standard_axis_style(ax)
+
     # Add legend
-    plt.legend()
+    ax.legend()
+
+    # Get experiment name and save path
+    experiment_name = dm.get_experiment_foldername_from_SSOD(simulation_output.simulation_output_dir)
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
+    figure_output_path = os.path.join(experiment_plots_dir, "fitness_trajectory.tiff")
+
     # Save the plot
-    # plt.savefig(figpath)
-    plt.close()
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
     
 def plot_trajectory(seeded_simulation_output_dir):
-    '''
-    Plots the simulation trajectory and the evolution of infectivity
-    during the simulation. (In paper Figure 2B)
+    """
+    Plot the population trajectory of a SARS-CoV-2 simulation.
 
-    '''
+    This figure shows the evolution of three compartments over time:
+    - Susceptibles
+    - Infected individuals
+    - Diagnosed individuals (cumulative)
+
+    Parameters
+    ----------
+    seeded_simulation_output_dir : str
+        Path to the seeded simulation output directory.
+    """
+
+    # Load simulation trajectory data
     simulation_trajectory = om.read_simulation_trajectory(seeded_simulation_output_dir)
-    time       = simulation_trajectory['time'].tolist()
-    infected   = simulation_trajectory['infected']
-    diagnosed  = simulation_trajectory['diagnosed']
-    susceptibles  = simulation_trajectory['susceptibles'] 
+    time = simulation_trajectory['time'].tolist()
+    infected = simulation_trajectory['infected']
+    diagnosed = simulation_trajectory['diagnosed']
+    susceptibles = simulation_trajectory['susceptibles']
 
-    # fig = plt.figure(0,figsize=(16, 9))
-    plt.title('Simulation of SARS-CoV-2 outbreak')
-    
-    
-    plt.plot(time,susceptibles,
-        label='Susceptibles', 
-        color= 'black')
-    plt.plot(time,infected,
-            label='Infected individuals', 
-            color= 'red')
-    plt.plot(time,diagnosed,
-            label='Diagnosed individuals (cumulative)', 
-            color= 'green')
-    
-    plt.xlabel('Time - days')
-    plt.ylabel('Number of individuals in compartment')
-    plt.xlim(0,time[-1])
-    plt.ylim(0)
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Plot population compartments
+    ax.plot(time, susceptibles, label='Susceptibles', color='black')
+    ax.plot(time, infected, label='Infected individuals', color='red')
+    ax.plot(time, diagnosed, label='Diagnosed individuals (cumulative)', color='green')
+
+    # Set labels, limits, and legend
+    ax.set_title('Simulation of SARS-CoV-2 outbreak')
+    ax.set_xlabel('Time - days')
+    ax.set_ylabel('Number of individuals in compartment')
+    ax.set_xlim(0, time[-1])
+    ax.set_ylim(0)
+    ax.legend()
     plt.tight_layout()
-    plt.legend()
+
+    # Apply axis styling
+    apply_standard_axis_style(ax)
+
+    # Determine save path
+    experiment_name = dm.get_experiment_foldername_from_SSOD(seeded_simulation_output_dir)
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
+    seed = os.path.basename(seeded_simulation_output_dir)
+    figure_output_path = os.path.join(experiment_plots_dir, f"{experiment_name}_{seed}_trajectory.tiff")
+
+    # Save the plot 
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
 
 def plot_simulation(seeded_simulation_output_dir, threshold):
-    '''
-    joins plots of population trajectory and lineages frequency in a single 
-    plot
+    """
+    Plot a combined simulation summary figure.
 
-    '''
-    
-    from matplotlib.ticker import FuncFormatter
-    from matplotlib.gridspec import GridSpec
-    fig = plt.figure(num=1,figsize=(12, 8))
+    This multi-panel figure includes:
+    1. System trajectory: Number of infected individuals over time.
+    2. Lineage frequencies over time (filtered by threshold).
+    3. Average fitness score with standard deviation.
 
-    # Create a gridspec object with 3 rows. 
-    # The height_ratios argument determines the relative heights of the plots.
-    # Here, 1:2 ratio for the plots, and an empty space with '0' ratio.
-    gs = GridSpec(3, 1, height_ratios=[1,1,1])  
-    
-    # Create the subplots using the gridspec indices
+    Parameters
+    ----------
+    seeded_simulation_output_dir : str
+        Path to the seeded simulation output directory.
+    threshold : float
+        Relative frequency threshold for filtering lineages (e.g., 0.05 = 5%).
+    """
+    # Set up figure and layout
+    fig = plt.figure(figsize=(12, 8))
+    gs = GridSpec(3, 1, height_ratios=[1, 1, 1])  
     ax2 = fig.add_subplot(gs[0, 0])  
-    ax1 = fig.add_subplot(gs[2, 0],sharex=ax2) 
-    ax3 = fig.add_subplot(gs[1, 0],sharex=ax2) 
-    
-    # Adjust subplot parameters
+    ax1 = fig.add_subplot(gs[2, 0], sharex=ax2)
+    ax3 = fig.add_subplot(gs[1, 0], sharex=ax2)
+
     fig.subplots_adjust(
-        top=0.95,
-        bottom=0.085,
-        left=0.07,
-        right=0.81,
-        hspace=0.1,
-        wspace=0.085
+        top=0.95, bottom=0.085,
+        left=0.07, right=0.81,
+        hspace=0.1, wspace=0.085
     )
-    
-    # -------------------- system trajectory subplot  -------------------------
+
+    # --- Subplot 1: System trajectory ----------------------------------------
     trajectory_df = om.read_simulation_trajectory(seeded_simulation_output_dir)
-    
     time = trajectory_df['time'].tolist()
-    infected   = trajectory_df['infected'].tolist()
-            
-    ax2.plot(time,infected,
-            label='Infected individuals at time t', 
-            color= 'red')
-    
-    ax2.set_ylim(0,max(infected)*1.5)
-    ax2.tick_params(axis='both', labelsize=15)
-    ax2.set_ylabel('N individuals', fontsize=15)
-    ax2.legend(loc='upper left', fontsize=15)
-    
-    # ----------------- lineages frequency subplot ----------------------------
+    infected = trajectory_df['infected'].tolist()
+
+    ax2.plot(time, infected, label='Infected individuals at time t', color='red')
+    ax2.set_ylim(0, max(infected) * 1.5)
+    ax2.set_ylabel('N individuals')
+    ax2.legend(loc='upper left')
+    apply_standard_axis_style(ax2)
+
+    # --- Subplot 2: Lineages frequency ---------------------------------------
     lineage_frequency_df = om.read_lineage_frequency(seeded_simulation_output_dir)
-    
-    # get lineages colormap
     colormap_df = make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow')
-    # save lineages colors tab
-    plot_lineages_colors_tab(seeded_simulation_output_dir)
-   
-    # filter lineages_df by threshold
-    filtered_df,_ = om.filter_lineage_frequency_df(lineage_frequency_df, threshold)
-    # get colors
-    colors = [get_lineage_color(lineage_name, colormap_df) for lineage_name in filtered_df.columns]
-    # plot
-    filtered_df.plot(kind='area', stacked=False, color=colors,
-                         alpha=0.5, ax=ax1)
+    plot_lineages_colors_tab(seeded_simulation_output_dir)  # Save color key figure
+
+    filtered_df, _ = om.filter_lineage_frequency_df(lineage_frequency_df, threshold)
+    colors = [get_lineage_color(name, colormap_df) for name in filtered_df.columns]
+    filtered_df.plot(kind='area', stacked=False, color=colors, alpha=0.5, ax=ax1)
+
     time_file_path = os.path.join(seeded_simulation_output_dir, 'final_time.csv')
     time_final = pd.read_csv(time_file_path, header=None).iloc[0, 0]
-    ax1.set_xlim([0,time_final])
-    # Define custom formatter function
-    def to_percent(x, _):
-        return f"{100 * x:.0f}%"
+    ax1.set_xlim([0, time_final])
+
+    def to_percent(x, _): return f"{100 * x:.0f}%"
     ax1.yaxis.set_major_formatter(FuncFormatter(to_percent))
-    # Set tick label sizes for both axes
-    ax1.tick_params(axis='both', labelsize=15)
-    ax1.set_ylabel("Relative frequency of lineage", fontsize=15)
-    # ax1.set_xlabel("Time (days)", fontsize=20)
-    # ax2.legend(loc='upper left', bbox_to_anchor=(1, 2.95))
+    ax1.set_ylabel("Relative frequency of lineage")
     ax1.legend().remove()
-    
-    # ------------------------ fitness subplot --------------------------------
+    apply_standard_axis_style(ax1)
+
+    # --- Subplot 3: Fitness trajectory ---------------------------------------
     fitness_trajectory_file_path = os.path.join(seeded_simulation_output_dir, 'fitness_trajectory.csv')
     fitness_trajectory_df = pd.read_csv(fitness_trajectory_file_path)
-    
-    # Extract time, mean, and standard deviation data
+
     times = fitness_trajectory_df['Time'].tolist()
     means = fitness_trajectory_df['Mean'].tolist()
     stds = fitness_trajectory_df['Std'].tolist()
-    
-    ax3.plot(times, means, linestyle='-', color='#2ca02c', label='Average fitness score')
 
-    # Add shaded area for standard deviation
-    ax3.fill_between(times, 
-                     [m - s for m, s in zip(means, stds)], 
-                     [m + s for m, s in zip(means, stds)], 
+    ax3.plot(times, means, linestyle='-', color='#2ca02c', label='Average fitness score')
+    ax3.fill_between(times,
+                     [m - s for m, s in zip(means, stds)],
+                     [m + s for m, s in zip(means, stds)],
                      color='#2ca02c', alpha=0.3, label='Fitness score std')
 
-    # Add labels and title
-    # ax3.xlabel('Time')
-    ax3.tick_params(axis='both', labelsize=15)
-    ax3.set_xlabel('Time - days', fontsize=15)
-    ax3.set_xticks(np.arange(0,time_final,50))
-    ax3.set_xticklabels(np.arange(0,time_final,50).astype(int))
-    ax3.set_ylabel('Fitness score',fontsize=15)
+    ax3.set_xlabel('Time - days')
+    ax3.set_ylabel('Fitness score')
+    ax3.set_xticks(np.arange(0, time_final, 50))
+    ax3.set_xticklabels(np.arange(0, time_final, 50).astype(int))
     ax3.set_xlim(left=0)
     ax3.set_ylim(bottom=0)
-    # ax3.yaxis.set_label_coords(-0.1, 0)
-    # Add legend
-    ax3.legend(loc='upper left', fontsize=15)
-    
-    # Align the y-axis labels
+    ax3.legend(loc='upper left')
+    apply_standard_axis_style(ax3)
+
+    # --- Final formatting and saving -----------------------------------------
     fig.align_ylabels([ax2, ax3])
-    # save plot
     plt.tight_layout()
+
     experiment_name = dm.get_experiment_foldername_from_SSOD(seeded_simulation_output_dir)
     so_foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
     seed = os.path.basename(seeded_simulation_output_dir)
     experiment_simulations_plots_dir = dm.get_experiment_simulations_plots_dir(experiment_name)
-    figure_output_path = os.path.join(experiment_simulations_plots_dir,f"{so_foldername}_{seed}_simulation_trajectory.png")
-    plt.savefig(figure_output_path)
-    plt.close()
+    figure_output_path = os.path.join(
+        experiment_simulations_plots_dir,
+        f"{so_foldername}_{seed}_simulation_trajectory.tiff"
+    )
+
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
 
 # -----------------------------------------------------------------------------
 #                       Tempest regression and OSR plots
@@ -242,719 +313,841 @@ def ideal_subplot_grid(num_plots):
 def plot_tempest_regression(sequencing_data_df,
                             fitted_tempest_regression,
                             ax):
-    # get linear regression points
+    """
+    Plot the tempest regression for observed substitution rates (OSR).
+
+    This plot shows the linear regression of root-to-tip distance over time,
+    with the observed substitution rate (OSR) shown as the slope. The OSR value
+    is also included in the legend.
+
+    Parameters
+    ----------
+    sequencing_data_df : pandas.DataFrame
+        DataFrame with 'Sequencing_time' and 'Distance_from_root' columns.
+
+    fitted_tempest_regression : sklearn.linear_model.LinearRegression
+        Fitted regression model for OSR estimation.
+
+    ax : matplotlib.axes.Axes
+        The matplotlib axis object to draw the plot on.
+    """
+
+    # Get linear regression prediction
     x = sequencing_data_df['Sequencing_time'].values.reshape(-1, 1)
     y_pred = fitted_tempest_regression.predict(x)
-    # get observed subswtitution rate (OSR) value
-    observed_substitution_rate = fitted_tempest_regression.coef_[0] # substitution rate per site per year
-    # plot data points
-    sequencing_data_df.plot(kind='scatter', x='Sequencing_time', y='Distance_from_root', color='blue', ax=ax)
-    # plot linear regression
-    ax.plot(x, y_pred, color='red', linewidth=2, 
-            label='y = OSR · x')
-    ax.set_xlabel('Simulation time in years')
-    ax.set_ylabel('Distance from root (normed substitions/site)')
-    ax.set_xlim(left=0,right=3)
-    ax.set_ylim(0)
-    ax.grid(True)
-    # Adding OSR value to the legend
-    extra_text = f'OSR = {observed_substitution_rate:.5f}'
-    handles, labels = ax.get_legend_handles_labels()
-    handles.append(plt.Line2D([0], [0], color='white', label=extra_text))  # Invisible line for text
-    # Show legend
-    ax.legend(handles=handles)
-   
-def plot_figure_tempest_regression(experiment_name):
-    parameter = 'nucleotide_substitution_rate'
-    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
-    simulation_output_dir = simulation_output_dirs[10]
-    param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
-    sequencing_data_df = om.create_combined_sequencing_df(simulation_output_dir, 
-                                                          min_seq_number=30,
-                                                          min_sim_lenght=100)
-    
-    fig, ax = plt.subplots(1, 1, figsize=(8,8))
-    
-    if sequencing_data_df is None: 
-        print('no data to plot')
-        print(simulation_output_dir)
-        pass
-    else:
-        fitted_tempest_regression = er.tempest_regression(sequencing_data_df)
-        
-        plot_tempest_regression(sequencing_data_df,
-                                   fitted_tempest_regression,
-                                   ax)
-        ax.set_title(f'Regression - {parameter}: {param}')
-        # ax.set_ylim(0, 1)
+    osr = fitted_tempest_regression.coef_[0]
 
-    plt.tight_layout()
-    plt.savefig(os.path.join(experiment_plots_dir, f"{experiment_name}_figure3_tempest_regression.png"))
+    # Plot observed points
+    sequencing_data_df.plot(
+        kind='scatter',
+        x='Sequencing_time',
+        y='Distance_from_root',
+        color='blue',
+        ax=ax
+    )
+
+    # Plot regression line
+    ax.plot(x, y_pred, color='red', linewidth=2, label='y = OSR · x')
+
+    # Axis labels and limits
+    ax.set_xlabel('Simulation time in years')
+    ax.set_ylabel('Distance from root') #(substitutions/site, normed)
+    ax.set_xlim(left=0, right=3)
+    ax.set_ylim(0)
+
+    # Add OSR value to legend
+    extra_text = f'OSR = {osr:.5f}'
+    handles, labels = ax.get_legend_handles_labels()
+    handles.append(plt.Line2D([0], [0], color='white', label=extra_text))
+    ax.legend(handles=handles)
+
+    # Apply standard styling
+    apply_standard_axis_style(ax)
     
 def plot_combined_tempest_regressions(experiment_name, parameter, 
-                                      min_seq_number=0,min_sim_lenght=0, 
+                                      min_seq_number=0, min_sim_lenght=0, 
                                       y_axis_max=0.1):
-    # Get sorted simulation output directories for experiment
+    """
+    Plot a grid of tempest regressions for each simulation, grouped by a parameter value.
+
+    Each subplot shows the observed substitution rate (OSR) regression for a simulation
+    with a specific value of the given parameter.
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment to retrieve simulation outputs.
+
+    parameter : str
+        Parameter name to sort simulation outputs by (e.g., 'nucleotide_substitution_rate').
+
+    min_seq_number : int, optional
+        Minimum number of sequences required for regression (default is 0).
+
+    min_sim_lenght : int, optional
+        Minimum simulation length for inclusion (default is 0).
+
+    y_axis_max : float, optional
+        Maximum y-axis value for all plots (default is 0.1).
+    """
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
-  
-    sorted_simulation_output_dirs = sorted(simulation_output_dirs, 
-                     key=lambda dir: sm.get_parameter_value_from_simulation_output_dir(dir, parameter))
-    
-    # Determine the number of rows and columns for subplots
-    num_rows, num_cols = ideal_subplot_grid(len(sorted_simulation_output_dirs))
 
+    # Sort simulation directories by parameter value
+    sorted_simulation_output_dirs = sorted(
+        simulation_output_dirs, 
+        key=lambda dir: sm.get_parameter_value_from_simulation_output_dir(dir, parameter)
+    )
+
+    # Compute subplot grid size
+    num_rows, num_cols = ideal_subplot_grid(len(sorted_simulation_output_dirs))
     fig, axs = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows))
-    
-    # If there's only one subplot, axs is not an array, so we convert it to a 2D array for consistency
-    if num_rows * num_cols == 1:
-        axs = [[axs]]
-    elif num_rows == 1 or num_cols == 1:
-        axs = axs.reshape(1, -1)
-    else:
-        axs = axs
-    
+
+    # Ensure axs is a 2D numpy array
+    axs = np.atleast_2d(axs)
+
     for i, simulation_output_dir in enumerate(sorted_simulation_output_dirs):
-        param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
-        sequencing_data_df = om.create_combined_sequencing_df(simulation_output_dir, 
-                                                              min_seq_number=min_seq_number,
-                                                              min_sim_lenght=min_sim_lenght,
-                                                              )
-        if sequencing_data_df is None: 
-            pass
-        else:
-            fitted_tempest_regression = er.tempest_regression(sequencing_data_df)
-            ax = axs[i // num_cols][i % num_cols]
-            plot_tempest_regression(sequencing_data_df,
-                                       fitted_tempest_regression,
-                                       ax)
-            ax.set_title(f'Regression - {parameter}: {param}')
-            ax.set_ylim(0, y_axis_max)
-    
+        sequencing_data_df = om.create_combined_sequencing_df(
+            simulation_output_dir, 
+            min_seq_number=min_seq_number,
+            min_sim_lenght=min_sim_lenght
+        )
+
+        if sequencing_data_df is None:
+            continue
+
+        fitted_tempest_regression = er.tempest_regression(sequencing_data_df)
+        ax = axs[i // num_cols][i % num_cols]
+
+        # Plot the regression and title
+        plot_tempest_regression(sequencing_data_df, fitted_tempest_regression, ax)
+
+        param_val = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
+        ax.set_title(f'Regression - {parameter}: {param_val}')
+        ax.set_ylim(0, y_axis_max)
+
+        apply_standard_axis_style(ax)
+
     plt.tight_layout()
-    plt.savefig(os.path.join(experiment_plots_dir, f"{experiment_name}_combined_regression.png"))
+
+    # Define save path
+    figure_output_path = os.path.join(
+        experiment_plots_dir, 
+        f"{experiment_name}_combined_regression.tiff"
+    )
+
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
 
 def plot_combined_OSR_vs_parameter(experiment_name, 
                                     parameter,  
                                     min_seq_number=0,
                                     min_sim_lenght=0):
-    ''' Plot observed substituion rate (tempest regression) against desired parameter values
-    '''
+    """
+    Plot observed substitution rate (OSR) against the desired simulation parameter.
+
+    This figure shows the distribution of OSR values across different values of the 
+    specified simulation parameter using a boxplot.
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment to fetch output data and save plots.
+
+    parameter : str
+        Parameter (e.g., 'nucleotide_substitution_rate') to group OSR values by.
+
+    min_seq_number : int, optional
+        Minimum number of sequences required for inclusion (default is 0).
+
+    min_sim_lenght : int, optional
+        Minimum simulation duration to include (default is 0).
+    """
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
 
+    # Load observed substitution rate data
     df = om.read_OSR_vs_parameter_csv(experiment_name, 
-                                        parameter,
-                                        min_seq_number,
-                                        min_sim_lenght)
+                                      parameter,
+                                      min_seq_number,
+                                      min_sim_lenght)
 
-    # Boxplot for each X position
-    sns.boxplot(x=df[parameter], y=df['observed_substitution_rate'], hue=df[parameter], 
-                palette="coolwarm", width=0.6, showfliers=True)
-    
-    plt.xlabel(parameter)
-    plt.ylabel('Observed substitution rate')
-    plt.title(f'{parameter} vs observed substitution rate')
-    plt.grid(True)
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Boxplot
+    sns.boxplot(x=df[parameter],
+                y=df['observed_substitution_rate'],
+                hue=df[parameter],
+                palette="coolwarm",
+                width=0.6,
+                showfliers=True,
+                ax=ax)
+
+    # Labels and title
+    ax.set_xlabel(parameter)
+    ax.set_ylabel('Observed substitution rate')
+    ax.legend().remove()
+
+    # Standard styling
+    apply_standard_axis_style(ax)
+
     plt.tight_layout()
-    plt.legend().remove()
-    plt.savefig(os.path.join(experiment_plots_dir, 
-                             f"{experiment_name}_{parameter}_vs_observed_substitution_rate.png"))
-        
+
+    # Save
+    figure_output_path = os.path.join(
+        experiment_plots_dir, 
+        f"{experiment_name}_{parameter}_vs_observed_substitution_rate.tiff"
+    )
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
 def plot_combined_OSR_fit(experiment_name, 
-                                                 fit_result, 
-                                                 model_type, 
-                                                 min_seq_number,
-                                                 min_sim_lenght):
-    ''' plot fit of nucleotide substitution rate / observed substitution rate curve
-    '''
+                          fit_result, 
+                          model_type, 
+                          min_seq_number,
+                          min_sim_lenght):
+    """
+    Plot the fit of nucleotide substitution rate (NSR) vs. observed substitution rate (OSR).
 
-    data = om.read_combined_OSR_vs_parameter_csv(experiment_name, 
-                                                 'nucleotide_substitution_rate', 
-                                                 min_seq_number,
-                                                 min_sim_lenght)
-    x_data = data['nucleotide_substitution_rate'] 
-    y_data = data['observed_substitution_rate']  
-    
-    # Create figure and axes
-    fig, ax = plt.subplots(3,1, figsize=(8, 10))
-    # scatterplot data (u)
-    ax[0].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    ax[1].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    ax[2].scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
-    
-    # linear scale
-    ax[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', 
-               color='red', linewidth=2)
-    ax[0].set_ylim(0)
-    ax[0].set_xlim(0)
-    # ax[0].set_xlabel('Substitution Rate (site/year) (e)')
-    # ax[0].set_ylabel('observed substitution rate (site/year) (u)')
-    ax[0].legend()
-    # semilog scale
-    ax[1].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve',
-               color='red', linewidth=2)
-    ax[1].set_xscale("log")
-    ax[1].set_ylim(0)
-    # ax[1].set_xlabel('Substitution Rate (site/year) (e)')
-    ax[1].set_ylabel('observed substitution rate (site/year) (u)')
-    ax[1].legend()
-    # loglog scale
-    ax[2].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve',
-               color='red', linewidth=2)
-    ax[2].set_yscale("log")
-    ax[2].set_xscale("log")
-    ax[2].set_xlabel('Substitution Rate (site/year) (e)')
-    # ax[2].set_ylabel('observed substitution rate (site/year) (u)')
-    ax[2].legend()
-    
-    # fig.legend(loc="upper center", ncol=2, fontsize=10)
-    
-    plt.title('')
-    # plt.subplots_adjust(top=0.6)
+    Includes three views of the same data and fit:
+    1. Linear scale
+    2. Semi-log scale (log x-axis)
+    3. Log-log scale (log x- and y-axis)
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment for reading data and saving plots.
+
+    fit_result : lmfit.model.ModelResult
+        Fitted model result containing `.best_fit`.
+
+    model_type : str
+        Type of model used (used in file name).
+
+    min_seq_number : int
+        Minimum number of sequences for inclusion.
+
+    min_sim_lenght : int
+        Minimum simulation length for inclusion.
+    """
+    data = om.read_combined_OSR_vs_parameter_csv(
+        experiment_name,
+        'nucleotide_substitution_rate',
+        min_seq_number,
+        min_sim_lenght
+    )
+    x_data = data['nucleotide_substitution_rate']
+    y_data = data['observed_substitution_rate']
+
+    # Create subplots
+    fig, axes = plt.subplots(3, 1, figsize=(8, 10))
+
+    for ax in axes:
+        ax.scatter(x_data, y_data, label='Data', color='blue', alpha=0.5)
+
+    # Plot 1 — Linear scale
+    axes[0].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', color='red', linewidth=2)
+    axes[0].set_xlim(left=0)
+    axes[0].set_ylim(bottom=0)
+    axes[0].set_xlabel("Nucleotide substitution rate (site/year)")
+    axes[0].legend()
+    apply_standard_axis_style(axes[0])
+
+    # Plot 2 — Semi-log x
+    axes[1].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', color='red', linewidth=2)
+    axes[1].set_xscale("log")
+    axes[1].set_ylim(bottom=0)
+    axes[1].set_xlabel("Nucleotide substitution rate (site/year)")
+    axes[1].set_ylabel("observed substitution rate (site/year) (u)")
+    axes[1].legend()
+    apply_standard_axis_style(axes[1])
+
+    # Plot 3 — Log-log
+    axes[2].plot(x_data, fit_result.best_fit, label=f'Fitted {model_type} curve', color='red', linewidth=2)
+    axes[2].set_xscale("log")
+    axes[2].set_yscale("log")
+    axes[2].set_xlabel("Nucleotide substitution rate (site/year)")
+    axes[2].legend()
+    apply_standard_axis_style(axes[2])
+
+    # Finalize and save
     plt.tight_layout()
-    file_path = os.path.join(dm.get_experiment_plots_dir(experiment_name),
-     f'{experiment_name}_combined_observed_substitution_rate_{model_type}_fit.png')
-    plt.savefig(file_path)
+    figure_output_path = os.path.join(
+        dm.get_experiment_plots_dir(experiment_name),
+        f"{experiment_name}_combined_observed_substitution_rate_{model_type}_fit.tiff"
+    )
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
 def plot_OSR_fit(experiment_name, 
-                fit_result, 
-                model_type,
-                min_seq_number,
-                min_sim_lenght):
-    ''' plot fit of nucleotide substitution rate / observed substitution rates curve
-    '''
+                 fit_result, 
+                 model_type,
+                 min_seq_number,
+                 min_sim_lenght):
+    """
+    Plot nucleotide substitution rate vs. observed substitution rate (OSR)
+    including three panel views (linear, semilog, and log-log).
+
+    Each panel shows:
+    - OSR estimates (single simulations)
+    - Fitted curve
+    - Combined regression estimates
+    - Mean OSR values
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment, used to load and save data.
+
+    fit_result : lmfit.model.ModelResult
+        Fitted model result containing `.best_fit`.
+
+    model_type : str
+        Model used (used in output file name).
+
+    min_seq_number : int
+        Minimum number of sequences required for inclusion.
+
+    min_sim_lenght : int
+        Minimum simulation duration required for inclusion.
+    """
     parameter = 'nucleotide_substitution_rate'
-    
-    line_color = 'black' #'#DE8F05' # orange
-    scatter_color = '#DE8F05'# orange
-    combined_OSR_marker_color = '#E64B9D' # pink
-    scatter_color_2 = '#0173B2' # blue '#029E73' # green
-    
-    # Create figure and axes
-    fig, ax = plt.subplots(3,1, figsize=(8, 12))
+
+    line_color = 'black'
+    scatter_color = '#DE8F05'            # Orange
+    combined_OSR_marker_color = '#E64B9D'  # Pink
+    scatter_color_2 = '#0173B2'          # Blue
+
+    fig, axes = plt.subplots(3, 1, figsize=(8, 12))
     
     # import combined regression data
-    combined_data = om.read_combined_OSR_vs_parameter_csv(experiment_name,
-                                                          parameter,
-                                                          min_seq_number,
-                                                          min_sim_lenght)
-    
+    combined_data = om.read_combined_OSR_vs_parameter_csv(
+        experiment_name, parameter, min_seq_number, min_sim_lenght)
     # import single simulations regression data
-    data = om.read_OSR_vs_parameter_csv(experiment_name, 
-                                        parameter,
-                                        min_seq_number,
-                                        min_sim_lenght)
-    
+    data = om.read_OSR_vs_parameter_csv(
+        experiment_name, parameter, min_seq_number, min_sim_lenght)
     # Group by nucleotide_substitution_rate and compute mean and standard deviation for OSR
-    data_mean_df = om.get_mean_std_OSR(experiment_name,
-                                        parameter,
-                                        min_seq_number,
-                                        min_sim_lenght)
-    
-    # get lower and upper confidence interval for fit results
-    x_data = data['nucleotide_substitution_rate']
-    # x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data)
+    data_mean_df = om.get_mean_std_OSR(
+        experiment_name, parameter, min_seq_number, min_sim_lenght)
 
-    
-    # plot on each axis of subplots in a loop
-    for a in ax:
-        # # Fill between the upper and lower curves for the confidence interval region
-        # a.fill_between(x,lower_curve, upper_curve, 
-        #                color=line_color, alpha=0.3, label='95% Confidence Interval',
-        #                zorder=-1)
-        # scatterplot Estimated OSR - single simulation
-        sns.scatterplot(x=parameter, y='observed_substitution_rate', 
-                        label='Estimated OSR - single simulation', data=data,
-                        color=scatter_color, alpha=0.5, ax=a,
-                        zorder=0)
-        # plot fitted curve
-        sns.lineplot(x=x_data, y=fit_result.best_fit, 
-                     label=f'Fitted {model_type} curve', 
-                     color=line_color, linewidth=1, ax=a,
-                     zorder=1)
-        # scatterplot combined regression points (as comparison)
-        sns.scatterplot(x='nucleotide_substitution_rate', y='observed_substitution_rate', marker='X',
+    x_data = data['nucleotide_substitution_rate']
+
+    for ax in axes:
+        sns.scatterplot(
+            x=parameter, y='observed_substitution_rate',
+            label='Estimated OSR - single simulation', data=data,
+            color=scatter_color, alpha=0.5, ax=ax, zorder=0
+        )
+        sns.lineplot(
+            x=x_data, y=fit_result.best_fit,
+            label=f'Fitted {model_type} curve',
+            color=line_color, linewidth=1, ax=ax, zorder=1
+        )
+        sns.scatterplot(
+            x='nucleotide_substitution_rate', y='observed_substitution_rate', marker='X',
             label='Combined tempest regression estimate of OSR', data=combined_data,
-            color=combined_OSR_marker_color,alpha=1, ax=a,
-            zorder=2)
-        # plot mean of observed_substitution_rate from data_mean_std
-        sns.scatterplot(x=parameter, y='mean', marker = 'X',
-                        label='Mean of estimated OSR (single simulations)', data=data_mean_df,
-                        color=scatter_color_2, alpha=1, ax=a,
-                        zorder=3)
-        # Add horizontal lines 
-        # a.hlines(y=[1e-5, 1e-2], xmin=0, xmax=x_data.max(), colors=['r', 'r'], linestyles='--')
-        # Set y-axis limits
-        a.set_ylim(0.000009, 0.02)
-        
-        # minsimlenghts = [0,100,200,300]
-        # palette = sns.color_palette("tab10", len(minsimlenghts))
-        # for i, minsimlenght in enumerate(minsimlenghts):
-        #     df = om.get_mean_std_observed_substitution_rates(experiment_name,
-                                                                # parameter,
-                                                                # min_seq_number,
-                                                                # minsimlenght)
-        #     # plot mean of observed_substitution_rate from data_mean_std
-        #     sns.scatterplot(x=parameter, y='mean', marker = 'X',
-        #                     label=f'Mean of estimated OSR - min {minsimlenght} d', data=df,
-        #                     color=palette[i], alpha=0.8, ax=a,
-        #                     zorder=4)
+            color=combined_OSR_marker_color, alpha=1, ax=ax, zorder=2
+        )
+        sns.scatterplot(
+            x=parameter, y='mean', marker='X',
+            label='Mean of estimated OSR (single simulations)', data=data_mean_df,
+            color=scatter_color_2, alpha=1, ax=ax, zorder=3
+        )
+        ax.set_ylim(0.000009, 0.02)
+        apply_standard_axis_style(ax)
 
-    # First plot (linear scale) -----------------------------------------------
-    ax[0].set_xlabel(f'{parameter}')
-    ax[0].set_ylabel('observed substitution rate')
-    
-    
-    # Second plot (semilog scale) -----------------------------------------------
-    
-    ax[1].set_xlabel(f'{parameter}')
-    ax[1].set_ylabel('observed substitution rate')
-    ax[1].set_xscale('log')
-    ax[1].legend_.remove()
-    
-    # Third plot (log log scale) -----------------------------------------------
-    ax[2].set_xlabel(f'{parameter}')
-    ax[2].set_ylabel('observed substitution rate')
-    ax[2].set_xscale('log')
-    ax[2].set_yscale('log')
-    ax[2].legend_.remove()
-    
+    # Linear scale
+    axes[0].set_xlabel("Nucleotide substitution rate (site/year)")
+    axes[0].set_ylabel("Observed Substitution Rate (site/year)")
+
+    # Semi-log x-axis
+    axes[1].set_xlabel("Nucleotide substitution rate (site/year)")
+    axes[1].set_ylabel("Observed Substitution Rate (site/year)")
+    axes[1].set_xscale("log")
+    axes[1].legend_.remove()
+
+    # Log-log
+    axes[2].set_xlabel("Nucleotide substitution rate (site/year)")
+    axes[2].set_ylabel("Observed Substitution Rate (site/year)")
+    axes[2].set_xscale("log")
+    axes[2].set_yscale("log")
+    axes[2].legend_.remove()
+
     plt.tight_layout()
-    plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
-        f"{experiment_name}_observed_substitution_rates_{model_type}_fit.png"))
-    
-def plot_OSR_fit_figure(experiment_name, 
-                fit_result, 
-                model_type,
-                min_seq_number,
-                min_sim_lenght):
-    ''' plot fit of nucleotide substitution rate / observed substitution rates curve
-    '''
-    parameter = 'nucleotide_substitution_rate'
-    
-    line_color = 'black' #'#DE8F05' # orange
-    scatter_color = '#DE8F05'# orange
-    combined_OSR_marker_color = '#E64B9D' # pink
-    scatter_color_2 = '#0173B2' # blue '#029E73' # green
-    
-    # Create figure and axes
-    fig, ax = plt.subplots(1,1, figsize=(8,6))
-    
-    # import combined regression data
-    combined_data = om.read_combined_OSR_vs_parameter_csv(experiment_name,
-                                                          parameter,
-                                                          min_seq_number,
-                                                          min_sim_lenght)
-    
-    # import single simulations regression data
-    data = om.read_OSR_vs_parameter_csv(experiment_name, 
-                                        parameter,
-                                        min_seq_number,
-                                        min_sim_lenght)
-    
-    # Group by nucleotide_substitution_rate and compute mean and standard deviation for OSR
-    data_mean_df = om.get_mean_std_OSR(experiment_name,
-                                        parameter,
-                                        min_seq_number,
-                                        min_sim_lenght)
-    
-    # get lower and upper confidence interval for fit results
-    x_data = data['nucleotide_substitution_rate']
-    # x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data)
-    
-    
-    # # Fill between the upper and lower curves for the confidence interval region
-    # ax.fill_between(x,lower_curve, upper_curve, 
-    #                color=line_color, alpha=0.3, label='95% Confidence Interval',
-    #                zorder=-1)
-    # scatterplot Estimated OSR - single simulation
-    sns.scatterplot(x=parameter, y='observed_substitution_rate', 
-                    label='Estimated OSR - single simulation', data=data,
-                    color=scatter_color, alpha=0.5, ax=ax,
-                    zorder=0)
-    # plot fitted curve
-    sns.lineplot(x=x_data, y=fit_result.best_fit, 
-                 label=f'Fitted {model_type} curve', 
-                 color=line_color, linewidth=1, ax=ax,
-                 zorder=1)
-    # scatterplot combined regression points (as comparison)
-    sns.scatterplot(x='nucleotide_substitution_rate', y='observed_substitution_rate', marker='X',
-        label='Combined tempest regression estimate of OSR', data=combined_data,
-        color=combined_OSR_marker_color,alpha=1, ax=ax,
-        zorder=2)
-    # plot mean of observed_substitution_rate from data_mean_std
-    sns.scatterplot(x=parameter, y='mean', marker = 'X',
-                    label='Mean of estimated OSR (single simulations)', data=data_mean_df,
-                    color=scatter_color_2, alpha=1, ax=ax,
-                    zorder=3)
 
-    
-    # Set axis (log log scale) -----------------------------------------------
-    ax.set_xlabel(f'{parameter}')
-    ax.set_ylabel('observed substitution rate')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlim(x_data.min(),x_data.max()*1.1)
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
-        f"Figure4_OSR_{model_type}_fit.png"))
-    
-# def confidence_interval_fit(model_type, fit_result, x):
-#     params_lower = {}
-#     params_upper = {}
-    
-    
-#     # print(f'{model_type}')
-#     for param in fit_result.params:
-#         param_value = fit_result.params[param].value
-#         param_stderr = fit_result.params[param].stderr if fit_result.params[param].stderr else 0
-        
-#         # print(f'CI std : {param} - {param_value} - {param_stderr}')
-#         ci_lower = param_value - 1.96 * param_stderr
-#         ci_upper = param_value + 1.96 * param_stderr
-        
-#         params_lower[param] = ci_lower
-#         params_upper[param] = ci_upper
-    
-#     def remove_duplicates_array(arr):
-#         _, idx = np.unique(arr, return_index=True)
-#         return arr[np.sort(idx)]
-
-#     x = remove_duplicates_array(x)
-
-#     # Create the upper and lower bound curves for confidence intervals
-#     upper_curve = er.evaluate_model(model_type, params_upper, x)
-#     lower_curve = er.evaluate_model(model_type, params_lower, x)
-#     return x, lower_curve, upper_curve
-
+    figure_output_path = os.path.join(
+        dm.get_experiment_plots_dir(experiment_name),
+        f"{experiment_name}_observed_substitution_rates_{model_type}_fit.tiff"
+    )
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
 # -----------------------------------------------------------------------------
 #                          Phenotype model plots
 # -----------------------------------------------------------------------------
-
-def plot_w_t(t_max, t_eval): # plot weights of phenotype model
-    '''plot the phenotype model weight function for calculating fitness score 
-    (distance from weighted consensus sequence)
-    '''
     
+def plot_w_t(t_max, t_eval, experiment_name):
+    """
+    Plot the time-dependent weight function w(t) used in the phenotype model.
+
+    The weight function represents the relative importance of sequences at different
+    time points in computing the consensus used for fitness estimation.
+
+    Parameters
+    ----------
+    t_max : float
+        Maximum simulation time.
+
+    t_eval : float
+        Current simulation time at which the weight curve is evaluated.
+    """
     params = pheno_weight.w_t_params()
-    k_e = params[0]
-    k_a = params[1]
-    
-    # Time points 
-    t = np.linspace(0,300,1000)
+    k_e, k_a = params
 
-    # Calculate concentration for each time point
+    # Time points
+    t = np.linspace(0, 300, 1000)
     w_t = pheno_weight.weights(t, t_eval, k_e, k_a, t_max)
 
-    # Plotting the concentration-time profile
-    plt.plot(t, w_t, label=f'w(t) at simulation time {t_eval}',color='black')
-    plt.xlabel('Time (days)',fontsize=20)
-    plt.ylabel('Normalized Antibody Concentration (weight)',fontsize=20)
-    plt.ylim(0,1.1)
-    plt.xlim(left=0)
-    plt.tick_params(axis='both', labelsize=20)
-    # plt.title('Concentration-Time Profile')
-    plt.legend(loc ='upper left',fontsize=20)
-    plt.show()
-    
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(t, w_t, label=f'w(t) at simulation time {t_eval}', color='black')
+
+    ax.set_xlabel("Time (days)")
+    ax.set_ylabel("Weight(t) for the consensus sequence")
+    ax.set_xlim(left=0)
+    ax.set_ylim(0, 1.1)
+    ax.legend(loc='upper left')
+
+    apply_standard_axis_style(ax)
+    plt.tight_layout()
+
+    figure_output_path = os.path.join(
+        dm.get_experiment_plots_dir(experiment_name),
+        f"phenotype_weight_function_tmax_{t_max}_teval_{t_eval}.tiff"
+    )
+
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
 # -----------------------------------------------------------------------------
 #                             Intra host model plots
 # -----------------------------------------------------------------------------
-def plot_intra_host(intra_host_model,time,step):
-    '''
-    Plot intra-host model solutions.
+
+def plot_intra_host(experiment_name, intra_host_model, time, step):
+    """
+    Plot intra-host model solutions over time for all initial states.
+
+    Displays curves for the probability of being infectious at time t for
+    all possible initial states (0 to 20), with a continuous color mapping.
 
     Parameters
     ----------
+    experiment_name : str
+        Name of the experiment used for saving the plot.
+
+    intra_host_model : IntraHostModel
+        Intra-host model object with `_data_plot_model(state, time, step)` method.
+
     time : float
-        Time for the intra-host model solution
+        Maximum time to simulate.
 
-    Returns
-    -------
-    Plot p_inf/p_dia/p_rec.
-
-    '''
+    step : float
+        Time step resolution.
+    """
     import matplotlib.colors as mcolors
     from matplotlib import cm
-    matplotlib.rcParams.update({'font.size': 22})
 
-    t = np.arange(0,time,step)
-    states = np.arange(0,21,1) #[0] # 
-    # setup the normalization and the colormap
-    normalize = mcolors.Normalize(vmin=min(states), vmax=max(states))
+    t = np.arange(0, time, step)
+    states = np.arange(0, 21, 1)
+
+    normalize = mcolors.Normalize(vmin=states.min(), vmax=states.max())
     colormap = cm.brg
-    
-    # plot curve for each starting state
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Plot probability curves per state
     for state in states:
-        plt.plot(t,intra_host_model._data_plot_model(state,time,step), 
-                 color = colormap(normalize(state)))
-        
-    # setup the colorbar
-    scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
-    scalarmappaple.set_array(states)
-    cb = plt.colorbar(scalarmappaple)
-    cb.set_ticks(np.arange(0,21,1))
-    plt.text(300.5,1.1,'Initial state')
-   
-    # show the figure
-    plt.xlabel('Time (d)')
-    plt.ylabel('Probability of being inf after t days')
-    plt.xlim(0,time)
-    plt.ylim(0)
-    plt.show()    
+        prob = intra_host_model._data_plot_model(state, time, step)
+        ax.plot(t, prob, color=colormap(normalize(state)))
+
+    # Colorbar
+    scalarmappable = cm.ScalarMappable(norm=normalize, cmap=colormap)
+    scalarmappable.set_array(states)
+    cbar = fig.colorbar(scalarmappable, ax=ax)
+    cbar.set_ticks(np.arange(0, 21, 1))
+    cbar.set_label("Initial state")
+
+    # Axis labels
+    ax.set_xlabel("Time (d)")
+    ax.set_ylabel("Probability of being infected after t days")
+    ax.set_xlim(0, time)
+    ax.set_ylim(0)
+
+    apply_standard_axis_style(ax)
+
+    plt.tight_layout()
+    figure_output_path = os.path.join(
+        dm.get_experiment_plots_dir(experiment_name),
+        f"{experiment_name}_intra_host_model_solution.tiff"
+    )
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
     
-def plot_comparison_intra_host_models(intra_host_model):
-    '''
-    Plot intra-host model probability of being infectious after t days for
-    normal and long shedders individuals
+def plot_comparison_intra_host_models(experiment_name, intra_host_model):
+    """
+    Compare intra-host model dynamics for normal vs. long-shedder individuals.
+
+    Two curves are plotted:
+    - One for typical infectious period (normal)
+    - One for long shedders (immunocompromised)
 
     Parameters
     ----------
-    time : float
-        Time for the intra-host model solution
+    experiment_name : str
+        Name of the experiment used to save the plot.
 
-    Returns
-    -------
-    Plot p_inf
-
-    '''
+    intra_host_model : IntraHostModel
+        The intra-host model instance with matrix and solver methods.
+    """
     import scipy
-    
-    matplotlib.rcParams.update({'font.size': 22})
 
-    t = np.arange(0,50,0.1)
+    fig, ax = plt.subplots(figsize=(8, 5))
 
-    plt.plot(t,intra_host_model._data_plot_model(0,50,.1), color = 'orange', 
-             label = 'normal')
-    
-    # setup intra-host model matrix and calculate matrix exponential
+    # Normal individual curve
+    t_normal = np.arange(0, 50, 0.1)
+    y_normal = intra_host_model._data_plot_model(0, 50, 0.1)
+    ax.plot(t_normal, y_normal, color='orange', label='Normal')
+
+    # Immunocompromised individual curve
     intra_host_model.A = intra_host_model._matrix(133.5)
     intra_host_model.A_ex = scipy.linalg.expm(intra_host_model.A)
-    
-    t = np.arange(0,300,1)
-    plt.plot(t,intra_host_model._data_plot_model(0,300,1), color = 'blue', 
-             label = 'immunocompromised')
-    # show the figure
-    plt.xlabel('Time (d)')
-    plt.ylabel('Probability of being inf. after t days')
-    plt.xlim(0,300)
-    plt.ylim(0)
-    plt.legend()
-    plt.show()    
+    t_compromised = np.arange(0, 300, 1)
+    y_compromised = intra_host_model._data_plot_model(0, 300, 1)
+    ax.plot(t_compromised, y_compromised, color='blue', label='Immunocompromised')
+
+    # Axis settings
+    ax.set_xlabel("Time (d)")
+    ax.set_ylabel("Probability of being infected after t days")
+    ax.set_xlim(0, 300)
+    ax.set_ylim(0)
+    ax.legend()
+
+    apply_standard_axis_style(ax)
+    plt.tight_layout()
+
+    figure_output_path = os.path.join(
+        dm.get_experiment_plots_dir(experiment_name),
+        f"{experiment_name}_intra_host_model_comparison.tiff"
+    )
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
     
 # -----------------------------------------------------------------------------
 #                           Runtime analysis plot
 # -----------------------------------------------------------------------------
 
 def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
-    ''' Plots infected number vs simulation RUNTIME.
-    extrande_pop_runtime_csv is generated in extrande for memory profiling (commented out)
-    '''
+    """
+    Plot the number of infected individuals versus simulation runtime.
+
+    This figure is generated from a CSV file containing runtime profiling output.
+
+    Parameters
+    ----------
+    extrande_pop_runtime_csv : str
+        Path to the CSV file with two columns: runtime (s) and infected count.
+    """
     import csv
-    # Read the CSV file
+
     x_values = []
     y_values = []
-    
+
     with open(extrande_pop_runtime_csv, mode='r') as file:
         reader = csv.reader(file)
         for row in reader:
-            x, y = map(float, row)  
+            x, y = map(float, row)
             x_values.append(x)
             y_values.append(y)
-            
-    # Sort based on x_values 
+
+    # Sort by runtime
     x_values, y_values = zip(*sorted(zip(x_values, y_values)))
-    # Plotting the data
-    plt.plot(x_values, y_values) 
-    plt.xlabel('Runtime (s)')
-    plt.ylabel('Infected number')
-    plt.title('Plot infected number over simulation runtime')
-    plt.grid(True)
-    plt.savefig('extrande_pop_runtime.png')
-    plt.show()
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(x_values, y_values)
+
+    ax.set_xlabel("Runtime (s)")
+    ax.set_ylabel("Infected number")
+
+    apply_standard_axis_style(ax)
+    plt.tight_layout()
+
+    output_path = "extrande_pop_runtime.tiff"
+    print(f"Saving figure to: {output_path}")
+    plt.savefig(output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
     
 # -----------------------------------------------------------------------------
 #                          Diagnosis rate plots
 # -----------------------------------------------------------------------------
-
+    
 def plot_effective_theoretical_diagnosis_rate(experiment_name):
-    ''' plot scatter and regression line of effective vs theoretical diagnosis rate
-    '''
-    import simplicity.tuning.diagnosis_rate as dr
-    from sklearn.linear_model import LinearRegression
-    # get theoretical and effective diagnosis rates 
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name) 
+    """
+    Plot effective vs. theoretical diagnosis rate as a scatter plot with regression fit.
+
+    For each simulation, the plot compares the user-specified (theoretical) diagnosis
+    rate with the effective diagnosis rate observed from the output, including
+    standard deviation as vertical error bars.
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment used to retrieve simulation outputs and save the plot.
+    """
+
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+
     diagnosis_rates_coord = []
     std_effective_rates = []
+
     for simulation_output_dir in simulation_output_dirs:
         diagnosis_rates, std_effective_rate = dr.get_diagnosis_rates(simulation_output_dir)
-        diagnosis_rates_coord.append(diagnosis_rates) 
+        diagnosis_rates_coord.append(diagnosis_rates)
         std_effective_rates.append(std_effective_rate)
-        
-    x, y = zip(*diagnosis_rates_coord) # x is theoretical rate, y is effective
-    
-    # Convert x and y to numpy arrays for compatibility with sklearn
-    x = np.array(x).reshape(-1, 1)  # Reshape for sklearn
+
+    x, y = zip(*diagnosis_rates_coord)
+    x = np.array(x).reshape(-1, 1)
     y = np.array(y)
-    
-    # Fit linear regression
+
     model = LinearRegression()
     model.fit(x, y)
-    
     y_pred = model.predict(x)
-    
-    # Get the regression slope and intercept
+
     slope = model.coef_[0]
     intercept = model.intercept_
 
-    # Creating the scatter plot
-    plt.scatter(x, y)
-    # Plot the regression line
-    plt.plot(x, y_pred, color='red', 
-             label=f'Regression Line: y = {slope:.2f}x + {intercept:.2f}')
-    # Plot the standard deviation as vertical lines
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.scatter(x, y, label="Simulations")
+    ax.plot(x, y_pred, color='red', label=f'y = {slope:.2f}x + {intercept:.2f}')
+
     for i in range(len(x)):
-        plt.errorbar(x[i], y[i], yerr=std_effective_rate, fmt='o', color='black', capsize=5)
-   
-    # Adding labels
-    plt.title('Linear regression: theoretical vs effective diagnosis rate')
-    plt.xlabel('Theoretical diagnosis rate')
-    plt.xlim(0,max(x)*1.1)
-    plt.ylabel('Effective diagnosis rate')
-    plt.ylim(0,max(x)*1.1)
-    plt.legend()
-    # Display the plot
-    plt.show()
+        ax.errorbar(x[i], y[i], yerr=std_effective_rates[i], fmt='o', color='black', capsize=5)
+
+    ax.set_xlabel("Theoretical diagnosis rate")
+    ax.set_ylabel("Effective diagnosis rate")
+    ax.set_xlim(0, max(x) * 1.1)
+    ax.set_ylim(0, max(x) * 1.1)
+    ax.legend()
+
+    apply_standard_axis_style(ax)
+    plt.tight_layout()
+
+    figure_output_path = os.path.join(
+        dm.get_experiment_plots_dir(experiment_name),
+        f"{experiment_name}_effective_vs_theoretical_diagnosis_rate.tiff"
+    )
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
 def plot_heatmap_R_diagnosis_rate(experiment_name):
-    ''' Plot heatnmap to see relationship of R and diagnosis rate.  
-    y axis is R 
-    x axis is theoretical diagnosis rate (user input)
-    score for heatmap is effective/theoretical diagnosis rate
-    '''
-    # get theoretical and effective diagnosis rates 
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name) 
-    # create df
-    heatmap_data = pd.DataFrame()
-    # get data
+    """
+    Plot a heatmap showing the relationship between R and theoretical diagnosis rate.
+
+    The heatmap values represent the ratio of effective to theoretical diagnosis rate,
+    across all simulation outputs within the experiment.
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment used to retrieve simulation output and save the plot.
+    """
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+
     theoretical_diagnosis_rates = []
     R_values = []
-    diagnosis_rate_scores = [] 
+    diagnosis_rate_scores = []
+
     for simulation_output_dir in simulation_output_dirs:
         diagnosis_rates, _ = dr.get_diagnosis_rates(simulation_output_dir)
-        
-        theoretical_diagnosis_rates.append(sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir,
-                                                                             'diagnosis_rate'))
-        R_values.append(sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir,
-                                                                             'R'))
-        diagnosis_rate_scores.append(diagnosis_rates[1]/diagnosis_rates[0])
-    # fill the df iteratively
-    for diagnosis_rate, R, score in zip(theoretical_diagnosis_rates, 
-                                        R_values, 
-                                        diagnosis_rate_scores):
+
+        theoretical_diagnosis_rates.append(
+            sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, 'diagnosis_rate')
+        )
+        R_values.append(
+            sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, 'R')
+        )
+        score = diagnosis_rates[1] / diagnosis_rates[0]
+        diagnosis_rate_scores.append(score)
+
+    # Construct DataFrame
+    heatmap_data = pd.DataFrame()
+    for diagnosis_rate, R, score in zip(theoretical_diagnosis_rates, R_values, diagnosis_rate_scores):
         heatmap_data.loc[diagnosis_rate, R] = score
-    # sort the df by labels values
-    heatmap_data = heatmap_data.sort_index(axis=1)
-    heatmap_data = heatmap_data.sort_index(axis=0)
-    # pivot df 
-    heatmap_data = heatmap_data.T
-    # Plot the heatmap
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(heatmap_data, annot=True, fmt=".2f", cmap='viridis')
-    plt.title('Heatmap of diagnosis rates vs R')
-    plt.ylabel('R')
-    plt.xlabel('Theoretical (user input) diagnosis rates')
-    
+
+    heatmap_data = heatmap_data.sort_index(axis=1)  # sort columns (R)
+    heatmap_data = heatmap_data.sort_index(axis=0)  # sort rows (diagnosis rate)
+    heatmap_data = heatmap_data.T  # transpose so R is y-axis
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.heatmap(heatmap_data, annot=True, fmt=".2f", cmap='viridis', ax=ax)
+
+    ax.set_xlabel("Theoretical (user input) diagnosis rates")
+    ax.set_ylabel("R")
+
+    apply_standard_axis_style(ax)
+    plt.tight_layout()
+
+    figure_output_path = os.path.join(
+        dm.get_experiment_plots_dir(experiment_name),
+        f"{experiment_name}_heatmap_R_vs_diagnosis_rate.tiff"
+    )
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
 # -----------------------------------------------------------------------------
 #                      Intra host lineage distribution plot
 # -----------------------------------------------------------------------------
 
 def plot_IH_lineage_distribution(experiment_name):
-    fig, axes  = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
-    df = om.get_IH_lineages_data_experiment(experiment_name)
-    
-    ax0 = sns.barplot(x='IH_lineages_number', y='ih_virus_count', data=df, hue='IH_virus_emergence_rate', 
-                ax=axes[0], dodge=True, palette="Set2", alpha=0.7)
-    ax1 = sns.barplot(x='IH_unique_lineages_number', y='ih_lineage_count', data=df, hue='IH_virus_emergence_rate',
-                ax=axes[1], dodge=True, palette="Set2",alpha=0.7)
-    
-    # Loop through each bar and set the edgecolor to match the bar color
-    for patch in ax0.patches:
-        # Get the color of the bar
-        color = patch.get_facecolor()
-        # Set the edgecolor to the same as the facecolor
-        patch.set_edgecolor(color)
-        patch.set_linewidth(1)
-        
-    for patch in ax1.patches:
-        # Get the color of the bar
-        color = patch.get_facecolor()
-        # Set the edgecolor to the same as the facecolor
-        patch.set_edgecolor(color)
-        patch.set_linewidth(1)
-    
-    axes[0].set_title('Count of IH_lineages_number')
-    axes[0].set_xlabel('IH_lineages_number')
-    axes[0].set_ylabel('Count')
+    """
+    Plot distribution histograms for intra-host lineage variability across an experiment.
 
-    axes[1].set_title('Count of unique lineages_number')
-    axes[1].set_xlabel('Unique lineages_number')
-    axes[1].set_ylabel('Count')
-    
-    
-    plt.suptitle('Histogram of IH virus and lineage distribution')
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    fig_path = os.path.join(experiment_output_dir,'IH variability plot.png')
-    plt.savefig(fig_path)
+    Two subplots are shown:
+    - Left: total number of intra-host lineages per individual
+    - Right: number of distinct lineages per individual
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment used to load data and save the plot.
+    """
+    df = om.get_IH_lineages_data_experiment(experiment_name)
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
+
+    ax0 = sns.barplot(
+        x='IH_lineages_number', y='ih_virus_count', data=df,
+        hue='IH_virus_emergence_rate', ax=axes[0], dodge=True,
+        palette="Set2", alpha=0.7
+    )
+    ax1 = sns.barplot(
+        x='IH_unique_lineages_number', y='ih_lineage_count', data=df,
+        hue='IH_virus_emergence_rate', ax=axes[1], dodge=True,
+        palette="Set2", alpha=0.7
+    )
+
+    for patch in ax0.patches + ax1.patches:
+        color = patch.get_facecolor()
+        patch.set_edgecolor(color)
+        patch.set_linewidth(1)
+
+    # Apply axis labels
+    ax0.set_xlabel("Intra host lineages number")
+    ax0.set_ylabel("Proportion of individuals with x lineages")
+    ax1.set_xlabel("Intra host distinct lineages number")
+    ax1.set_ylabel("Proportion of individuals with x distinct lineages")
+
+    # Clean up
+    axes[0].set_title("")
+    axes[1].set_title("")
+    plt.suptitle("")
+    for ax in axes:
+        apply_standard_axis_style(ax)
+
+    plt.tight_layout()
+    figure_output_path = os.path.join(
+        dm.get_experiment_output_dir(experiment_name),
+        f"{experiment_name}_IH_lineage_distribution.tiff"
+    )
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
 def plot_IH_lineage_distribution_simulation(experiment_name):
+    """
+    Plot intra-host distinct lineage distributions for each simulation in the experiment.
+
+    Each subplot shows the distribution of the number of distinct intra-host lineages
+    per individual, grouped by simulation.
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment used to load simulation data and save the plot.
+    """
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
     num_sims = len(simulation_output_dirs)
+
     ncols = 2
     nrows = math.ceil(num_sims / ncols)
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(7 * ncols, 5 * nrows))
-    axes = axes.flatten()  # Flatten in case of a single row/col
+    axes = axes.flatten()
 
     for i, simulation_output_dir in enumerate(simulation_output_dirs):
         df = om.get_IH_lineages_data_simulation(simulation_output_dir)
         ax = axes[i]
 
         sns.barplot(
-            x='IH_unique_lineages_number', y='ih_lineage_count', 
+            x='IH_unique_lineages_number', y='ih_lineage_count',
             data=df,
             ax=ax, dodge=True, palette="Set2", alpha=0.7
         )
 
-        # Beautify bars
         for patch in ax.patches:
             color = patch.get_facecolor()
             patch.set_edgecolor(color)
             patch.set_linewidth(1)
 
         sim_id = os.path.basename(simulation_output_dir)
-        ax.set_title(f'Simulation: {sim_id}')
-        ax.set_xlabel('IH_lineages_number')
-        ax.set_ylabel('Proportion')
+        ax.set_title(f"Simulation: {sim_id}")
+        ax.set_xlabel("Intra host distinct lineages number")
+        ax.set_ylabel("Proportion of individuals with x distinct lineages")
 
-        # Optional: shrink legend
-        ax.legend(title='Intra-host lineages', fontsize=9, title_fontsize=10)
+        apply_standard_axis_style(ax)
 
-    # Hide any unused axes
+        # Optional: shrink or remove legend if unused
+        if ax.get_legend():
+            ax.legend_.remove()
+
+    # Hide unused axes if any
     for j in range(i + 1, len(axes)):
         fig.delaxes(axes[j])
 
-    plt.suptitle('IH Lineage Distribution by Simulation', fontsize=16)
+    plt.suptitle("")
     plt.tight_layout(rect=[0, 0, 1, 0.96])
+
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    fig_path = os.path.join(experiment_output_dir, 'IH_variability_by_simulation.png')
-    plt.savefig(fig_path)
+    figure_output_path = os.path.join(experiment_output_dir, f"{experiment_name}_IH_variability_by_simulation.tiff")
+
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
     plt.close(fig)
 
 def plot_IH_lineage_distribution_grouped_by_simulation(experiment_name):
+    """
+    Plot intra-host lineage distributions grouped by tau_3 parameter across simulations.
+
+    Each bar represents the proportion of individuals with a given number of distinct
+    intra-host lineages, grouped and color-coded by `tau_3` values.
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment used to retrieve simulation data and save the plot.
+    """
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
     plot_output_dir = dm.get_experiment_plots_dir(experiment_name)
 
@@ -965,26 +1158,22 @@ def plot_IH_lineage_distribution_grouped_by_simulation(experiment_name):
         tau_3 = sm.get_parameter_value_from_simulation_output_dir(sim_dir, 'tau_3')
         df['tau_3'] = tau_3
 
-        # Normalize ih_lineage_count
         total = df['ih_lineage_count'].sum()
         df['ih_lineage_count'] = df['ih_lineage_count'] / total if total > 0 else 0
 
         all_data.append(df)
 
     full_df = pd.concat(all_data, axis=0)
-
-    # Ensure IH_unique_lineages_number is categorical with fixed order 1–5
     full_df['IH_unique_lineages_number'] = pd.Categorical(
         full_df['IH_unique_lineages_number'],
         categories=[1, 2, 3, 4, 5],
         ordered=True
     )
 
-    # Sort hue order
     tau_3_order = sorted(full_df['tau_3'].unique())
 
-    plt.figure(figsize=(10, 6))
-    ax = sns.barplot(
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.barplot(
         x='IH_unique_lineages_number',
         y='ih_lineage_count',
         hue='tau_3',
@@ -992,99 +1181,50 @@ def plot_IH_lineage_distribution_grouped_by_simulation(experiment_name):
         palette=sns.color_palette("coolwarm", n_colors=len(tau_3_order)),
         hue_order=tau_3_order,
         dodge=True,
-        alpha=0.8
+        alpha=0.8,
+        ax=ax
     )
 
-    ax.set_title('Intra Host Lineage Distribution', fontsize=14)
-    ax.set_xlabel('IH_unique_lineages_number')
-    ax.set_ylabel('Proportion')
+    ax.set_xlabel("Intra host distinct lineages number")
+    ax.set_ylabel("Proportion of individuals with x distinct lineages")
     ax.legend(title='tau_3', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    apply_standard_axis_style(ax)
     plt.tight_layout()
 
-    output_path = os.path.join(plot_output_dir, f'{experiment_name}_IH_unique_lineages_by_tau_3.png')
-    plt.savefig(output_path)
-    plt.close()
-
-def plot_OSR_and_IH_lineages_by_parameter(experiment_name, 
-                                           parameter='tau_3', 
-                                           min_seq_number=0, 
-                                           min_sim_lenght=0):
-    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
-
-    # ===== LEFT: OSR vs parameter (boxplot) =====
-    df_osr = om.read_OSR_vs_parameter_csv(experiment_name, 
-                                           parameter,
-                                           min_seq_number,
-                                           min_sim_lenght)
-
-    # ===== RIGHT: Normalized IH lineage barplot by simulation =====
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
-    all_data = []
-    for sim_dir in simulation_output_dirs:
-        df = om.get_IH_lineages_data_simulation(sim_dir)[['IH_unique_lineages_number', 'ih_lineage_count']]
-        tau_3 = sm.get_parameter_value_from_simulation_output_dir(sim_dir, parameter)
-        df['tau_3'] = tau_3
-
-        total = df['ih_lineage_count'].sum()
-        df['ih_lineage_count'] = df['ih_lineage_count'] / total if total > 0 else 0
-
-        all_data.append(df)
-
-    df_lineage = pd.concat(all_data, axis=0)
-    df_lineage['IH_unique_lineages_number'] = pd.Categorical(df_lineage['IH_unique_lineages_number'], 
-                                                              categories=[1, 2, 3, 4, 5], ordered=True)
-
-    # ===== Shared color palette =====
-    unique_param_values = sorted(df_lineage['tau_3'].unique())
-    palette = sns.color_palette("coolwarm", n_colors=len(unique_param_values))
-    palette_dict = dict(zip(unique_param_values, palette))
-
-    # ===== Create figure =====
-    fig, axes = plt.subplots(ncols=2, figsize=(14, 6))
-
-    # --- Left: Boxplot
-    sns.boxplot(ax=axes[0], x=parameter, y='observed_substitution_rate', hue=parameter, 
-                data=df_osr, palette=palette_dict, hue_order=unique_param_values, width=0.6)
-    axes[0].set_xlabel(parameter)
-    axes[0].set_ylabel('Observed substitution rate')
-    axes[0].set_title('Infectious time vs Observed Substitution Rate')
-    axes[0].grid(True)
-    axes[0].legend_.remove()
-
-    # --- Right: Histogram (barplot)
-    sns.barplot(ax=axes[1], x='IH_unique_lineages_number', y='ih_lineage_count', 
-                hue='tau_3', data=df_lineage, palette=palette_dict, hue_order=unique_param_values, 
-                dodge=True, alpha=0.8)
-    axes[1].set_xlabel('Intra host lineages number')
-    axes[1].set_ylabel('Frequency')
-    axes[1].set_title('Intra Host Lineage Distribution')
-    axes[1].legend(title= 'Infectious time parameter', bbox_to_anchor=(1.05, 1), loc='upper left')
-
-    plt.tight_layout()
-    output_path = os.path.join(experiment_plots_dir, f"{experiment_name}_{parameter}_OSR_and_IH_lineages.png")
-    plt.savefig(output_path)
-    print(f'Figure saved under: {output_path}')
-    plt.close()
+    output_path = os.path.join(plot_output_dir, f'{experiment_name}_IH_unique_lineages_by_tau_3.tiff')
+    print(f"Saving figure to: {output_path}")
+    plt.savefig(output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
 # -----------------------------------------------------------------------------
 #                       Simulations final times histogram
 # -----------------------------------------------------------------------------
 
 def plot_histograms(experiment_name, final_times_data_frames, r_order=None):
-    ''' 
-    Plot histograms of simulation final times.
-    Plots are ordered by R if r_order is provided.
-    All subplots share the same x-axis limits.
-    '''
+    """
+    Plot histograms of final times across multiple seeded simulations.
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment used for organizing output.
+    final_times_data_frames : pd.DataFrame
+        DataFrame where each column contains final time values from different conditions or folders.
+    r_order : list of float, optional
+        Optional list to reorder plots based on their corresponding R values.
+    """
     num_folders = len(final_times_data_frames.columns)
 
-    # Determine global min and max for x-axis
+    # Determine global min and max for shared x-axis
     all_values = []
     for col in final_times_data_frames.columns:
         all_values.extend(final_times_data_frames[col].dropna().values)
+
     if not all_values:
         print("No data to plot.")
         return
+
     global_min, global_max = min(all_values), max(all_values)
 
     # Apply R-ordering if provided
@@ -1099,16 +1239,16 @@ def plot_histograms(experiment_name, final_times_data_frames, r_order=None):
     for ax, (folder_name, data) in zip(axes.flatten(), final_times_data_frames.items()):
         ax.hist(data.dropna(), bins=30, edgecolor='black')
         ax.set_xlim(global_min, global_max)
-        ax.set_title(f'Histogram for {folder_name}')
-        ax.set_xlabel('Final Time Value')
-        ax.set_ylabel('Frequency')
+        ax.set_xlabel("Seeded simulation final time")
+        ax.set_ylabel("Frequency")
+        apply_standard_axis_style(ax)
 
     plt.tight_layout()
-    out_path = os.path.join(dm.get_experiment_dir(experiment_name), 'simulations_length_histogram.png')
-    plt.savefig(out_path)
-    plt.close()
-    print(f"Saved histogram plot to {out_path}")
 
+    out_path = os.path.join(dm.get_experiment_dir(experiment_name), f"{experiment_name}_simulations_final_time_histograms.tiff")
+    print(f"Saving figure to: {out_path}")
+    plt.savefig(out_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
 # -----------------------------------------------------------------------------
 #                              Lineages colors 
@@ -1116,10 +1256,26 @@ def plot_histograms(experiment_name, final_times_data_frames, r_order=None):
 
 def make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow'):
     """
-    Generate a DataFrame mapping lineages to unique colors based on their time order.
-
-    Returns:
-    pd.DataFrame: DataFrame with 'Lineage_name' and 'Color' columns.
+      Generate a colormap for lineages based on their order of emergence.
+    
+      This function reads phylogenetic data for a seeded simulation and assigns
+      each lineage a unique color from a specified matplotlib colormap, ordered
+      by time of emergence. The output is a DataFrame that maps lineage names
+      to hexadecimal color codes.
+    
+      Parameters
+      ----------
+      seeded_simulation_output_dir : str
+          Path to the directory containing simulation output and phylogenetic data.
+      cmap_name : str, optional
+          Name of the matplotlib colormap to use for color assignment (default is 'gist_rainbow').
+    
+      Returns
+      -------
+      pd.DataFrame
+          DataFrame with columns:
+          - 'Lineage_name': str, lineage identifiers
+          - 'Color': str, hexadecimal color codes
     """
     def lineage_to_colormap(index, lineages, cmap_name):
         """Map a lineage to a unique color in a gradient colormap."""
@@ -1138,13 +1294,32 @@ def make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow
 
     return lineage_color_mapping_df
 
-
 def get_lineage_color(lineage_name, colormap_df, cmap_name='gist_rainbow'):
-    """Return the corresponding color for a given lineage name.
-    lineage: str 
-        string with lineage name
-    color mapping: colormap
-        output of make_lineages_colormap
+    """
+    Retrieve the color assigned to a specific lineage.
+
+    Given a lineage name and a lineage-to-color mapping DataFrame (as generated
+    by `make_lineages_colormap`), this function returns the corresponding color
+    as a hexadecimal string.
+
+    Parameters
+    ----------
+    lineage_name : str
+        Name of the lineage to retrieve the color for.
+    colormap_df : pd.DataFrame
+        DataFrame containing 'Lineage_name' and 'Color' columns, as returned by `make_lineages_colormap`.
+    cmap_name : str, optional
+        Unused in this function (retained for compatibility), default is 'gist_rainbow'.
+
+    Returns
+    -------
+    str
+        Hexadecimal color code (e.g., '#aabbcc') corresponding to the given lineage.
+
+    Raises
+    ------
+    ValueError
+        If `lineage_name` is None or not found in the colormap.
     """
     df = colormap_df
     if lineage_name is None:
@@ -1156,25 +1331,50 @@ def get_lineage_color(lineage_name, colormap_df, cmap_name='gist_rainbow'):
     return lineage_color  
 
 def plot_lineages_colors_tab(seeded_simulation_output_dir):
-    
+    """
+    Plot a labeled color reference for all lineages in the simulation.
+
+    Each lineage is represented by a colored circle and its label, displayed in a
+    vertical table format. Colors are assigned based on the order of emergence using
+    a specified colormap.
+
+    The figure is saved to the experiment's simulation plots directory using the
+    seeded simulation folder and seed as part of the filename.
+
+    Parameters
+    ----------
+    seeded_simulation_output_dir : str
+        Path to the seeded simulation output directory. Used to read lineage data
+        and determine the output save location.
+    """
     colormap_df = make_lineages_colormap(seeded_simulation_output_dir, cmap_name='gist_rainbow')
-    # Plot lineages colors in a table format with circles
-    fig, ax = plt.subplots(num=2,figsize=(5, len(colormap_df) * 0.5))
+
+    fig, ax = plt.subplots(num=2, figsize=(5, len(colormap_df) * 0.5))
+
     for i, lineage_name in enumerate(reversed(colormap_df['Lineage_name'].values)):
-        ax.scatter(0, i, color=get_lineage_color(lineage_name, colormap_df), s=200, marker='o')  # Draw a circle
-        ax.text(0.2, i, lineage_name, va='center', fontsize=12)  # Add text next to it
-    
+        ax.scatter(0, i, color=get_lineage_color(lineage_name, colormap_df), s=200, marker='o')
+        ax.text(0.2, i, lineage_name, va='center', fontsize=8)
+
     ax.set_xlim(-0.1, 1)
     ax.set_ylim(-1, len(colormap_df))
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_frame_on(False)
+
+    apply_standard_axis_style(ax)
+
     experiment_name = dm.get_experiment_foldername_from_SSOD(seeded_simulation_output_dir)
     so_foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
     seed = os.path.basename(seeded_simulation_output_dir)
     experiment_simulations_plots_dir = dm.get_experiment_simulations_plots_dir(experiment_name)
-    plt.savefig(os.path.join(experiment_simulations_plots_dir,
-                             f'{so_foldername}_{seed}_lineages_colors_tab.png'))
+
+    figure_output_path = os.path.join(
+        experiment_simulations_plots_dir,
+        f'{so_foldername}_{seed}_lineages_colors_tab.tiff'
+    )
+
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
     plt.close()
 
 # -----------------------------------------------------------------------------
@@ -1454,7 +1654,18 @@ def plot_circular_tree(ete_root,
 
 def plot_infections_hist(individuals_df, ax, colormap_df, bin_size):
     """
-    Plot stacked histogram of infections per lineage over time using `inherited_lineage`.
+    Plot stacked histogram of infections per lineage over time (colored by infecting lineage).
+
+    Parameters
+    ----------
+    individuals_df : pd.DataFrame
+        DataFrame containing individual infection data with 't_infection' and 'inherited_lineage'.
+    ax : matplotlib.axes.Axes
+        Axis object on which to draw the histogram.
+    colormap_df : pd.DataFrame
+        DataFrame mapping lineage names to colors.
+    bin_size : int
+        Width of the time bins (in days) for the histogram.
     """
     df = individuals_df[individuals_df['t_infection'].notnull()].copy()
     df = df[df['inherited_lineage'].notnull()]
@@ -1474,7 +1685,11 @@ def plot_infections_hist(individuals_df, ax, colormap_df, bin_size):
         bottom += counts
 
     ax.set_ylim(0, bottom.max() * 1.2)
-    ax.set_ylabel("Infections in time window")
+    ax.set_xlabel("Time (days)")
+    ax.set_ylabel(f"Infections in {bin_size} day windows")
+
+    apply_standard_axis_style(ax)
+
 
 def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size, threshold):
     """
@@ -1574,12 +1789,205 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
     print(f"Combined Rₑ plot saved to:\n- {filepath}")
 
 
+# -----------------------------------------------------------------------------
+# Plots for paper
+# -----------------------------------------------------------------------------
+
+def plot_figure_tempest_regression(experiment_name):
+    parameter = 'nucleotide_substitution_rate'
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dir = simulation_output_dirs[10]
+    param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
+    sequencing_data_df = om.create_combined_sequencing_df(simulation_output_dir, 
+                                                          min_seq_number=30,
+                                                          min_sim_lenght=100)
+    
+    fig, ax = plt.subplots(1, 1, figsize=(8,8))
+    
+    if sequencing_data_df is None: 
+        print('no data to plot')
+        print(simulation_output_dir)
+        pass
+    else:
+        fitted_tempest_regression = er.tempest_regression(sequencing_data_df)
+        
+        plot_tempest_regression(sequencing_data_df,
+                                   fitted_tempest_regression,
+                                   ax)
+        ax.set_title(f'Regression - {parameter}: {param}')
+        # ax.set_ylim(0, 1)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(experiment_plots_dir, f"{experiment_name}_figure3_tempest_regression.png"))
 
 
+def plot_OSR_fit_figure(experiment_name, 
+                fit_result, 
+                model_type,
+                min_seq_number,
+                min_sim_lenght):
+    ''' plot fit of nucleotide substitution rate / observed substitution rates curve
+    '''
+    parameter = 'nucleotide_substitution_rate'
+    
+    line_color = 'black' #'#DE8F05' # orange
+    scatter_color = '#DE8F05'# orange
+    combined_OSR_marker_color = '#E64B9D' # pink
+    scatter_color_2 = '#0173B2' # blue '#029E73' # green
+    
+    # Create figure and axes
+    fig, ax = plt.subplots(1,1, figsize=(8,6))
+    
+    # import combined regression data
+    combined_data = om.read_combined_OSR_vs_parameter_csv(experiment_name,
+                                                          parameter,
+                                                          min_seq_number,
+                                                          min_sim_lenght)
+    
+    # import single simulations regression data
+    data = om.read_OSR_vs_parameter_csv(experiment_name, 
+                                        parameter,
+                                        min_seq_number,
+                                        min_sim_lenght)
+    
+    # Group by nucleotide_substitution_rate and compute mean and standard deviation for OSR
+    data_mean_df = om.get_mean_std_OSR(experiment_name,
+                                        parameter,
+                                        min_seq_number,
+                                        min_sim_lenght)
+    
+    # get lower and upper confidence interval for fit results
+    x_data = data['nucleotide_substitution_rate']
+    # x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data)
+    
+    
+    # # Fill between the upper and lower curves for the confidence interval region
+    # ax.fill_between(x,lower_curve, upper_curve, 
+    #                color=line_color, alpha=0.3, label='95% Confidence Interval',
+    #                zorder=-1)
+    # scatterplot Estimated OSR - single simulation
+    sns.scatterplot(x=parameter, y='observed_substitution_rate', 
+                    label='Estimated OSR - single simulation', data=data,
+                    color=scatter_color, alpha=0.5, ax=ax,
+                    zorder=0)
+    # plot fitted curve
+    sns.lineplot(x=x_data, y=fit_result.best_fit, 
+                 label=f'Fitted {model_type} curve', 
+                 color=line_color, linewidth=1, ax=ax,
+                 zorder=1)
+    # scatterplot combined regression points (as comparison)
+    sns.scatterplot(x='nucleotide_substitution_rate', y='observed_substitution_rate', marker='X',
+        label='Combined tempest regression estimate of OSR', data=combined_data,
+        color=combined_OSR_marker_color,alpha=1, ax=ax,
+        zorder=2)
+    # plot mean of observed_substitution_rate from data_mean_std
+    sns.scatterplot(x=parameter, y='mean', marker = 'X',
+                    label='Mean of estimated OSR (single simulations)', data=data_mean_df,
+                    color=scatter_color_2, alpha=1, ax=ax,
+                    zorder=3)
+
+    
+    # Set axis (log log scale) -----------------------------------------------
+    ax.set_xlabel(f'{parameter}')
+    ax.set_ylabel('observed substitution rate')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlim(x_data.min(),x_data.max()*1.1)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
+        f"Figure4_OSR_{model_type}_fit.png"))
+    
+# def confidence_interval_fit(model_type, fit_result, x):
+#     params_lower = {}
+#     params_upper = {}
+    
+    
+#     # print(f'{model_type}')
+#     for param in fit_result.params:
+#         param_value = fit_result.params[param].value
+#         param_stderr = fit_result.params[param].stderr if fit_result.params[param].stderr else 0
+        
+#         # print(f'CI std : {param} - {param_value} - {param_stderr}')
+#         ci_lower = param_value - 1.96 * param_stderr
+#         ci_upper = param_value + 1.96 * param_stderr
+        
+#         params_lower[param] = ci_lower
+#         params_upper[param] = ci_upper
+    
+#     def remove_duplicates_array(arr):
+#         _, idx = np.unique(arr, return_index=True)
+#         return arr[np.sort(idx)]
+
+#     x = remove_duplicates_array(x)
+
+#     # Create the upper and lower bound curves for confidence intervals
+#     upper_curve = er.evaluate_model(model_type, params_upper, x)
+#     lower_curve = er.evaluate_model(model_type, params_lower, x)
+#     return x, lower_curve, upper_curve
 
 
+def plot_OSR_and_IH_lineages_by_parameter(experiment_name, 
+                                           parameter='tau_3', 
+                                           min_seq_number=0, 
+                                           min_sim_lenght=0):
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
 
+    # ===== LEFT: OSR vs parameter (boxplot) =====
+    df_osr = om.read_OSR_vs_parameter_csv(experiment_name, 
+                                           parameter,
+                                           min_seq_number,
+                                           min_sim_lenght)
 
+    # ===== RIGHT: Normalized IH lineage barplot by simulation =====
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    all_data = []
+    for sim_dir in simulation_output_dirs:
+        df = om.get_IH_lineages_data_simulation(sim_dir)[['IH_unique_lineages_number', 'ih_lineage_count']]
+        tau_3 = sm.get_parameter_value_from_simulation_output_dir(sim_dir, parameter)
+        df['tau_3'] = tau_3
+
+        total = df['ih_lineage_count'].sum()
+        df['ih_lineage_count'] = df['ih_lineage_count'] / total if total > 0 else 0
+
+        all_data.append(df)
+
+    df_lineage = pd.concat(all_data, axis=0)
+    df_lineage['IH_unique_lineages_number'] = pd.Categorical(df_lineage['IH_unique_lineages_number'], 
+                                                              categories=[1, 2, 3, 4, 5], ordered=True)
+
+    # ===== Shared color palette =====
+    unique_param_values = sorted(df_lineage['tau_3'].unique())
+    palette = sns.color_palette("coolwarm", n_colors=len(unique_param_values))
+    palette_dict = dict(zip(unique_param_values, palette))
+
+    # ===== Create figure =====
+    fig, axes = plt.subplots(ncols=2, figsize=(14, 6))
+
+    # --- Left: Boxplot
+    sns.boxplot(ax=axes[0], x=parameter, y='observed_substitution_rate', hue=parameter, 
+                data=df_osr, palette=palette_dict, hue_order=unique_param_values, width=0.6)
+    axes[0].set_xlabel(parameter)
+    axes[0].set_ylabel('Observed substitution rate')
+    axes[0].set_title('Infectious time vs Observed Substitution Rate')
+    axes[0].grid(True)
+    axes[0].legend_.remove()
+
+    # --- Right: Histogram (barplot)
+    sns.barplot(ax=axes[1], x='IH_unique_lineages_number', y='ih_lineage_count', 
+                hue='tau_3', data=df_lineage, palette=palette_dict, hue_order=unique_param_values, 
+                dodge=True, alpha=0.8)
+    axes[1].set_xlabel('Intra host lineages number')
+    axes[1].set_ylabel('Frequency')
+    axes[1].set_title('Intra Host Lineage Distribution')
+    axes[1].legend(title= 'Infectious time parameter', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.tight_layout()
+    output_path = os.path.join(experiment_plots_dir, f"{experiment_name}_{parameter}_OSR_and_IH_lineages.png")
+    plt.savefig(output_path)
+    print(f'Figure saved under: {output_path}')
+    plt.close()
 
 
 
