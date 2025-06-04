@@ -592,7 +592,15 @@
     * Verified and cleaned axis labels; updated units and text per figure
     * Added printed confirmation of saved figure path 
 
+2025-04-06 pietro gerletti
 
+    Version 1.1.0
+
+    * added paper's figures scripts
+    * added build_tree module
+    * added scripts (back and frontend) to calculate and display entropy and clustering
+    * clean and fixed minor bugs and experiment naming
+    
 	
 	
 	

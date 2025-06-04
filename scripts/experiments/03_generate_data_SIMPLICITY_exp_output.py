@@ -27,7 +27,7 @@ The set of all simulations is what we call an experiment.
 from experiment_script_runner import run_experiment_script
 import argparse
 
-experiment_name =  'generate_data_trees_and_R_eff'
+experiment_name =  'SIMPLICITY_exp_output'
 
 def fixture_experiment_settings():
     

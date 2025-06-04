@@ -185,6 +185,30 @@ def get_experiment_tree_simulation_plots_dir(experiment_name,
                                                        'plots')
     os.makedirs(experiment_tree_simulation_plots_dir,exist_ok=True)
     return experiment_tree_simulation_plots_dir
+
+def get_ssod(sim_out_dir, seed_number):
+    """
+    Returns the seeded simulation output directory (SSOD) for the given seed number.
+
+    Args:
+        sim_out_dir (str): Path to a simulation output directory (e.g., one from dm.get_simulation_output_dirs()).
+        seed_number (int): The seed number (e.g., 7).
+
+    Returns:
+        str: Full path to the matching seed_XXXX directory.
+
+    Raises:
+        ValueError: If the seed directory cannot be found.
+    """
+    all_seed_dirs = get_seeded_simulation_output_dirs(sim_out_dir)
+    target = f"seed_{seed_number:04d}"
+    
+    for path in all_seed_dirs:
+        if os.path.basename(path) == target:
+            return path
+
+    raise ValueError(f"Seed folder '{target}' not found in {sim_out_dir}")
+
     
 
 
