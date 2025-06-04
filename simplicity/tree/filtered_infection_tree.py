@@ -14,14 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Apr  6 14:09:22 2025
-
-@author: pietro
-"""
-
 import simplicity.output_manager as om
 from anytree import Node
 from ete3 import Tree, TreeStyle, TextFace, NodeStyle

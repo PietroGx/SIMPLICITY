@@ -27,7 +27,7 @@ The set of all simulations is what we call an experiment.
 from experiment_script_runner import run_experiment_script
 import argparse
 import numpy as np
-experiment_name =  'generate_data_OSR_fit'
+experiment_name =  'OSR_fit'
 
 def fixture_experiment_settings():
     # number of values for NSR

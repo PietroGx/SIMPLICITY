@@ -151,6 +151,40 @@ class Host:
         '''
         A_t = self.get_A_t(delta_t)
         return [self.get_p_t(A_t, i) for i in self.states]
+    
+    def data_plot_ih_solution(self,state,time,step):
+        '''
+        Compute:
+            p_inf - probability of being infectious after a time t 
+            p_det - probability of being detectable  after a time t 
+            p_rec - probability of being recovered  after a time t 
+    
+        Parameters
+        ----------
+        state : int
+            Intra-host model starting state
+        time : float
+            Time for the intra-host model solution
+    
+        Returns
+        -------
+        Either p_inf, p_dia or p_red. The output is used to plot the 
+        intra-host model results.
+        '''
+        t = np.arange(0,time,step)
+    
+        p_inf = []
+        p_det = []
+        p_rec = []
+        
+        for time_point in t:
+            A_t = self.get_A_t(time_point)
+            p_i = self.get_p_t(A_t,state)
+            p_inf.append(np.sum(p_i[5:19]))
+            p_det.append(np.sum(p_i[5:20]))
+            p_rec.append(p_i[20])
+        
+        return p_inf,p_det,p_rec
 
     def simulate_trajectory(self, delta_t, rng=None, exponential_dt=False):
         '''
@@ -504,6 +538,7 @@ def plot_state_timeline_summary(state_durations_dict, phase_durations_dict, titl
     plt.suptitle("Timeline of Average State Residence Times (Phase Colored)", fontsize=14)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
+    
 
 
 

@@ -96,7 +96,6 @@ class Population:
                            self.infected,
                            self.diagnosed,
                            self.recovered,
-                           self.deceased,
                            self.infectious_normal,
                            self.detectables,
                            self.susceptibles

@@ -36,6 +36,7 @@ import glob
 import ast
 import numpy as np
 from tqdm import tqdm
+import warnings
 
 def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
     """
@@ -717,6 +718,7 @@ def get_r_effective_population_traj(ssod, time_window):
     Compute and return the population-level R_effective trajectory as a pandas Series.
     """
     df = read_individuals_data(ssod)
+    # df = df[df['t_infection'] > 0]
     final_time = read_final_time(ssod)
 
     timeline = np.arange(0, final_time, 1)
@@ -763,6 +765,7 @@ def get_r_effective_lineages_traj(ssod, time_window, threshold):
         return pd.DataFrame(rows)
     
     individuals_df = read_individuals_data(ssod)
+    # individuals_df = individuals_df[individuals_df['t_infection'] > 0]
     final_time = read_final_time(ssod)
     # Read and filter lineage frequency
     lineage_freq_df = read_lineage_frequency(ssod)
@@ -821,13 +824,19 @@ def read_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir,
                                time_window, threshold):
     """
     Read R_effective (population + lineage) trajectories from CSV.
-    
+    If files are missing, issues a warning and generates them.
+
     Returns:
         - r_effective_population_traj: pd.Series
         - r_effective_lineages_traj: dict of {lineage_name: pd.Series}
     """
     pop_fp = get_r_effective_population_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
     line_fp = get_r_effective_lineages_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
+
+    # Check if files exist
+    if not os.path.exists(pop_fp) or not os.path.exists(line_fp):
+        warnings.warn("R_effective CSVs missing. Recomputing and writing them.")
+        write_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir, time_window, threshold)
 
     # Read population R_eff
     r_eff_pop = pd.read_csv(pop_fp, index_col=0)

@@ -14,13 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Jan  7 10:00:16 2025
-
-@author: pietro
-"""
 import os
 import math
 import matplotlib
@@ -44,17 +37,18 @@ import simplicity.tuning.evolutionary_rate as er
 import simplicity.phenotype.weight         as pheno_weight
 
 def apply_plos_rcparams():
+    text_size = 16
     plt.rcParams.update({
         'savefig.dpi': 300,
-        'font.size': 8,
-        'axes.labelsize': 8,
-        'axes.titlesize': 8,
-        'xtick.labelsize': 8,
-        'ytick.labelsize': 8,
-        'legend.fontsize': 8,
+        'font.size': text_size,
+        'axes.labelsize': text_size,
+        'axes.titlesize': text_size,
+        'xtick.labelsize': text_size,
+        'ytick.labelsize': text_size,
+        'legend.fontsize': text_size,
         'font.family': 'sans-serif',
-        'font.sans-serif': ['Arial'],  # PLOS-compatible font
-        'pdf.fonttype': 42,            # Embed fonts in PDF
+        'font.sans-serif': ['Arial'],  
+        'pdf.fonttype': 42,            
         'ps.fonttype': 42,
         'figure.dpi': 300
     })
@@ -70,12 +64,13 @@ def apply_standard_axis_style(ax, has_secondary_y=False):
     ax.spines['top'].set_visible(False)
     if not has_secondary_y:
         ax.spines['right'].set_visible(False)
-
+        
+    text_size = 16
     # Ensure ticks and labels are 8pt (in case rcParams missed it)
-    ax.tick_params(labelsize=8)
-    ax.title.set_fontsize(8)
-    ax.xaxis.label.set_fontsize(8)
-    ax.yaxis.label.set_fontsize(8)
+    ax.tick_params(labelsize=text_size)
+    ax.title.set_fontsize(text_size)
+    ax.xaxis.label.set_fontsize(text_size)
+    ax.yaxis.label.set_fontsize(text_size)
 
 def save_plos_figure(fig, filepath):
     """
@@ -347,11 +342,11 @@ def plot_tempest_regression(sequencing_data_df,
     )
 
     # Plot regression line
-    ax.plot(x, y_pred, color='red', linewidth=2, label='y = OSR · x')
+    ax.plot(x, y_pred, color='orange', linewidth=2, label='y = OSR · x')
 
     # Axis labels and limits
-    ax.set_xlabel('Simulation time in years')
-    ax.set_ylabel('Distance from root') #(substitutions/site, normed)
+    ax.set_xlabel('Simulation time (y)')
+    ax.set_ylabel('Genetic distance from root (ssy)') #(substitutions/site, normed)
     ax.set_xlim(left=0, right=3)
     ax.set_ylim(0)
 
@@ -761,9 +756,7 @@ def plot_intra_host(experiment_name, intra_host_model, time, step):
     step : float
         Time step resolution.
     """
-    import matplotlib.colors as mcolors
     from matplotlib import cm
-
     t = np.arange(0, time, step)
     states = np.arange(0, 21, 1)
 
@@ -1643,6 +1636,8 @@ def plot_circular_tree(ete_root,
     # ts.complete_branch_lines_when_necessary = True
     ts.draw_guiding_lines = True
     ts.root_opening_factor = 1.0  
+    ts.show_scale = False
+
     
     # Render tree
     ete_root.render(file_path, w=800, h=800, tree_style=ts)
@@ -1788,146 +1783,6 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
 
     print(f"Combined Rₑ plot saved to:\n- {filepath}")
 
-
-# -----------------------------------------------------------------------------
-# Plots for paper
-# -----------------------------------------------------------------------------
-
-def plot_figure_tempest_regression(experiment_name):
-    parameter = 'nucleotide_substitution_rate'
-    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
-    simulation_output_dir = simulation_output_dirs[10]
-    param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
-    sequencing_data_df = om.create_combined_sequencing_df(simulation_output_dir, 
-                                                          min_seq_number=30,
-                                                          min_sim_lenght=100)
-    
-    fig, ax = plt.subplots(1, 1, figsize=(8,8))
-    
-    if sequencing_data_df is None: 
-        print('no data to plot')
-        print(simulation_output_dir)
-        pass
-    else:
-        fitted_tempest_regression = er.tempest_regression(sequencing_data_df)
-        
-        plot_tempest_regression(sequencing_data_df,
-                                   fitted_tempest_regression,
-                                   ax)
-        ax.set_title(f'Regression - {parameter}: {param}')
-        # ax.set_ylim(0, 1)
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(experiment_plots_dir, f"{experiment_name}_figure3_tempest_regression.png"))
-
-
-def plot_OSR_fit_figure(experiment_name, 
-                fit_result, 
-                model_type,
-                min_seq_number,
-                min_sim_lenght):
-    ''' plot fit of nucleotide substitution rate / observed substitution rates curve
-    '''
-    parameter = 'nucleotide_substitution_rate'
-    
-    line_color = 'black' #'#DE8F05' # orange
-    scatter_color = '#DE8F05'# orange
-    combined_OSR_marker_color = '#E64B9D' # pink
-    scatter_color_2 = '#0173B2' # blue '#029E73' # green
-    
-    # Create figure and axes
-    fig, ax = plt.subplots(1,1, figsize=(8,6))
-    
-    # import combined regression data
-    combined_data = om.read_combined_OSR_vs_parameter_csv(experiment_name,
-                                                          parameter,
-                                                          min_seq_number,
-                                                          min_sim_lenght)
-    
-    # import single simulations regression data
-    data = om.read_OSR_vs_parameter_csv(experiment_name, 
-                                        parameter,
-                                        min_seq_number,
-                                        min_sim_lenght)
-    
-    # Group by nucleotide_substitution_rate and compute mean and standard deviation for OSR
-    data_mean_df = om.get_mean_std_OSR(experiment_name,
-                                        parameter,
-                                        min_seq_number,
-                                        min_sim_lenght)
-    
-    # get lower and upper confidence interval for fit results
-    x_data = data['nucleotide_substitution_rate']
-    # x, lower_curve, upper_curve = confidence_interval_fit(model_type, fit_result, x_data)
-    
-    
-    # # Fill between the upper and lower curves for the confidence interval region
-    # ax.fill_between(x,lower_curve, upper_curve, 
-    #                color=line_color, alpha=0.3, label='95% Confidence Interval',
-    #                zorder=-1)
-    # scatterplot Estimated OSR - single simulation
-    sns.scatterplot(x=parameter, y='observed_substitution_rate', 
-                    label='Estimated OSR - single simulation', data=data,
-                    color=scatter_color, alpha=0.5, ax=ax,
-                    zorder=0)
-    # plot fitted curve
-    sns.lineplot(x=x_data, y=fit_result.best_fit, 
-                 label=f'Fitted {model_type} curve', 
-                 color=line_color, linewidth=1, ax=ax,
-                 zorder=1)
-    # scatterplot combined regression points (as comparison)
-    sns.scatterplot(x='nucleotide_substitution_rate', y='observed_substitution_rate', marker='X',
-        label='Combined tempest regression estimate of OSR', data=combined_data,
-        color=combined_OSR_marker_color,alpha=1, ax=ax,
-        zorder=2)
-    # plot mean of observed_substitution_rate from data_mean_std
-    sns.scatterplot(x=parameter, y='mean', marker = 'X',
-                    label='Mean of estimated OSR (single simulations)', data=data_mean_df,
-                    color=scatter_color_2, alpha=1, ax=ax,
-                    zorder=3)
-
-    
-    # Set axis (log log scale) -----------------------------------------------
-    ax.set_xlabel(f'{parameter}')
-    ax.set_ylabel('observed substitution rate')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlim(x_data.min(),x_data.max()*1.1)
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
-        f"Figure4_OSR_{model_type}_fit.png"))
-    
-# def confidence_interval_fit(model_type, fit_result, x):
-#     params_lower = {}
-#     params_upper = {}
-    
-    
-#     # print(f'{model_type}')
-#     for param in fit_result.params:
-#         param_value = fit_result.params[param].value
-#         param_stderr = fit_result.params[param].stderr if fit_result.params[param].stderr else 0
-        
-#         # print(f'CI std : {param} - {param_value} - {param_stderr}')
-#         ci_lower = param_value - 1.96 * param_stderr
-#         ci_upper = param_value + 1.96 * param_stderr
-        
-#         params_lower[param] = ci_lower
-#         params_upper[param] = ci_upper
-    
-#     def remove_duplicates_array(arr):
-#         _, idx = np.unique(arr, return_index=True)
-#         return arr[np.sort(idx)]
-
-#     x = remove_duplicates_array(x)
-
-#     # Create the upper and lower bound curves for confidence intervals
-#     upper_curve = er.evaluate_model(model_type, params_upper, x)
-#     lower_curve = er.evaluate_model(model_type, params_lower, x)
-#     return x, lower_curve, upper_curve
-
-
 def plot_OSR_and_IH_lineages_by_parameter(experiment_name, 
                                            parameter='tau_3', 
                                            min_seq_number=0, 
@@ -1989,6 +1844,61 @@ def plot_OSR_and_IH_lineages_by_parameter(experiment_name,
     print(f'Figure saved under: {output_path}')
     plt.close()
 
+def plot_OSR_fit_figure(experiment_name, 
+                fit_result,
+                OSR_single_sim_data,
+                OSR_combined_sim_data,
+                OSR_mean_data,
+                model_type,
+                min_seq_number,
+                min_sim_lenght):
+    ''' plot fit of nucleotide substitution rate / observed substitution rates curve
+    '''
+    parameter = 'nucleotide_substitution_rate'
+    
+    line_color = 'black' #'#DE8F05' # orange
+    scatter_color = '#DE8F05'# orange
+    combined_OSR_marker_color = '#E64B9D' # pink
+    scatter_color_2 = '#0173B2' # blue '#029E73' # green
+    
+    # Create figure and axes
+    fig, ax = plt.subplots(1,1, figsize=(8,6))
+    
+    x_data = OSR_single_sim_data['nucleotide_substitution_rate']
+
+    # scatterplot Estimated OSR - single simulation
+    sns.scatterplot(x=parameter, y='observed_substitution_rate', 
+                    label='Estimated OSR - single simulation', data=OSR_single_sim_data,
+                    color=scatter_color, alpha=0.5, ax=ax,
+                    zorder=0)
+    # plot fitted curve
+    sns.lineplot(x=x_data, y=fit_result.best_fit, 
+                 label=f'Fitted {model_type} curve', 
+                 color=line_color, linewidth=1, ax=ax,
+                 zorder=1)
+    
+    # scatterplot combined regression points (as comparison)
+    sns.scatterplot(x='nucleotide_substitution_rate', y='observed_substitution_rate', marker='X',
+        label='Combined tempest regression estimate of OSR', data=OSR_combined_sim_data,
+        color=combined_OSR_marker_color,alpha=1, ax=ax,
+        zorder=2)
+    
+    # plot mean of observed_substitution_rate
+    sns.scatterplot(x=parameter, y='mean', marker = 'X',
+                    label='Mean of estimated OSR (single simulations)', data=OSR_mean_data,
+                    color=scatter_color_2, alpha=1, ax=ax,
+                    zorder=3)
+
+    # Set axis (log log scale) -----------------------------------------------
+    ax.set_xlabel(f'{parameter}')
+    ax.set_ylabel('observed substitution rate')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlim(x_data.min(),x_data.max()*1.1)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
+        f"OSR_{model_type}_fit.png"))
 
 
 
