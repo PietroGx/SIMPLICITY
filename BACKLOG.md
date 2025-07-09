@@ -8,6 +8,7 @@ Created on Tue Feb 18 22:01:47 2025
 
 ## Backlog
 - [ ] write unit_runs for running with/wo plotting (technical debt item 1)
+- [ ] update jump_update (line 308,212 ih_model, population.py) for long shedders 
 
 ### Bug Fixes
 - [ ] slurm runner gets stuck if there are abrupt job terminations (like OOM or OOT errors): the job is not reported as failed and the runner does not submit a new job to slurm

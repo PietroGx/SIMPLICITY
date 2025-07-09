@@ -43,16 +43,21 @@ def write_standard_parameters_values():
     filename= get_standard_parameters_values_file_path()
     standard_values = {
         "population_size": 1000,
+        'long_shedders_ratio': 0,
         "infected_individuals_at_start": 10,
-        "final_time": 365,
+        "tau_1": 2.86,
+        "tau_2": 3.91,
         "tau_3": 7.5,
+        "tau_3_long": 133.5,
+        "tau_4": 8,
         "R": 1.1,
         "diagnosis_rate": 0.1, # in percentage, will be converted to kd in model 
         "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
         "nucleotide_substitution_rate":  0.00008759,  # e in theoretical model equations
+        "final_time": 365,
+        "max_runtime": 86000, 
         "phenotype_model": 'immune_waning',  # or 'linear'
         "sequencing_rate": 0.05,
-        "max_runtime": 86000, 
         "seed": None
     }
     with open(filename, "w") as file:
@@ -63,7 +68,12 @@ def write_parameter_specs():
     filename= get_parameter_specs_file_path()
     parameter_specs = {
         "population_size":               {"type": "int", "min": 0, "max": 10000},
-        "tau_3":                         {"type": "float", "min": 0, "max": 1000},
+        'long_shedders_ratio':           {"type": "float", "min": 0, "max": 1},
+        "tau_1":                         {"type": "float", "min": 0, "max": 10},
+        "tau_2":                         {"type": "float", "min": 0, "max": 100},
+        "tau_3":                         {"type": "float", "min": 0, "max": 300},
+        "tau_3_long":                    {"type": "float", "min": 0, "max": 300},
+        "tau_4":                         {"type": "float", "min": 0, "max": 30},
         "infected_individuals_at_start": {"type": "int", "min": 0},
         "R":                             {"type": "float", "min": 0, "max": 20},
         "diagnosis_rate":                {"type": "float", "min": 0, "max": 1},
@@ -196,8 +206,13 @@ def write_experiment_settings(experiment_name: str, experiment_settings: list, n
     print(f"Experiment settings file written to {experiment_settings_file_path}")
 
 def write_simulation_parameters(file_path,
-                                population_size, 
+                                population_size,
+                                long_shedders_ratio,
+                                tau_1,
+                                tau_2,
                                 tau_3,
+                                tau_3_long,
+                                tau_4,
                                 infected_individuals_at_start, 
                                 R,
                                 diagnosis_rate,
@@ -211,7 +226,12 @@ def write_simulation_parameters(file_path,
                                 ):
     settings = {
         "population_size": population_size,
+        "long_shedders_ratio": long_shedders_ratio,
+        "tau_1": tau_1,
+        "tau_2": tau_2,
         "tau_3": tau_3,
+        "tau_3_long": tau_3_long,
+        "tau_4": tau_4,
         "infected_individuals_at_start": infected_individuals_at_start,
         "R": R,
         "diagnosis_rate": diagnosis_rate, 
@@ -307,7 +327,12 @@ def read_settings_and_write_simulation_parameters(experiment_name):
         # Write the simulation parameters to a JSON file
         write_simulation_parameters(simulation_parameters_file_path, 
                                     settings["population_size"],
+                                    settings['long_shedders_ratio'],
+                                    settings["tau_1"],
+                                    settings["tau_2"],
                                     settings["tau_3"],
+                                    settings["tau_3_long"],
+                                    settings["tau_4"],
                                     settings["infected_individuals_at_start"],
                                     settings["R"],
                                     settings["diagnosis_rate"],
