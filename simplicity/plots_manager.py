@@ -192,6 +192,7 @@ def plot_trajectory(seeded_simulation_output_dir):
     plt.close(fig)
 
 
+# %%
 def plot_simulation(seeded_simulation_output_dir, threshold):
     """
     Plot a combined simulation summary figure.
@@ -239,7 +240,7 @@ def plot_simulation(seeded_simulation_output_dir, threshold):
 
     filtered_df, _ = om.filter_lineage_frequency_df(lineage_frequency_df, threshold)
     colors = [get_lineage_color(name, colormap_df) for name in filtered_df.columns]
-    filtered_df.plot(kind='area', stacked=False, color=colors, alpha=0.5, ax=ax1)
+    filtered_df.plot(kind='area', stacked=True, color=colors, alpha=0.5, ax=ax1)
 
     time_file_path = os.path.join(seeded_simulation_output_dir, 'final_time.csv')
     time_final = pd.read_csv(time_file_path, header=None).iloc[0, 0]

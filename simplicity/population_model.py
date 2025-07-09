@@ -28,11 +28,11 @@ def SIDR_propensities(population, beta, k_d, k_v, seq_rate):
     # system propensities
     # reaction_id, reaction_rate, action
     propensities = [
-        ('infection',      beta * population.infectious_normal, lambda: infection(population)),
+        ('infection',      beta * population.infectious, lambda: infection(population)),
         ('diagnosis',      k_d * population.detectables,        lambda: diagnosis(population, seq_rate)),
         ('add_ih_lineage', k_v * population.infected,           lambda: add_lineage(population))
     ]
-    # print('a1:',beta * population.infectious_normal)
+    # print('a1:',beta * population.infectious)
     # print('a2:',k_d * population.detectables)
     # print('a3:',k_v * population.infected)
     return propensities, propensities_params
@@ -81,9 +81,9 @@ def diagnosis(population, seq_rate=0):
     
     # remove individual index from detectable_i, infectious_i, infected_i and add to diagnosed_i
     
-    if diagnosed_individual_i in population.infectious_normal_i:
-        population.infectious_normal_i.remove(diagnosed_individual_i)
-        population.infectious_normal -= 1
+    if diagnosed_individual_i in population.infectious_i:
+        population.infectious_i.remove(diagnosed_individual_i)
+        population.infectious -= 1
     
     population.detectable_i.remove(diagnosed_individual_i)
     population.detectables -= 1
@@ -97,13 +97,36 @@ def diagnosis(population, seq_rate=0):
     new_susceptible_index = population.reservoir_i.pop()
     population.susceptibles_i.add(new_susceptible_index)
 
+def infect_long_shedder(population, new_infected_index):
+    
+    min_time = 0
+    min_infected_n = 300
+    max_long_shedders = population.size * population.long_shedders_ratio
+    
+    if (population.time > min_time and 
+        population.infected > min_infected_n and
+        population.long_shedders < max_long_shedders and 
+        population.rng4.uniform() < 0.01
+                      ):
+        population.long_shedder_i.add(new_infected_index)
+        population.long_shedders += 1
+        
+        individual_type = 'long_shedder'
+    
+    else:
+        individual_type = 'normal'
+        
+    return individual_type
+    
+    
+
 def infection(population):
     '''
     Select a random susceptible individual to be infected and tags it as 
     such. Update compartments and infected_i
     '''
     # Convert sets to lists for random sampling
-    infectious_i_list = sorted(population.infectious_normal_i)
+    infectious_i_list = sorted(population.infectious_i)
     susceptibles_list = sorted(population.susceptibles_i)
 
     # select random patient to be the transmitter
@@ -119,53 +142,54 @@ def infection(population):
     # select random patient to be infected
     new_infected_index = population.rng4.choice(susceptibles_list)
     population.exclude_i = {new_infected_index}
+    new_inf = population.individuals[new_infected_index]
 
     # update the active lineages number
-    population.active_lineages_n += population.individuals[new_infected_index]['IH_lineages_number']
+    population.active_lineages_n += new_inf['IH_lineages_number']
 
     # Move individual from susceptibles to infected
     population.susceptibles_i.discard(new_infected_index)
     population.infected_i.add(new_infected_index)
 
     # time of infection
-    population.individuals[new_infected_index]['t_infection'] = population.time
+    new_inf['t_infection'] = population.time
     # state
-    population.individuals[new_infected_index]['state'] = 'infected'
+    new_inf['state'] = 'infected'
     
     if population.update_ih_mode == 'jump':
         # Sample first jump time from exponential distribution
-        rate = - population.individuals[new_infected_index]['model'].A[0][0]
-        population.individuals[new_infected_index]['t_next_state'] = (
+        individual_type = new_inf['type']
+        rate = - population.host_model[individual_type].A[0][0]
+        new_inf['t_next_state'] = (
         population.time + population.rng3.exponential(scale=1 / rate)
         )
         
     # parent
-    population.individuals[new_infected_index]['parent'] = parent
+    new_inf['parent'] = parent
 
     # Select random lineage from parent
     index = population.rng4.integers(0, population.individuals[parent]['IH_lineages_number'])
     transmitted_lineage = population.individuals[parent]['IH_lineages'][index]
     transmitted_fitness = population.individuals[parent]['IH_lineages_fitness_score'][index]
     # assign transmitted lineage
-    population.individuals[new_infected_index]['inherited_lineage']  = transmitted_lineage
+    new_inf['inherited_lineage']  = transmitted_lineage
     # update lineage trajectory
-    population.individuals[new_infected_index]['IH_lineages_trajectory'][transmitted_lineage] = {'ih_birth':None,'ih_death':None}
+    new_inf['IH_lineages_trajectory'][transmitted_lineage] = {'ih_birth':None,'ih_death':None}
     
     # Append transmitted lineage + fitness
-    new_lineages = population.individuals[new_infected_index]['IH_lineages']
-    new_fitness = population.individuals[new_infected_index]['IH_lineages_fitness_score']
+    new_lineages = new_inf['IH_lineages']
+    new_fitness = new_inf['IH_lineages_fitness_score']
     new_lineages.append(transmitted_lineage)
     new_fitness.append(transmitted_fitness)
 
     # Sort lineage and fitness together
     combined = sorted(zip(new_lineages, new_fitness))
     lineages_sorted, fitness_sorted = zip(*combined)
-    population.individuals[new_infected_index]['IH_lineages'] = list(lineages_sorted)
-    population.individuals[new_infected_index]['IH_lineages_fitness_score'] = list(fitness_sorted)
+    new_inf['IH_lineages'] = list(lineages_sorted)
+    new_inf['IH_lineages_fitness_score'] = list(fitness_sorted)
     
-   
     # Update individual fitness (average of lineage's fitness)
-    population.individuals[new_infected_index]['fitness_score'] = round(np.average(fitness_sorted), 4)
+    new_inf['fitness_score'] = round(np.average(fitness_sorted), 4)
 
     # store infection info for R effective
     population.individuals[parent]['new_infections'].append({
@@ -173,7 +197,10 @@ def infection(population):
         'transmitted_lineage': transmitted_lineage,
         'individual_infected': new_infected_index
     })
-
+    
+    # set the individual to be a long shedder if conditions apply
+    new_inf['type'] = infect_long_shedder(population, new_infected_index)
+    
     # update susceptibles and infected 
     population.susceptibles -= 1
     population.infected += 1

@@ -196,7 +196,7 @@ def read_sequencing_data(seeded_simulation_output_dir):
 def save_simulation_trajectory(simulation_output, seeded_simulation_output_dir):
     df = pd.DataFrame(simulation_output.trajectory, columns= 
                       ['time','infected','diagnosed','recovered','deceased',
-                       'infectious_normal','detectables','susceptibles'])
+                       'infectious','detectables','susceptibles'])
     trajectory_file_path = os.path.join(seeded_simulation_output_dir,
                                         "simulation_trajectory.csv")
     df.to_csv(trajectory_file_path, index=False)
@@ -233,7 +233,6 @@ def read_lineage_frequency(seeded_simulation_output_dir):
 
 def save_individuals_data(simulation_output, seeded_simulation_output_dir):
     individuals_data = simulation_output.individuals_data_to_df()
-    individuals_data.drop('model',axis=1,inplace=True)
     individuals_data_file_path = os.path.join(seeded_simulation_output_dir,
                                                "individuals_data.csv")
     individuals_data.to_csv(individuals_data_file_path)

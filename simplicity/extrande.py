@@ -185,7 +185,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
             return "No infected left - ending simulation"
         if population.susceptibles == 0:
             return "No susceptibles left - ending simulation"
-        if t > 60.0 and population.infectious_normal == 0:
+        if t > 60.0 and population.infectious == 0:
             return "No infectious left - ending simulation"
         if len(population.reservoir_i) < 1000:
             return "Reservoir depleted - ending simulation"

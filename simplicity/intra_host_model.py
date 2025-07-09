@@ -34,7 +34,7 @@ class Host:
     This class defines the intra-host model of SARS-CoV-2 pathogenesis.
     '''
 
-    def __init__(self, tau_1=2.86, tau_2=3.91, tau_3=7.5, tau_4=8.0, update_mode = 'matrix'):
+    def __init__(self, tau_1, tau_2, tau_3, tau_4, update_mode = 'matrix'):
         
         # set up the model matrix
         self.tau_1 = tau_1
