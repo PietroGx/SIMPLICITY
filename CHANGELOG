@@ -602,12 +602,14 @@
     * clean and fixed minor bugs and experiment naming
     
 
-2025-06-07 pietro gerletti
+2025-16-07 pietro gerletti
 
     Version 2.0.0
 
     * added tau_1, tau_2, tau_4 to settings manager 
-    * uppdated code to include long shedders subpopulation (testing phase 0)
+    * updated code to include long shedders subpopulation (testing phase 2)
+
+
     
 	
 	

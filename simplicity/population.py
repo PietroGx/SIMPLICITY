@@ -586,7 +586,7 @@ def create_population(parameters):
         'tau_1': parameters['tau_1'],
         'tau_2': parameters['tau_2'],
         'tau_3': parameters['tau_3'],
-        'tau_3_long': parameters['tau_3'], # change here
+        'tau_3_long': parameters['tau_3_long'],
         'tau_4': parameters['tau_4'],
         }
     
