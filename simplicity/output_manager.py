@@ -240,7 +240,8 @@ def save_individuals_data(simulation_output, seeded_simulation_output_dir):
 def read_individuals_data(seeded_simulation_output_dir):
     trajectory_file_path = os.path.join(seeded_simulation_output_dir,
                                         "individuals_data.csv")
-    df = pd.read_csv(trajectory_file_path, index_col=0)
+    df = pd.read_csv(trajectory_file_path, index_col=0,low_memory=False)
+    df['type'] = df['type'].astype(str)
     df['IH_lineages'] = df['IH_lineages'].apply(ast.literal_eval)
     df['IH_lineages_fitness_score'] = df['IH_lineages_fitness_score'].apply(ast.literal_eval) 
     df['new_infections'] = df['new_infections'].apply(ast.literal_eval)

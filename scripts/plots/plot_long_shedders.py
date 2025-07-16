@@ -32,6 +32,56 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
+def plot_segmented_infection_timeline(ssod):
+    
+    colormap_df = pm.make_lineages_colormap(ssod)
+    
+    individuals_data = om.read_individuals_data(ssod)
+    data = individuals_data.dropna(subset=['t_infection', 't_not_infected'])
+    data =  data[data['type'] == 'long_shedder'].copy()
+    data = data.sort_values(by='t_infection').reset_index(drop=True)
+
+    plt.figure(figsize=(12, 8))
+
+    for idx, row in data.iterrows():
+        t0, t1 = row['t_infection'], row['t_not_infected']
+        traj = row['IH_lineages_trajectory']
+        base_y = idx
+        jitter_step = 0.15
+
+        if not isinstance(traj, dict):
+            continue
+
+        for j, (lineage, times) in enumerate(traj.items()):
+            ih_start = max(t0, times.get('ih_birth', t0))
+            ih_end = min(t1, times.get('ih_death', t1))
+            if ih_end <= ih_start:
+                continue
+
+            y_jittered = base_y + (j * jitter_step - jitter_step / 2)
+            color = pm.get_lineage_color(lineage, colormap_df)
+            alpha = 1.0 if row['type'] == 'long_shedder' else 0.5
+            plt.hlines(y_jittered, ih_start, ih_end, color=color, linewidth=2, alpha=alpha)
+
+    plt.xlabel("Time")
+    plt.ylabel("Individuals")
+    plt.title("Segmented Infection Timelines Colored by Lineage")
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Determine save path
+    experiment_name = dm.get_experiment_foldername_from_SSOD(ssod)
+    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
+    sim_out_name = dm.get_simulation_output_foldername_from_SSOD(ssod)
+    seed = os.path.basename(ssod)
+    figure_output_path = os.path.join(experiment_plots_dir, f"{sim_out_name}_{seed}_long_shedders_trajectory_colored.tiff")
+
+    # Save the plot 
+    print(f"Saving figure to: {figure_output_path}")
+    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.close()
+
+
 # Plot 1: Timeline of infection for each long shedder
 def plot_long_shedders_timeline(ssod):
     
@@ -60,8 +110,9 @@ def plot_long_shedders_timeline(ssod):
     # Determine save path
     experiment_name = dm.get_experiment_foldername_from_SSOD(ssod)
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
+    sim_out_name = dm.get_simulation_output_foldername_from_SSOD(ssod)
     seed = os.path.basename(ssod)
-    figure_output_path = os.path.join(experiment_plots_dir, f"{experiment_name}_{seed}_long_shedders_trajectory.tiff")
+    figure_output_path = os.path.join(experiment_plots_dir, f"{sim_out_name}_{seed}_long_shedders_trajectory.tiff")
 
     # Save the plot 
     print(f"Saving figure to: {figure_output_path}")
@@ -83,9 +134,11 @@ def plot_avg_infection_duration_by_type(ssod):
         data=df_durations, 
         x='type', 
         y='infection_duration', 
+        hue='type', 
         estimator=np.mean,  # Corrected from 'mean' to np.mean
-        ci='sd', 
-        palette='muted'
+        errorbar='sd', 
+        palette='muted',
+        legend=False
     )
     plt.ylabel("Average Infection Duration")
     plt.title("Average Infection Time: Normal vs Long Shedders")
@@ -94,8 +147,9 @@ def plot_avg_infection_duration_by_type(ssod):
     # Determine save path
     experiment_name = dm.get_experiment_foldername_from_SSOD(ssod)
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
+    sim_out_name = dm.get_simulation_output_foldername_from_SSOD(ssod)
     seed = os.path.basename(ssod)
-    figure_output_path = os.path.join(experiment_plots_dir, f"{experiment_name}_{seed}_avg_inf_time.tiff")
+    figure_output_path = os.path.join(experiment_plots_dir, f"{sim_out_name}_{seed}_avg_inf_time.tiff")
 
     # Save the plot 
     print(f"Saving figure to: {figure_output_path}")
@@ -105,10 +159,19 @@ def plot_avg_infection_duration_by_type(ssod):
 def plot(experiment_name, seed_number):
     
     sim_out_dirs = dm.get_simulation_output_dirs(experiment_name)
+    print('')
+    print(sim_out_dirs)
+    print('')
     for sim_out_dir in sim_out_dirs:
         ssod = dm.get_ssod(sim_out_dir, seed_number)
+        print('PLOT 1')
+        print('')
         pm.plot_simulation(ssod, threshold=0)
-        plot_long_shedders_timeline(ssod)
+        print('PLOT 2')
+        print('')
+        plot_segmented_infection_timeline(ssod)
+        print('PLOT 3')
+        print('')
         plot_avg_infection_duration_by_type(ssod)
 
 def main():

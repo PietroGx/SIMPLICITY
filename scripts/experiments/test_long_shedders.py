@@ -41,7 +41,8 @@ def user_set_experiment_settings():
     }
     # parameters to keep fixed (but different from standard_value) across combinations
     fixed_params = {
-        'population_size': 5000,
+        'population_size': 3000,
+        "IH_virus_emergence_rate": 0,
         'infected_individuals_at_start': 50,
         'final_time': 365*2
     }
