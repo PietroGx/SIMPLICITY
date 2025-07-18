@@ -456,7 +456,8 @@ class Population:
                            self.recovered,
                            self.infectious,
                            self.detectables,
-                           self.susceptibles
+                           self.susceptibles,
+                           self.long_shedders
                            ])
     
     def update_fitness_trajectory(self):
