@@ -191,8 +191,6 @@ def plot_trajectory(seeded_simulation_output_dir):
     plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
     plt.close(fig)
 
-
-# %%
 def plot_simulation(seeded_simulation_output_dir, threshold):
     """
     Plot a combined simulation summary figure.

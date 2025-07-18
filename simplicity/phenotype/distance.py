@@ -42,12 +42,12 @@ def hamming_true(lineage):
             distance += 1
     return distance
 
-def hamming_iw(lineage,consensus):
+def hamming_iw(lineage,lineage2):
     # compute the hamming distance of a lineage from consensus sequence
     
     # Convert sequences into dictionaries
     dict1 = {position: base for position, base in lineage}
-    dict2 = {position: base for position, base in consensus}
+    dict2 = {position: base for position, base in lineage2}
     
     # Get the set of all unique positions in either sequence
     all_positions = set(dict1.keys()) | set(dict2.keys())

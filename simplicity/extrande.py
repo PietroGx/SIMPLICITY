@@ -45,7 +45,7 @@ class ProgressReporter:
 
         self.pbar = tqdm(
                     total=total_time,
-                    desc=f"RUNNING SIMPLICITY SIMULATION:  {simulation_id}",
+                    desc=f"RUNNING SIMULATION:  {simulation_id[:40]}",
                     unit="step",
                     bar_format="{l_bar}{bar}| {n:.2f}/{total_fmt} {unit} {postfix}",
                     position=1,
@@ -216,7 +216,7 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
     
     reporter = ProgressReporter(total_time=final_time, simulation_id=sim_id)
     
-    min_update_threshold = 0.16  # minimum dt for intra-host update (4h step)
+    min_update_threshold = 0.5  # minimum dt for intra-host update (122h step)
     dt_accumulated = 0  # initialize accumulator
     
     while t < final_time:
