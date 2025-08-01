@@ -526,25 +526,6 @@ def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
     plt.savefig(output_path, format='tiff',  dpi=300, bbox_inches='tight')
     print(f"Figure saved to: {output_path}")
     plt.close(fig)
-
-    
-def main():
-    
-    # # Set up the argument parser
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('experiment_name', type=str, help="experiment name")
-    # parser.add_argument('max_seed', type=int, help="max_seed")
-    
-    # args = parser.parse_args()
-    
-    experiment_name = 'test_long_shedders_r1_kv_#5'
-    
-    min_freq_threshold = 0.05
-    for seed in range (0,1):
-        plot(experiment_name, seed, min_freq_threshold, cluster_threshold=5)
-
-if __name__ == "__main__":
-    main()
     
 def main():
     
