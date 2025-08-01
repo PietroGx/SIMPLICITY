@@ -67,7 +67,6 @@ def get_platform_executable_extension():
 
 def submit_simulations(experiment_name: str, 
                        run_seeded_simulation: typing.Callable, 
-                       plot_trajectory: bool,
                        n:int):
     # run_seeded_simulation to qualname
     fn_name = run_seeded_simulation.__name__
@@ -206,7 +205,7 @@ def release_simulations(experiment_name, n: int):
         signal_released_path  = seeded_simulation_parameters_path + ".released"
         pathlib.Path(signal_released_path).touch()
         
-def run_seeded_simulations(experiment_name, run_seeded_simulation, plot_trajectory):
+def run_seeded_simulations(experiment_name, run_seeded_simulation):
     """the simplicity.runner.run_seeded_simulations function"""
     import time, os
     SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM = int(os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"])
@@ -215,7 +214,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation, plot_trajecto
     status = poll_simulations_status(experiment_name)
 
     # submit simulations
-    submit_simulations(experiment_name, run_seeded_simulation, plot_trajectory, n=status.total)
+    submit_simulations(experiment_name, run_seeded_simulation, n=status.total)
     print(f"submitted {status.total} seeded simulations"); last_printed = time.time()
     
     # loop until no simulation left to release
