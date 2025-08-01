@@ -13,10 +13,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+from collections import defaultdict, deque
+
 import os
 import pandas as pd
 import numpy as np
-from PIL import Image
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import FuncFormatter
@@ -27,10 +29,8 @@ from matplotlib.transforms import Bbox, TransformedBbox
 from matplotlib.image import BboxImage
 from matplotlib.colors import Normalize
 from matplotlib.collections import LineCollection
-from matplotlib.cm import get_cmap
+from matplotlib import colormaps
 import argparse
-import pandas as pd
-from collections import defaultdict
 
 from simplicity.phenotype.distance import hamming_iw
 import simplicity.output_manager as om
@@ -38,7 +38,6 @@ import simplicity.plots_manager as pm
 import simplicity.dir_manager as dm
 
 pm.apply_plos_rcparams()
-
 
 class RainbowLegendLine:
     """Dummy handle for a rainbow‐gradient line in the legend."""
@@ -65,7 +64,7 @@ class HandlerRainbowLine(HandlerBase):
 
         # Create a LineCollection from these segments
         # “array” controls the color along the line (0→1 over all segments)
-        cmap = get_cmap("gist_rainbow")
+        cmap = colormaps["gist_rainbow"]
         colors = np.linspace(0, 1, n_segments - 1)
 
         lc = LineCollection(
@@ -120,15 +119,12 @@ class HandlerRainbowBox(HandlerBase):
 
         return [im, border]
 
+def add_custom_legend_right(fig, axs1, axs2=None):
+    """
+    Places all legend sections (abbreviations + subplot entries) vertically
+    on the right-hand side of the figure.
+    """
 
-def add_custom_legend(fig, axs1, axs2=None):
-    """
-    Adds a multi‐section legend beneath the figure, arranged in three columns:
-      • Column 1: Abbreviations
-      • Column 2: Subplot 1 + Subplot 2 entries
-      • Column 3: Subplot 3 + Subplot 4 entries
-    """
-    # ── Build all the individual legend handles and labels ─────────────────────
     # Section 1: Abbreviations
     subtitle_abbrev = Line2D([], [], linestyle="None", label=r"$\bf{Abbreviations:}$")
     l_abbrev = [
@@ -137,12 +133,8 @@ def add_custom_legend(fig, axs1, axs2=None):
         "  L.r.f. = Lineage relative frequency",
         "  R.e.  = R effective",
     ]
-    abbrev_handles = [subtitle_abbrev, Line2D([], [], linestyle="None")]
-    abbrev_labels = [subtitle_abbrev.get_label(), " "]  # blank line for spacing
-    
-    for text in l_abbrev:
-        abbrev_handles.append(Line2D([], [], linestyle="None"))
-        abbrev_labels.append(text)
+    abbrev_handles = [subtitle_abbrev] + [Line2D([], [], linestyle="None") for _ in l_abbrev]
+    abbrev_labels  = [subtitle_abbrev.get_label()] + l_abbrev
 
     # Section 2: Subplot 1 – Infected trajectory
     subtitle1 = Line2D([], [], linestyle="None", label=r"$\bf{Subplot\ 1\ –\ Infected\ trajectory}$")
@@ -157,43 +149,41 @@ def add_custom_legend(fig, axs1, axs2=None):
     sub2_labels  = [subtitle2.get_label()] + l2
 
     # Section 4: Subplot 3 – Lineage Frequency
-    subtitle3     = Line2D([], [], linestyle="None", label=r"$\bf{Subplot\ 3\ –\ Lineage\ Frequency}$")
-    rainbow_box   = RainbowLegendBox()
-    sub3_handles  = [subtitle3, rainbow_box]
-    sub3_labels   = [subtitle3.get_label(), "Lineage frequency"]
+    subtitle3    = Line2D([], [], linestyle="None", label=r"$\bf{Subplot\ 3\ –\ Lineage\ Frequency}$")
+    rainbow_box  = RainbowLegendBox()
+    sub3_handles = [subtitle3, rainbow_box]
+    sub3_labels  = [subtitle3.get_label(), "Lineage frequency"]
 
- 
+    # Section 5: Subplot 4 – Clustered Frequencies
+    subtitle4     = Line2D([], [], linestyle="None", label=r"$\bf{Subplot\ 4\ –\ Clustered\ Frequencies}$")
+    cluster_line  = RainbowLegendLine()
+    sub4_handles  = [subtitle4, cluster_line]
+    sub4_labels   = [subtitle4.get_label(), "Cluster frequency"]
 
-    # ── First Column: Abbreviations ─────────────────────────────────────────────
-    # Place the "Abbreviations" block at x ≈ 0.16 (in figure fraction coordinates)
+    # Combine all
+    all_handles = abbrev_handles + [Line2D([], [], linestyle="None")] + \
+                  sub1_handles + [Line2D([], [], linestyle="None")] + \
+                  sub2_handles + [Line2D([], [], linestyle="None")] + \
+                  sub3_handles + [Line2D([], [], linestyle="None")] + \
+                  sub4_handles
+
+    all_labels = abbrev_labels + [" "] + \
+                 sub1_labels + [" "] + \
+                 sub2_labels + [" "] + \
+                 sub3_labels + [" "] + \
+                 sub4_labels
+
+    # Final right-side legend
     fig.legend(
-        abbrev_handles,
-        abbrev_labels,
-        loc='lower left',
-        bbox_to_anchor=(0.16, -0.02),
-        frameon=False,
-        ncol=1,
-        fontsize="small",
-        handlelength=0,       
-        handletextpad=0.5,
-    )
-
-    # ── Second Column: Subplot 1 + Subplot 2 ────────────────────────────────────
-    # Combine the two sub‐blocks into one list, keeping subtitles at top of each
-    sub12_handles = sub1_handles + [Line2D([], [], linestyle="None", label=" ")] + sub2_handles
-    sub12_labels  = sub1_labels  + [" "] + sub2_labels
-
-    # Place that combined block at x ≈ 0.50
-    fig.legend(
-        sub12_handles,
-        sub12_labels,
-        loc='lower center',
-        bbox_to_anchor=(0.50, -0.02),
+        all_handles,
+        all_labels,
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.5),
         frameon=False,
         ncol=1,
         fontsize="small",
         handlelength=1.0,
-        handletextpad=0.5,
+        handletextpad=0.6,
         labelspacing=0.4,
         handler_map={
             RainbowLegendBox: HandlerRainbowBox(),
@@ -201,30 +191,70 @@ def add_custom_legend(fig, axs1, axs2=None):
         }
     )
 
-    # ── Third Column: Subplot 3 + Subplot 4 ────────────────────────────────────
-    sub3_handles = sub3_handles + [Line2D([], [], linestyle="None", label=" ")] 
-    sub3_labels  = sub3_labels  
+    # Leave more room on the right
+    fig.subplots_adjust(right=0.82)
 
-    # Place that combined block at x ≈ 0.84
-    fig.legend(
-        sub3_handles,
-        sub3_labels,
-        loc='lower right',
-        bbox_to_anchor=(0.84, -0.02),
-        frameon=False,
-        ncol=1,
-        fontsize="small",
-        handlelength=1.0,
-        handletextpad=0.5,
-        labelspacing=0.4,
-        handler_map={
-            RainbowLegendBox: HandlerRainbowBox(),
-            RainbowLegendLine: HandlerRainbowLine(),
-        }
+def parse_genome(genome):
+    """Convert a genome representation to a frozenset of mutation tuples."""
+    if genome is None:
+        return frozenset()
+    try:
+        return frozenset(tuple(x) for x in genome)
+    except Exception:
+        return frozenset()
+
+def cluster_lineages_by_shared_mutations(lin2mut: dict, freq_pivot: pd.DataFrame, min_shared: int):
+    """
+    Cluster lineages based on shared mutations using transitive closure.
+    Returns:
+      - freq_df_clusters: DataFrame where each column is a cluster's summed frequency
+      - clusters: list of sets (each set = lineage names in that cluster)
+      - parents: list of representative lineage names (one per cluster)
+    """
+    adjacency = defaultdict(set)
+    items = list(lin2mut.items())
+    for i, (l1, m1) in enumerate(items):
+        for j, (l2, m2) in enumerate(items):
+            if l1 != l2 and len(m1 & m2) >= min_shared:
+                adjacency[l1].add(l2)
+                adjacency[l2].add(l1)
+
+    visited, clusters, parents = set(), [], []
+    for lineage in lin2mut:
+        if lineage not in visited:
+            cluster = set()
+            queue = deque([lineage])
+            parents.append(lineage)
+            while queue:
+                current = queue.popleft()
+                if current not in visited:
+                    visited.add(current)
+                    cluster.add(current)
+                    queue.extend(adjacency[current] - visited)
+            clusters.append(cluster)
+
+    cluster_freqs = []
+    for i, cluster in enumerate(clusters):
+        cols = [col for col in cluster if col in freq_pivot.columns]
+        if cols:
+            summed = freq_pivot[cols].sum(axis=1)
+            cluster_freqs.append(summed.rename(f"Cluster_{i}"))
+
+    freq_df_clusters = pd.concat(cluster_freqs, axis=1) if cluster_freqs else pd.DataFrame(index=freq_pivot.index)
+    return freq_df_clusters, clusters, parents
+
+def build_clustered_freqs(lineage_to_mutations, freq_df_lineages, threshold):
+    """
+    Cluster lineages by shared mutations with threshold, returning:
+      - freq_df_clusters: DataFrame of cluster-summed frequencies
+      - cluster_parents: list of parent lineage names (one per cluster column)
+    """
+    if threshold == 0:
+        return freq_df_lineages.copy(), list(freq_df_lineages.columns)
+    freq_df_clusters, clusters, parents = cluster_lineages_by_shared_mutations(
+        lineage_to_mutations, freq_df_lineages, threshold
     )
-
-    # ── Make room at the bottom for all three legend columns ───────────────────
-    fig.subplots_adjust(bottom=0.20)
+    return freq_df_clusters, parents
 
 def compute_transmission_distances(ssod):
     """
@@ -301,8 +331,6 @@ def plot_hamming_distance_boxplot_ax(ax, transmission_distance_data, label="C"):
         Subplot label to annotate (e.g., "D")
     """
     import seaborn as sns
-    import pandas as pd
-
     # Build group column
     df_plot = transmission_distance_data.copy()
     df_plot['group'] = df_plot['type'].map({
@@ -310,16 +338,10 @@ def plot_hamming_distance_boxplot_ax(ax, transmission_distance_data, label="C"):
         'long_shedder': 'long'
     })
 
-    # Add combined group
-    df_combined = df_plot.copy()
-    df_combined['group'] = 'normal+long'
-
-    plot_df = pd.concat([df_plot, df_combined], ignore_index=True)
-
     # Plot to provided axis
-    sns.boxplot(data=plot_df, x='group', y='hamming_distance',
-                palette='pastel', ax=ax)
-    sns.stripplot(data=plot_df, x='group', y='hamming_distance',
+    sns.boxplot(data=df_plot, x='group', y='hamming_distance',
+                hue = 'group', palette='pastel', ax=ax)
+    sns.stripplot(data=df_plot, x='group', y='hamming_distance',
                   color='black', alpha=0.3, size=4, jitter=True, ax=ax)
 
     ax.set_xlabel("Transmitting Individual Type")
@@ -332,29 +354,25 @@ def plot_hamming_distance_boxplot_ax(ax, transmission_distance_data, label="C"):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
-
-def extended_simulation_trajectory(axs, ssod, experiment_name, threshold, label):
-    
+def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshold, cluster_threshold, label):
     axs[0].text(-0.1, 1.05, label, transform=axs[0].transAxes,
-            fontsize=16, fontweight='bold', va='top', ha='left')
-    
+                fontsize=16, fontweight='bold', va='top', ha='left')
+
     # --- Subplot 1: System trajectory ----------------------------------------
     trajectory_df = om.read_simulation_trajectory(ssod)
     time = trajectory_df['time'].tolist()
     infected = trajectory_df['infected'].tolist()
-    
-    
+
     axs[0].plot(time, infected, label='Infected individuals at time t', color='blue')
     try:
         long_shedders = trajectory_df['long_shedders'].tolist()
         ax2 = axs[0].twinx()
         ax2.plot(time, long_shedders, label='Long shedders at time t', color='orange')
-    except: pass
-    # axs[0].plot(time, diagnosed, label='Diagnosed individuals (cumulative)', color='yellow')
+    except:
+        pass
     axs[0].set_ylim(0, max(infected) * 1.5)
     axs[0].set_ylabel('N. i.')
-    # axs[0].legend(loc='upper left')
-    
+
     # --- Subplot 2: Fitness trajectory ---------------------------------------
     fitness_trajectory_file_path = os.path.join(ssod, 'fitness_trajectory.csv')
     try:
@@ -371,20 +389,19 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, threshold, label)
     axs[1].fill_between(times,
                         [m - s for m, s in zip(means, stds)],
                         [m + s for m, s in zip(means, stds)],
-                        color='#2ca02c', alpha=0.3, label='Std.')
-    # axs[1].legend(loc='upper left')
+                        color='#2ca02c', alpha=0.3)
     axs[1].set_ylabel("R.a.t.f.")
 
     # --- Subplot 3: Lineages frequency ---------------------------------------
     try:
         lineage_frequency_df = om.read_lineage_frequency(ssod)
         colormap_df = pm.make_lineages_colormap(ssod, cmap_name='gist_rainbow')
-        pm.plot_lineages_colors_tab(ssod)  # Save color key figure
+        pm.plot_lineages_colors_tab(ssod)
     except Exception as e:
         print(f"[ERROR] Lineage frequency or colormap failed: {e}")
         return
 
-    filtered_df, _ = om.filter_lineage_frequency_df(lineage_frequency_df, threshold)
+    filtered_df, _ = om.filter_lineage_frequency_df(lineage_frequency_df, min_freq_threshold)
     colors = [pm.get_lineage_color(name, colormap_df) for name in filtered_df.columns]
     filtered_df.plot(kind='area', stacked=False, color=colors, alpha=0.5, ax=axs[2], legend=False)
 
@@ -395,29 +412,66 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, threshold, label)
         print(f"[ERROR] final_time.csv could not be read: {e}")
         time_final = max(time)
     axs[2].set_xlim([0, time_final])
+    axs[2].yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{100 * x:.0f}%"))
+    axs[2].set_ylabel("L.r.f.")
 
-    def to_percent(x, _): return f"{100 * x:.0f}%"
-    axs[2].yaxis.set_major_formatter(FuncFormatter(to_percent))
-    axs[2].set_ylabel("L.r.f.")    
+    # --- Subplot 4: Clustered frequency ---------------------------------------
+
+    # --- Subplot 4: Clustered frequency ---------------------------------------
+    try:
     
+        # Read phylogenetic info
+        phylo_df = om.read_phylogenetic_data(ssod)
+    
+        # Parse genome into mutation sets
+        lineage_to_mutations = dict(zip(
+            phylo_df["Lineage_name"],
+            phylo_df["Genome"].apply(parse_genome)
+        ))
+        # Pivot frequency dataframe
+        full_pivot_df = lineage_frequency_df.pivot(
+            index="Time_sampling",
+            columns="Lineage_name",
+            values="Frequency_at_t"
+        )
+
+    
+        # Apply clustering
+        clustered_df, cluster_parents = build_clustered_freqs(
+            lineage_to_mutations,
+            full_pivot_df,
+            cluster_threshold
+        )
+
+        # Plot
+        colors = [pm.get_lineage_color(parent, colormap_df) for parent in cluster_parents]
+    
+        clustered_df.plot(kind='area', stacked=False,
+                          color=colors, alpha=0.6, ax=axs[3], legend=False)
+        axs[3].set_xlim([0, time_final])
+        axs[3].set_ylim(0, 1.0)
+        axs[3].set_ylabel("Cluster freq.")
+        
+    except:
+        import traceback
+        print("[ERROR] Clustered frequency plot failed:")
+        traceback.print_exc()
+
+    
+    
+    # Apply consistent styling
     for ax in axs:
-        # ax.tick_params(labelbottom=True)
         pm.apply_standard_axis_style(ax)
-    
-    # set y lims --------------------------------------------------------------
+
+    # y-axis limits
     max_y1 = max(infected) * 1.5
-    axs[0].set_ylim(0, max_y1)
-    
-    max_y2 = max([m + s for m, s in zip(means, stds)])
-    axs[1].set_ylim(0, max_y2 * 1.2)
- 
-    max_y3 = 1.0  
-    axs[2].set_ylim(0, max_y3)
-    
-    return [max_y1, max_y2, max_y3]
+    max_y2 = max([m + s for m, s in zip(means, stds)]) * 1.2
+    max_y3 = 1.0
+    max_y4 = 1.0  # same for clustered frequency
 
+    return [max_y1, max_y2, max_y3, max_y4]
 
-def plot(experiment_name, seed, threshold):
+def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
     sim_dirs = dm.get_simulation_output_dirs(experiment_name)
 
     if len(sim_dirs) < 2:
@@ -429,19 +483,19 @@ def plot(experiment_name, seed, threshold):
 
     # ── Setup figure layout ───────────────────────────────────────────────
     fig = plt.figure(figsize=(16, 12))
-    gs = GridSpec(5, 7, figure=fig)
+    gs = GridSpec(6, 7, figure=fig)
 
     # Top left: ssod1 simulation outputs
     axs1 = [fig.add_subplot(gs[0, 0:3])]
-    for i in range(1, 3):
+    for i in range(1, 4):
         axs1.append(fig.add_subplot(gs[i, 0:3], sharex=axs1[0]))
-    ylims1 = extended_simulation_trajectory(axs1, ssod1, experiment_name, threshold, label='A')
+    ylims1 = extended_simulation_trajectory(axs1, ssod1, experiment_name, min_freq_threshold, cluster_threshold, label='A')
 
     # Top right: ssod2 simulation outputs
     axs2 = [fig.add_subplot(gs[0, 4:7])]
-    for i in range(1, 3):
+    for i in range(1, 4):
         axs2.append(fig.add_subplot(gs[i, 4:7], sharex=axs2[0]))
-    ylims2 = extended_simulation_trajectory(axs2, ssod2, experiment_name, threshold, label='B')
+    ylims2 = extended_simulation_trajectory(axs2, ssod2, experiment_name, min_freq_threshold, cluster_threshold, label='B')
 
     # Match y-axis limits across the two sides
     for i in range(3):
@@ -464,7 +518,7 @@ def plot(experiment_name, seed, threshold):
                  ha='center', va='top')
 
     # Add combined legend using top panel (axs1)
-    add_custom_legend(fig, axs1, axs2)
+    add_custom_legend_right(fig, axs1, axs2)
 
     # Save figure
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
@@ -476,17 +530,36 @@ def plot(experiment_name, seed, threshold):
     
 def main():
     
+    # # Set up the argument parser
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('experiment_name', type=str, help="experiment name")
+    # parser.add_argument('max_seed', type=int, help="max_seed")
+    
+    # args = parser.parse_args()
+    
+    experiment_name = 'test_long_shedders_r1_kv_#5'
+    
+    min_freq_threshold = 0.05
+    for seed in range (0,1):
+        plot(experiment_name, seed, min_freq_threshold, cluster_threshold=5)
+
+if __name__ == "__main__":
+    main()
+    
+def main():
+    
     # Set up the argument parser
     parser = argparse.ArgumentParser()
     parser.add_argument('experiment_name', type=str, help="experiment name")
     parser.add_argument('max_seed', type=int, help="max_seed")
+    parser.add_argument('cluster_threshold', type=int, help="cluster_threshold")
     
     args = parser.parse_args()
     
 
-    threshold = 0.05
+    min_freq_threshold = 0.05
     for seed in range (0,args.max_seed):
-        plot(args.experiment_name, seed, threshold)
+        plot(args.experiment_name, seed, min_freq_threshold, args.cluster_threshold)
 
 if __name__ == "__main__":
     main()
