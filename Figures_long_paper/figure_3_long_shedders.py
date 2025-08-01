@@ -28,7 +28,7 @@ from matplotlib.image import BboxImage
 from matplotlib.colors import Normalize
 from matplotlib.collections import LineCollection
 from matplotlib.cm import get_cmap
-
+import argparse
 import pandas as pd
 from collections import defaultdict
 
@@ -475,10 +475,18 @@ def plot(experiment_name, seed, threshold):
 
     
 def main():
-    experiment_name = 'test_long_shedders_r1_kv_#5'
-    seed = 0
+    
+    # Set up the argument parser
+    parser = argparse.ArgumentParser()
+    parser.add_argument('experiment_name', type=int, help="experiment name")
+    parser.add_argument('max_seed', type=int, help="max_seed")
+    
+    args = parser.parse_args()
+    
+
     threshold = 0.05
-    plot(experiment_name, seed, threshold)
+    for seed in range (0,args.max_seed):
+        plot(args.experiment_name, seed, threshold)
 
 if __name__ == "__main__":
     main()
