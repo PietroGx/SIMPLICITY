@@ -97,13 +97,13 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     """
     # model parameters
     R = parameters["R"]
-    ih_tau_2 = 3.91
-    tau_inf = parameters['tau_3'] + ih_tau_2
+    tau_inf = parameters['tau_2'] + parameters['tau_3']
     beta = R / tau_inf
     print(f'R: {R} Beta: {beta}')
     k_d = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate"], parameters["tau_3"])
     k_v = parameters["IH_virus_emergence_rate"]
-    e = np.sum([parameters["nucleotide_substitution_rate"]] * len(ref.get_reference()))
+    NSR = parameters["nucleotide_substitution_rate"]
+    L = len(ref.get_reference())
     seq_rate = parameters["sequencing_rate"]
     max_runtime = parameters["max_runtime"]
     # for fitness update
@@ -139,7 +139,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     
     def update_fitness_step(population):
         t = population.time
-        individuals_to_update = sorted(population.infected_i)
+        individuals_to_update = sorted(population.infectious_i)
         # calculate consensus every 5 simulation days and use it for fitness score (immune waning model)
         if use_consensus:
             if np.floor(t) > last_consensus_snapshot["t_snapshot"]:
@@ -160,9 +160,9 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         delta_t_y = delta_t / 365.25 # time in years
         if use_consensus:
             consensus = last_consensus_snapshot['consensus']
-            evo.mutate(population, e, delta_t_y, phenotype_model, consensus)
+            evo.mutate(population, NSR, L, delta_t_y, phenotype_model, consensus)
         else:
-            evo.mutate(population, e, delta_t_y, phenotype_model)
+            evo.mutate(population, NSR, L, delta_t_y, phenotype_model)
     
     def fire_reaction(population, propensities, tau_2):
         a0 = sum(rate for _, rate, _ in propensities)
@@ -284,6 +284,7 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
     tqdm.write("SIMPLICITY SIMULATION COMPLETED")
     tqdm.write("----------------------------------------\n")
     tqdm.write('')
+
     return population
 
 def extrande_factory(phenotype_model, parameters, sim_id, rng1, rng2):

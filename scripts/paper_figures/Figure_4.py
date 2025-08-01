@@ -193,7 +193,7 @@ def count_sweeps(series_bool, min_days_above_threshold=21):
 # Plotting Helpers
 # -----------------------------------------------------------------------------
 
-def draw_stack_entropy(ax, freq_df, entropy_series, colormap, data_type):
+def draw_stack_entropy(ax, freq_df, entropy_series, colormap, data_type, label):
     """
     ax:             A single Axes object
     freq_df:        DataFrame indexed by time; each column is a lineage (frequency over time)
@@ -201,7 +201,8 @@ def draw_stack_entropy(ax, freq_df, entropy_series, colormap, data_type):
     colormap:       result of pm.make_lineages_colormap(...) for coloring each lineage
     data_type:      lineage or cluster, used for axis label
     """
-
+    ax.text(-0.1, 1.05, label, transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
     # Entropy 
     ax.plot(entropy_series.index, entropy_series.values, "k-", linewidth=2)
     ax.set_ylabel("Entropy")
@@ -229,7 +230,7 @@ def draw_stack_entropy(ax, freq_df, entropy_series, colormap, data_type):
     pm.apply_standard_axis_style(ax, True)
 
 
-def draw_violin(ax, counts_group1, counts_group2, ylabel):
+def draw_violin(ax, counts_group1, counts_group2, ylabel, label):
     """
     ax:              A single Axes object
     counts_group1:   list of ints (e.g. tcl1 or tcc1)
@@ -250,6 +251,8 @@ def draw_violin(ax, counts_group1, counts_group2, ylabel):
         hue="Group",
         legend=False
     )
+    ax.text(-0.1, 1.05, label, transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
     ax.set_ylabel(ylabel)
     ax.set_xlabel("")
     pm.apply_standard_axis_style(ax)
@@ -391,7 +394,7 @@ def plot_figure_4(include_clusters=False):
         ax00.set_title("Linear phenotype model")
         draw_stack_entropy(
             ax00,
-            freq_l1, ent_l1, cmap1, data_type='Lineage'
+            freq_l1, ent_l1, cmap1, data_type='Lineage', label='A'
         )
 
         # Left, bottom (1,0): Immune raw + entropy
@@ -399,12 +402,12 @@ def plot_figure_4(include_clusters=False):
         ax10.set_title("Immune waning phenotype model")
         draw_stack_entropy(
             ax10,
-            freq_l2, ent_l2, cmap2, data_type='Lineage'
+            freq_l2, ent_l2, cmap2, data_type='Lineage', label='B'
         )
 
         # Right (spans rows 0–1, col 1): lineage‐level violin
         ax_violin = fig.add_subplot(gs[:, 1])
-        draw_violin(ax_violin, scl1, scl2, "Number of selective sweeps")
+        draw_violin(ax_violin, scl1, scl2, "Number of selective sweeps", label='C')
 
     else:
         fig_name = f"Figure_4S_{EXPERIMENT_NAME}_seed{SEED}.tiff"
@@ -425,7 +428,7 @@ def plot_figure_4(include_clusters=False):
         ax00.set_title("Linear phenotype model")
         draw_stack_entropy(
             ax00,
-            freq_l1, ent_l1, cmap1, data_type='Lineage'
+            freq_l1, ent_l1, cmap1, data_type='Lineage', label='A'
         )
 
         # Left, row 1 (freq_c1 + ent_c1)
@@ -433,11 +436,11 @@ def plot_figure_4(include_clusters=False):
         ax01.set_title("Immune waning phenotype model")
         draw_stack_entropy(
             ax01,
-            freq_l2, ent_l2, cmap2, data_type='Lineage'
+            freq_l2, ent_l2, cmap2, data_type='Lineage', label='B'
         )
         # Right, rows 0–1: lineage‐level violin
         ax_violin1 = fig.add_subplot(gs[0:2, 1])
-        draw_violin(ax_violin1, scl1, scl2, "Number of selective sweeps")
+        draw_violin(ax_violin1, scl1, scl2, "Number of selective sweeps",label='E')
         
         
         # Row 2 - SPACER
@@ -447,7 +450,7 @@ def plot_figure_4(include_clusters=False):
         ax02.set_title("Linear phenotype model")
         draw_stack_entropy(
             ax02,
-            freq_c1, ent_c1, cmap1, data_type='Clustered Lineage'
+            freq_c1, ent_c1, cmap1, data_type='Clustered Lineage', label='C'
         )
       
         # Left, row 3 (freq_c2 + ent_c2)
@@ -455,12 +458,12 @@ def plot_figure_4(include_clusters=False):
         ax03.set_title("Immune waning phenotype model")
         draw_stack_entropy(
             ax03,
-            freq_c2, ent_c2, cmap2, data_type='Clustered Lineage'
+            freq_c2, ent_c2, cmap2, data_type='Clustered Lineage', label='D'
         )
 
         # Right, rows 2–3: cluster‐level violin
         ax_violin2 = fig.add_subplot(gs[3:5, 1])
-        draw_violin(ax_violin2, scc1, scc2, "Number of selective sweeps")
+        draw_violin(ax_violin2, scc1, scc2, "Number of selective sweeps", label='F')
 
    
     output_path = os.path.join("Data", fig_name)

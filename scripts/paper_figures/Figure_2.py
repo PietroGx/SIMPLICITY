@@ -37,7 +37,9 @@ def plot_intra_host(ax):
     all possible initial states (0 to 20), with a continuous color mapping.
 
     """
-    ih_model = Host()
+    ax.text(-0.1, 1.05, "A", transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
+    ih_model = Host(tau_1=2.86, tau_2=3.91, tau_3=7.5, tau_4=8)
     time = 50
     step = 0.1
     
@@ -62,8 +64,9 @@ def plot_intra_host(ax):
 
 def plot_figure_tempest_regression(experiment_name, ax, out_sim_dir_i=9):
     
+    ax.text(-0.1, 1.05, "B", transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
     # parameter = 'nucleotide_substitution_rate'
-    
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
     simulation_output_dir = simulation_output_dirs[out_sim_dir_i]
     # param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
@@ -83,7 +86,8 @@ def plot_figure_tempest_regression(experiment_name, ax, out_sim_dir_i=9):
 def plot_OSR_fit_figure(experiment_name, ax):
     ''' plot fit of nucleotide substitution rate / observed substitution rates curve
     '''
-    
+    ax.text(-0.1, 1.05, "C", transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
     parameter = 'nucleotide_substitution_rate'
     model_type = 'exp'
     min_seq_number=30

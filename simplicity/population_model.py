@@ -100,7 +100,7 @@ def diagnosis(population, seq_rate=0):
 def infect_long_shedder(population, new_infected_index):
     
     min_time = 0
-    min_infected_n = 300
+    min_infected_n = 0
     max_long_shedders = population.size * population.long_shedders_ratio
     
     if (population.time > min_time and 
@@ -117,8 +117,6 @@ def infect_long_shedder(population, new_infected_index):
         individual_type = 'normal'
         
     return individual_type
-    
-    
 
 def infection(population):
     '''
@@ -128,17 +126,11 @@ def infection(population):
     # Convert sets to lists for random sampling
     infectious_i_list = sorted(population.infectious_i)
     susceptibles_list = sorted(population.susceptibles_i)
+    
+    infection_fitness_weight = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
 
-    # select random patient to be the transmitter
-    fitness_inf = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
-    fitsum = np.sum(fitness_inf)
-
-    if fitsum > 0:
-        normed_fitness = [f / fitsum for f in fitness_inf]
-        parent = population.rng4.choice(infectious_i_list, p=normed_fitness)
-    else:
-        parent = population.rng4.choice(infectious_i_list)
-
+    parent = population.rng4.choice(infectious_i_list, p=infection_fitness_weight)
+   
     # select random patient to be infected
     new_infected_index = population.rng4.choice(susceptibles_list)
     population.exclude_i = {new_infected_index}
@@ -175,6 +167,8 @@ def infection(population):
     new_inf['inherited_lineage']  = transmitted_lineage
     # update lineage trajectory
     new_inf['IH_lineages_trajectory'][transmitted_lineage] = {'ih_birth':None,'ih_death':None}
+    # update mutation weight event timer
+    new_inf['time_last_weight_event'] = population.time
     
     # Append transmitted lineage + fitness
     new_lineages = new_inf['IH_lineages']
@@ -219,10 +213,12 @@ def add_lineage(population):
     # Add a duplicate lineage if under max capacity 
     if IH_lineage_n < IH_lineages_max:
         idx = population.rng4.integers(0, IH_lineage_n)
-        individual['IH_lineages'].append(individual['IH_lineages'][idx])
+        duplicated_lineage = individual['IH_lineages'][idx]
+        individual['IH_lineages'].append(duplicated_lineage)
         individual['IH_lineages_fitness_score'].append(individual['IH_lineages_fitness_score'][idx])
         individual['IH_lineages_number'] += 1
         population.active_lineages_n += 1
+        
     # Replace one lineage (delete + duplicate) if at max
     elif IH_lineage_n == IH_lineages_max and IH_lineages_max > 1:
         # Randomly delete one

@@ -24,23 +24,28 @@ use to store genomic data (we only store the positions and mutations that are
 from simplicity.evolution import reference as ref
 reference = ref.get_reference()
 
-def hamming(lineage):
-    # compute the hamming distance of a lineage from reference genome
-    distance = 1
-    
-    for mutation in lineage:
-        if reference[mutation[0]] != mutation[1]:
-            distance += 1
-    return distance
 
-def hamming_true(lineage):
+# def hamming(lineage):
+#     # compute the hamming distance of a lineage from reference genome
+#     distance = 1
+    
+#     for mutation in lineage:
+#         if reference[mutation[0]] != mutation[1]:
+#             distance += 1
+#     return distance
+
+def hamming(lineage):
     # compute the hamming distance of a lineage from reference genome
     distance = 0
     
     for mutation in lineage:
         if reference[mutation[0]] != mutation[1]:
             distance += 1
-    return distance
+            
+    epsilon = 1e-6  # fitness floor
+    distance = max(distance, epsilon)
+    
+    return distance 
 
 def hamming_iw(lineage,lineage2):
     # compute the hamming distance of a lineage from consensus sequence
@@ -64,6 +69,6 @@ def hamming_iw(lineage,lineage2):
         if base1 != base2:
             distance += 1
     
-    return distance
+    return distance 
 
     

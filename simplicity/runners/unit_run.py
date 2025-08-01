@@ -15,8 +15,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 def run_seeded_simulation(seeded_simulation_parameters_path: str, 
-                          experiment_name: str,
-                          plot_trajectory: bool) -> None:
+                          experiment_name: str) -> None:
     """runs one seeded simulation. This function isolates how to run one simulation 
     from the looping over all seeded simulation parameters of one experiment.
     
@@ -43,6 +42,4 @@ def run_seeded_simulation(seeded_simulation_parameters_path: str,
     simulation = sim.Simplicity       (parameters, output_directory, sim_id)
     simulation.run()
     ## </simplicity core>        
-    if plot_trajectory:    
-        simulation.plot()
     

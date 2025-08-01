@@ -602,14 +602,33 @@
     * clean and fixed minor bugs and experiment naming
     
 
-2025-16-07 pietro gerletti
+2025-23-07 pietro gerletti
 
     Version 2.0.0
 
     * added tau_1, tau_2, tau_4 to settings manager 
-    * updated code to include long shedders subpopulation (testing phase 2)
+    * updated code to include long shedders subpopulation 
+    * added figure 1,2,3 for long shedders paper
+    * removed plot_simulation bool from runners
+    * updated check simulations script
 
+2025-27-07 pietro gerletti
 
+    Version 2.0.01
+
+    * updated fitness to relative fitness (it was already used as such in selection process)
+    * improved how fitness floor is handled (epsilon)
+    * removed 1 based hamming distance
+    * added temporal weight to genome selection for substitution assignment
+    
+2025-27-07 pietro gerletti
+
+    Version 2.0.02
+    
+    * updated plot to show normed fitness value 
+    * added plots for long shedder exps 
+    * removed long shedders from consensus calculation
+    * relative fitness smoothing by adding a small floor 
     
 	
 	

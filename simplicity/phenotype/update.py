@@ -25,9 +25,22 @@ def immune_waning_fitness_score(population,lineage_genome,consensus):
     # compute fitness score
     infected_fraction = min((population.diagnosed + population.recovered)/population.size,1)
     non_infected_fraction = max((population.size-(population.diagnosed + population.recovered))/population.size,0)
+    
     fitness_score = infected_fraction*distance_from_weighted_consensus + non_infected_fraction/population.active_lineages_n
     
+    epsilon = 1e-6  # fitness floor
+    fitness_score = max(fitness_score, epsilon)
+    
     return fitness_score
+
+def update_relative_fitness(population):
+    infectious_i_list = sorted(population.infectious_i)
+   
+    fitness_inf = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
+    fitsum = np.sum(fitness_inf)
+    
+    for i in infectious_i_list : 
+        population.individuals[i]['fitness_score'] /= fitsum
 
 def update_fitness_factory(type):
     '''
@@ -47,6 +60,8 @@ def update_fitness_factory(type):
                     fitness.append(dis.hamming(lineage_genome))
                 population.individuals[individual]['IH_lineages_fitness_score'] = fitness
                 population.individuals[individual]['fitness_score'] = np.average(fitness)
+            # update relative fitness scores for the population
+            update_relative_fitness(population)
         
         return update_fitness
     
@@ -63,6 +78,8 @@ def update_fitness_factory(type):
                     fitness.append(immune_waning_fitness_score(population,lineage_genome,consensus))
                 population.individuals[individual_index]['IH_lineages_fitness_score'] = fitness
                 population.individuals[individual_index]['fitness_score'] = np.average(fitness)
+            # update relative fitness scores for the population
+            update_relative_fitness(population)
         
         return update_fitness
 

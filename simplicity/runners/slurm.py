@@ -117,8 +117,8 @@ def submit_simulations(experiment_name: str,
     ]), env=(env:={
         **os.environ,
         "SIMPLICITY_EXPERIMENT_NAME": experiment_name,
-        "USER_RUN_SEEDED_SIMULATION": run_seeded_simulation_qualname,
-        "PLOT_TRAJECTORY"           : str(plot_trajectory)
+        "USER_RUN_SEEDED_SIMULATION": run_seeded_simulation_qualname
+        # "PLOT_TRAJECTORY"           : str(plot_trajectory)
     }), input=stdin)
     assert slurm_process.returncode == 0, f"Slurm was called with the following arguments:\n{' '.join(args)}\n{env}\n=== stdin\n{stdin}\n=== /stdin"
     
@@ -255,7 +255,7 @@ def job():
     # retrieve arguments value (set by submit_simulation) 
     experiment_name                = os.environ["SIMPLICITY_EXPERIMENT_NAME"]
     run_seeded_simulation_qualname = os.environ["USER_RUN_SEEDED_SIMULATION"]
-    plot_trajectory = os.getenv("PLOT_TRAJECTORY", "False").lower() == "true"
+    # plot_trajectory = os.getenv("PLOT_TRAJECTORY", "False").lower() == "true"
     
     # resolve i_th seeded_simulation given Slurm's given rank
     i_th_seeded_simulation = int(os.environ["SLURM_ARRAY_TASK_ID"]) - int(os.environ["SLURM_ARRAY_TASK_MIN"])
@@ -289,8 +289,8 @@ def job():
         run_seeded_simulation = getattr(run_seeded_simulation_module, fn_name)
     
         # call run_seeded_simulation
-        print(type(plot_trajectory))
-        run_seeded_simulation(seeded_simulation_parameters_path, experiment_name, plot_trajectory)
+        # print(type(plot_trajectory))
+        run_seeded_simulation(seeded_simulation_parameters_path, experiment_name)
         
     except Exception as exc:
         # signal seeded simulation failed

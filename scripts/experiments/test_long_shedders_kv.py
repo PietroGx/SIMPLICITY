@@ -29,7 +29,7 @@ from experiment_script_runner import run_experiment_script
 import simplicity.settings_manager as sm
 import argparse
 
-experiment_name =  'test_long_shedders'
+experiment_name =  'test_long_shedders_kv'
 
 def user_set_experiment_settings():
     
@@ -41,7 +41,7 @@ def user_set_experiment_settings():
     }
     # parameters to keep fixed (but different from standard_value) across combinations
     fixed_params = {
-        'population_size': 3000,
+        'population_size': 1000,
         "IH_virus_emergence_rate": 0.01,
         'infected_individuals_at_start': 10,
         'final_time': 365*2
@@ -57,7 +57,7 @@ def user_set_experiment_settings():
     # fixed_params = sm.read_user_set_parameters_file(filename)
     
     # -------------------------------------------------------------------------
-    n_seeds = 100
+    n_seeds = 10
     
     return (varying_params,fixed_params,n_seeds)
 
