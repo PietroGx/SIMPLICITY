@@ -478,7 +478,7 @@ def main():
     
     # Set up the argument parser
     parser = argparse.ArgumentParser()
-    parser.add_argument('experiment_name', type=int, help="experiment name")
+    parser.add_argument('experiment_name', type=str, help="experiment name")
     parser.add_argument('max_seed', type=int, help="max_seed")
     
     args = parser.parse_args()
