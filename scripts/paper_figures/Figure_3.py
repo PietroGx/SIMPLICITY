@@ -228,8 +228,9 @@ def add_custom_legend(fig, axs1, axs2=None):
     fig.subplots_adjust(bottom=0.20)
 
 
-def extended_simulation_trajectory(axs, ssod, experiment_name, threshold):
-
+def extended_simulation_trajectory(axs, ssod, experiment_name, threshold, label):
+    axs[0].text(-0.1, 1.05, label, transform=axs[0].transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
     # --- Subplot 1: System trajectory ----------------------------------------
     trajectory_df = om.read_simulation_trajectory(ssod)
     time = trajectory_df['time'].tolist()
@@ -351,7 +352,7 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, threshold):
 
 
 
-def load_tree_to_ax(ax, ssod, experiment_name):
+def load_tree_to_ax(ax, ssod, experiment_name, label):
     try:
         # Get the path to the circular phylogenetic tree image
         image_path = om.get_tree_plot_filepath(
@@ -363,6 +364,8 @@ def load_tree_to_ax(ax, ssod, experiment_name):
 
         # Open and display it on the axis
         img = Image.open(image_path)
+        ax.text(-0.1, 1.05, label, transform=ax.transAxes,
+                fontsize=16, fontweight='bold', va='top', ha='left')
         ax.imshow(np.array(img))
         ax.axis('off')
 
@@ -388,12 +391,13 @@ def figure_3(experiment_name, seed, threshold):
     axs1 = [fig.add_subplot(gs[0, 0:4])]
     for i in range(1, 4):
         axs1.append(fig.add_subplot(gs[i, 0:4], sharex=axs1[0]))
-    ylims1 = extended_simulation_trajectory(axs1, ssod1, experiment_name, threshold)
+    ylims1 = extended_simulation_trajectory(axs1, ssod1, experiment_name, threshold,
+                                            label= 'A')
    
     # ------------------------------------------------------------------------- 
     ax_tree1 = fig.add_subplot(gs[0:4, 4:])
     build_tree.draw_tree(ssod1, experiment_name, 'phylogenetic')
-    load_tree_to_ax(ax_tree1, ssod1, experiment_name)
+    load_tree_to_ax(ax_tree1, ssod1, experiment_name, label='B')
 
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -406,7 +410,8 @@ def figure_3(experiment_name, seed, threshold):
     axs2 = [fig.add_subplot(gs[5, 0:4])]
     for i in range(6, 9):
         axs2.append(fig.add_subplot(gs[i, 0:4], sharex=axs2[0]))
-    ylims2 = extended_simulation_trajectory(axs2, ssod2, experiment_name, threshold)
+    ylims2 = extended_simulation_trajectory(axs2, ssod2, experiment_name, threshold,
+                                            label= 'C')
 
     # set max y axis across corresponding plots
     for i in range(4):
@@ -418,7 +423,7 @@ def figure_3(experiment_name, seed, threshold):
     
     ax_tree2 = fig.add_subplot(gs[5:9, 4:])
     build_tree.draw_tree(ssod2, experiment_name, 'phylogenetic')
-    load_tree_to_ax(ax_tree2, ssod2, experiment_name)
+    load_tree_to_ax(ax_tree2, ssod2, experiment_name, label='D')
     
     # --------------------------------------------------------------------------
     fig.subplots_adjust(hspace=0.5, top=0.94, bottom=0.05)

@@ -195,8 +195,8 @@ class Population:
                      'IH_lineages_max': self.rng3.integers(1,6),
                      'IH_lineages_fitness_score' : [1],
                      'IH_lineages_trajectory': {}, # lineage name : [ih_time_start, ih_time_end]
-                     
-                     'fitness_score'     : 1
+                     'time_last_weight_event': 0, # time since infection or last mutation
+                     'fitness_score'     :  1e-6  # fitness floor (individual fitness)
                     }
             # add index of individuals to either susceptibles indices or to 
             # reservoir indices (the simulaiton starts with a pool of susceptibles)
@@ -481,7 +481,7 @@ class Population:
         count_lineages_t = {}
         
         # Loop through the infected individuals and get a list of unique IH_virus names (lineage)
-        for individual_index in self.infected_i:
+        for individual_index in set(self.infected_i) -set(self.long_shedder_i):
             unique_lineages = set(self.individuals[individual_index]['IH_lineages'])
             for lineage_name in unique_lineages:
                 count_lineages_t[lineage_name] = count_lineages_t.get(lineage_name, 0) + 1
@@ -521,7 +521,6 @@ class Population:
                 if lineage_traj_dic[lineage].get('ih_death') is None:
                     lineage_traj_dic[lineage]['ih_death'] = row['t_not_infectious']
         
-            # Optional: reassign if you're not sure mutation is enough
             individuals_data.at[idx, 'IH_lineages_trajectory'] = lineage_traj_dic
         return individuals_data
         
@@ -554,20 +553,6 @@ class Population:
         
         return df
     
-    # def DEBUG_update_ih_to_df(self):
-    #     sim_time = [step[0] for step in self.DEBUG_update_ih]
-    #     delta_t = [step[1] for step in self.DEBUG_update_ih]
-    #     leap = [step[2] for step in self.DEBUG_update_ih]
-        
-    #     # Create a pandas DataFrame
-    #     df = pd.DataFrame({
-    #         'sim_time': sim_time,
-    #         'delta_t': delta_t,
-    #         'leap': leap
-    #     })
-        
-    #     return df
-
 # -----------------------------------------------------------------------------
 # =============================================================================
 # -----------------------------------------------------------------------------  

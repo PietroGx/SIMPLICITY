@@ -163,10 +163,11 @@ def save_sequencing_dataset(simulation_output, output_path):
                 # Write the sequence data
                 fasta_file.write(f"{genome}\n")     
                 
+                
                 # add sequence data to df for regression 
                 sequencing_data_dic.append({
                     'Sequencing_time': round(individual_sequencing_data[1]/365.25,4), #seq time in years
-                    'Distance_from_root': dis.hamming_true(individual_sequencing_data[2])/len(dis.reference) #Subst/site - normed
+                    'Distance_from_root': dis.hamming(individual_sequencing_data[2])/len(dis.reference)  # normalized hamming distance
                            })
         # save dictionary of sequencing data for regression
         with open(csv_file_path, mode='w', newline='') as file:
@@ -195,8 +196,8 @@ def read_sequencing_data(seeded_simulation_output_dir):
         
 def save_simulation_trajectory(simulation_output, seeded_simulation_output_dir):
     df = pd.DataFrame(simulation_output.trajectory, columns= 
-                      ['time','infected','diagnosed','recovered','deceased',
-                       'infectious','detectables','susceptibles'])
+                      ['time','infected','diagnosed','recovered',
+                       'infectious','detectables','susceptibles','long_shedders'])
     trajectory_file_path = os.path.join(seeded_simulation_output_dir,
                                         "simulation_trajectory.csv")
     df.to_csv(trajectory_file_path, index=False)
@@ -218,18 +219,6 @@ def read_lineage_frequency(seeded_simulation_output_dir):
                                         "lineage_frequency.csv")
     df = pd.read_csv(lineage_frequency_file_path)
     return df
-
-# def save_DEBUG_update_ih(simulation_output, seeded_simulation_output_dir):
-#     df = simulation_output.DEBUG_update_ih_to_df()
-#     DEBUG_update_ih_file_path = os.path.join(seeded_simulation_output_dir,
-#                                                "DEBUG_update_ih.csv")
-#     df.to_csv(DEBUG_update_ih_file_path, index=False)
-
-# def read_DEBUG_update_ih(seeded_simulation_output_dir):
-#     DEBUG_update_ih_file_path = os.path.join(seeded_simulation_output_dir,
-#                                                "DEBUG_update_ih.csv")
-#     df = pd.read_csv(DEBUG_update_ih_file_path)
-#     return df
 
 def save_individuals_data(simulation_output, seeded_simulation_output_dir):
     individuals_data = simulation_output.individuals_data_to_df()

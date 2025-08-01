@@ -69,7 +69,6 @@ def user_set_experiment_settings():
 def run_experiment(experiment_name: str, 
                    set_experiment_parameters: types.FunctionType,
                    simplicity_runner: types.ModuleType,
-                   plot_trajectory:bool,
                    archive_experiment=False):
     
     # setup experiment files directories
@@ -87,8 +86,7 @@ def run_experiment(experiment_name: str,
     print('-------------------------------------------------------------------')
     # let one of simplicity.runners run each seeded simulation
     simplicity_runner.run_seeded_simulations(experiment_name, 
-                                             run_seeded_simulation,
-                                             plot_trajectory)
+                                             run_seeded_simulation)
     
     if archive_experiment: 
         om.archive_experiment(experiment_name)
@@ -103,5 +101,4 @@ if __name__ == "__main__":
     run_experiment(experiment_name,       
                    user_set_experiment_settings,
                    simplicity_runner  = simplicity.runners.serial,
-                   plot_trajectory = True,
                    archive_experiment = False)

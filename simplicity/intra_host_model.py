@@ -184,7 +184,7 @@ class Host:
             p_det.append(np.sum(p_i[5:20]))
             p_rec.append(p_i[20])
         
-        return p_inf #,p_det,p_rec
+        return p_inf,p_det,p_rec
 
     def simulate_trajectory(self, delta_t, rng=None, exponential_dt=False):
         '''
