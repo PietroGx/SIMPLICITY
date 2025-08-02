@@ -68,6 +68,7 @@ def fixture_experiment_settings():
         "nucleotide_substitution_rate": 0.0001,
         'infected_individuals_at_start': 100,
         'R' : 1.3,
+        'long_shedders_ratio':0.01,
         'final_time': 600
     }
     
@@ -81,7 +82,7 @@ def fixture_experiment_settings():
     # fixed_params = sm.read_user_set_parameters_file(filename)
    
     # -------------------------------------------------------------------------
-    n_seeds = 2
+    n_seeds = 10
     
     return (varying_params,fixed_params,n_seeds)
 

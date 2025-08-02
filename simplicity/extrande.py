@@ -96,10 +96,13 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     Returns helper functions for extrande (SIMPLICITY engine).
     """
     # model parameters
-    R = parameters["R"]
-    tau_inf = parameters['tau_2'] + parameters['tau_3']
-    beta = R / tau_inf
-    print(f'R: {R} Beta: {beta}')
+    tau_inf_normal = parameters['tau_2'] + parameters['tau_3']
+    beta_normal = parameters["R"] / tau_inf_normal
+    
+    tau_inf_long = parameters['tau_2'] + parameters['tau_3_long']
+    beta_long = parameters['R_long']/ tau_inf_long
+    
+    # print(f'R: {R} Beta: {beta}')
     k_d = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate"], parameters["tau_3"])
     k_v = parameters["IH_virus_emergence_rate"]
     NSR = parameters["nucleotide_substitution_rate"]
@@ -112,7 +115,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     last_consensus_snapshot = {"t_snapshot": 0, "consensus": []} if use_consensus else None
     
     def compute_upperbound(population):
-        propensities, params = SIDR.SIDR_propensities(population, beta, k_d, k_v, seq_rate)
+        propensities, params = SIDR.SIDR_propensities(population, beta_normal, beta_long, k_d, k_v, seq_rate)
         # a0 = sum(rate for rate, _ in propensities)
         B = np.sum(params) * population.infected
         # print(f"B = {B}")
@@ -167,16 +170,18 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     def fire_reaction(population, propensities, tau_2):
         a0 = sum(rate for _, rate, _ in propensities)
         if tau_2 > a0:
+            # print('thinning')
             return 'thinning' # thinning
         threshold = 0
         for reaction_id, rate, action in propensities:
             threshold += rate
             if tau_2 <= threshold:
+                # print(reaction_id)
                 action()
                 return reaction_id
     
     def reaction_step(population, B):
-        propensities, _ = SIDR.SIDR_propensities(population, beta, k_d, k_v, seq_rate)
+        propensities, _ = SIDR.SIDR_propensities(population, beta_normal, beta_long, k_d, k_v, seq_rate)
         tau_2 = rng2.uniform(0, B)
         return fire_reaction(population, propensities, tau_2)
     
@@ -216,7 +221,7 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
     
     reporter = ProgressReporter(total_time=final_time, simulation_id=sim_id)
     
-    min_update_threshold = 0.5  # minimum dt for intra-host update (122h step)
+    min_update_threshold = 0.5  # minimum dt for intra-host update (12h step)
     dt_accumulated = 0  # initialize accumulator
     
     while t < final_time:
@@ -254,6 +259,7 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
             # update system  (IH host model states)
             # Only update the intra-host state if accumulated dt exceeds threshold:
             if dt_accumulated >= min_update_threshold:
+                # print('DEBUG: UPDATE STEP')
                 helpers["update_step"](population, dt_accumulated)
                 # population.DEBUG_update_ih.append([t,dt_accumulated,False])
                 # mutations

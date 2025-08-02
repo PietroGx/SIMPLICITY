@@ -23,14 +23,15 @@ Created on Fri Mar 28 12:51:33 2025
 """
 import numpy as np
 
-def SIDR_propensities(population, beta, k_d, k_v, seq_rate):
-    propensities_params = [beta, k_d, k_v]
+def SIDR_propensities(population, beta_normal, beta_long, k_d, k_v, seq_rate):
+    propensities_params = [beta_normal, beta_long, k_d, k_v]
     # system propensities
     # reaction_id, reaction_rate, action
     propensities = [
-        ('infection',      beta * population.infectious, lambda: infection(population)),
-        ('diagnosis',      k_d * population.detectables,        lambda: diagnosis(population, seq_rate)),
-        ('add_ih_lineage', k_v * population.infected,           lambda: add_lineage(population))
+        ('infection_normal', beta_normal * population.infectious_normal, lambda: infection(population, from_long_shedder=False)),
+        ('infection_long',   beta_long * population.infectious_long  ,   lambda: infection(population, from_long_shedder=True)),
+        ('diagnosis',        k_d * population.detectables,               lambda: diagnosis(population, seq_rate)),
+        ('add_ih_lineage',   k_v * population.infected,                  lambda: add_lineage(population))
     ]
     # print('a1:',beta * population.infectious)
     # print('a2:',k_d * population.detectables)
@@ -118,18 +119,31 @@ def infect_long_shedder(population, new_infected_index):
         
     return individual_type
 
-def infection(population):
+def infection(population, from_long_shedder=False):
     '''
     Select a random susceptible individual to be infected and tags it as 
     such. Update compartments and infected_i
     '''
     # Convert sets to lists for random sampling
-    infectious_i_list = sorted(population.infectious_i)
+    if from_long_shedder:
+        # Infectious AND long shedders
+        infectious_i_list = sorted(population.infectious_i & population.long_shedder_i)
+    else: 
+        # Infectious but NOT long shedders
+        infectious_i_list = sorted(population.infectious_i - population.long_shedder_i)
+        
     susceptibles_list = sorted(population.susceptibles_i)
     
-    infection_fitness_weight = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
-
-    parent = population.rng4.choice(infectious_i_list, p=infection_fitness_weight)
+    infection_fitness = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
+    fitness_sum = sum(infection_fitness)
+    
+    if fitness_sum > 0:
+        weights = [f / fitness_sum for f in infection_fitness]
+    else:
+        # fallback to uniform probabilities if all fitness scores are zero
+        weights = [1 / len(infectious_i_list)] * len(infectious_i_list)
+    
+    parent = population.rng4.choice(infectious_i_list, p=weights)
    
     # select random patient to be infected
     new_infected_index = population.rng4.choice(susceptibles_list)

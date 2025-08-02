@@ -33,14 +33,14 @@ def immune_waning_fitness_score(population,lineage_genome,consensus):
     
     return fitness_score
 
-def update_relative_fitness(population):
-    infectious_i_list = sorted(population.infectious_i)
+# def update_relative_fitness(population):
+#     infectious_i_list = sorted(population.infectious_i)
    
-    fitness_inf = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
-    fitsum = np.sum(fitness_inf)
+#     fitness_inf = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
+#     fitsum = np.sum(fitness_inf)
     
-    for i in infectious_i_list : 
-        population.individuals[i]['fitness_score'] /= fitsum
+#     for i in infectious_i_list : 
+#         population.individuals[i]['fitness_score'] /= fitsum
 
 def update_fitness_factory(type):
     '''
@@ -60,8 +60,8 @@ def update_fitness_factory(type):
                     fitness.append(dis.hamming(lineage_genome))
                 population.individuals[individual]['IH_lineages_fitness_score'] = fitness
                 population.individuals[individual]['fitness_score'] = np.average(fitness)
-            # update relative fitness scores for the population
-            update_relative_fitness(population)
+            # # update relative fitness scores for the population
+            # update_relative_fitness(population)
         
         return update_fitness
     
@@ -78,8 +78,8 @@ def update_fitness_factory(type):
                     fitness.append(immune_waning_fitness_score(population,lineage_genome,consensus))
                 population.individuals[individual_index]['IH_lineages_fitness_score'] = fitness
                 population.individuals[individual_index]['fitness_score'] = np.average(fitness)
-            # update relative fitness scores for the population
-            update_relative_fitness(population)
+            # # update relative fitness scores for the population
+            # update_relative_fitness(population)
         
         return update_fitness
 

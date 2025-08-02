@@ -24,6 +24,7 @@ import simplicity.evolution.reference as ref
 from   simplicity.random_gen          import randomgen
 import pandas as pd
 import numpy as np
+import scipy.stats
 
 class Population:
     '''
@@ -65,7 +66,11 @@ class Population:
                                      # new ones from the reservoir become 
                                      # susceptible) 
         
-        self.infectious   = 0        # number of infectious individuals
+        
+        self.infectious_normal = 0
+        self.infectious_long   = 0
+        
+        self.infectious   = self.infectious_normal + self.infectious_long # number of infectious individuals
         self.detectables  = 0        # number of detectable individuals
         
         # set attributes for evolutionary model ===============================
@@ -110,7 +115,7 @@ class Population:
                                     # that happened in the simulaiton, used for 
                                     # R_effective calculations
         self.R_effective_trajectory = []
-        self.fitness_trajectory = [[0,[0,0]]]  
+        self.fitness_trajectory = []
         
         
        # ih model -------------------------------------------------------------
@@ -342,7 +347,18 @@ class Population:
                 self.individuals[i]['t_next_state'] += dt
         
         # Update compartments
+        
+        # Infectious but NOT long shedders
+        infectious_normal_i = sorted(self.infectious_i - self.long_shedder_i)
+        # Infectious AND long shedders
+        infectious_long_i = sorted(self.infectious_i & self.long_shedder_i)
+        
+        self.infectious_normal = len(infectious_normal_i)
+        print(self.infectious_normal)
+        self.infectious_long  = len(infectious_long_i)
+        print(self.infectious_long)
         self.infectious = len(self.infectious_i)
+        assert self.infectious == self.infectious_normal + self.infectious_long 
         self.detectables = len(self.detectable_i)
     
     def _update_states_matrix(self, delta_t, individual_type):
@@ -434,7 +450,23 @@ class Population:
     
         # Post-processing
         self.exclude_i = set()
+        
+        # Update compartments
+        
+        # Infectious but NOT long shedders
+        infectious_normal_i = sorted(self.infectious_i - self.long_shedder_i)
+        # Infectious AND long shedders
+        infectious_long_i = sorted(self.infectious_i & self.long_shedder_i)
+        
+        self.infectious_normal = len(infectious_normal_i)
+        # print('NORMAL: ', self.infectious_normal)
+        self.infectious_long  = len(infectious_long_i)
+        # print('LONG: ',self.infectious_long)
         self.infectious = len(self.infectious_i)
+        assert self.infectious == self.infectious_normal + self.infectious_long 
+        self.detectables = len(self.detectable_i)
+        
+        
         self.detectables = len(self.detectable_i)
         self.long_shedders = len(self.long_shedder_i)
 
@@ -461,15 +493,25 @@ class Population:
                            ])
     
     def update_fitness_trajectory(self):
-        # update fitness trajectory
-        def compute_mean_fitness(individuals, infected_i):
-            value = []
-            for i in infected_i:
-                    value.append(individuals[i]['fitness_score'])
-                    
-            return [np.mean(value),np.std(value)]
-     
-        self.fitness_trajectory.append([self.time,compute_mean_fitness(self.individuals, self.infected_i)])
+        fitness_scores = [self.individuals[i]['fitness_score'] for i in self.infected_i]
+        if not fitness_scores:
+            self.fitness_trajectory.append([self.time, 0, 0, 0])
+            return
+    
+        mean_fitness = np.mean(fitness_scores)
+        std_fitness = np.std(fitness_scores)
+    
+        # Entropy of normalized fitness 
+        total = sum(fitness_scores)
+        normed = [f / total for f in fitness_scores]
+        entropy = scipy.stats.entropy(normed) if total > 0 else 0.0
+    
+        self.fitness_trajectory.append({
+                                        'Time': self.time,
+                                        'Mean': mean_fitness,
+                                        'Std': std_fitness,
+                                        'Entropy': entropy
+                                    })
     
     def update_lineage_frequency_t(self, t):
         '''
@@ -481,7 +523,7 @@ class Population:
         count_lineages_t = {}
         
         # Loop through the infected individuals and get a list of unique IH_virus names (lineage)
-        for individual_index in set(self.infected_i) -set(self.long_shedder_i):
+        for individual_index in set(self.infected_i) - set(self.long_shedder_i):
             unique_lineages = set(self.individuals[individual_index]['IH_lineages'])
             for lineage_name in unique_lineages:
                 count_lineages_t[lineage_name] = count_lineages_t.get(lineage_name, 0) + 1
@@ -540,18 +582,8 @@ class Population:
         return pd.DataFrame(self.lineage_frequency)
         
     def fitness_trajectory_to_df(self):
-        times = [coord[0] for coord in self.fitness_trajectory]
-        means = [coord[1][0] for coord in self.fitness_trajectory]
-        stds = [coord[1][1] for coord in self.fitness_trajectory]
-        
-        # Create a pandas DataFrame
-        df = pd.DataFrame({
-            'Time': times,
-            'Mean': means,
-            'Std': stds
-        })
-        
-        return df
+        return pd.DataFrame(self.fitness_trajectory)
+
     
 # -----------------------------------------------------------------------------
 # =============================================================================
