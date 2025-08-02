@@ -628,8 +628,14 @@
     * updated plot to show normed fitness value 
     * added plots for long shedder exps 
     * removed long shedders from consensus calculation
-    * relative fitness smoothing by adding a small floor 
+
+2025-02-08 pietro gerletti
+
+    Version 2.0.03
     
+    * reverted changes in fitness (not normed fitness store, normed before selection)
+    * added fitness entropy calculation for better plotting
+    * added and tested reaction for long shedders infection rate
 	
 	
 	

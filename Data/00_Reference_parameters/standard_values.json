@@ -8,6 +8,7 @@
     "tau_3_long": 133.5,
     "tau_4": 8,
     "R": 1.1,
+    "R_long": 1,
     "diagnosis_rate": 0.1,
     "IH_virus_emergence_rate": 0,
     "nucleotide_substitution_rate": 8.759e-05,
