@@ -44,7 +44,7 @@ def user_set_experiment_settings():
         'population_size': 2000,
         "IH_virus_emergence_rate": 0.01,
         'infected_individuals_at_start': 500,
-        'R' : 1.03,
+        'R' : 1.05,
         'final_time': 365*3
     }
     

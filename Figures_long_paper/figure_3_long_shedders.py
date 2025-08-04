@@ -36,6 +36,7 @@ from simplicity.phenotype.distance import hamming_iw
 import simplicity.output_manager as om
 import simplicity.plots_manager as pm
 import simplicity.dir_manager as dm
+import simplicity.settings_manager as sm
 
 pm.apply_plos_rcparams()
 
@@ -177,8 +178,8 @@ def add_custom_legend_right(fig, axs1, axs2=None):
     fig.legend(
         all_handles,
         all_labels,
-        loc="center left",
-        bbox_to_anchor=(1.01, 0.5),
+        loc="upper left",
+        bbox_to_anchor=(1.01, 1),
         frameon=False,
         ncol=1,
         fontsize="small",
@@ -192,7 +193,7 @@ def add_custom_legend_right(fig, axs1, axs2=None):
     )
 
     # Leave more room on the right
-    fig.subplots_adjust(right=0.82)
+    fig.subplots_adjust(right=0.9   )
 
 def parse_genome(genome):
     """Convert a genome representation to a frozenset of mutation tuples."""
@@ -353,6 +354,52 @@ def plot_hamming_distance_boxplot_ax(ax, transmission_distance_data, label="C"):
     # Optional: remove top and right spines for aesthetics
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    
+def plot_hamming_distance_violinplot_ax(ax, transmission_distance_data, label="C"):
+    """
+    Plot a violin plot of Hamming distances from transmission events on a given Axes,
+    grouped by:
+        - 'normal'
+        - 'long'
+        - 'normal+long' (combined)
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axis to plot on (as a subplot).
+    transmission_distance_data : pd.DataFrame
+        Output of compute_transmission_distances(...)
+    label : str
+        Subplot label to annotate (e.g., "D")
+    """
+    import seaborn as sns
+
+    # Build group column
+    df_plot = transmission_distance_data.copy()
+    df_plot['group'] = df_plot['type'].map({
+        'normal': 'normal',
+        'long_shedder': 'long'
+    })
+
+    # Plot violin
+    sns.violinplot(data=df_plot, x='group', y='hamming_distance',
+                   hue='group', palette='pastel', ax=ax, inner=None)
+
+    # Add individual data points
+    sns.stripplot(data=df_plot, x='group', y='hamming_distance',
+                  color='black', alpha=0.3, size=4, jitter=True, ax=ax)
+
+    ax.set_xlabel("Transmitting Individual Type")
+    ax.set_ylabel("Tras. Dist.")
+    ax.set_title("")
+    ax.text(-0.1, 1.05, label, transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
+
+    # Aesthetic cleanup
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+
 
 def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshold, cluster_threshold, label):
     axs[0].text(-0.1, 1.05, label, transform=axs[0].transAxes,
@@ -473,18 +520,126 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshol
 
     return [max_y1, max_y2, max_y3, max_y4]
 
+def plot_secondary_infections_boxplot_ax(ax, ssod, label="D"):
+    """
+    Plot a boxplot of the number of secondary infections (offspring)
+    per individual, grouped by type (normal vs long_shedder).
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axis to plot on (as a subplot).
+    ssod : str
+        Path to seeded simulation output directory.
+    label : str
+        Subplot label (e.g., "D").
+    """
+    import seaborn as sns
+    import simplicity.output_manager as om
+
+    df = om.read_individuals_data(ssod)
+    df['group'] = df['type'].map({
+        'normal': 'normal',
+        'long_shedder': 'long'
+    })
+
+    # Compute number of infections caused
+    df['n_infections'] = df['new_infections'].apply(len)
+    
+    # Get top 3
+    top_infectors = df.sort_values('n_infections', ascending=False).head(3)
+    
+    # Print result
+    for idx, row in top_infectors.iterrows():
+        print(f"Index: {idx}, Type: {row['type']}, Infections caused: {row['n_infections']}")
+        
+    # Plot
+    sns.boxplot(data=df, x='group', y='n_infections',
+                palette='pastel', hue = 'group', ax=ax)
+    sns.stripplot(data=df, x='group', y='n_infections',
+                  color='black', alpha=0.3, size=4, jitter=True, ax=ax)
+
+    ax.set_xlabel("Transmitting Individual Type")
+    ax.set_ylabel("Inf./ind.")
+    ax.set_title("")
+    ax.text(-0.1, 1.05, label, transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+
+# def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
+#     sim_dirs = dm.get_simulation_output_dirs(experiment_name)
+
+#     if len(sim_dirs) < 2:
+#         raise ValueError("Need at least 2 simulation output directories.")
+
+#     # Get long_shedders_ratio for each sim_dir and sort
+#     sim_dirs_sorted = sorted(sim_dirs, key=lambda d: sm.get_parameter_value_from_simulation_output_dir(d, 'long_shedders_ratio'))
+
+#     ssod1 = dm.get_ssod(sim_dirs_sorted[0], seed)  # lower value → left
+#     ssod2 = dm.get_ssod(sim_dirs_sorted[1], seed)  # higher value → right
+
+#     # ── Setup figure layout ───────────────────────────────────────────────
+#     fig = plt.figure(figsize=(16, 12))
+#     gs = GridSpec(6, 7, figure=fig)
+
+#     # Top left: ssod1 simulation outputs
+#     axs1 = [fig.add_subplot(gs[0, 0:3])]
+#     for i in range(1, 4):
+#         axs1.append(fig.add_subplot(gs[i, 0:3], sharex=axs1[0]))
+#     ylims1 = extended_simulation_trajectory(axs1, ssod1, experiment_name, min_freq_threshold, cluster_threshold, label='A')
+
+#     # Top right: ssod2 simulation outputs
+#     axs2 = [fig.add_subplot(gs[0, 4:7])]
+#     for i in range(1, 4):
+#         axs2.append(fig.add_subplot(gs[i, 4:7], sharex=axs2[0]))
+#     ylims2 = extended_simulation_trajectory(axs2, ssod2, experiment_name, min_freq_threshold, cluster_threshold, label='B')
+
+#     # Match y-axis limits across the two sides
+#     for i in range(3):
+#         ymax = max(ylims1[i], ylims2[i])
+#         axs1[i].set_ylim(top=ymax)
+#         axs2[i].set_ylim(top=ymax)
+
+#     # ── Bottom row: transmission distance boxplot ─────────────────────────
+#     axs3 = fig.add_subplot(gs[4, :])
+#     transmission_distance_data = compute_transmission_distances(ssod2)
+#     plot_hamming_distance_violinplot_ax(axs3, transmission_distance_data)
+
+#     # ── Adjust layout and finalize ────────────────────────────────────────
+#     fig.subplots_adjust(hspace=0.5, top=0.94, bottom=0.08)
+
+#     axs1[-1].tick_params(labelbottom=True)
+#     axs1[2].text(0.5, -0.3, "Time (d)", transform=axs1[2].transAxes,
+#                  ha='center', va='top')
+#     axs2[2].text(0.5, -0.3, "Time (d)", transform=axs2[2].transAxes,
+#                  ha='center', va='top')
+
+#     # Add combined legend using top panel (axs1)
+#     add_custom_legend_right(fig, axs1, axs2)
+
+#     # Save figure
+#     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
+#     output_path = os.path.join(experiment_plots_dir, f"Figure_3_long_{experiment_name}_seed{seed}.tiff")
+#     plt.savefig(output_path, format='tiff',  dpi=300, bbox_inches='tight')
+#     print(f"Figure saved to: {output_path}")
+#     plt.close(fig)
+
 def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
     sim_dirs = dm.get_simulation_output_dirs(experiment_name)
 
     if len(sim_dirs) < 2:
         raise ValueError("Need at least 2 simulation output directories.")
 
-    ssod1 = dm.get_ssod(sim_dirs[1], seed)
-    # print(ssod1)
-    ssod2 = dm.get_ssod(sim_dirs[0], seed)
+    # Sort sim_dirs by long_shedders_ratio
+    sim_dirs_sorted = sorted(sim_dirs, key=lambda d: sm.get_parameter_value_from_simulation_output_dir(d, 'long_shedders_ratio'))
+    ssod1 = dm.get_ssod(sim_dirs_sorted[0], seed)
+    ssod2 = dm.get_ssod(sim_dirs_sorted[1], seed)
 
     # ── Setup figure layout ───────────────────────────────────────────────
-    fig = plt.figure(figsize=(16, 12))
+    fig = plt.figure(figsize=(18, 12))
     gs = GridSpec(6, 7, figure=fig)
 
     # Top left: ssod1 simulation outputs
@@ -499,36 +654,37 @@ def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
         axs2.append(fig.add_subplot(gs[i, 4:7], sharex=axs2[0]))
     ylims2 = extended_simulation_trajectory(axs2, ssod2, experiment_name, min_freq_threshold, cluster_threshold, label='B')
 
-    # Match y-axis limits across the two sides
+    # Match y-axis limits
     for i in range(3):
         ymax = max(ylims1[i], ylims2[i])
         axs1[i].set_ylim(top=ymax)
         axs2[i].set_ylim(top=ymax)
 
-    # ── Bottom row: transmission distance boxplot ─────────────────────────
-    axs3 = fig.add_subplot(gs[4, :])
-    transmission_distance_data = compute_transmission_distances(ssod2)
-    plot_hamming_distance_boxplot_ax(axs3, transmission_distance_data)
+    # ── Bottom row: violin plot (left) and placeholder (right) ─────────────
+    ax_violin = fig.add_subplot(gs[4, 0:3])  
+    ax_infections    = fig.add_subplot(gs[4, 4:7])  
 
+    transmission_distance_data = compute_transmission_distances(ssod2)
+    plot_hamming_distance_violinplot_ax(ax_violin, transmission_distance_data)
+    
+    plot_secondary_infections_boxplot_ax(ax_infections, ssod2, label="D")
+    
     # ── Adjust layout and finalize ────────────────────────────────────────
-    fig.subplots_adjust(hspace=0.5, top=0.94, bottom=0.08)
+    fig.subplots_adjust(hspace=0.5, wspace=0.3, top=0.94, bottom=0.08)
 
     axs1[-1].tick_params(labelbottom=True)
-    axs1[2].text(0.5, -0.3, "Time (d)", transform=axs1[2].transAxes,
-                 ha='center', va='top')
-    axs2[2].text(0.5, -0.3, "Time (d)", transform=axs2[2].transAxes,
-                 ha='center', va='top')
+    axs1[2].text(0.5, -0.3, "Time (d)", transform=axs1[2].transAxes, ha='center', va='top')
+    axs2[2].text(0.5, -0.3, "Time (d)", transform=axs2[2].transAxes, ha='center', va='top')
 
-    # Add combined legend using top panel (axs1)
     add_custom_legend_right(fig, axs1, axs2)
 
-    # Save figure
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
     output_path = os.path.join(experiment_plots_dir, f"Figure_3_long_{experiment_name}_seed{seed}.tiff")
-    plt.savefig(output_path, format='tiff',  dpi=300, bbox_inches='tight')
+    plt.savefig(output_path, format='tiff', dpi=300, bbox_inches='tight')
     print(f"Figure saved to: {output_path}")
     plt.close(fig)
-    
+
+
 def main():
     
     # Set up the argument parser
