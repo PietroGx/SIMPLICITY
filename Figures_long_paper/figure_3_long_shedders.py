@@ -384,12 +384,15 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshol
     times = fitness_trajectory_df['Time'].tolist()
     means = fitness_trajectory_df['Mean'].tolist()
     stds = fitness_trajectory_df['Std'].tolist()
+    entropy = fitness_trajectory_df['Entropy'].tolist()
 
     axs[1].plot(times, means, linestyle='-', color='#2ca02c', label='Relative avg. transmission fitness')
     axs[1].fill_between(times,
                         [m - s for m, s in zip(means, stds)],
                         [m + s for m, s in zip(means, stds)],
                         color='#2ca02c', alpha=0.3)
+    axs[1].plot(times, entropy, linestyle='-', color='blue', label='Transmission fitness entropy')
+    
     axs[1].set_ylabel("R.a.t.f.")
 
     # --- Subplot 3: Lineages frequency ---------------------------------------
@@ -414,8 +417,6 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshol
     axs[2].set_xlim([0, time_final])
     axs[2].yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{100 * x:.0f}%"))
     axs[2].set_ylabel("L.r.f.")
-
-    # --- Subplot 4: Clustered frequency ---------------------------------------
 
     # --- Subplot 4: Clustered frequency ---------------------------------------
     try:
