@@ -391,7 +391,8 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshol
                         [m - s for m, s in zip(means, stds)],
                         [m + s for m, s in zip(means, stds)],
                         color='#2ca02c', alpha=0.3)
-    axs[1].plot(times, entropy, linestyle='-', color='blue', label='Transmission fitness entropy')
+    ax3 = axs[1].twinx()
+    ax3.plot(times, entropy, linestyle='-', color='purple', label='Transmission fitness entropy')
     
     axs[1].set_ylabel("R.a.t.f.")
 
@@ -478,9 +479,9 @@ def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
     if len(sim_dirs) < 2:
         raise ValueError("Need at least 2 simulation output directories.")
 
-    ssod1 = dm.get_ssod(sim_dirs[0], seed)
-    print(ssod1)
-    ssod2 = dm.get_ssod(sim_dirs[1], seed)
+    ssod1 = dm.get_ssod(sim_dirs[1], seed)
+    # print(ssod1)
+    ssod2 = dm.get_ssod(sim_dirs[0], seed)
 
     # ── Setup figure layout ───────────────────────────────────────────────
     fig = plt.figure(figsize=(16, 12))
