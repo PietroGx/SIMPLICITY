@@ -636,7 +636,13 @@
     * reverted changes in fitness (not normed fitness store, normed before selection)
     * added fitness entropy calculation for better plotting
     * added and tested reaction for long shedders infection rate
-	
+
+2025-04-08 pietro gerletti
+
+    Version 2.0.04
+    
+    * updated long shedder figure 3
+    * updated long shedders experiment settings
 	
 	
 	
