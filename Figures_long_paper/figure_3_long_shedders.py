@@ -386,8 +386,8 @@ def plot_hamming_distance_violinplot_ax(ax, transmission_distance_data, label="C
                    hue='group', palette='pastel', ax=ax, inner=None)
 
     # Add individual data points
-    sns.stripplot(data=df_plot, x='group', y='hamming_distance',
-                  color='black', alpha=0.3, size=4, jitter=True, ax=ax)
+    # sns.stripplot(data=df_plot, x='group', y='hamming_distance',
+    #               color='black', alpha=0.3, size=4, jitter=True, ax=ax)
 
     ax.set_xlabel("Transmitting Individual Type")
     ax.set_ylabel("Tras. Dist.")
@@ -495,7 +495,7 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshol
         # Plot
         colors = [pm.get_lineage_color(parent, colormap_df) for parent in cluster_parents]
     
-        clustered_df.plot(kind='area', stacked=False,
+        clustered_df.plot(kind='area', stacked=True,
                           color=colors, alpha=0.6, ax=axs[3], legend=False)
         axs[3].set_xlim([0, time_final])
         axs[3].set_ylim(0, 1.0)
@@ -556,8 +556,8 @@ def plot_secondary_infections_boxplot_ax(ax, ssod, label="D"):
     # Plot
     sns.boxplot(data=df, x='group', y='n_infections',
                 palette='pastel', hue = 'group', ax=ax)
-    sns.stripplot(data=df, x='group', y='n_infections',
-                  color='black', alpha=0.3, size=4, jitter=True, ax=ax)
+    # sns.stripplot(data=df, x='group', y='n_infections',
+    #               color='black', alpha=0.3, size=4, jitter=True, ax=ax)
 
     ax.set_xlabel("Transmitting Individual Type")
     ax.set_ylabel("Inf./ind.")
@@ -661,8 +661,8 @@ def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
         axs2[i].set_ylim(top=ymax)
 
     # ── Bottom row: violin plot (left) and placeholder (right) ─────────────
-    ax_violin = fig.add_subplot(gs[4, 0:3])  
-    ax_infections    = fig.add_subplot(gs[4, 4:7])  
+    ax_violin = fig.add_subplot(gs[4:6, 0:3])  
+    ax_infections    = fig.add_subplot(gs[4:6, 4:7])  
 
     transmission_distance_data = compute_transmission_distances(ssod2)
     plot_hamming_distance_violinplot_ax(ax_violin, transmission_distance_data)
