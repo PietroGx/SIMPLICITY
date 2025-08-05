@@ -20,11 +20,11 @@ import simplicity.settings_manager as sm
 
 # --- Config ---
 CONFIG = {
-    'TAKEOVER_THRESH': 0.4,
+    'TAKEOVER_THRESH': 0.5,
     'MIN_DAYS': 21,
     
-    'RISE_LOW': 0.01,
-    'RISE_HIGH': 0.4,
+    'RISE_LOW': 0.1,
+    'RISE_HIGH': 0.5,
     'PIE_COLORS': {
         'normal': 'blue',
         'long_shedder': 'orange'
@@ -160,104 +160,6 @@ def _plot_pie(ax, pie_data, title):
     ax.pie(values, labels=keys, autopct='%1.0f%%',
            textprops={'fontsize': 8}, colors=colors)
     ax.set_title(title, fontsize=9)
-
-# # --- Plotting ---
-# def plot_sod_boxplots(sod_data):
-#     sod_name = sod_data["sod_name"]
-#     fig, axs = plt.subplots(1, 3, figsize=(18, 5))  
-
-#     fig.suptitle(f"Summary Boxplots for {sod_name}", fontsize=12)
-#     labels = ["First", "Second", "Third"]
-
-#     _plot_box(axs[0], sod_data["takeovers"], "Takeover Events", "Count")
-#     _plot_box(axs[1], sod_data["growth_bins"], "Top 3 Growth Speeds", "Days", labels)
-#     _plot_box(axs[2], sod_data["freq_bins"], "Top 3 Max Frequencies", "Relative Freq", labels)
-
-#     plt.tight_layout(rect=[0, 0, 1, 0.95])
-#     plt.show()
-
-# def plot_sod_pies(sod_data):
-#     sod_name = sod_data["sod_name"]
-#     fig, axs = plt.subplots(3, 3, figsize=(18, 12))  # 3 rows x 3 columns
-#     fig.suptitle(f"Host Type Composition for {sod_name}", fontsize=12)
-
-#     # Row 1: Takeover pie chart
-#     _plot_pie(axs[0, 0], sod_data["takeover_pie"], "Host Type (Takeovers)")
-#     for j in [1, 2]:
-#         axs[0, j].axis("off")
-
-#     # Row 2: Growth speed host types
-#     labels = ["Fastest", "2nd Fastest", "3rd Fastest"]
-#     for i in range(3):
-#         _plot_pie(axs[1, i], sod_data["growth_pies"][i], f"Host Type ({labels[i]} Growth)")
-
-#     # Row 3: Max freq host types
-#     for i in range(3):
-#         _plot_pie(axs[2, i], sod_data["freq_pies"][i], f"Host Type ({labels[i]} Freq)")
-
-#     plt.tight_layout(rect=[0, 0, 1, 0.95])
-#     plt.show()
-
-
-# def plot_comparative_sod_boxplots(sod_datas):
-#     fig, axs = plt.subplots(1, 3, figsize=(18, 5))
-#     fig.suptitle("Comparative Boxplots Across SODs", fontsize=12)
-
-#     sod_labels = [d['sod_name'] for d in sod_datas]
-#     num_sods = len(sod_datas)
-    
-#     # --- Add Legend for SOD colors ---
-#     from matplotlib.patches import Patch
-#     legend_labels = [
-#         f"long_shedder_ratio = {d['long_shedder_ratio']}" for d in sod_datas
-#     ]
-#     legend_patches = [
-#         Patch(facecolor=CONFIG['SOD_COLORS'][i], edgecolor='black', label=legend_labels[i])
-#         for i in range(len(sod_datas))
-#     ]
-#     fig.legend(handles=legend_patches, loc="lower center", ncol=len(sod_datas), fontsize=9)
-
-
-#     # --- Panel 1: Takeovers ---
-#     box = axs[0].boxplot([d["takeovers"] for d in sod_datas], patch_artist=True)
-#     for patch, color in zip(box['boxes'], CONFIG['SOD_COLORS'][:num_sods]):
-#         patch.set_facecolor(color)
-#     axs[0].set_title("Takeover Events", fontsize=10)
-#     axs[0].set_ylabel("Count", fontsize=9)
-#     axs[0].set_xticklabels(sod_labels)
-#     axs[0].tick_params(labelsize=8)
-
-#     # --- Panel 2: Growth Speeds ---
-#     labels = ["Fastest", "2nd Fastest", "3rd Fastest"]
-#     growth_data = []
-#     for rank in range(3):
-#         for sod in sod_datas:
-#             growth_data.append(sod["growth_bins"][rank])
-#     box = axs[1].boxplot(growth_data, patch_artist=True)
-#     for i, patch in enumerate(box['boxes']):
-#         patch.set_facecolor(CONFIG['SOD_COLORS'][i % num_sods])
-#     axs[1].set_title("Top Growth Speeds", fontsize=10)
-#     axs[1].set_ylabel("Days", fontsize=9)
-#     axs[1].set_xticks([1.5 + i * num_sods for i in range(3)])
-#     axs[1].set_xticklabels(labels)
-#     axs[1].tick_params(labelsize=8)
-
-#     # --- Panel 3: Max Frequencies ---
-#     freq_data = []
-#     for rank in range(3):
-#         for sod in sod_datas:
-#             freq_data.append(sod["freq_bins"][rank])
-#     box = axs[2].boxplot(freq_data, patch_artist=True)
-#     for i, patch in enumerate(box['boxes']):
-#         patch.set_facecolor(CONFIG['SOD_COLORS'][i % num_sods])
-#     axs[2].set_title("Top Max Frequencies", fontsize=10)
-#     axs[2].set_ylabel("Relative Freq", fontsize=9)
-#     axs[2].set_xticks([1.5 + i * num_sods for i in range(3)])
-#     axs[2].set_xticklabels(labels)
-#     axs[2].tick_params(labelsize=8)
-
-#     plt.tight_layout(rect=[0, 0, 1, 0.95])
-#     plt.show()
 
 def plot_comparative_sod_boxplots(sod_datas, experiment_name):
     
