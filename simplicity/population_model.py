@@ -113,6 +113,7 @@ def infect_long_shedder(population, new_infected_index):
         population.long_shedders += 1
         
         individual_type = 'long_shedder'
+        
     
     else:
         individual_type = 'normal'
@@ -208,6 +209,8 @@ def infection(population, from_long_shedder=False):
     
     # set the individual to be a long shedder if conditions apply
     new_inf['type'] = infect_long_shedder(population, new_infected_index)
+    if new_inf['type']  == 'long_shedder':
+        new_inf['IH_lineages_max'] = population.rng3.integers(5,16)
     
     # update susceptibles and infected 
     population.susceptibles -= 1
