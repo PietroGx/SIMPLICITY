@@ -10,19 +10,20 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from collections import defaultdict, Counter, deque
+from collections import Counter
 import argparse
 
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.settings_manager as sm
+import simplicity.clustering as cl
 
 # --- Config ---
 CONFIG = {
     'TAKEOVER_THRESH': 0.5,
     'MIN_DAYS': 21,
     
-    'RISE_LOW': 0.1,
+    'RISE_LOW': 0.01,
     'RISE_HIGH': 0.5,
     'PIE_COLORS': {
         'normal': 'blue',
@@ -32,54 +33,6 @@ CONFIG = {
 
 }
 
-def parse_genome(genome):
-    """Convert a genome representation to a frozenset of mutation tuples."""
-    if genome is None:
-        return frozenset()
-    try:
-        return frozenset(tuple(x) for x in genome)
-    except Exception:
-        return frozenset()
-
-def cluster_lineages_by_shared_mutations(lin2mut: dict, freq_pivot: pd.DataFrame, min_shared: int):
-    """
-    Cluster lineages based on shared mutations using transitive closure.
-    Returns:
-      - freq_df_clusters: DataFrame where each column is a cluster's summed frequency
-      - clusters: list of sets (each set = lineage names in that cluster)
-      - parents: list of representative lineage names (one per cluster)
-    """
-    adjacency = defaultdict(set)
-    items = list(lin2mut.items())
-    for i, (l1, m1) in enumerate(items):
-        for j, (l2, m2) in enumerate(items):
-            if l1 != l2 and len(m1 & m2) >= min_shared:
-                adjacency[l1].add(l2)
-                adjacency[l2].add(l1)
-
-    visited, clusters, parents = set(), [], []
-    for lineage in lin2mut:
-        if lineage not in visited:
-            cluster = set()
-            queue = deque([lineage])
-            parents.append(lineage)
-            while queue:
-                current = queue.popleft()
-                if current not in visited:
-                    visited.add(current)
-                    cluster.add(current)
-                    queue.extend(adjacency[current] - visited)
-            clusters.append(cluster)
-
-    cluster_freqs = []
-    for i, cluster in enumerate(clusters):
-        cols = [col for col in cluster if col in freq_pivot.columns]
-        if cols:
-            summed = freq_pivot[cols].sum(axis=1)
-            cluster_freqs.append(summed.rename(f"Cluster_{i}"))
-
-    freq_df_clusters = pd.concat(cluster_freqs, axis=1) if cluster_freqs else pd.DataFrame(index=freq_pivot.index)
-    return freq_df_clusters, clusters, parents
 
 # --- Helpers ---
 def count_takeovers(freq_series, threshold=0.1, min_days=21):
@@ -97,24 +50,39 @@ def time_to_rise(time_series, freq_series, low=0.01, high=0.1):
     except Exception:
         return None
 
-def analyze_ssod(ssod):
-    
-    lineage_df = om.read_lineage_frequency(ssod)
-    pivot = lineage_df.pivot(index="Time_sampling", columns="Lineage_name", values="Frequency_at_t")
-    freq_df_clusters, clusters, parents = cluster_lineages_by_shared_mutations(lin2mut, pivot, min_shared=5)
-    
-    # Convert back to long format for the rest of the pipeline
-    cluster_df = freq_df_clusters.reset_index().melt(id_vars="Time_sampling", 
-                                                      var_name="Lineage_name", 
-                                                      value_name="Frequency_at_t")
-    lineage_df = cluster_df  # replaces the original lineage_df
-
+def analyze_ssod(ssod, use_clusters=True, cluster_threshold=5):
+    # Read phylogenetic and frequency data
     phylo_df = om.read_phylogenetic_data(ssod)
+    lineage_df = om.read_lineage_frequency(ssod)
 
+    # Round time
     lineage_df['Time_sampling'] = lineage_df['Time_sampling'].round(2)
-    grouped = lineage_df.groupby('Lineage_name')
 
-    host_type_series = phylo_df.set_index("Lineage_name")["Host_type"]
+    # Build host type map
+    host_type_series_raw = phylo_df.set_index("Lineage_name")["Host_type"]
+
+    if use_clusters:
+        # Pivot lineage frequencies
+        pivot = lineage_df.pivot(index="Time_sampling", columns="Lineage_name", values="Frequency_at_t")
+
+        # Build lineage -> mutation dictionary
+        lin2mut = cl.build_lineage_to_mutation_dict(phylo_df)
+
+        # Cluster and aggregate frequencies
+        freq_df_clusters, parents = cl.build_clustered_freqs(lin2mut, pivot, cluster_threshold)
+
+        # Convert back to long format
+        cluster_df = freq_df_clusters.reset_index().melt(id_vars="Time_sampling",
+                                                         var_name="Lineage_name",
+                                                         value_name="Frequency_at_t")
+        lineage_df = cluster_df  # override with clustered frequencies
+
+        # Assign host type from parent lineages
+        host_type_series = cl.assign_cluster_hosttypes_from_parents(parents, freq_df_clusters.columns, host_type_series_raw)
+    else:
+        host_type_series = host_type_series_raw
+
+    grouped = lineage_df.groupby('Lineage_name')
 
     takeover_counts = 0
     growth_meta = []
@@ -156,8 +124,8 @@ def analyze_ssod(ssod):
         "takeover_hosttypes": takeover_hosttypes
     }
 
-# --- Main Aggregation ---
-def process_sod(sod, sod_name, min_final_time=100):
+
+def process_sod(sod, sod_name, min_final_time, use_clusters):
     ssods = dm.get_seeded_simulation_output_dirs(sod)
     long_ratio = sm.get_parameter_value_from_simulation_output_dir(sod, 'long_shedders_ratio')
 
@@ -177,7 +145,7 @@ def process_sod(sod, sod_name, min_final_time=100):
         if final_time < min_final_time:
             continue  # exclude short simulations
 
-        result = analyze_ssod(ssod)
+        result = analyze_ssod(ssod, use_clusters) 
         takeover_counts.append(result["takeover_count"])
 
         for i, (lin, val, ht) in enumerate(result["growth"]):
@@ -300,14 +268,15 @@ def plot_sod_pies(sod_data, experiment_name):
     print(f"Saved pie charts for {sod_name} to: {output_path}")
     plt.close(fig)
 
-
-
-
-
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     parser.add_argument('experiment_name', type=str, help="experiment name")
+    parser.add_argument('min_final_time', type=int, help="min_final_time")
+    parser.add_argument('--use_clusters', action='store_true', help="Enable lineage clustering")
+    parser.add_argument('--no_clusters', dest='use_clusters', action='store_false', help="Disable lineage clustering")
+    parser.set_defaults(use_clusters=True)
+
 
     args = parser.parse_args()
     sod_dirs = dm.get_simulation_output_dirs(args.experiment_name)
@@ -316,8 +285,8 @@ if __name__ == "__main__":
         raise ValueError(f"Expected exactly 2 SODs for comparative plots, got {len(sod_dirs)}.")
 
     sod_datas = [
-        process_sod(sod_dirs[0], "SOD 1", min_final_time=100),
-        process_sod(sod_dirs[1], "SOD 2", min_final_time=100)
+        process_sod(sod_dirs[0], "SOD 1", args.min_final_time, args.use_clusters),
+        process_sod(sod_dirs[1], "SOD 2", args.min_final_time, args.use_clusters)
     ]
 
     plot_comparative_sod_boxplots(sod_datas, args.experiment_name)

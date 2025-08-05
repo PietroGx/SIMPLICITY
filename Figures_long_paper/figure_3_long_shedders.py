@@ -14,8 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-from collections import defaultdict, deque
-
 import os
 import pandas as pd
 import numpy as np
@@ -37,6 +35,7 @@ import simplicity.output_manager as om
 import simplicity.plots_manager as pm
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
+import simplicity.clustering as cl
 
 pm.apply_plos_rcparams()
 
@@ -413,10 +412,8 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshol
         phylo_df = om.read_phylogenetic_data(ssod)
     
         # Parse genome into mutation sets
-        lineage_to_mutations = dict(zip(
-            phylo_df["Lineage_name"],
-            phylo_df["Genome"].apply(parse_genome)
-        ))
+        lineage_to_mutations = cl.build_lineage_to_mutation_dict(phylo_df)
+        
         # Pivot frequency dataframe
         full_pivot_df = lineage_frequency_df.pivot(
             index="Time_sampling",
@@ -426,7 +423,7 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshol
 
     
         # Apply clustering
-        clustered_df, cluster_parents = build_clustered_freqs(
+        clustered_df, cluster_parents = cl.build_clustered_freqs(
             lineage_to_mutations,
             full_pivot_df,
             cluster_threshold
