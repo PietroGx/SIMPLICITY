@@ -51,63 +51,11 @@ def sub_events(rng, NSR, L, dt, IH_lineages):
     
     return events
 
-# def select_positions(population,L,NSR,dt):
-#     '''
-#     Select positions of the pooled genome to mutate.
-
-#     Parameters
-#     ----------
-#     population : 
-#         instance of population class.
-#     L : int
-#         lenght of IH_lineage genome
-#     rng : numpy method
-#         Random number generator.
-#     NSR : float
-#         nucleotide substitution rate.
-#     dt : float
-#         delta t - extrande time step.
-
-#     Raises
-#     ------
-#     ValueError
-#         raise error if the lenght of active_lineages is not same as 
-#         population.active_lineages_n.
-
-#     Returns
-#     -------
-#     positions: array
-#         positions that will undergo substitution
-#     active_lineages : list
-#         list of "active" lineages, coord map onto individuals
-#     sub_number: int
-#         number of substitution events happening
-#     '''
-#     rng = population.rng5
-#     # list of "active" lineages, coord map onto individuals
-#     active_lineages = [[i, j] for i in sorted(population.infected_i) for j 
-#                        in range(0,population.individuals[i]['IH_lineages_number'])]
-     
-#     # raise error if the lenght of active_lineages is not same as active_lineages_n       
-#     if population.active_lineages_n != len(active_lineages):
-#         raise ValueError('active_lineages_n must have lenght "active_lineages"')
-    
-#     # vector of pooled genome positions
-#     positions = np.arange(0,population.active_lineages_n*L,1)
-
-#     # number of substitutions event in time step dt
-#     sub_number = sub_events(rng, NSR, dt, population.active_lineages_n)
-    
-#     if sub_number == 0:
-#         return 'No substitutions'
-#     else:    
-#         # return vector of positions that will be mutated
-#         return rng.choice(positions,sub_number), active_lineages, sub_number
-
-
 def get_individual_mutation_weight(population, i, NSR, L):
     delta_t = population.time - population.individuals[i]['time_last_weight_event']
     weight  = 1 - np.exp(-NSR*delta_t*L)
+    if population.individuals[i]['type'] == 'long_shedder':
+        weight = weight*5
     return weight
 
 
@@ -550,25 +498,4 @@ def mutate(population, NSR, L, dt, phenotype_model, *args):
         else:
             update_fitness(population, individuals_to_update)
 
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         

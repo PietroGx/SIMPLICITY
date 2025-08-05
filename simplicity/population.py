@@ -197,7 +197,7 @@ class Population:
                      'IH_lineages'   : [],
                      'IH_unique_lineages_number': 1,
                      'IH_lineages_number'    : 1,
-                     'IH_lineages_max': self.rng3.integers(1,6),
+                     'IH_lineages_max': self.rng3.integers(1,5),
                      'IH_lineages_fitness_score' : [1],
                      'IH_lineages_trajectory': {}, # lineage name : [ih_time_start, ih_time_end]
                      'time_last_weight_event': 0, # time since infection or last mutation
