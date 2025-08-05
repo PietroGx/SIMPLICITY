@@ -10,8 +10,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from collections import defaultdict, Counter
-from statistics import mean, stdev
+from collections import defaultdict, Counter, deque
 import argparse
 
 import simplicity.dir_manager as dm
@@ -33,6 +32,55 @@ CONFIG = {
 
 }
 
+def parse_genome(genome):
+    """Convert a genome representation to a frozenset of mutation tuples."""
+    if genome is None:
+        return frozenset()
+    try:
+        return frozenset(tuple(x) for x in genome)
+    except Exception:
+        return frozenset()
+
+def cluster_lineages_by_shared_mutations(lin2mut: dict, freq_pivot: pd.DataFrame, min_shared: int):
+    """
+    Cluster lineages based on shared mutations using transitive closure.
+    Returns:
+      - freq_df_clusters: DataFrame where each column is a cluster's summed frequency
+      - clusters: list of sets (each set = lineage names in that cluster)
+      - parents: list of representative lineage names (one per cluster)
+    """
+    adjacency = defaultdict(set)
+    items = list(lin2mut.items())
+    for i, (l1, m1) in enumerate(items):
+        for j, (l2, m2) in enumerate(items):
+            if l1 != l2 and len(m1 & m2) >= min_shared:
+                adjacency[l1].add(l2)
+                adjacency[l2].add(l1)
+
+    visited, clusters, parents = set(), [], []
+    for lineage in lin2mut:
+        if lineage not in visited:
+            cluster = set()
+            queue = deque([lineage])
+            parents.append(lineage)
+            while queue:
+                current = queue.popleft()
+                if current not in visited:
+                    visited.add(current)
+                    cluster.add(current)
+                    queue.extend(adjacency[current] - visited)
+            clusters.append(cluster)
+
+    cluster_freqs = []
+    for i, cluster in enumerate(clusters):
+        cols = [col for col in cluster if col in freq_pivot.columns]
+        if cols:
+            summed = freq_pivot[cols].sum(axis=1)
+            cluster_freqs.append(summed.rename(f"Cluster_{i}"))
+
+    freq_df_clusters = pd.concat(cluster_freqs, axis=1) if cluster_freqs else pd.DataFrame(index=freq_pivot.index)
+    return freq_df_clusters, clusters, parents
+
 # --- Helpers ---
 def count_takeovers(freq_series, threshold=0.1, min_days=21):
     freq_series = np.asarray(freq_series)
@@ -50,7 +98,17 @@ def time_to_rise(time_series, freq_series, low=0.01, high=0.1):
         return None
 
 def analyze_ssod(ssod):
+    
     lineage_df = om.read_lineage_frequency(ssod)
+    pivot = lineage_df.pivot(index="Time_sampling", columns="Lineage_name", values="Frequency_at_t")
+    freq_df_clusters, clusters, parents = cluster_lineages_by_shared_mutations(lin2mut, pivot, min_shared=5)
+    
+    # Convert back to long format for the rest of the pipeline
+    cluster_df = freq_df_clusters.reset_index().melt(id_vars="Time_sampling", 
+                                                      var_name="Lineage_name", 
+                                                      value_name="Frequency_at_t")
+    lineage_df = cluster_df  # replaces the original lineage_df
+
     phylo_df = om.read_phylogenetic_data(ssod)
 
     lineage_df['Time_sampling'] = lineage_df['Time_sampling'].round(2)

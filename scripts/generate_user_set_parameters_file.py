@@ -50,7 +50,7 @@ def get_NSR():
         print('Entering setup of substitution rate for SIMPLICITY')
         print('-----')
         print('')
-        check_experiment_run = input("Did you run scripts/experiments/generate_data_OSR_fit.py? (y/n/q): ").strip().lower()
+        check_experiment_run = input("Did you run scripts/experiments/00_generate_data_OSR_fit.py? (y/n/q): ").strip().lower()
         check_fit_run = input("Did you run scripts/plots/plot_OSR_fit.py or scripts/fit_observed_evolutionary_rate_regressor.py? (y/n/q): ").strip().lower()
         
         if check_experiment_run == "y" and check_fit_run == "y":
