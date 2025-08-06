@@ -106,7 +106,7 @@ def build_clustered_freqs(lineage_to_mutations, freq_df_lineages, threshold):
     freq_df_clusters, clusters, parents = cluster_lineages_by_shared_mutations(
         lineage_to_mutations, freq_df_lineages, threshold
     )
-    return freq_df_clusters, parents
+    return freq_df_clusters, clusters, parents
 
 def assign_cluster_hosttypes_from_parents(parents, cluster_names, host_type_series):
     """
@@ -126,3 +126,22 @@ def assign_cluster_hosttypes_from_parents(parents, cluster_names, host_type_seri
         if ht is not None:
             cluster_hosttypes[cname] = ht
     return pd.Series(cluster_hosttypes)
+
+def assign_cluster_hosttypes_by_max_mutation(clusters, lin2mut, host_type_series):
+    """
+    Assign cluster to the host type of the lineage with the most mutations.
+    
+    Args:
+        clusters (list of sets): Each cluster as a set of lineage names
+        lin2mut (dict): Lineage → mutation set
+        host_type_series (pd.Series): Lineage → host type
+    
+    Returns:
+        List of assigned host types per cluster
+    """
+    hosttypes = []
+    for cluster in clusters:
+        max_lin = max(cluster, key=lambda l: len(lin2mut.get(l, [])))
+        hosttypes.append(host_type_series.get(max_lin, "Unknown"))
+    return hosttypes
+

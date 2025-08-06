@@ -43,9 +43,12 @@ def user_set_experiment_settings():
     fixed_params = {
         'population_size': 2000,
         "IH_virus_emergence_rate": 0.01,
-        'infected_individuals_at_start': 500,
-        'R' : 1.03,
-        'final_time': 365*3
+        'infected_individuals_at_start': 10,
+        'R' : 1.1,
+        'R_long' : 0.5,
+        'final_time': 365*3,
+        'nucleotide_substitution_rate': 0.000111
+        
     }
     
     # ---------- OR import them from file -------------------------------------
