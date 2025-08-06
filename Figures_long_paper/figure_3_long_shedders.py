@@ -423,7 +423,7 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshol
 
     
         # Apply clustering
-        clustered_df, cluster_parents = cl.build_clustered_freqs(
+        clustered_df, _, cluster_parents = cl.build_clustered_freqs(
             lineage_to_mutations,
             full_pivot_df,
             cluster_threshold
