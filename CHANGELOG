@@ -652,6 +652,13 @@
     * faster evolution in long shedders
     * higher viral diversity in long shedders
     * updated plots stats and clustering module
+    
+2025-06-08 pietro gerletti
+
+    Version 2.0.06
+    
+    * work in progress on clustering
+    * lower r long in test experiment and fitted NSR
 	
 	
 	

@@ -69,7 +69,7 @@ def analyze_ssod(ssod, use_clusters=True, cluster_threshold=5):
         lin2mut = cl.build_lineage_to_mutation_dict(phylo_df)
 
         # Cluster and aggregate frequencies
-        freq_df_clusters, parents = cl.build_clustered_freqs(lin2mut, pivot, cluster_threshold)
+        freq_df_clusters, clusters, parents = cl.build_clustered_freqs(lin2mut, pivot, cluster_threshold)
 
         # Convert back to long format
         cluster_df = freq_df_clusters.reset_index().melt(id_vars="Time_sampling",
@@ -78,7 +78,8 @@ def analyze_ssod(ssod, use_clusters=True, cluster_threshold=5):
         lineage_df = cluster_df  # override with clustered frequencies
 
         # Assign host type from parent lineages
-        host_type_series = cl.assign_cluster_hosttypes_from_parents(parents, freq_df_clusters.columns, host_type_series_raw)
+        # host_type_series = cl.assign_cluster_hosttypes_from_parents(parents, freq_df_clusters.columns, host_type_series_raw)
+        host_type_series = cl.assign_cluster_hosttypes_by_max_mutation(clusters, lin2mut, host_type_series_raw)
     else:
         host_type_series = host_type_series_raw
 
