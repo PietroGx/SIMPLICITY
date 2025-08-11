@@ -20,11 +20,14 @@
 @author: pietro
 """
 from simplicity.tree.tree_builder import get_tree
-from simplicity.tests.common_test_fixtures import fixture_tree_builder_type
-from simplicity.tests.common_test_fixtures import fixture_infection_tree_subtype
-from simplicity.tests.common_test_fixtures import fixture_phylogenetic_tree_subtype
+from tests.common_test_fixtures import fixture_tree_builder_type
+from tests.common_test_fixtures import fixture_infection_tree_subtype
+from tests.common_test_fixtures import fixture_phylogenetic_tree_subtype
 
-output_directory = ''
+experiment_name = 'test_local_experiment_serial_#9'
+seeded_simulation_output_dir = 'Data/test_local_experiment_serial_#9/04_Output/long_shedders_ratio_0p01_NSR_0p0001_R_1p3_T_300/seed_0000'
+
+
 
 ##### run all tests
 if __name__ == "__main__":
@@ -34,19 +37,23 @@ if __name__ == "__main__":
         
         if tree_type == 'infection':  
             for tree_subtype in fixture_infection_tree_subtype():
-                get_tree(output_directory,
-                         tree_type,
-                         tree_subtype,
-                         save_plot=True,
-                         export='nexus',
-                         dashplot=False)
+                get_tree(experiment_name,
+                             seeded_simulation_output_dir,
+                             tree_type,
+                             tree_subtype,
+                             coloring = 'lineage',
+                             save_plot=True,
+                             export_filetype='nexus',
+                             dashplot=False)
                 
         if tree_type == 'phylogenetic':  
             for tree_subtype in fixture_phylogenetic_tree_subtype():
-                get_tree(output_directory,
-                         tree_type,
-                         tree_subtype,
-                         save_plot=True,
-                         export='nexus',
-                         dashplot=False)
+                get_tree(experiment_name,
+                             seeded_simulation_output_dir,
+                             tree_type,
+                             tree_subtype,
+                             coloring = 'lineage',
+                             save_plot=True,
+                             export_filetype='nexus',
+                             dashplot=False)
            

@@ -26,42 +26,36 @@ import simplicity.tree.newick as nwk
 
 def write_nexus_file(tree, nexus_filepath):
     '''
-    Generate nexus file from AnyTree tree and newick file
-
-    Parameters
-    ----------
-    newick_tree : newick file
-    tree : AnyTree tree
-    output_directory : output_directory 
-    -------
-    Save tree in Nexus format.
-
+    Generate NEXUS file from AnyTree tree, including branch lengths in time units
+    and time_emergence annotations 
     '''
     root = tree[0]
-    newick_tree = nwk.export_newick(root)
+
+    newick_tree = nwk.export_newick(root)  
+
     with open(nexus_filepath, 'w') as f:
-        f.write('#NEXUS')
-        f.write('\n')
-        f.write('begin data;')
-        f.write('\n')
-        f.write('  Matrix')
-        f.write('\n')
-        for node in tree:
-            if node.leaf or node.label=='root':
-                name = node.name
-                # sequence = node.sequence if we want sequence stored in tree file, 
-                # we can use the node name (individual index), individuals_data.csv
-                # and the decoder to save the full sequence data here
-                f.write(F'{name}')# {sequence}')
-                f.write('\n')
-            
-        f.write('    ;')        
-        f.write('\n')
-        f.write('end;')
-        f.write('\n')
-        f.write('\n')
-        f.write('begin trees;')
-        f.write('\n')
-        f.write('    tree Tree = ('+newick_tree+');')
-        f.write('\n')
-        f.write('end;')
+        f.write('#NEXUS\n')
+        
+        # --- TAXA block (lists tip names) ---
+        tips = [n for n in tree if getattr(n, 'leaf', False)]
+        if tips:
+            f.write('begin taxa;\n')
+            f.write(f'  dimensions ntax={len(tips)};\n')
+            f.write('  taxlabels\n')
+            for n in tips:
+                f.write(f'    {getattr(n, "lineage", n.name)}\n')
+            f.write('  ;\nend;\n\n')
+
+        # # --- DATA block ---
+        # f.write('begin data;\n')
+        # f.write('  Matrix\n')
+        # for node in tree:
+        #     if getattr(node, 'leaf', False) or getattr(node, 'label', '') == 'root':
+        #         f.write(f'    {getattr(node, "lineage", node.name)}\n')
+        # f.write('  ;\nend;\n\n')
+
+        # --- Trees block with time-scaled Newick ---
+        f.write('begin trees;\n')
+        # newick_tree already has trailing semicolon, so no wrapping or extra ";"
+        f.write(f'  tree TimeScaled = {newick_tree}\n')
+        f.write('end;\n')

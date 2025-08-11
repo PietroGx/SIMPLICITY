@@ -659,6 +659,13 @@
     
     * work in progress on clustering
     * lower r long in test experiment and fitted NSR
+    
+2025-11-08 pietro gerletti
+
+    Version 2.0.07
+    
+    * updated seqeuncing data storage (for tree plots)
+    * updated newick and nexus tree exporter
 	
 	
 	

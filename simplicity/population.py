@@ -89,7 +89,7 @@ class Population:
                                      
                                  }]
         self.phylodots = []         # needed to name lineages
-        self.sequencing_data = []
+        self.sequencing_data = []   # to store sequencing data
         # ---------------------------------------------------------------------
         
         self.lineage_frequency = [] # count lineage frequency in the population

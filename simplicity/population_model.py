@@ -51,19 +51,20 @@ def diagnosis(population, seq_rate=0):
     
     if population.rng6.uniform(0, 1) < seq_rate:
         # store sequencing data
-        # patient_id, time, genome, subst number, patient type, infection duration
+        # patient_id, time, genome, subst number, patient type, infection duration, ih lineage number
         i = 0
         for lineage_name in population.individuals[diagnosed_individual_i]['IH_lineages']:
             genome = population.get_lineage_genome(lineage_name)
-            population.sequencing_data.append([
-                diagnosed_individual_i,
-                population.time,
-                genome,
-                len(genome),
-                population.individuals[diagnosed_individual_i]['type'],
-                population.time - population.individuals[diagnosed_individual_i]['t_infection'],
-                i
-            ])
+            population.sequencing_data.append({
+                'individual index': diagnosed_individual_i,
+                'sequencing time' : population.time,
+                'lineage name'    : lineage_name,
+                'sequence'        : genome,
+                'sequence lenght' : len(genome),
+                'individual type' : population.individuals[diagnosed_individual_i]['type'],
+                'infection duration' : population.time - population.individuals[diagnosed_individual_i]['t_infection'],
+                'intra-host lineage index' :i
+            })
             i += 1
 
     # update the active lineages number
