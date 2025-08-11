@@ -143,21 +143,30 @@ def save_sequencing_dataset(simulation_output, output_path):
     """
     try:
         # dataframe for phylogenetic regression
-        sequencing_data_dic = []
+        sequencing_data = simulation_output.sequencing_data
+        sequencing_data_regression_dic = []
         # paths for files to save
         fasta_file_path = os.path.join(output_path,'sequencing_data.fasta')
-        csv_file_path = os.path.join(output_path,'sequencing_data_regression.csv')
+        data_regression_file_path = os.path.join(output_path,'sequencing_data_regression.csv')
+        data_file_path = os.path.join(output_path,'sequencing_data.csv')
+        
         # open fasta file to write on
         with open(fasta_file_path, 'w') as fasta_file:
              # loop over the list of sequencing data, getting the identifiers
              # and the sequences to write them in the fasta file
-             for individual_sequencing_data in simulation_output.sequencing_data:
+             for individual_sequencing_data in sequencing_data:
                 # get seq ID
-                sequences_id = f'>{individual_sequencing_data[0]}_{individual_sequencing_data[6]}_time_{individual_sequencing_data[1]:.2f}'
+                individual_index         = individual_sequencing_data['individual index']
+                intra_host_lineage_index = individual_sequencing_data['intra-host lineage index']
+                sequencing_time          = individual_sequencing_data['sequencing time']
+                lineage_name             = individual_sequencing_data['lineage name']
+                sequence                 = individual_sequencing_data['sequence']
+              
+                sequences_id =f'>{individual_index}_{intra_host_lineage_index}_time_{sequencing_time:.2f}_lin_{lineage_name}'
                 # Write the sequence identifier
                 fasta_file.write(f"{sequences_id}\n")
                 # get full genome
-                decoded_genome = decode_genome(individual_sequencing_data[2])
+                decoded_genome = decode_genome(sequence)
                 # remove ' from genome string and write to fasta
                 genome = decoded_genome.replace("'","")
                 # Write the sequence data
@@ -165,29 +174,43 @@ def save_sequencing_dataset(simulation_output, output_path):
                 
                 
                 # add sequence data to df for regression 
-                sequencing_data_dic.append({
-                    'Sequencing_time': round(individual_sequencing_data[1]/365.25,4), #seq time in years
-                    'Distance_from_root': dis.hamming(individual_sequencing_data[2])/len(dis.reference)  # normalized hamming distance
+                sequencing_data_regression_dic.append({
+                    'Sequencing_time': round(sequencing_time/365.25,4), #seq time in years
+                    'Distance_from_root': dis.hamming(sequence)/len(dis.reference)  # normalized hamming distance
                            })
         # save dictionary of sequencing data for regression
-        with open(csv_file_path, mode='w', newline='') as file:
+        with open(data_regression_file_path, mode='w', newline='') as file:
             # Create a DictWriter object and pass the fieldnames (keys of the dictionary)
             # Use the keys of the first dictionary to get the column names
-            fieldnames = sequencing_data_dic[0].keys()  
+            fieldnames = sequencing_data_regression_dic[0].keys()  
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             
             # Write the header (column names)
             writer.writeheader()
             
             # Write the rows (the actual data)
-            writer.writerows(sequencing_data_dic)
+            writer.writerows(sequencing_data_regression_dic)
+            
+        # save dictionary of sequencing data for regression
+        with open(data_file_path, mode='w', newline='') as file:
+            # Create a DictWriter object and pass the fieldnames (keys of the dictionary)
+            # Use the keys of the first dictionary to get the column names
+            fieldnames = sequencing_data[0].keys()  
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            
+            # Write the header (column names)
+            writer.writeheader()
+            
+            # Write the rows (the actual data)
+            writer.writerows(sequencing_data)
+            
     except:
             if simulation_output.sequencing_data == []:
                 print('No individuals sequenced during simulation, not saving FASTA file')
                 print('')
             else: 
                 raise ValueError('There is something wrong with the sequencing data')
-
+                
 def read_sequencing_data(seeded_simulation_output_dir):
     sequencing_data_file_path = os.path.join(seeded_simulation_output_dir,
                                         "sequencing_data_regression.csv")
