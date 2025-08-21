@@ -666,7 +666,12 @@
     
     * updated seqeuncing data storage (for tree plots)
     * updated newick and nexus tree exporter
-	
+
+2025-21-08 pietro gerletti
+
+    Version 2.0.08
+    
+    * updated clustering algorithm
 	
 	
 	
