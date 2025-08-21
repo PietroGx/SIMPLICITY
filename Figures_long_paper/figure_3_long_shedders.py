@@ -405,45 +405,74 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshol
     axs[2].yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{100 * x:.0f}%"))
     axs[2].set_ylabel("L.r.f.")
 
-    # --- Subplot 4: Clustered frequency ---------------------------------------
+    # --- Subplot 4: Clade (clustered) frequency ---------------------------------
     try:
-    
-        # Read phylogenetic info
+      
         phylo_df = om.read_phylogenetic_data(ssod)
     
-        # Parse genome into mutation sets
-        lineage_to_mutations = cl.build_lineage_to_mutation_dict(phylo_df)
-        
-        # Pivot frequency dataframe
+        # Pivot lineage frequency dataframe
         full_pivot_df = lineage_frequency_df.pivot(
             index="Time_sampling",
             columns="Lineage_name",
             values="Frequency_at_t"
         )
-
     
-        # Apply clustering
-        clustered_df, _, cluster_parents = cl.build_clustered_freqs(
-            lineage_to_mutations,
-            full_pivot_df,
-            cluster_threshold
+        # Build clades (tree-based, deterministic)
+        (clade_to_lineages,
+         lineage_to_clade,
+         per_clade_mut_df,
+         clade_meta_df) = cl.cluster_lin_into_clades_with_meta(
+            phylo_df,
+            shared_mut_threshold=cluster_threshold
         )
-
-        # Plot
-        colors = [pm.get_lineage_color(parent, colormap_df) for parent in cluster_parents]
     
-        clustered_df.plot(kind='area', stacked=True,
-                          color=colors, alpha=0.6, ax=axs[3], legend=False)
+        # Aggregate lineage frequencies → clade frequencies
+        clade_series = []
+        clade_names  = []
+        for clade, members in clade_to_lineages.items():
+            cols = [c for c in members if c in full_pivot_df.columns]
+            if not cols:
+                continue
+            s = full_pivot_df[cols].sum(axis=1)
+            s.name = clade
+            clade_series.append(s)
+            clade_names.append(clade)
+    
+        if not clade_series:
+            raise ValueError("No clade had any member lineages present in the frequency table.")
+    
+        clade_freq_df = pd.concat(clade_series, axis=1)
+    
+        # Order clades by start time 
+        order = (clade_meta_df
+                 .set_index("clade")
+                 .loc[clade_freq_df.columns, "start_time"]
+                 .sort_values(kind="mergesort")  
+                 .index)
+        clade_freq_df = clade_freq_df[order]
+    
+        # Colors: use the color of each clade's root lineage
+        root_by_clade = clade_meta_df.set_index("clade")["root_lineage"].to_dict()
+        colors = []
+        for clade in clade_freq_df.columns:
+            root_lin = root_by_clade.get(clade)
+            try:
+                colors.append(pm.get_lineage_color(root_lin, colormap_df))
+            except Exception:
+                # fallback palette (rarely used if colormap_df is complete)
+                from matplotlib import colormaps
+                cmap = colormaps["tab10"]
+                idx = list(clade_freq_df.columns).index(clade) % 10
+                colors.append(cmap(idx))
+    
+        clade_freq_df.plot(kind='area', stacked=True,
+                           color=colors, alpha=0.6, ax=axs[3], legend=False)
         axs[3].set_xlim([0, time_final])
         axs[3].set_ylim(0, 1.0)
-        axs[3].set_ylabel("Cluster freq.")
-        
-    except:
-        import traceback
-        print("[ERROR] Clustered frequency plot failed:")
-        traceback.print_exc()
+        axs[3].set_ylabel("Clade freq.")
 
-    
+    except Exception as e:
+        print(f"[ERROR] Clade frequency plot failed: {e}")    
     
     # Apply consistent styling
     for ax in axs:
@@ -506,63 +535,7 @@ def plot_secondary_infections_boxplot_ax(ax, ssod, label="D"):
     ax.spines['right'].set_visible(False)
 
 
-# def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
-#     sim_dirs = dm.get_simulation_output_dirs(experiment_name)
 
-#     if len(sim_dirs) < 2:
-#         raise ValueError("Need at least 2 simulation output directories.")
-
-#     # Get long_shedders_ratio for each sim_dir and sort
-#     sim_dirs_sorted = sorted(sim_dirs, key=lambda d: sm.get_parameter_value_from_simulation_output_dir(d, 'long_shedders_ratio'))
-
-#     ssod1 = dm.get_ssod(sim_dirs_sorted[0], seed)  # lower value → left
-#     ssod2 = dm.get_ssod(sim_dirs_sorted[1], seed)  # higher value → right
-
-#     # ── Setup figure layout ───────────────────────────────────────────────
-#     fig = plt.figure(figsize=(16, 12))
-#     gs = GridSpec(6, 7, figure=fig)
-
-#     # Top left: ssod1 simulation outputs
-#     axs1 = [fig.add_subplot(gs[0, 0:3])]
-#     for i in range(1, 4):
-#         axs1.append(fig.add_subplot(gs[i, 0:3], sharex=axs1[0]))
-#     ylims1 = extended_simulation_trajectory(axs1, ssod1, experiment_name, min_freq_threshold, cluster_threshold, label='A')
-
-#     # Top right: ssod2 simulation outputs
-#     axs2 = [fig.add_subplot(gs[0, 4:7])]
-#     for i in range(1, 4):
-#         axs2.append(fig.add_subplot(gs[i, 4:7], sharex=axs2[0]))
-#     ylims2 = extended_simulation_trajectory(axs2, ssod2, experiment_name, min_freq_threshold, cluster_threshold, label='B')
-
-#     # Match y-axis limits across the two sides
-#     for i in range(3):
-#         ymax = max(ylims1[i], ylims2[i])
-#         axs1[i].set_ylim(top=ymax)
-#         axs2[i].set_ylim(top=ymax)
-
-#     # ── Bottom row: transmission distance boxplot ─────────────────────────
-#     axs3 = fig.add_subplot(gs[4, :])
-#     transmission_distance_data = compute_transmission_distances(ssod2)
-#     plot_hamming_distance_violinplot_ax(axs3, transmission_distance_data)
-
-#     # ── Adjust layout and finalize ────────────────────────────────────────
-#     fig.subplots_adjust(hspace=0.5, top=0.94, bottom=0.08)
-
-#     axs1[-1].tick_params(labelbottom=True)
-#     axs1[2].text(0.5, -0.3, "Time (d)", transform=axs1[2].transAxes,
-#                  ha='center', va='top')
-#     axs2[2].text(0.5, -0.3, "Time (d)", transform=axs2[2].transAxes,
-#                  ha='center', va='top')
-
-#     # Add combined legend using top panel (axs1)
-#     add_custom_legend_right(fig, axs1, axs2)
-
-#     # Save figure
-#     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
-#     output_path = os.path.join(experiment_plots_dir, f"Figure_3_long_{experiment_name}_seed{seed}.tiff")
-#     plt.savefig(output_path, format='tiff',  dpi=300, bbox_inches='tight')
-#     print(f"Figure saved to: {output_path}")
-#     plt.close(fig)
 
 def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
     sim_dirs = dm.get_simulation_output_dirs(experiment_name)

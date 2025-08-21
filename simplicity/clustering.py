@@ -1,147 +1,228 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from collections import defaultdict, deque, Counter
+
+from collections import defaultdict
 import pandas as pd
 
-
 def parse_genome(genome):
-    """
-    Convert a genome (e.g. list of mutations) into a frozenset of mutation tuples.
-    Safely handles None or malformed inputs.
-    
-    Args:
-        genome (list or None): Genome data from a row in phylogenetic table.
-    
-    Returns:
-        frozenset: Unique set of mutation tuples.
-    """
+    """Convert a genome (list of mutations) into a frozenset of mutation tuples."""
     if genome is None:
         return frozenset()
     try:
         return frozenset(tuple(x) for x in genome)
     except Exception:
         return frozenset()
-
-
-def build_lineage_to_mutation_dict(phylo_df):
-    """
-    Build a dictionary mapping each lineage to its parsed set of mutations.
     
-    Args:
-        phylo_df (pd.DataFrame): Must include "Lineage_name" and "Genome" columns.
-    
-    Returns:
-        dict: Lineage_name → frozenset of mutations
-    """
+def build_lineage_to_mutation_dict(phylogenetic_data_df):
+    """Return {Lineage_name -> frozenset of mutation tuples} from the phylo table."""
     return {
         row["Lineage_name"]: parse_genome(row["Genome"])
-        for _, row in phylo_df.iterrows()
-        if row["Genome"] is not None
+        for _, row in phylogenetic_data_df.iterrows()
     }
 
-
-def cluster_lineages_by_shared_mutations(lin2mut: dict, freq_pivot: pd.DataFrame, min_shared: int):
+def cluster_lin_into_clades_with_meta(
+    phylogenetic_data_df: pd.DataFrame,
+    shared_mut_threshold: int = 5,
+):
     """
-    Cluster lineages based on shared mutations using transitive closure.
-    
-    Args:
-        lin2mut (dict): Lineage → frozenset of mutations
-        freq_pivot (pd.DataFrame): Pivot table (Time_sampling x Lineage_name)
-        min_shared (int): Minimum number of shared mutations for clustering
-    
-    Returns:
-        freq_df_clusters (pd.DataFrame): Clustered frequency table
-        clusters (list of sets): Each set = raw lineage names in that cluster
-        parents (list): Representative lineage name for each cluster
-    """
-    adjacency = defaultdict(set)
-    items = list(lin2mut.items())
-    for i, (l1, m1) in enumerate(items):
-        for j, (l2, m2) in enumerate(items):
-            if l1 != l2 and len(m1 & m2) >= min_shared:
-                adjacency[l1].add(l2)
-                adjacency[l2].add(l1)
+    Cluster lineages into nested clades (time-ordered, deterministic) and, at the moment a new clade
+    is created, record the *clade-defining mutations* (the mutations accumulated since the previous
+    clade root up to the current clade root) together with where they emerged.
 
-    visited, clusters, parents = set(), [], []
-    for lineage in lin2mut:
-        if lineage not in visited:
-            cluster = set()
-            queue = deque([lineage])
-            parents.append(lineage)
-            while queue:
-                current = queue.popleft()
-                if current not in visited:
-                    visited.add(current)
-                    cluster.add(current)
-                    queue.extend(adjacency[current] - visited)
-            clusters.append(cluster)
+    Required columns:
+      - 'Lineage_name'     : unique lineage ID
+      - 'Lineage_parent'   : parent lineage ID
+      - 'Genome'           : list-like of mutations (already parsed upstream)
+      - 'Host_type'        : host phenotype where the lineage/edge arose
+      - 'Time_emergence'   : numeric time (used for deterministic ordering)
 
-    cluster_freqs = []
-    for i, cluster in enumerate(clusters):
-        cols = [col for col in cluster if col in freq_pivot.columns]
-        if cols:
-            summed = freq_pivot[cols].sum(axis=1)
-            cluster_freqs.append(summed.rename(f"Cluster_{i}"))
+    Returns
+    -------
+    clade_to_lineages : dict
+        { clade_name → set(lineage_names) }
+    lineage_to_clade  : dict
+        { lineage_name → clade_name }
+    per_clade_mut_df  : dict
+        { clade_name → DataFrame with columns:
+            ['mutation', 'emergence_lineage', 'host_type', 'time'] }
+        These rows are *only* the clade-defining mutations for that clade.
+    clade_meta_df     : pd.DataFrame
+        Columns: ['clade','root_lineage','parent_clade','n_defining','start_time']
+    """
+    required = {
+        "Lineage_name", "Lineage_parent", "Genome", "Host_type", "Time_emergence"
+    }
+    missing = required - set(phylogenetic_data_df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
 
-    freq_df_clusters = pd.concat(cluster_freqs, axis=1) if cluster_freqs else pd.DataFrame(index=freq_pivot.index)
-    return freq_df_clusters, clusters, parents
+    # Maps
+    lin2mut    = build_lineage_to_mutation_dict(phylogenetic_data_df)
+    lin2parent = dict(zip(phylogenetic_data_df["Lineage_name"], phylogenetic_data_df["Lineage_parent"]))
+    lin2host   = dict(zip(phylogenetic_data_df["Lineage_name"], phylogenetic_data_df["Host_type"]))
+    lin2time   = dict(zip(phylogenetic_data_df["Lineage_name"], phylogenetic_data_df["Time_emergence"]))
+
+    # Root detection (earliest Time_emergence among NaN/empty/self-parent)
+    def _is_root_candidate(lin, par):
+        return pd.isna(par) or par in ("", None) or lin == par
+
+    root_candidates = [lin for lin, par in lin2parent.items() if _is_root_candidate(lin, par)]
+    if not root_candidates:
+        raise ValueError("No root lineage found.")
+    root = min(root_candidates, key=lambda lin: (lin2time.get(lin, float("inf")), str(lin)))
+
+    # Children adjacency, deterministic order: by time then name
+    children = defaultdict(list)
+    for child, parent in lin2parent.items():
+        if _is_root_candidate(child, parent):
+            continue
+        children[parent].append(child)
+    for p in children:
+        children[p].sort(key=lambda c: (lin2time.get(c, float("inf")), str(c)))
+
+    # Precompute edge mutations for each lineage: muts(lineage) - muts(parent)
+    edge_muts = {}
+    for lin, muts in lin2mut.items():
+        parent = lin2parent.get(lin)
+        parent_muts = lin2mut.get(parent, frozenset()) if parent in lin2mut else frozenset()
+        edge_muts[lin] = muts - parent_muts  # typically size 1 in fully resolved trees
+
+    # Containers
+    clade_to_lineages: dict[str, set] = {}
+    lineage_to_clade: dict[str, str] = {}
+    clade_branch_counts = defaultdict(int)
+    per_clade_mut_df: dict[str, pd.DataFrame] = {}
+    clade_meta_rows = []
+
+    def _norm_host(h):
+        if pd.isna(h):
+            return None
+        v = str(h).strip().lower()
+        if v.startswith("long"):
+            return "long_shedder"
+        if v.startswith("norm"):
+            return "normal"
+        if v in ("", "none", "nan", "unknown"):
+            return None
+        return v
+
+    def recurse(current_lin: str, clade_root_mutset: frozenset, clade_path: str, path_since_root: list[str]):
+        current_mut = lin2mut.get(current_lin, frozenset())
+        # NEW mutations since current clade root
+        mut_distance = len(current_mut - clade_root_mutset)
+
+        start_new_clade = (mut_distance >= shared_mut_threshold) or (clade_path == "")
+
+        if start_new_clade:
+            parent_clade = clade_path if clade_path != "" else None
+
+            # Build the segment from the previous clade root to the *new* clade root:
+            # nodes on the path since last root (path_since_root) plus current node.
+            segment_nodes = (path_since_root + [current_lin]) if clade_path != "" else [current_lin]
+
+            # Create the new clade name
+            if clade_path == "":
+                new_clade = "Clade_0"
+            else:
+                idx = clade_branch_counts[clade_path]
+                clade_branch_counts[clade_path] += 1
+                new_clade = f"{clade_path}.{idx}"
+
+            # Collect clade-defining mutation records from segment nodes
+            records = []
+            defining_set = set()
+            for node in segment_nodes:
+                node_time = lin2time.get(node)
+                node_host = _norm_host(lin2host.get(node))
+                for m in edge_muts.get(node, ()):
+                    defining_set.add(m)
+                    records.append({
+                        "mutation": m,
+                        "emergence_lineage": node,
+                        "host_type": node_host if node_host is not None else "unknown",
+                        "time": node_time
+                    })
+
+            # Register clade objects
+            clade_to_lineages.setdefault(new_clade, set())
+            per_clade_mut_df[new_clade] = pd.DataFrame(records, columns=["mutation", "emergence_lineage", "host_type", "time"])
+            clade_meta_rows.append({
+                "clade": new_clade,
+                "root_lineage": current_lin,
+                "parent_clade": parent_clade,
+                "n_defining": len(defining_set),
+                "start_time": lin2time.get(current_lin)
+            })
+
+            # Reset clade root state
+            clade_root_mutset = current_mut
+            clade_path = new_clade
+            path_since_root = []  # reset path accumulator after starting a new clade
+
+        # Assign current lineage to the current clade
+        clade_to_lineages[clade_path].add(current_lin)
+        lineage_to_clade[current_lin] = clade_path
+
+        # Descend: accumulate path since current clade root
+        next_path_since_root = path_since_root + [current_lin]
+        for child in children.get(current_lin, []):
+            recurse(child, clade_root_mutset, clade_path, next_path_since_root)
+
+    recurse(root, lin2mut.get(root, frozenset()), "", [])
+
+    clade_meta_df = pd.DataFrame(clade_meta_rows, columns=["clade","root_lineage","parent_clade","n_defining","start_time"])
+    return clade_to_lineages, lineage_to_clade, per_clade_mut_df, clade_meta_df
 
 
-def build_clustered_freqs(lineage_to_mutations, freq_df_lineages, threshold):
+def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame]):
     """
-    High-level wrapper for clustering and aggregating frequencies.
-    
-    Args:
-        lineage_to_mutations (dict): Lineage → mutation set
-        freq_df_lineages (pd.DataFrame): Pivoted frequency data
-        threshold (int): Shared mutation count threshold
-    
-    Returns:
-        freq_df_clusters (pd.DataFrame): Aggregated cluster frequency table
-        cluster_parents (list): Parent lineages representing clusters
-    """
-    if threshold == 0:
-        return freq_df_lineages.copy(), list(freq_df_lineages.columns)
-    freq_df_clusters, clusters, parents = cluster_lineages_by_shared_mutations(
-        lineage_to_mutations, freq_df_lineages, threshold
-    )
-    return freq_df_clusters, clusters, parents
+    Given per-clade mutation tables (only clade-defining mutations), assign each clade a label
+    by majority of host types among those mutations and also return a summary table.
 
-def assign_cluster_hosttypes_from_parents(parents, cluster_names, host_type_series):
-    """
-    Assign each cluster the host type of its founder (parent) lineage.
-    
-    Args:
-        parents (list): Representative lineage for each cluster (from clustering)
-        cluster_names (list): Corresponding cluster names (e.g., "Cluster_0")
-        host_type_series (pd.Series): Lineage_name → host type
-    
-    Returns:
-        pd.Series: Cluster_name → founder's host type
-    """
-    cluster_hosttypes = {}
-    for cname, parent in zip(cluster_names, parents):
-        ht = host_type_series.get(parent)
-        if ht is not None:
-            cluster_hosttypes[cname] = ht
-    return pd.Series(cluster_hosttypes)
+    Returns
+    -------
+    clade_labels : pd.Series
+        { clade_name -> 'normal' / 'long_shedder' / 'unknown' }
 
-def assign_cluster_hosttypes_by_max_mutation(clusters, lin2mut, host_type_series):
+    clade_summary_df : pd.DataFrame
+        columns = ['clade','total_normal','total_long_shedder','total_unknown','label']
     """
-    Assign cluster to the host type of the lineage with the most mutations.
-    
-    Args:
-        clusters (list of sets): Each cluster as a set of lineage names
-        lin2mut (dict): Lineage → mutation set
-        host_type_series (pd.Series): Lineage → host type
-    
-    Returns:
-        List of assigned host types per cluster
-    """
-    hosttypes = []
-    for cluster in clusters:
-        max_lin = max(cluster, key=lambda l: len(lin2mut.get(l, [])))
-        hosttypes.append(host_type_series.get(max_lin, "Unknown"))
-    return hosttypes
+    labels = {}
+    rows = []
+
+    for clade, df in per_clade_mut_df.items():
+        if df is None or df.empty:
+            labels[clade] = "unknown"
+            rows.append({"clade": clade, "total_normal": 0, "total_long_shedder": 0, "total_unknown": 0, "label": "unknown"})
+            continue
+
+        counts = df["host_type"].value_counts(dropna=False).to_dict()
+        total_normal = counts.get("normal", 0)
+        total_long   = counts.get("long_shedder", 0)
+        total_unknown = counts.get("unknown", 0)
+
+        if total_long > total_normal:
+            label = "long_shedder"
+        elif total_normal > total_long:
+            label = "normal"
+        else:
+            # tie or both zero, assign mixed label
+            label = "mixed"
+
+        labels[clade] = label
+        rows.append({
+            "clade": clade,
+            "total_normal": total_normal,
+            "total_long_shedder": total_long,
+            "total_unknown": total_unknown,
+            "label": label
+        })
+
+    clade_labels = pd.Series(labels)
+    clade_summary_df = pd.DataFrame(rows, columns=["clade","total_normal","total_long_shedder","total_unknown","label"])
+    return clade_labels, clade_summary_df
+
+
+
 
