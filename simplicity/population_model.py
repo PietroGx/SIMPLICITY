@@ -179,6 +179,9 @@ def infection(population, from_long_shedder=False):
     index = population.rng4.integers(0, population.individuals[parent]['IH_lineages_number'])
     transmitted_lineage = population.individuals[parent]['IH_lineages'][index]
     transmitted_fitness = population.individuals[parent]['IH_lineages_fitness_score'][index]
+    # count lineage infection
+    population._phylo_name_map[transmitted_lineage]['Total_infections'] = population._phylo_name_map[transmitted_lineage].get('Total_infections', 0) + 1
+    
     # assign transmitted lineage
     new_inf['inherited_lineage']  = transmitted_lineage
     # update lineage trajectory

@@ -62,6 +62,20 @@ def cluster_lin_into_clades_with_meta(
     lin2parent = dict(zip(phylogenetic_data_df["Lineage_name"], phylogenetic_data_df["Lineage_parent"]))
     lin2host   = dict(zip(phylogenetic_data_df["Lineage_name"], phylogenetic_data_df["Host_type"]))
     lin2time   = dict(zip(phylogenetic_data_df["Lineage_name"], phylogenetic_data_df["Time_emergence"]))
+    
+    
+    
+    # # --- DEBUG: input host values & genome parsing ---
+    # raw_hosts = phylogenetic_data_df["Host_type"].astype(str).str.strip().str.lower()
+    # print("[DBG] Host_type unique (raw):", sorted(set(raw_hosts)))
+    
+    # nonempty_edges = sum(1 for v in lin2mut.values())
+    # print(f"[DBG] Total lineages with genomes: {nonempty_edges}/{len(lin2mut)}")
+    
+    # # Check edge_muts fill after you build it (see next block)
+
+    
+    
 
     # Root detection (earliest Time_emergence among NaN/empty/self-parent)
     def _is_root_candidate(lin, par):
@@ -87,6 +101,17 @@ def cluster_lin_into_clades_with_meta(
         parent = lin2parent.get(lin)
         parent_muts = lin2mut.get(parent, frozenset()) if parent in lin2mut else frozenset()
         edge_muts[lin] = muts - parent_muts  # typically size 1 in fully resolved trees
+        
+    
+    
+    # # --- DEBUG: edge mutation sanity ---
+    # non_empty = sum(1 for v in edge_muts.values() if len(v) > 0)
+    # print(f"[DBG] edge_muts non-empty: {non_empty}/{len(edge_muts)} ({non_empty/len(edge_muts):.1%})")
+    # if non_empty == 0:
+    #     print("[DBG] WARNING: No edge mutations found; definers will be empty -> labels become 'unknown'/'mixed'.")
+
+    
+    
 
     # Containers
     clade_to_lineages: dict[str, set] = {}
@@ -143,7 +168,23 @@ def cluster_lin_into_clades_with_meta(
                         "host_type": node_host if node_host is not None else "unknown",
                         "time": node_time
                     })
+            
+            
+            # # --- DEBUG: clade-defining segment summary ---
+            # host_counts = pd.Series([r["host_type"] for r in records]).value_counts(dropna=False).to_dict()
+            # print(
+            #     f"[DBG] New {new_clade}: "
+            #     f"parent={parent_clade}, segment_nodes={len(segment_nodes)}, "
+            #     f"n_defining={len(defining_set)}, start_time={lin2time.get(current_lin)}"
+            # )
+            # print(f"[DBG]   definers host_counts: {host_counts}")
+            # if host_counts.get("unknown", 0) > 0:
+            #     print("[DBG]   first few defining rows:", records[:min(3, len(records))])
 
+            
+            
+            
+            
             # Register clade objects
             clade_to_lineages.setdefault(new_clade, set())
             per_clade_mut_df[new_clade] = pd.DataFrame(records, columns=["mutation", "emergence_lineage", "host_type", "time"])
@@ -201,6 +242,12 @@ def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame]):
         total_normal = counts.get("normal", 0)
         total_long   = counts.get("long_shedder", 0)
         total_unknown = counts.get("unknown", 0)
+        
+        # # --- DEBUG: per-clade label inputs ---
+        # print(f"[DBG] Labeling {clade}: normal={total_normal}, long={total_long}, unknown={total_unknown}, n_rows={len(df)}")
+        # if total_normal == 0 and total_long == 0 and total_unknown > 0:
+        #     print("[DBG]   NOTE: all definers are 'unknown' -> will not favor normal/long.")
+
 
         if total_long > total_normal:
             label = "long_shedder"

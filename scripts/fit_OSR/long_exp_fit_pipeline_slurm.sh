@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# -------- resources for the DRIVER jobs (not the seeds) --------
-TIME_PER_DRIVER="1-00:00:00"   # long enough for the driver to manage its 1,500-task array
+# -------- light resources for the DRIVER jobs (not the seeds) --------
+TIME_PER_DRIVER="1-00:00:00"   # keep driver alive while it manages its array
 CPUS_DRIVER=2
 MEM_DRIVER="2G"
 
@@ -31,7 +31,7 @@ for py in "${FILES[@]}"; do
     -e "$LOGDIR/${base%.py}_%j.err" \
     --export=ALL,SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM=500,QT_QPA_PLATFORM=offscreen \
     ${prev_job:+--dependency=afterok:$prev_job} \
-    --wrap "python \"$py\" slurm 1")
+    --wrap "scripts/fit_OSR/run_driver_with_watchdog.sh \"$py\"")
   jid=$(awk '{print $4}' <<<"$out")
   echo "Submitted $base as job $jid (afterok: ${prev_job:-none})"
   prev_job="$jid"
@@ -52,4 +52,4 @@ echo "Submitted batch_fit_long.py as job $batch_jid (afterok: $prev_job)"
 
 echo
 echo "Monitor with:"
-echo "  squeue -u $USER -o '%18i %9P %20j %8T %10M %10l %5D %R'"
+echo "  squeue -u $USER -o '%18i %20j %8T %10M %10l %5D %R'"

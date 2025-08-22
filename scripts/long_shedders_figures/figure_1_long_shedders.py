@@ -5,7 +5,7 @@ Created on Wed Jul 16 18:04:59 2025
 
 @author: pietro
 """
-import Figures_long_paper.preprocess_data as preprocess
+import scripts.long_shedders_figures.preprocess_data as preprocess
 import simplicity.plots_manager as pm
 import simplicity.dir_manager as dm
 import argparse
@@ -28,34 +28,34 @@ def plot_comparison_intra_host_models_ax(ax, label="A"):
     ----------
     ax : matplotlib.axes.Axes
         Target subplot axis.
-    intra_host_model : IntraHostModel
-        The model instance used for curve generation.
     label : str
         Subplot label (e.g. 'A').
     """
-    
+    # --- Baseline ('normal') individual ---
     intra_host_model = ih.Host(tau_1=2.86, tau_2=3.91, tau_3=7.5, tau_4=8)
-    # Normal individual curve 
-    t_normal = np.arange(0, 300, 1)
-    y_normal = intra_host_model.data_plot_ih_solution(0, 300, 1)[0]
-    ax.plot(t_normal, y_normal, color='blue', label='Normal')
+    t = np.arange(0, 300, 1)
+    y = intra_host_model.data_plot_ih_solution(0, 300, 1)[0]
+    ax.plot(t, y, label='Normal', linewidth=2)
 
-    # Long shedder individual curve
-    intra_host_model_long = ih.Host(tau_1=2.86, tau_2=3.91, tau_3=133.5, tau_4=8)
-    t_long= np.arange(0, 300, 1)
-    y_long = intra_host_model_long.data_plot_ih_solution(0, 300, 1)[0]
-    ax.plot(t_long, y_long, color='orange', label='Long shedder')
+    # --- Long-shedder scenarios (11/16/32/72 days) ---
+    long_shed_durations = [11, 16, 32, 72]
+    for d in long_shed_durations:
+        ih_long = ih.Host(tau_1=2.86, tau_2=3.91, tau_3=d, tau_4=8)
+        y_long = ih_long.data_plot_ih_solution(0, 300, 1)[0]
+        ax.plot(t, y_long, linestyle='--', label=f'Long shedder – {d}d')
 
     ax.set_xlabel("Time (d)")
-    ax.set_ylabel("P(infected after t)")
+    ax.set_ylabel("P(infectious after t)")
     ax.set_xlim(0, 300)
-    ax.set_ylim(0)
-    ax.legend()
+    ax.set_ylim(0)  # keep your original y lower bound; remove or set to (0,1) if preferred
+    ax.legend(title="Intra-host profiles", frameon=False, ncol=2)
 
-    pm.apply_standard_axis_style(ax)  
+    pm.apply_standard_axis_style(ax)
 
-    # Add subplot label
-    ax.text(-0.1, 1.05, label, transform=ax.transAxes, fontsize=16, fontweight='bold', va='top', ha='left')
+    # Subplot label
+    ax.text(-0.1, 1.05, label, transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
+
     
 # === Subplot B: Avg Duration ===
 
@@ -85,7 +85,7 @@ def plot_figure_1(ssod):
     fig, axes = plt.subplots(1, 2, figsize=(16, 8), gridspec_kw={'width_ratios': [4, 2]})
 
     plot_comparison_intra_host_models_ax(axes[0])
-    plot_avg_duration_ax(axes[1], duration_data)
+    # plot_avg_duration_ax(axes[1], duration_data)
 
     for ax in axes:
         ax.spines['top'].set_visible(False)
@@ -122,8 +122,8 @@ def main():
     # args = parser.parse_args()
     # # Run the script with the provided parameter
     
-    experiment_name = 'test_long_shedders_kv_#1'
-    seed_number = 9
+    experiment_name = 'test_long_shedders_r1_kv_#1'
+    seed_number = 1
     metrics = plot(experiment_name, seed_number)
     return metrics
     

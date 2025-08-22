@@ -677,7 +677,13 @@
     * added OSR fit scripts for long shedders experiments
     * added batch fit pipeline and slurm scheduler
 	
-	
+2025-22-08 pietro gerletti
+
+    Version 2.0.09
+    
+    * added tracking of total infections per lineage
+    * updated figure 4 
+    * update slurm batch submission script
 	
 	
 	

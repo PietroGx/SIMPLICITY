@@ -41,12 +41,12 @@ def user_set_experiment_settings():
     }
     # parameters to keep fixed (but different from standard_value) across combinations
     fixed_params = {
-        'population_size': 2000,
+        'population_size': 1000,
         "IH_virus_emergence_rate": 0.01,
         'infected_individuals_at_start': 100,
         'R' : 1.03,
         'R_long' : 0.5,
-        'final_time': 365*3,
+        'final_time': 365*2,
         'nucleotide_substitution_rate': 0.000111
         
     }
@@ -61,7 +61,7 @@ def user_set_experiment_settings():
     # fixed_params = sm.read_user_set_parameters_file(filename)
     
     # -------------------------------------------------------------------------
-    n_seeds = 100
+    n_seeds = 2
     
     return (varying_params,fixed_params,n_seeds)
 
