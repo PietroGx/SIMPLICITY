@@ -13,48 +13,52 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-
-@author: pietro
-   
-Each simulation will be repeated n_seeds time with a different random seed.
-
-The set of all simulations is what we call an experiment.
+  long_evo_rate_f = 5
+  tau_3_long = 11
+  R_long = 0.5
+  long_shedders_ratio = 0.01
+  IH_virus_emergence_rate = 0.01
 """
-from experiment_script_runner import run_experiment_script
+from scripts.experiments.experiment_script_runner import run_experiment_script
 import argparse
 import numpy as np
-experiment_name =  'OSR_fit'
+
+experiment_name = "longf5_tau11_Rlong0p5_lsr0p01_OSR_fit"
 
 def fixture_experiment_settings():
     # number of values for NSR
     nucleotide_substitution_rate_num_values = 15
-    
-    # Generate values spaced logarithmically between 10^-5 and 10^-2
-    values = np.logspace(np.log10(1e-6), np.log10(0.0003), 
+
+    # Generate values spaced logarithmically between 10^-6 and 3e-4
+    values = np.logspace(np.log10(1e-6), np.log10(3e-4), 
                          num=nucleotide_substitution_rate_num_values)
     nucleotide_substitution_rate_values = values.tolist()
-    # parameters value to get combinations from
+
+    # parameters value to get combinations from 
     varying_params = {
         'nucleotide_substitution_rate': nucleotide_substitution_rate_values
     }
-    # parameters to keep fixed (but different from standard_value) across combinations
+
+    # parameters to keep fixed across combinations 
     fixed_params = {
         'infected_individuals_at_start': 10,
         'final_time': 365*3,
-        'R': 1.1
+        'R': 1.1,
+        'long_evo_rate_f': 5,
+        'tau_3_long': 11,
+        'R_long': 0.5,
+        'long_shedders_ratio': 0.01,
+        'IH_virus_emergence_rate': 0.01
     }
-    
+
     n_seeds = 100
-    
-    return (varying_params,fixed_params,n_seeds)
+
+    return (varying_params, fixed_params, n_seeds)
 
 def main():
     # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Run script to generate IH lineages data")
+    parser = argparse.ArgumentParser(description="Run script to generate IH lineages data (OSR fit)")
     parser.add_argument('runner', type=str, help="runner")
     parser.add_argument('experiment_number', type=int, help="experiment number")
     args = parser.parse_args()
@@ -66,5 +70,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
-    

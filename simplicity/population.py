@@ -36,6 +36,7 @@ class Population:
                  ih_model_parameters,
                  rng3,rng4,rng5,rng6,
                  long_shedders_ratio=0,
+                 long_evo_rate_f = 1,
                  reservoir=100000):
         
         # counter for inf reactions
@@ -58,6 +59,7 @@ class Population:
         self.recovered    = 0   # compartment - number of recovered individuals
         
         self.long_shedders_ratio = long_shedders_ratio
+        self.long_evo_rate_f = long_evo_rate_f # weight factor for long shedders substitution rate
         self.long_shedders = 0 # number of long shedders
          
         self.reservoir = reservoir   # size of total population (not everyone is 
@@ -599,6 +601,7 @@ def create_population(parameters):
     seed     = parameters['seed']
     
     long_shedders_ratio = parameters['long_shedders_ratio']
+    long_evo_rate_f     = parameters['long_evo_rate_f']
     
     ih_model_parameters = {
         'tau_1': parameters['tau_1'],
@@ -617,7 +620,8 @@ def create_population(parameters):
     rng6 = randomgen(seeds_generator.integers(0,10000)) # for synthetic sequencing data
     
     # create population
-    pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5,rng6, long_shedders_ratio)
+    pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5,rng6, 
+                     long_shedders_ratio, long_evo_rate_f)
     return pop
         
         
