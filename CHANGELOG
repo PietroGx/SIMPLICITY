@@ -674,7 +674,8 @@
     * updated clustering algorithm
     * added long_evo_rate_f parameter to population class
     * updated scripts folder order
-    * added OSR fit script for long shedders experiments
+    * added OSR fit scripts for long shedders experiments
+    * added batch fit pipeline and slurm scheduler
 	
 	
 	
