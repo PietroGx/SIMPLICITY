@@ -5,7 +5,7 @@ Created on Fri Jul 18 12:48:46 2025
 
 @author: pietro
 """
-import Figures_long_paper.preprocess_data as preprocess
+import scripts.long_shedders_figures.preprocess_data as preprocess
 import simplicity.plots_manager as pm
 import simplicity.dir_manager as dm
 import argparse
@@ -115,8 +115,8 @@ def main():
     # args = parser.parse_args()
     # # Run the script with the provided parameter
     
-    experiment_name = 'test_long_shedders_r1_kv_#2'
-    seed_number =  9
+    experiment_name = 'test_long_shedders_r1_kv_#1'
+    seed_number =  1
     
     sim_out_dirs = dm.get_simulation_output_dirs(experiment_name)
     

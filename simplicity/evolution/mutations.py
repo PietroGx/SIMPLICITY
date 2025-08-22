@@ -423,14 +423,19 @@ def update_lineages(population, sub_coord_dicmap):
         new_lineage_genome = copy.deepcopy(parent_lineage_genome)
         new_lineage_genome.append([coord[2],coord[3]])
         new_lineage_genome.sort(key=lambda x: x[0])  # sort by position
-
-        population.phylogenetic_data.append(
-                     {'Time_emergence'  : population.time,
-                      'Lineage_name'    : new_lineage_name,
-                      'Lineage_parent'  : parent_lineage_name,
-                      'Genome'          : new_lineage_genome,
-                      'Host_type'       : individual['type']
-                    })
+        
+        new_row_dict = {'Time_emergence'  : population.time,
+         'Lineage_name'    : new_lineage_name,
+         'Lineage_parent'  : parent_lineage_name,
+         'Genome'          : new_lineage_genome,
+         'Host_type'       : individual['type'],
+         'Total_infections': 0
+        }
+        
+        population.phylogenetic_data.append(new_row_dict)
+        population._phylo_name_map[new_lineage_name] = new_row_dict
+        
+        
         # print(f'Phylo data: {population.phylogenetic_data}')
     mutated_individuals = {coord[0] for coord in sub_coord_dicmap}
     

@@ -87,9 +87,10 @@ class Population:
                                      'Lineage_name'    : 'wt',
                                      'Lineage_parent'  : None,
                                      'Genome'          : [],
-                                     'Host_type'       : 'normal'
-                                     
+                                     'Host_type'       : 'normal',
+                                     'Total_infections': 0
                                  }]
+        self._phylo_name_map = { row['Lineage_name']: row for row in self.phylogenetic_data }
         self.phylodots = []         # needed to name lineages
         self.sequencing_data = []   # to store sequencing data
         # ---------------------------------------------------------------------
