@@ -55,7 +55,7 @@ def get_individual_mutation_weight(population, i, NSR, L):
     delta_t = population.time - population.individuals[i]['time_last_weight_event']
     weight  = 1 - np.exp(-NSR*delta_t*L)
     if population.individuals[i]['type'] == 'long_shedder':
-        weight = weight*5
+        weight = weight*population.long_evo_rate_f
     return weight
 
 
