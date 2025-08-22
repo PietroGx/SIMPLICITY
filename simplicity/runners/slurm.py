@@ -94,14 +94,14 @@ def submit_simulations(experiment_name: str,
    
     # Define the output and error file paths
     
-    # slurm_logs_dir = dm.get_slurm_logs_dir(experiment_name)
+    slurm_logs_dir = dm.get_slurm_logs_dir(experiment_name)
     
-    # output_file = f"{slurm_logs_dir}/{experiment_name}-%A_%a.out"  # %A = job ID, %a = array index
-    # error_file  = f"{slurm_logs_dir}/{experiment_name}-%A_%a.err"  # %A = job ID, %a = array index
+    output_file = f"{slurm_logs_dir}/{experiment_name}-%A_%a.out"  # %A = job ID, %a = array index
+    error_file  = f"{slurm_logs_dir}/{experiment_name}-%A_%a.err"  # %A = job ID, %a = array index
     
     # send logs to /dev/null 
-    output_file = "/dev/null"
-    error_file  = "/dev/null"
+    # output_file = "/dev/null"
+    # error_file  = "/dev/null"
         
     max_runtime = "1-00:00:00"  # 1 day max runtime
     
