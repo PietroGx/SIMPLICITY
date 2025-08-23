@@ -24,8 +24,8 @@ from tests.common_test_fixtures import fixture_tree_builder_type
 from tests.common_test_fixtures import fixture_infection_tree_subtype
 from tests.common_test_fixtures import fixture_phylogenetic_tree_subtype
 
-experiment_name = 'test_local_experiment_serial_#9'
-seeded_simulation_output_dir = 'Data/test_local_experiment_serial_#9/04_Output/long_shedders_ratio_0p01_NSR_0p0001_R_1p3_T_300/seed_0000'
+experiment_name = 'test_long_shedders_r1_kv_#9'
+seeded_simulation_output_dir = '/scratch/gerlettip/SIMPLICITY/Data/test_long_shedders_r1_kv_#9/04_Output/long_shedders_ratio_0p01_N_2000_kv_0p01_init_100_R_1_Rl_0p5_T_1095_NSR_0p00011/seed_0099/'
 
 
 

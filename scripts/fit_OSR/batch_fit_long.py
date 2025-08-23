@@ -48,26 +48,26 @@ import simplicity.tuning.evolutionary_rate as er
 
 # --------------------------- constants ---------------------------
 INDEX_CSV = os.path.join('scripts', 'fit_OSR', 'INDEX.csv')
-OUT_CSV = os.path.join('data', 'OSR_long_batch_fit_summary.csv')
+OUT_CSV = os.path.join('Data', 'OSR_long_batch_fit_summary.csv')
 TARGET_OSR = 1e-3
 DATA_TYPE = 'single_rates'  # or 'combined_rate'
 PARAMETER = 'nucleotide_substitution_rate'
 MIN_SEQ_NUMBER = 30
 MIN_SIM_LENGTH = 100  # note: passed as 'min_sim_lenght' kwarg to match existing API
 
+EXPERIMENT_NUMBER = 1
+EXP_SUFFIX = f"_#{EXPERIMENT_NUMBER}"
+
 # --------------------------- helpers ---------------------------
 def read_experiment_names_from_index(index_csv_path: str) -> List[str]:
     if not os.path.exists(index_csv_path):
         raise FileNotFoundError(f"INDEX CSV not found: {index_csv_path}")
     df = pd.read_csv(index_csv_path)
-    # Prefer experiment_name column; fall back to deriving from filename if needed
+
     if 'experiment_name' in df.columns:
-        names = df['experiment_name'].astype(str).tolist()
-    elif 'filename' in df.columns:
-        names = [
-            os.path.basename(fn).replace('.py', '').split('generate_data_')[-1]
-            for fn in df['filename'].astype(str).tolist()
-        ]
+        names = df['experiment_name'].astype(str).tolist()     
+        names = [n if n.endswith(EXP_SUFFIX) else n + EXP_SUFFIX for n in names]
+        
     else:
         raise KeyError("INDEX CSV must have 'experiment_name' or 'filename' column")
     # Keep stable order: by 'order' if present, else as-is
