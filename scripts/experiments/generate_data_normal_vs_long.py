@@ -29,7 +29,7 @@ from experiment_script_runner import run_experiment_script
 import simplicity.settings_manager as sm
 import argparse
 
-experiment_name =  'test_long_shedders_r1_kv'
+experiment_name =  'generate_data_normal_vs_long'
 
 def user_set_experiment_settings():
     
@@ -45,10 +45,11 @@ def user_set_experiment_settings():
         "IH_virus_emergence_rate": 0.01,
         'infected_individuals_at_start': 100,
         'R' : 1.03,
-        'R_long' : 0.5,
-        'final_time': 365*2,
-        'nucleotide_substitution_rate': 0.000111
-        
+        'R_long' : 3,
+        'tau_3_long': 72,
+        'final_time': 365*3,
+        'long_evo_rate_f':5,
+        'nucleotide_substitution_rate': 0.0001562947609214
     }
     
     # ---------- OR import them from file -------------------------------------
@@ -61,7 +62,7 @@ def user_set_experiment_settings():
     # fixed_params = sm.read_user_set_parameters_file(filename)
     
     # -------------------------------------------------------------------------
-    n_seeds = 2
+    n_seeds = 100
     
     return (varying_params,fixed_params,n_seeds)
 

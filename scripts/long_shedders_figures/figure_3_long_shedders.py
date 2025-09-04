@@ -1,615 +1,584 @@
-# This file is part of SIMPLICITY
-# Copyright (C) 2025 Pietro Gerletti
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <https://www.gnu.org/licenses/>.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Figure 3 for long shedders (cached, with progress, PNG output).
+
+Panels:
+  A: SOD1 lineage frequency (raw)
+  B: SOD1 clustered frequency (shared_mut_threshold = --cluster-threshold)
+  C: SOD2 lineage frequency (raw)
+  D: SOD2 clustered frequency (shared_mut_threshold = --cluster-threshold)
+  E: 5 violins of GENETIC distance per TRANSMISSION EVENT:
+     - 7.5d "normal" from BASELINE SOD of --exp-name (SOD with long_shedders_ratio == 0)
+     - one violin per tau_3_long from INDEX filtered by evo=5, R=3, ratio=0.01
+       (first experiment #1, first SOD; we aggregate ALL seeds in that SOD)
+
+CLI:
+  --cluster-threshold  int
+  --seed               int
+  --exp-name           str (default: generate_data_normal_vs_long_#1)
+  --freq-threshold     float (default: 0.01)  # min peak freq to show a lineage in A/C
+  --debug              flag to print diagnostics
+
+Notes:
+- Caching is automatic: per-SSOD CSVs under Data/cache_hamming/, plus an aggregated CSV under Data/.
+- Colors for A-D use your lineage colormap; E uses baseline-first cycle order.
+- ASCII-only strings; no grids.
+"""
 
 import os
-import pandas as pd
+import argparse
+import warnings
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
-from matplotlib.ticker import FuncFormatter
-from matplotlib.lines import Line2D
-from matplotlib.legend_handler import HandlerBase
 from matplotlib.patches import Rectangle
-from matplotlib.transforms import Bbox, TransformedBbox
-from matplotlib.image import BboxImage
-from matplotlib.colors import Normalize
-from matplotlib.collections import LineCollection
+from matplotlib.lines import Line2D
 from matplotlib import colormaps
-import argparse
+from matplotlib.legend_handler import HandlerBase
+from matplotlib.collections import LineCollection
+from matplotlib.colors import Normalize
+from tqdm import tqdm
+import seaborn as sns
 
-from simplicity.phenotype.distance import hamming_iw
+import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.plots_manager as pm
-import simplicity.dir_manager as dm
-import simplicity.settings_manager as sm
 import simplicity.clustering as cl
+from simplicity.settings_manager import get_parameter_value_from_simulation_output_dir as get_param
+from simplicity.phenotype.distance import hamming_iw
 
 pm.apply_plos_rcparams()
 
-class RainbowLegendLine:
-    """Dummy handle for a rainbow‐gradient line in the legend."""
+INDEX_CSV = "scripts/long_shedders_experiments/INDEX_exp_scripts.csv"
+BASELINE_TAU_LABEL = "7.5d"
+CACHE_DIR_NAME = "cache_hamming"  # under Data/
+AGG_CSV_NAME = "figure3_long_distances_{exp_name}.csv"
+
+# ---------- Legend ----------
+
+class RainbowLegendBoxHandle:
+    """Dummy legend handle for a rainbow gradient box."""
     pass
 
-class HandlerRainbowLine(HandlerBase):
-    def create_artists(
-        self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans
-    ):
-        """
-        Draw a horizontal line that goes from left to right, 
-        colored by a ‘gist_rainbow’ gradient.
-        """
-        # We will break the line into many small segments:
-        n_segments = 100
-        xs = np.linspace(xdescent, xdescent + width, n_segments)
-        y_center = ydescent + height / 2.0
-
-        # Build list of segment endpoints: [ [(x0,y), (x1,y)], [(x1,y),(x2,y)], ... ]
-        segments = []
-        for i in range(n_segments - 1):
-            x0, x1 = xs[i], xs[i + 1]
-            segments.append([(x0, y_center), (x1, y_center)])
-
-        # Create a LineCollection from these segments
-        # “array” controls the color along the line (0→1 over all segments)
-        cmap = colormaps["gist_rainbow"]
-        colors = np.linspace(0, 1, n_segments - 1)
-
+class HandlerRainbowLegendBox(HandlerBase):
+    def create_artists(self, legend, orig_handle, x0, y0, w, h, fs, trans):
+        n = 30
+        ys = np.linspace(y0, y0 + h, n + 1)
+        segs = []
+        for i in range(n):
+            y = (ys[i] + ys[i + 1]) / 2.0
+            segs.append([(x0, y), (x0 + w, y)])
         lc = LineCollection(
-            segments,
-            cmap=cmap,
+            segs,
+            cmap=colormaps["gist_rainbow"],
             norm=Normalize(0, 1),
-            linewidths=1.5,
-            transform=trans,  
-            zorder=2
-        )
-        lc.set_array(colors)
-
-        return [lc]
-
-class RainbowLegendBox:
-    """A dummy handle for the rainbow‐gradient legend entry."""
-    pass
-
-class HandlerRainbowBox(HandlerBase):
-    def create_artists(
-        self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans
-    ):
-        # Build a small horizontal gradient array
-        gradient = np.linspace(0, 1, 256).reshape(1, -1)
-        gradient = np.vstack([gradient] * 10)  # give it some vertical “thickness”
-
-        # Define a bounding box in the legend’s coordinate system
-        bbox = Bbox.from_bounds(xdescent, ydescent, width, height)
-        tbbox = TransformedBbox(bbox, trans)
-
-        # Create a BboxImage that will fill that box with the “gist_rainbow” colormap
-        im = BboxImage(
-            tbbox,
-            cmap="gist_rainbow",
-            interpolation="bilinear",
-            norm=Normalize(0, 1),
-            zorder=2
-        )
-        im.set_array(gradient)
-
-        # Create a thin black‐border rectangle on top
-        border = Rectangle(
-            (xdescent, ydescent),
-            width,
-            height,
+            linewidths=h / n,
             transform=trans,
-            edgecolor="black",
-            facecolor="none",
-            linewidth=0.5,
-            zorder=3
+            zorder=2,
         )
+        lc.set_array(np.linspace(0, 1, n))
+        border = Rectangle((x0, y0), w, h, transform=trans,
+                           edgecolor="black", facecolor="none",
+                           linewidth=0.5, zorder=3)
+        return [lc, border]
 
-        return [im, border]
+def add_custom_legend_right(fig, violin_colors, violin_labels, anchor=(0.97, 0.97)):
 
-def add_custom_legend_right(fig, axs1, axs2=None):
-    """
-    Places all legend sections (abbreviations + subplot entries) vertically
-    on the right-hand side of the figure.
-    """
+    handles, labels = [], []
 
-    # Section 1: Abbreviations
-    subtitle_abbrev = Line2D([], [], linestyle="None", label=r"$\bf{Abbreviations:}$")
-    l_abbrev = [
-        "  N.i.  = N individuals",
-        "  R.a.t.f. = Relative avg. transmission fitness",
-        "  L.r.f. = Lineage relative frequency",
-        "  R.e.  = R effective",
-    ]
-    abbrev_handles = [subtitle_abbrev] + [Line2D([], [], linestyle="None") for _ in l_abbrev]
-    abbrev_labels  = [subtitle_abbrev.get_label()] + l_abbrev
+    # Rainbow box for the frequency panels A–D
+    handles.append(RainbowLegendBoxHandle())
+    labels.append("Lineages / Clusters")
 
-    # Section 2: Subplot 1 – Infected trajectory
-    subtitle1 = Line2D([], [], linestyle="None", label=r"$\bf{Subplot\ 1\ –\ Infected\ trajectory}$")
-    h1, l1 = axs1[0].get_legend_handles_labels()
-    sub1_handles = [subtitle1] + h1
-    sub1_labels  = [subtitle1.get_label()] + l1
+    # spacer
+    handles.append(Line2D([], [], linestyle="None"))
+    labels.append(" ")
 
-    # Section 3: Subplot 2 – Relative Fitness
-    subtitle2 = Line2D([], [], linestyle="None", label=r"$\bf{Subplot\ 2\ –\ Relative\ Fitness}$")
-    h2, l2 = axs1[1].get_legend_handles_labels()
-    sub2_handles = [subtitle2] + h2
-    sub2_labels  = [subtitle2.get_label()] + l2
+    # header + swatches for violin groups
+    handles.append(Line2D([], [], linestyle="None"))
+    labels.append("Groups (violin)")
+    for lab in violin_labels:
+        c = violin_colors.get(lab, "0.5")
+        handles.append(Rectangle((0, 0), 1, 1, facecolor=c, edgecolor=c))
+        labels.append(lab)
 
-    # Section 4: Subplot 3 – Lineage Frequency
-    subtitle3    = Line2D([], [], linestyle="None", label=r"$\bf{Subplot\ 3\ –\ Lineage\ Frequency}$")
-    rainbow_box  = RainbowLegendBox()
-    sub3_handles = [subtitle3, rainbow_box]
-    sub3_labels  = [subtitle3.get_label(), "Lineage frequency"]
-
-    # Section 5: Subplot 4 – Clustered Frequencies
-    subtitle4     = Line2D([], [], linestyle="None", label=r"$\bf{Subplot\ 4\ –\ Clustered\ Frequencies}$")
-    cluster_line  = RainbowLegendLine()
-    sub4_handles  = [subtitle4, cluster_line]
-    sub4_labels   = [subtitle4.get_label(), "Cluster frequency"]
-
-    # Combine all
-    all_handles = abbrev_handles + [Line2D([], [], linestyle="None")] + \
-                  sub1_handles + [Line2D([], [], linestyle="None")] + \
-                  sub2_handles + [Line2D([], [], linestyle="None")] + \
-                  sub3_handles + [Line2D([], [], linestyle="None")] + \
-                  sub4_handles
-
-    all_labels = abbrev_labels + [" "] + \
-                 sub1_labels + [" "] + \
-                 sub2_labels + [" "] + \
-                 sub3_labels + [" "] + \
-                 sub4_labels
-
-    # Final right-side legend
     fig.legend(
-        all_handles,
-        all_labels,
+        handles, labels,
         loc="upper left",
-        bbox_to_anchor=(1.01, 1),
+        bbox_to_anchor=anchor,
         frameon=False,
         ncol=1,
         fontsize="small",
-        handlelength=1.0,
+        handlelength=1.2,
         handletextpad=0.6,
-        labelspacing=0.4,
-        handler_map={
-            RainbowLegendBox: HandlerRainbowBox(),
-            RainbowLegendLine: HandlerRainbowLine(),
-        }
+        labelspacing=0.5,
+        borderaxespad=0.0,
+        handler_map={RainbowLegendBoxHandle: HandlerRainbowLegendBox()},
     )
 
-    # Leave more room on the right
-    fig.subplots_adjust(right=0.9   )
+    fig.subplots_adjust(right=0.95)
 
-
-
-def compute_transmission_distances(ssod):
+def add_violin_legend_on_ax(ax, labels, color_map, anchor=(0.1, 0.98)):
     """
-    Compute the Hamming genomic distance between the inherited lineage and each
-    transmitted lineage for all individuals.
-
-    Returns:
-        pd.DataFrame with columns:
-            - individual_id
-            - inherited_lineage
-            - transmitted_lineage
-            - hamming_distance
+    Put the violin legend inside ax (axE).
+    anchor is (x, y) in axes coords. Lower y to move down; lower x to move left.
     """
-    
-    # Load data
-    individuals_data = om.read_individuals_data(ssod)
-    lineage_df = om.read_phylogenetic_data(ssod)
+    handles = [Rectangle((0, 0), 1, 1, facecolor=color_map[lab], edgecolor=color_map[lab])
+               for lab in labels]
+    ax.legend(
+        handles, labels,
+        loc="upper right",
+        bbox_to_anchor=anchor,
+        frameon=False,
+        ncol=1,
+        fontsize="small",
+        handlelength=1.2,
+        handletextpad=0.6,
+        labelspacing=0.5,
+        borderaxespad=0.0,
+    )
 
-    # Build lineage → genome map
-    genome_map = dict(zip(lineage_df['Lineage_name'], lineage_df['Genome']))
+# ---------- Utilities ----------
 
-    # data to collect
-    data = []
+def _is_number(x):
+    try:
+        float(x)
+        return True
+    except Exception:
+        return False
 
-    for individual_id, row in individuals_data.iterrows():
-        inherited = row['inherited_lineage']
-        new_infs = row['new_infections']
-        ind_type = row['type']
+def format_tau_label(tau):
+    x = float(tau)
+    if abs(x - int(x)) < 1e-9:
+        return "{}d".format(int(x))
+    return "{}d".format(x)
 
-        # Skip if no transmissions or inherited lineage missing
-        if not new_infs or inherited is None:
+def get_sod1_sod2(exp_name, debug=False):
+    sods = dm.get_simulation_output_dirs(exp_name)
+    if len(sods) < 2:
+        raise ValueError("Need at least two simulation_output dirs in experiment '{}'".format(exp_name))
+    if debug:
+        print("[DEBUG] {} SODs found for exp '{}':".format(len(sods), exp_name))
+        for s in sods[:5]:
+            print("  [DEBUG] SOD:", s)
+    return sods[0], sods[1]
+
+def get_exp_normal_sod(exp_name, tol=1e-12, debug=False):
+    """
+    Return the SOD from this experiment whose 'long_shedders_ratio' is zero
+    (within tolerance). If none equals zero, return the one with the smallest ratio.
+    """
+    sods = dm.get_simulation_output_dirs(exp_name)
+    if not sods:
+        raise ValueError("No simulation_output dirs for experiment '{}'".format(exp_name))
+
+    pairs = []
+    for sod in sods:
+        try:
+            r = get_param(sod, "long_shedders_ratio")
+            r = float(r) if r is not None and _is_number(r) else float("inf")
+        except Exception:
+            r = float("inf")
+        pairs.append((sod, r))
+        if debug:
+            print("[DEBUG] SOD ratio long_shedders_ratio =", r, "->", sod)
+
+    for sod, r in pairs:
+        if r <= tol:
+            if debug:
+                print("[DEBUG] Using baseline SOD (ratio==0):", sod)
+            return sod
+
+    sod_min, rmin = min(pairs, key=lambda kv: kv[1])
+    warnings.warn("No SOD with long_shedders_ratio == 0; using smallest ratio SOD.")
+    if debug:
+        print("[DEBUG] Using baseline SOD (min ratio {}): {}".format(rmin, sod_min))
+    return sod_min
+
+def iter_all_ssods_in_sod(sod_path):
+    """Return absolute paths to all SSODs (seed_* folders) under a SOD."""
+    ssods = []
+    try:
+        for name in sorted(os.listdir(sod_path)):
+            p = os.path.join(sod_path, name)
+            if os.path.isdir(p) and name.startswith("seed_"):
+                ssods.append(p)
+    except Exception:
+        pass
+    return ssods
+
+# ---------- GENETIC distance per transmission event ----------
+
+def compute_transmission_hamming_distances(ssod, donor_type_filter=None):
+    """
+    One Hamming distance per transmission event:
+      dist = hamming_iw(G_inherited_by_donor, G_transmitted_by_donor)
+    Restrict to donors where row['type'] == donor_type_filter if provided.
+    """
+    df = om.read_individuals_data(ssod)
+    phylo = om.read_phylogenetic_data(ssod)
+    lin2gen = dict(zip(phylo["Lineage_name"], phylo["Genome"]))
+
+    dists = []
+    for _, row in df.iterrows():
+        if donor_type_filter and str(row.get("type", "")) != donor_type_filter:
+            continue
+        inherited = row.get("inherited_lineage", None)
+        if inherited is None:
+            continue
+        gin = lin2gen.get(inherited, None)
+        if gin is None:
             continue
 
-        genome_inherited = genome_map.get(inherited)
-        if genome_inherited is None:
-            continue  # skip if missing genome
+        events = row.get("new_infections", [])
+        if not events:
+            continue
 
-        for inf in new_infs:
-            transmitted = inf.get('transmitted_lineage')
-            if transmitted is None:
+        for ev in events:
+            if not isinstance(ev, dict):
                 continue
-
-            genome_transmitted = genome_map.get(transmitted)
-            if genome_transmitted is None:
+            tlin = ev.get("transmitted_lineage", None)
+            if tlin is None:
                 continue
-
-            dist = hamming_iw(genome_inherited, genome_transmitted)
-
-            data.append({
-                'individual_id': individual_id,
-                'inherited_lineage': inherited,
-                'transmitted_lineage': transmitted,
-                'hamming_distance': dist,
-                'type': ind_type
-            })
-            
-    return pd.DataFrame(data)
-
-def plot_hamming_distance_boxplot_ax(ax, transmission_distance_data, label="C"):
-    """
-    Plot a boxplot of Hamming distances from transmission events on a given Axes,
-    grouped by:
-        - 'normal'
-        - 'long'
-        - 'normal+long' (combined)
-
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-        Axis to plot on (as a subplot).
-    df : pd.DataFrame
-        Output of compute_transmission_distances(...)
-    label : str
-        Subplot label to annotate (e.g., "D")
-    """
-    import seaborn as sns
-    # Build group column
-    df_plot = transmission_distance_data.copy()
-    df_plot['group'] = df_plot['type'].map({
-        'normal': 'normal',
-        'long_shedder': 'long'
-    })
-
-    # Plot to provided axis
-    sns.boxplot(data=df_plot, x='group', y='hamming_distance',
-                hue = 'group', palette='pastel', ax=ax)
-    sns.stripplot(data=df_plot, x='group', y='hamming_distance',
-                  color='black', alpha=0.3, size=4, jitter=True, ax=ax)
-
-    ax.set_xlabel("Transmitting Individual Type")
-    ax.set_ylabel("Hamming Distance")
-    ax.set_title("")
-    ax.text(-0.1, 1.05, label, transform=ax.transAxes,
-            fontsize=16, fontweight='bold', va='top', ha='left')
-
-    # Optional: remove top and right spines for aesthetics
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    
-def plot_hamming_distance_violinplot_ax(ax, transmission_distance_data, label="C"):
-    """
-    Plot a violin plot of Hamming distances from transmission events on a given Axes,
-    grouped by:
-        - 'normal'
-        - 'long'
-        - 'normal+long' (combined)
-
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-        Axis to plot on (as a subplot).
-    transmission_distance_data : pd.DataFrame
-        Output of compute_transmission_distances(...)
-    label : str
-        Subplot label to annotate (e.g., "D")
-    """
-    import seaborn as sns
-
-    # Build group column
-    df_plot = transmission_distance_data.copy()
-    df_plot['group'] = df_plot['type'].map({
-        'normal': 'normal',
-        'long_shedder': 'long'
-    })
-
-    # Plot violin
-    sns.violinplot(data=df_plot, x='group', y='hamming_distance',
-                   hue='group', palette='pastel', ax=ax, inner=None)
-
-    # Add individual data points
-    # sns.stripplot(data=df_plot, x='group', y='hamming_distance',
-    #               color='black', alpha=0.3, size=4, jitter=True, ax=ax)
-
-    ax.set_xlabel("Transmitting Individual Type")
-    ax.set_ylabel("Tras. Dist.")
-    ax.set_title("")
-    ax.text(-0.1, 1.05, label, transform=ax.transAxes,
-            fontsize=16, fontweight='bold', va='top', ha='left')
-
-    # Aesthetic cleanup
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-
-
-
-def extended_simulation_trajectory(axs, ssod, experiment_name, min_freq_threshold, cluster_threshold, label):
-    axs[0].text(-0.1, 1.05, label, transform=axs[0].transAxes,
-                fontsize=16, fontweight='bold', va='top', ha='left')
-
-    # --- Subplot 1: System trajectory ----------------------------------------
-    trajectory_df = om.read_simulation_trajectory(ssod)
-    time = trajectory_df['time'].tolist()
-    infected = trajectory_df['infected'].tolist()
-
-    axs[0].plot(time, infected, label='Infected individuals at time t', color='blue')
-    try:
-        long_shedders = trajectory_df['long_shedders'].tolist()
-        ax2 = axs[0].twinx()
-        ax2.plot(time, long_shedders, label='Long shedders at time t', color='orange')
-    except:
-        pass
-    axs[0].set_ylim(0, max(infected) * 1.5)
-    axs[0].set_ylabel('N. i.')
-
-    # --- Subplot 2: Fitness trajectory ---------------------------------------
-    fitness_trajectory_file_path = os.path.join(ssod, 'fitness_trajectory.csv')
-    try:
-        fitness_trajectory_df = pd.read_csv(fitness_trajectory_file_path)
-    except Exception as e:
-        print(f"[ERROR] Reading fitness_trajectory.csv failed: {e}")
-        return
-
-    times = fitness_trajectory_df['Time'].tolist()
-    means = fitness_trajectory_df['Mean'].tolist()
-    stds = fitness_trajectory_df['Std'].tolist()
-    entropy = fitness_trajectory_df['Entropy'].tolist()
-
-    axs[1].plot(times, means, linestyle='-', color='#2ca02c', label='Relative avg. transmission fitness')
-    axs[1].fill_between(times,
-                        [m - s for m, s in zip(means, stds)],
-                        [m + s for m, s in zip(means, stds)],
-                        color='#2ca02c', alpha=0.3)
-    ax3 = axs[1].twinx()
-    ax3.plot(times, entropy, linestyle='-', color='purple', label='Transmission fitness entropy')
-    
-    axs[1].set_ylabel("R.a.t.f.")
-
-    # --- Subplot 3: Lineages frequency ---------------------------------------
-    try:
-        lineage_frequency_df = om.read_lineage_frequency(ssod)
-        colormap_df = pm.make_lineages_colormap(ssod, cmap_name='gist_rainbow')
-        pm.plot_lineages_colors_tab(ssod)
-    except Exception as e:
-        print(f"[ERROR] Lineage frequency or colormap failed: {e}")
-        return
-
-    filtered_df, _ = om.filter_lineage_frequency_df(lineage_frequency_df, min_freq_threshold)
-    colors = [pm.get_lineage_color(name, colormap_df) for name in filtered_df.columns]
-    filtered_df.plot(kind='area', stacked=False, color=colors, alpha=0.5, ax=axs[2], legend=False)
-
-    time_file_path = os.path.join(ssod, 'final_time.csv')
-    try:
-        time_final = pd.read_csv(time_file_path, header=None).iloc[0, 0]
-    except Exception as e:
-        print(f"[ERROR] final_time.csv could not be read: {e}")
-        time_final = max(time)
-    axs[2].set_xlim([0, time_final])
-    axs[2].yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{100 * x:.0f}%"))
-    axs[2].set_ylabel("L.r.f.")
-
-    # --- Subplot 4: Clade (clustered) frequency ---------------------------------
-    try:
-      
-        phylo_df = om.read_phylogenetic_data(ssod)
-    
-        # Pivot lineage frequency dataframe
-        full_pivot_df = lineage_frequency_df.pivot(
-            index="Time_sampling",
-            columns="Lineage_name",
-            values="Frequency_at_t"
-        )
-    
-        # Build clades (tree-based, deterministic)
-        (clade_to_lineages,
-         lineage_to_clade,
-         per_clade_mut_df,
-         clade_meta_df) = cl.cluster_lin_into_clades_with_meta(
-            phylo_df,
-            shared_mut_threshold=cluster_threshold
-        )
-    
-        # Aggregate lineage frequencies → clade frequencies
-        clade_series = []
-        clade_names  = []
-        for clade, members in clade_to_lineages.items():
-            cols = [c for c in members if c in full_pivot_df.columns]
-            if not cols:
+            gout = lin2gen.get(tlin, None)
+            if gout is None:
                 continue
-            s = full_pivot_df[cols].sum(axis=1)
-            s.name = clade
-            clade_series.append(s)
-            clade_names.append(clade)
-    
-        if not clade_series:
-            raise ValueError("No clade had any member lineages present in the frequency table.")
-    
-        clade_freq_df = pd.concat(clade_series, axis=1)
-    
-        # Order clades by start time 
+            try:
+                d = hamming_iw(gin, gout)
+            except Exception:
+                continue
+            if np.isfinite(d):
+                dists.append(d)
+    return dists
+
+# ---------- Caching (automatic) ----------
+
+def cache_dir():
+    return os.path.join(dm.get_data_dir(), CACHE_DIR_NAME)
+
+def agg_csv_path(exp_name):
+    return os.path.join(dm.get_data_dir(), AGG_CSV_NAME.format(exp_name=exp_name))
+
+def ssod_cache_filename(group_label, donor_type, ssod):
+    sodname = os.path.basename(os.path.dirname(ssod))
+    seedname = os.path.basename(ssod)
+    fn = "{}__{}__{}__{}.csv".format(group_label, donor_type, sodname, seedname)
+    return os.path.join(cache_dir(), fn)
+
+def ensure_cached_ssod(group_label, donor_type, ssod, debug=False):
+    """
+    Ensure per-SSOD CSV exists; compute if missing.
+    Returns path to the cache CSV.
+    """
+    os.makedirs(cache_dir(), exist_ok=True)
+    outp = ssod_cache_filename(group_label, donor_type, ssod)
+    if os.path.isfile(outp) and os.path.getsize(outp) > 0:
+        return outp
+
+    dists = compute_transmission_hamming_distances(ssod, donor_type_filter=donor_type)
+    pd.DataFrame({"dist": dists}).to_csv(outp, index=False)
+    if debug:
+        print("[DEBUG] Wrote {} distances -> {}".format(len(dists), outp))
+    return outp
+
+def collect_groups(exp_name, seed, debug=False):
+    """
+    Build the list of groups for Panel E, each with its SOD and donor type.
+    Returns:
+      baseline_sod, groups_list
+    where groups_list = [(label, donor_type, sod_path), ...] with taus sorted.
+    """
+    base_sod = get_exp_normal_sod(exp_name, debug=debug)
+    groups = [(BASELINE_TAU_LABEL, "normal", base_sod)]
+
+    df = read_index_csv(INDEX_CSV)
+    evo = pd.to_numeric(df.get("long_evo_rate_f"), errors="coerce")
+    rlg = pd.to_numeric(df.get("R_long"), errors="coerce")
+    ratio = pd.to_numeric(df.get("long_shedders_ratio"), errors="coerce")
+    sub = df[(evo == 5) & (rlg == 3) & (ratio == 0.01)]
+    if sub.empty:
+        warnings.warn("INDEX filter returned empty set for evo=5, R=3, ratio=0.01.")
+        return base_sod, groups
+
+    taus = sorted(pd.to_numeric(sub["tau_3_long"], errors="coerce").dropna().unique().tolist())
+    for t in taus:
+        row = sub[pd.to_numeric(sub["tau_3_long"], errors="coerce") == t].iloc[0]
+        base = str(row["generated_experiment_name"])
+        exp2 = base + "_#1"
+        try:
+            sods = dm.get_simulation_output_dirs(exp2)
+        except Exception as e:
+            if debug:
+                print("[DEBUG] Missing experiment for tau {}d: {} ({})".format(t, exp2, e))
+            continue
+        if not sods:
+            if debug:
+                print("[DEBUG] No SODs for tau {}d in experiment {}".format(t, exp2))
+            continue
+        lab = format_tau_label(t)
+        groups.append((lab, "long_shedder", sods[0]))
+        if debug:
+            print("[DEBUG] Tau {}d -> exp {}, SOD {}".format(t, exp2, sods[0]))
+    return base_sod, groups
+
+def read_index_csv(path):
+    try:
+        return pd.read_csv(path)
+    except UnicodeDecodeError:
+        return pd.read_csv(path, encoding="cp1252")
+
+def build_violin_df_with_cache(exp_name, seed, debug=False):
+    """
+    Ensure per-SSOD caches for all required groups, aggregate to a single DF,
+    and save an aggregated CSV under Data/ for future instant loads.
+    """
+    aggp = agg_csv_path(exp_name)
+    if os.path.isfile(aggp) and os.path.getsize(aggp) > 0:
+        try:
+            df = pd.read_csv(aggp)
+            labels = [BASELINE_TAU_LABEL] + sorted(
+                [g for g in df["group"].unique() if g != BASELINE_TAU_LABEL],
+                key=lambda s: float(s[:-1]) if s.endswith("d") and _is_number(s[:-1]) else 1e9
+            )
+            return df, labels
+        except Exception:
+            pass
+
+    baseline_sod, groups = collect_groups(exp_name, seed, debug=debug)
+
+    rows = []
+    for lab, dtype, sod in groups:
+        ssods = iter_all_ssods_in_sod(sod)
+        if debug:
+            print("[DEBUG] Group {}, donor_type {}, SOD {}, {} SSODs".format(lab, dtype, sod, len(ssods)))
+        for ssod in tqdm(ssods, desc="{} ({})".format(lab, dtype), unit="ssod"):
+            cache_csv = ensure_cached_ssod(lab, dtype, ssod, debug=debug)
+            try:
+                ddf = pd.read_csv(cache_csv)
+            except Exception:
+                continue
+            if "dist" not in ddf.columns:
+                continue
+            for v in ddf["dist"].dropna().values:
+                rows.append({"group": lab, "dist": v, "dtype": dtype, "src_ssod": os.path.basename(ssod)})
+
+    if not rows:
+        warnings.warn("No data for Panel E violins.")
+        return pd.DataFrame(columns=["group", "dist", "dtype", "src_ssod"]), []
+
+    df = pd.DataFrame(rows)
+
+    try:
+        df.to_csv(aggp, index=False)
+        if debug:
+            print("[DEBUG] Wrote aggregated CSV:", aggp, "rows:", len(df))
+    except Exception as e:
+        if debug:
+            print("[DEBUG] Failed writing aggregated CSV {}: {}".format(aggp, e))
+
+    labels = [BASELINE_TAU_LABEL] + sorted(
+        [g for g in df["group"].unique() if g != BASELINE_TAU_LABEL],
+        key=lambda s: float(s[:-1]) if s.endswith("d") and _is_number(s[:-1]) else 1e9
+    )
+    return df, labels
+
+# ---------- Plot helpers for panels A-D ----------
+
+def plot_lineage_frequency_ax(ax, ssod, label_char, freq_threshold):
+    lf = om.read_lineage_frequency(ssod)
+    t_final = om.read_final_time(ssod)
+    cmap_df = pm.make_lineages_colormap(ssod)
+
+    pivot = lf.pivot(index="Time_sampling",
+                     columns="Lineage_name",
+                     values="Frequency_at_t")
+
+    # keep only columns that ever have nonzero freq
+    cols = [c for c in pivot.columns if (pivot[c].fillna(0) > 0).any()]
+    pivot = pivot[cols]
+
+    # drop lineages whose peak freq is below the threshold
+    if freq_threshold is not None and freq_threshold > 0:
+        max_by_col = pivot.fillna(0).max(axis=0)
+        keep_cols = [c for c in pivot.columns if max_by_col.get(c, 0.0) >= freq_threshold]
+        pivot = pivot[keep_cols]
+
+    # colors aligned to remaining columns
+    colors = [pm.get_lineage_color(c, cmap_df) for c in pivot.columns]
+
+    # plot as non-stacked area (overlaid fills)
+    pivot.plot(kind="area", stacked=False, color=colors, alpha=0.6, ax=ax, legend=False)
+
+    ax.set_xlim(0, t_final)
+    ax.set_ylim(0, 1.0)
+    ax.set_ylabel("Lineage freq.")
+    ax.set_xlabel("Time (d)")
+    ax.set_title(label_char, loc="left", pad=8, fontsize=16, fontweight="bold")
+    pm.apply_standard_axis_style(ax)
+    return cmap_df, t_final
+
+def plot_clustered_frequency_ax(ax, ssod, cluster_threshold, colormap_df, t_final, label_char):
+    phylo_df = om.read_phylogenetic_data(ssod)
+    lf = om.read_lineage_frequency(ssod)
+    full_pivot = lf.pivot(index="Time_sampling",
+                          columns="Lineage_name",
+                          values="Frequency_at_t")
+
+    (clade_to_lineages,
+     lineage_to_clade,
+     per_clade_mut_df,
+     clade_meta_df) = cl.cluster_lin_into_clades_with_meta(
+        phylo_df,
+        shared_mut_threshold=cluster_threshold
+    )
+
+    clade_series = []
+    for clade, members in clade_to_lineages.items():
+        cols = [c for c in members if c in full_pivot.columns]
+        if not cols:
+            continue
+        s = full_pivot[cols].sum(axis=1)
+        s.name = clade
+        clade_series.append(s)
+
+    if not clade_series:
+        raise ValueError("No clade members present in frequency table.")
+
+    clade_freq = pd.concat(clade_series, axis=1)
+
+    try:
         order = (clade_meta_df
                  .set_index("clade")
-                 .loc[clade_freq_df.columns, "start_time"]
-                 .sort_values(kind="mergesort")  
+                 .loc[clade_freq.columns, "start_time"]
+                 .sort_values(kind="mergesort")
                  .index)
-        clade_freq_df = clade_freq_df[order]
-    
-        # Colors: use the color of each clade's root lineage
-        root_by_clade = clade_meta_df.set_index("clade")["root_lineage"].to_dict()
-        colors = []
-        for clade in clade_freq_df.columns:
-            root_lin = root_by_clade.get(clade)
-            try:
-                colors.append(pm.get_lineage_color(root_lin, colormap_df))
-            except Exception:
-                # fallback palette (rarely used if colormap_df is complete)
-                from matplotlib import colormaps
-                cmap = colormaps["tab10"]
-                idx = list(clade_freq_df.columns).index(clade) % 10
-                colors.append(cmap(idx))
-    
-        clade_freq_df.plot(kind='area', stacked=True,
-                           color=colors, alpha=0.6, ax=axs[3], legend=False)
-        axs[3].set_xlim([0, time_final])
-        axs[3].set_ylim(0, 1.0)
-        axs[3].set_ylabel("Clade freq.")
+        clade_freq = clade_freq[order]
+    except Exception:
+        pass
 
-    except Exception as e:
-        print(f"[ERROR] Clade frequency plot failed: {e}")    
-    
-    # Apply consistent styling
-    for ax in axs:
-        pm.apply_standard_axis_style(ax)
+    root_by_clade = clade_meta_df.set_index("clade")["root_lineage"].to_dict()
+    colors = []
+    for clade in clade_freq.columns:
+        root_lin = root_by_clade.get(clade, None)
+        try:
+            colors.append(pm.get_lineage_color(root_lin, colormap_df))
+        except Exception:
+            cmap = colormaps["tab10"]
+            idx = list(clade_freq.columns).index(clade) % 10
+            colors.append(cmap(idx))
 
-    # y-axis limits
-    max_y1 = max(infected) * 1.5
-    max_y2 = max([m + s for m, s in zip(means, stds)]) * 1.2
-    max_y3 = 1.0
-    max_y4 = 1.0  # same for clustered frequency
+    clade_freq.plot(kind="area", stacked=True, color=colors, alpha=0.6, ax=ax, legend=False)
 
-    return [max_y1, max_y2, max_y3, max_y4]
+    ax.set_xlim(0, t_final)
+    ax.set_ylim(0, 1.0)
+    ax.set_ylabel("Clade freq.")
+    ax.set_xlabel("Time (d)")
+    ax.set_title(label_char, loc="left", pad=8, fontsize=16, fontweight="bold")
+    pm.apply_standard_axis_style(ax)
 
-def plot_secondary_infections_boxplot_ax(ax, ssod, label="D"):
+# ---------- Panel E (violins; from cached data) ----------
+
+def plot_violins_panel_E(ax, df, labels):
+    if df.empty or not labels:
+        ax.axis("off")
+        return {}, []
+
+    color_map = build_tau_violin_colors(labels)
+    palette = {lab: color_map[lab] for lab in labels}
+
+    sns.violinplot(
+        data=df, x="group", y="dist",
+        order=labels, hue="group", palette=palette,
+        cut=0, inner="quartile", linewidth=1,
+        ax=ax, legend=False
+    )
+
+    ax.set_xlabel("")
+    ax.set_ylabel("Hamming distance")
+    ax.set_title("E", loc="left", pad=8, fontsize=16, fontweight="bold")
+    pm.apply_standard_axis_style(ax)
+
+    return color_map, labels
+
+def build_tau_violin_colors(labels):
     """
-    Plot a boxplot of the number of secondary infections (offspring)
-    per individual, grouped by type (normal vs long_shedder).
-
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-        Axis to plot on (as a subplot).
-    ssod : str
-        Path to seeded simulation output directory.
-    label : str
-        Subplot label (e.g., "D").
+    Baseline first color, then each tau label gets the next colors in the Matplotlib prop cycle.
     """
-    import seaborn as sns
-    import simplicity.output_manager as om
+    cycle = plt.rcParams.get("axes.prop_cycle", None)
+    base = cycle.by_key()["color"] if cycle is not None else [colormaps["tab10"](i) for i in range(10)]
+    ordered = []
+    if BASELINE_TAU_LABEL in labels:
+        ordered.append(BASELINE_TAU_LABEL)
+    ordered += [lab for lab in labels if lab != BASELINE_TAU_LABEL]
+    color_map = {}
+    for i, lab in enumerate(ordered):
+        color_map[lab] = base[i % len(base)]
+    return color_map
 
-    df = om.read_individuals_data(ssod)
-    df['group'] = df['type'].map({
-        'normal': 'normal',
-        'long_shedder': 'long'
-    })
+# ---------- Build figure ----------
 
-    # Compute number of infections caused
-    df['n_infections'] = df['new_infections'].apply(len)
-    
-    # Get top 3
-    top_infectors = df.sort_values('n_infections', ascending=False).head(3)
-    
-    # Print result
-    for idx, row in top_infectors.iterrows():
-        print(f"Index: {idx}, Type: {row['type']}, Infections caused: {row['n_infections']}")
-        
-    # Plot
-    sns.boxplot(data=df, x='group', y='n_infections',
-                palette='pastel', hue = 'group', ax=ax)
-    # sns.stripplot(data=df, x='group', y='n_infections',
-    #               color='black', alpha=0.3, size=4, jitter=True, ax=ax)
+def build_figure(exp_name, cluster_threshold, seed, freq_threshold, debug=False):
+    # A-D inputs
+    sod1, sod2 = get_sod1_sod2(exp_name, debug=debug)
+    ssod1 = dm.get_ssod(sod1, seed)
+    ssod2 = dm.get_ssod(sod2, seed)
+    if debug:
+        print("[DEBUG] SOD1 ->", sod1, "SSOD1 ->", ssod1)
+        print("[DEBUG] SOD2 ->", sod2, "SSOD2 ->", ssod2)
 
-    ax.set_xlabel("Transmitting Individual Type")
-    ax.set_ylabel("Inf./ind.")
-    ax.set_title("")
-    ax.text(-0.1, 1.05, label, transform=ax.transAxes,
-            fontsize=16, fontweight='bold', va='top', ha='left')
+    # E data via automatic cache (per-SSOD + aggregated CSV)
+    dfE, labelsE = build_violin_df_with_cache(exp_name, seed, debug=debug)
 
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+    # figure
+    fig = plt.figure(figsize=(16, 12))
+    gs = GridSpec(3, 2, figure=fig, height_ratios=[1, 1, 1.1], hspace=0.35, wspace=0.25)
+    fig.subplots_adjust(top=0.92)
 
+    axA = fig.add_subplot(gs[0, 0])
+    cmap_df1, tfin1 = plot_lineage_frequency_ax(axA, ssod1, label_char="A", freq_threshold=freq_threshold)
 
+    axB = fig.add_subplot(gs[1, 0])
+    plot_clustered_frequency_ax(axB, ssod1, cluster_threshold, cmap_df1, tfin1, label_char="B")
 
+    axC = fig.add_subplot(gs[0, 1])
+    cmap_df2, tfin2 = plot_lineage_frequency_ax(axC, ssod2, label_char="C", freq_threshold=freq_threshold)
 
-def plot(experiment_name, seed, min_freq_threshold, cluster_threshold):
-    sim_dirs = dm.get_simulation_output_dirs(experiment_name)
+    axD = fig.add_subplot(gs[1, 1])
+    plot_clustered_frequency_ax(axD, ssod2, cluster_threshold, cmap_df2, tfin2, label_char="D")
 
-    if len(sim_dirs) < 2:
-        raise ValueError("Need at least 2 simulation output directories.")
+    axE = fig.add_subplot(gs[2, :])
+    violin_colors, violin_labels = plot_violins_panel_E(axE, dfE, labelsE)
 
-    # Sort sim_dirs by long_shedders_ratio
-    sim_dirs_sorted = sorted(sim_dirs, key=lambda d: sm.get_parameter_value_from_simulation_output_dir(d, 'long_shedders_ratio'))
-    ssod1 = dm.get_ssod(sim_dirs_sorted[0], seed)
-    ssod2 = dm.get_ssod(sim_dirs_sorted[1], seed)
+    # Legend inside violin subplot (upper-left or by your chosen anchor)
+    # add_violin_legend_on_ax(axE, violin_labels, violin_colors, anchor=(0.1, 0.98))
 
-    # ── Setup figure layout ───────────────────────────────────────────────
-    fig = plt.figure(figsize=(18, 12))
-    gs = GridSpec(6, 7, figure=fig)
-
-    # Top left: ssod1 simulation outputs
-    axs1 = [fig.add_subplot(gs[0, 0:3])]
-    for i in range(1, 4):
-        axs1.append(fig.add_subplot(gs[i, 0:3], sharex=axs1[0]))
-    ylims1 = extended_simulation_trajectory(axs1, ssod1, experiment_name, min_freq_threshold, cluster_threshold, label='A')
-
-    # Top right: ssod2 simulation outputs
-    axs2 = [fig.add_subplot(gs[0, 4:7])]
-    for i in range(1, 4):
-        axs2.append(fig.add_subplot(gs[i, 4:7], sharex=axs2[0]))
-    ylims2 = extended_simulation_trajectory(axs2, ssod2, experiment_name, min_freq_threshold, cluster_threshold, label='B')
-
-    # Match y-axis limits
-    for i in range(3):
-        ymax = max(ylims1[i], ylims2[i])
-        axs1[i].set_ylim(top=ymax)
-        axs2[i].set_ylim(top=ymax)
-
-    # ── Bottom row: violin plot (left) and placeholder (right) ─────────────
-    ax_violin = fig.add_subplot(gs[4:6, 0:3])  
-    ax_infections    = fig.add_subplot(gs[4:6, 4:7])  
-
-    transmission_distance_data = compute_transmission_distances(ssod2)
-    plot_hamming_distance_violinplot_ax(ax_violin, transmission_distance_data)
-    
-    plot_secondary_infections_boxplot_ax(ax_infections, ssod2, label="D")
-    
-    # ── Adjust layout and finalize ────────────────────────────────────────
-    fig.subplots_adjust(hspace=0.5, wspace=0.3, top=0.94, bottom=0.08)
-
-    axs1[-1].tick_params(labelbottom=True)
-    axs1[2].text(0.5, -0.3, "Time (d)", transform=axs1[2].transAxes, ha='center', va='top')
-    axs2[2].text(0.5, -0.3, "Time (d)", transform=axs2[2].transAxes, ha='center', va='top')
-
-    add_custom_legend_right(fig, axs1, axs2)
-
-    experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
-    output_path = os.path.join(experiment_plots_dir, f"Figure_3_long_{experiment_name}_seed{seed}.tiff")
-    plt.savefig(output_path, format='tiff', dpi=300, bbox_inches='tight')
-    print(f"Figure saved to: {output_path}")
+    # save to Data/ as PNG
+    data_dir = dm.get_data_dir()
+    os.makedirs(data_dir, exist_ok=True)
+    outfile = os.path.join(
+        data_dir, "Figure_3_long_{}_thr{}_seed{}.png".format(exp_name, cluster_threshold, seed)
+    )
+    print("[SAVE]", outfile)
+    fig.savefig(outfile, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
+# ---------- CLI ----------
 
 def main():
-    
-    # Set up the argument parser
-    parser = argparse.ArgumentParser()
-    parser.add_argument('experiment_name', type=str, help="experiment name")
-    parser.add_argument('max_seed', type=int, help="max_seed")
-    parser.add_argument('cluster_threshold', type=int, help="cluster_threshold")
-    
-    args = parser.parse_args()
-    
+    ap = argparse.ArgumentParser(description="Build Figure 3 (long shedders) with caching and progress")
+    ap.add_argument("--cluster-threshold", type=int, default=5, help="Clustering threshold (default 5)")
+    ap.add_argument("--seed", type=int, default=1, help="Seed number for A-D (default 1)")
+    ap.add_argument("--exp-name", type=str, default="generate_data_normal_vs_long_#1",
+                    help="Experiment name (default generate_data_normal_vs_long_#1)")
+    ap.add_argument("--freq-threshold", type=float, default=0.05,
+                    help="Min peak lineage freq to display in A/C (default 0.01)")
+    ap.add_argument("--debug", action="store_true", help="Print debug info (experiments/SODs/SSODs/groups)")
+    args = ap.parse_args()
 
-    min_freq_threshold = 0.05
-    for seed in range (0,args.max_seed):
-        plot(args.experiment_name, seed, min_freq_threshold, args.cluster_threshold)
+    build_figure(args.exp_name, args.cluster_threshold, args.seed, args.freq_threshold, debug=args.debug)
 
 if __name__ == "__main__":
     main()
-    

@@ -216,45 +216,83 @@ def cluster_lin_into_clades_with_meta(
     return clade_to_lineages, lineage_to_clade, per_clade_mut_df, clade_meta_df
 
 
-def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame]):
+def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame],
+                               clade_meta_df: pd.DataFrame):
     """
-    Given per-clade mutation tables (only clade-defining mutations), assign each clade a label
-    by majority of host types among those mutations and also return a summary table.
+    Assign a label to each clade from its *defining* mutations.
+
+    Rules
+    -----
+    - If the per-clade defining-mutation table is empty:
+        * If parent_clade is None => label = 'founder' (root clade).
+        * Otherwise => raise ValueError (this should never happen).
+    - Otherwise, every defining mutation must have host_type in {'normal','long_shedder'}.
+      If any definer has missing/unknown host_type => raise ValueError.
+    - Majority vote between 'normal' and 'long_shedder' determines the label.
+      If a tie somehow occurs, label 'mixed' (shouldn't happen with odd thresholds).
 
     Returns
     -------
-    clade_labels : pd.Series
-        { clade_name -> 'normal' / 'long_shedder' / 'unknown' }
-
-    clade_summary_df : pd.DataFrame
-        columns = ['clade','total_normal','total_long_shedder','total_unknown','label']
+    clade_labels : pd.Series mapping clade -> {'normal','long_shedder','founder','mixed'}
+    clade_summary_df : DataFrame with ['clade','total_normal','total_long_shedder','total_unknown','label']
     """
     labels = {}
     rows = []
 
     for clade, df in per_clade_mut_df.items():
+        # Case 1: no defining mutations
         if df is None or df.empty:
-            labels[clade] = "unknown"
-            rows.append({"clade": clade, "total_normal": 0, "total_long_shedder": 0, "total_unknown": 0, "label": "unknown"})
-            continue
+            # Check in clade_meta_df whether this is root
+            parent = None
+            if clade in set(clade_meta_df["clade"]):
+                parent = clade_meta_df.loc[clade_meta_df["clade"] == clade, "parent_clade"].iloc[0]
+            if pd.isna(parent) or parent is None:
+                labels[clade] = "founder"
+                rows.append({
+                    "clade": clade,
+                    "total_normal": 0,
+                    "total_long_shedder": 0,
+                    "total_unknown": 0,
+                    "label": "founder",
+                })
+                continue
+            else:
+                raise ValueError(
+                    f"[label_clades_from_definers] Clade {clade} has no definers but is not root "
+                    f"(parent={parent})."
+                )
 
-        counts = df["host_type"].value_counts(dropna=False).to_dict()
-        total_normal = counts.get("normal", 0)
-        total_long   = counts.get("long_shedder", 0)
-        total_unknown = counts.get("unknown", 0)
-        
-        # # --- DEBUG: per-clade label inputs ---
-        # print(f"[DBG] Labeling {clade}: normal={total_normal}, long={total_long}, unknown={total_unknown}, n_rows={len(df)}")
-        # if total_normal == 0 and total_long == 0 and total_unknown > 0:
-        #     print("[DBG]   NOTE: all definers are 'unknown' -> will not favor normal/long.")
+        # Case 2: definers present
+        tmp = df.copy()
+        tmp["host_type"] = tmp["host_type"].astype(str).str.strip().str.lower()
+        tmp["host_type"] = tmp["host_type"].replace({
+            "long": "long_shedder",
+            "long-shedder": "long_shedder",
+            "longshedder": "long_shedder",
+            "norm": "normal",
+            "none": "unknown",
+            "nan": "unknown",
+            "": "unknown",
+        })
 
+        counts = tmp["host_type"].value_counts(dropna=False).to_dict()
+        total_normal = int(counts.get("normal", 0))
+        total_long   = int(counts.get("long_shedder", 0))
+        total_unknown = int(counts.get("unknown", 0))
+
+        if total_unknown > 0:
+            bad = tmp[tmp["host_type"] == "unknown"].head(5)
+            raise ValueError(
+                f"[label_clades_from_definers] Found {total_unknown} 'unknown' definers in clade '{clade}'. "
+                f"Expected only 'normal'/'long_shedder'. Examples:\n{bad}"
+            )
 
         if total_long > total_normal:
             label = "long_shedder"
         elif total_normal > total_long:
             label = "normal"
         else:
-            # tie or both zero, assign mixed label
+            # should not happen if threshold is odd
             label = "mixed"
 
         labels[clade] = label
@@ -267,8 +305,12 @@ def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame]):
         })
 
     clade_labels = pd.Series(labels)
-    clade_summary_df = pd.DataFrame(rows, columns=["clade","total_normal","total_long_shedder","total_unknown","label"])
+    clade_summary_df = pd.DataFrame(
+        rows, columns=["clade","total_normal","total_long_shedder","total_unknown","label"]
+    )
     return clade_labels, clade_summary_df
+
+
 
 
 
