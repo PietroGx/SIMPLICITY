@@ -684,6 +684,14 @@
     * added tracking of total infections per lineage
     * updated figure 4 
     * update slurm batch submission script
+
+2025-04-09 pietro gerletti
+
+    Version 2.0.10
+    
+    * updated figures and long shedders experiments
+
+
 	
 	
 	

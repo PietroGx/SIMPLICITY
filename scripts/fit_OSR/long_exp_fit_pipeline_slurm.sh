@@ -31,7 +31,7 @@ for py in "${FILES[@]}"; do
     -e "$LOGDIR/${base%.py}_%j.err" \
     --export=ALL,SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM=500,QT_QPA_PLATFORM=offscreen \
     ${prev_job:+--dependency=afterok:$prev_job} \
-    --wrap "scripts/fit_OSR/run_driver_with_watchdog.sh \"$py\"")
+    --wrap "scripts/run_driver_with_watchdog.sh \"$py\"")
   jid=$(awk '{print $4}' <<<"$out")
   echo "Submitted $base as job $jid (afterok: ${prev_job:-none})"
   prev_job="$jid"
