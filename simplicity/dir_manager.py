@@ -114,6 +114,18 @@ def get_experiment_tree_dir(experiment_name):
     os.makedirs(experiment_tree_dir, exist_ok=True) 
     return experiment_tree_dir
 
+def get_nextstrain_dir(experiment_name):
+    base = get_experiment_tree_dir(experiment_name)
+    ns_dir = os.path.join(base, "nextstrain")
+    os.makedirs(ns_dir, exist_ok=True)
+    return ns_dir
+
+def get_experiment_cluster_dir(experiment_name):
+    exp_dir = get_experiment_dir(experiment_name)
+    out = os.path.join(exp_dir, "07_Clustering")
+    os.makedirs(out, exist_ok=True)
+    return out
+
 def get_experiment_fit_result_dir(experiment_name):
     fit_result_dir = os.path.join(get_experiment_dir(experiment_name), 'Fit_results')
     os.makedirs(fit_result_dir, exist_ok=True)
@@ -189,16 +201,6 @@ def get_experiment_tree_simulation_plots_dir(experiment_name,
 def get_ssod(sim_out_dir, seed_number):
     """
     Returns the seeded simulation output directory (SSOD) for the given seed number.
-
-    Args:
-        sim_out_dir (str): Path to a simulation output directory (e.g., one from dm.get_simulation_output_dirs()).
-        seed_number (int): The seed number (e.g., 7).
-
-    Returns:
-        str: Full path to the matching seed_XXXX directory.
-
-    Raises:
-        ValueError: If the seed directory cannot be found.
     """
     all_seed_dirs = get_seeded_simulation_output_dirs(sim_out_dir)
     target = f"seed_{seed_number:04d}"
@@ -208,6 +210,16 @@ def get_ssod(sim_out_dir, seed_number):
             return path
 
     raise ValueError(f"Seed folder '{target}' not found in {sim_out_dir}")
+    
+def get_seed_from_SSOD(seeded_simulation_output_dir):
+    """
+    Extract the zero-padded seed number (e.g. '0007')
+    """
+    import re
+    m = re.search(r"seed_(\d+)$", seeded_simulation_output_dir)
+    if not m:
+        raise ValueError(f"Could not find 'seed_####' at the end of: {seeded_simulation_output_dir}")
+    return m.group(1)
 
     
 

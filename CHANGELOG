@@ -691,13 +691,17 @@
     
     * updated figures and long shedders experiments
 
+2025-29-09 pietro gerletti
 
-	
-	
-	
-	
-	
-	
+    Version 2.1.0
+    
+    * added get_experiment_cluster_dir and get_seed_from_SSOD to dm
+    * added get_clustering_table_filepath, write_clustering_table and read_clustering_table to output manager
+    * added get_clustering_for_ssod to clustering (write and read clustering results)
+    * added get_nextstrain_dataset_paths to output manager
+    * added nexstrain.py
+    * updated dir_manager.py
+    * updated clustering.py
 	
 	
 	

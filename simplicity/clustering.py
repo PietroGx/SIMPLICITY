@@ -1,9 +1,103 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-
 from collections import defaultdict
 import pandas as pd
+import simplicity.output_manager as om
+import os
+from typing import Dict, Any, List
+
+def _serialize_definers_for_clade(def_df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """
+    Convert a 'defining mutations for clade' dataframe into a list[dict] with
+    stable keys.
+    Expected columns:
+      - 'mutation'
+      - 'emergence_lineage' 
+      - 'host_type'         
+      - 'time'              
+    """
+    if def_df is None or def_df.empty:
+        return []
+
+    cols = {c.lower(): c for c in def_df.columns}
+    get = lambda row, key, default="": row.get(cols.get(key, key), default)
+
+    out: List[Dict[str, Any]] = []
+    for row in def_df.to_dict("records"):
+        rec = {
+            "mutation": get(row, "mutation", ""),
+            "emergence_lineage": get(row, "emergence_lineage", ""),
+            "host_type": get(row, "host_type", ""),
+            "time": float(get(row, "time", 0.0) or 0.0),
+        }
+        out.append(rec)
+    return out
+
+def get_clustering_for_ssod(
+    experiment_name: str,
+    seeded_simulation_output_dir: str,
+    phylogenetic_df: pd.DataFrame | None = None,
+    shared_mut_threshold: int = 5,
+    force: bool = False,
+) -> str:
+    """
+    If the clustering CSV exists (and not force), returns it.
+    Otherwise computes clustering and writes a single CSV.
+    """
+    path = om.get_clustering_table_filepath(experiment_name, seeded_simulation_output_dir)
+    if (not force) and os.path.exists(path):
+        return path
+
+    if phylogenetic_df is None:
+        phylogenetic_df = om.read_phylogenetic_data(seeded_simulation_output_dir)
+
+    clade_to_lineages, lineage_to_clade, per_clade_mut_df, clade_meta_df = \
+        cluster_lin_into_clades_with_meta(phylogenetic_df, shared_mut_threshold=shared_mut_threshold)
+        
+    # Set 'clade' as the index 
+    if isinstance(clade_meta_df, pd.DataFrame) and "clade" in clade_meta_df.columns:
+        clade_meta_df = clade_meta_df.set_index("clade")
+
+    try:
+        labels_s, _ = label_clades_from_definers(per_clade_mut_df, clade_meta_df)
+    except Exception:
+        labels_s = pd.Series({}, dtype=object)
+
+    rows = []
+    meta_cols = set(clade_meta_df.columns) if isinstance(clade_meta_df, pd.DataFrame) else set()
+
+    for clade, lineages in clade_to_lineages.items():
+        lineages = sorted(lineages)
+
+        if isinstance(clade_meta_df, pd.DataFrame) and clade in clade_meta_df.index:
+            meta = clade_meta_df.loc[clade]
+            root_lineage = meta["root_lineage"] if "root_lineage" in meta_cols else meta.get("root_lineage", "")
+            parent_clade = meta["parent_clade"] if "parent_clade" in meta_cols else meta.get("parent_clade", "")
+            start_time = float(meta["start_time"]) if "start_time" in meta_cols else float(meta.get("start_time", 0.0))
+        else:
+            root_lineage, parent_clade, start_time = "", "", 0.0
+
+        def_df = per_clade_mut_df.get(clade, pd.DataFrame())
+        definers_list = _serialize_definers_for_clade(def_df)
+
+        rows.append({
+            "clade": clade,
+            "root_lineage": root_lineage,
+            "parent_clade": parent_clade,
+            "start_time": start_time,
+            "label": labels_s.get(clade, ""),
+            "n_lineages": len(lineages),
+            "n_defining": len(definers_list),
+            "n_def_normal": sum(1 for d in definers_list if str(d.get("host_type","")).lower().startswith("normal")),
+            "n_def_long":   sum(1 for d in definers_list if "long" in str(d.get("host_type","")).lower()),
+            "lineages": repr(lineages),
+            "defining_mutations": repr(definers_list),
+        })
+
+    df = pd.DataFrame(rows).sort_values(["start_time", "clade"]).reset_index(drop=True)
+    om.write_clustering_table(experiment_name, seeded_simulation_output_dir, df)
+    return path
 
 def parse_genome(genome):
     """Convert a genome (list of mutations) into a frozenset of mutation tuples."""
@@ -26,16 +120,16 @@ def cluster_lin_into_clades_with_meta(
     shared_mut_threshold: int = 5,
 ):
     """
-    Cluster lineages into nested clades (time-ordered, deterministic) and, at the moment a new clade
-    is created, record the *clade-defining mutations* (the mutations accumulated since the previous
+    Cluster lineages into nested clades and, at the moment a new clade
+    is created, record the clade-defining mutations (the mutations accumulated since the previous
     clade root up to the current clade root) together with where they emerged.
 
     Required columns:
-      - 'Lineage_name'     : unique lineage ID
-      - 'Lineage_parent'   : parent lineage ID
-      - 'Genome'           : list-like of mutations (already parsed upstream)
-      - 'Host_type'        : host phenotype where the lineage/edge arose
-      - 'Time_emergence'   : numeric time (used for deterministic ordering)
+      - 'Lineage_name'
+      - 'Lineage_parent'   
+      - 'Genome'
+      - 'Host_type'
+      - 'Time_emergence'   
 
     Returns
     -------
@@ -62,22 +156,8 @@ def cluster_lin_into_clades_with_meta(
     lin2parent = dict(zip(phylogenetic_data_df["Lineage_name"], phylogenetic_data_df["Lineage_parent"]))
     lin2host   = dict(zip(phylogenetic_data_df["Lineage_name"], phylogenetic_data_df["Host_type"]))
     lin2time   = dict(zip(phylogenetic_data_df["Lineage_name"], phylogenetic_data_df["Time_emergence"]))
-    
-    
-    
-    # # --- DEBUG: input host values & genome parsing ---
-    # raw_hosts = phylogenetic_data_df["Host_type"].astype(str).str.strip().str.lower()
-    # print("[DBG] Host_type unique (raw):", sorted(set(raw_hosts)))
-    
-    # nonempty_edges = sum(1 for v in lin2mut.values())
-    # print(f"[DBG] Total lineages with genomes: {nonempty_edges}/{len(lin2mut)}")
-    
-    # # Check edge_muts fill after you build it (see next block)
 
-    
-    
-
-    # Root detection (earliest Time_emergence among NaN/empty/self-parent)
+    # Root detection
     def _is_root_candidate(lin, par):
         return pd.isna(par) or par in ("", None) or lin == par
 
@@ -86,7 +166,7 @@ def cluster_lin_into_clades_with_meta(
         raise ValueError("No root lineage found.")
     root = min(root_candidates, key=lambda lin: (lin2time.get(lin, float("inf")), str(lin)))
 
-    # Children adjacency, deterministic order: by time then name
+    # Children adjacency
     children = defaultdict(list)
     for child, parent in lin2parent.items():
         if _is_root_candidate(child, parent):
@@ -95,24 +175,13 @@ def cluster_lin_into_clades_with_meta(
     for p in children:
         children[p].sort(key=lambda c: (lin2time.get(c, float("inf")), str(c)))
 
-    # Precompute edge mutations for each lineage: muts(lineage) - muts(parent)
+    # Precompute edge mutations for each lineage
     edge_muts = {}
     for lin, muts in lin2mut.items():
         parent = lin2parent.get(lin)
         parent_muts = lin2mut.get(parent, frozenset()) if parent in lin2mut else frozenset()
         edge_muts[lin] = muts - parent_muts  # typically size 1 in fully resolved trees
         
-    
-    
-    # # --- DEBUG: edge mutation sanity ---
-    # non_empty = sum(1 for v in edge_muts.values() if len(v) > 0)
-    # print(f"[DBG] edge_muts non-empty: {non_empty}/{len(edge_muts)} ({non_empty/len(edge_muts):.1%})")
-    # if non_empty == 0:
-    #     print("[DBG] WARNING: No edge mutations found; definers will be empty -> labels become 'unknown'/'mixed'.")
-
-    
-    
-
     # Containers
     clade_to_lineages: dict[str, set] = {}
     lineage_to_clade: dict[str, str] = {}
@@ -133,16 +202,15 @@ def cluster_lin_into_clades_with_meta(
         return v
 
     def recurse(current_lin: str, clade_root_mutset: frozenset, clade_path: str, path_since_root: list[str]):
+        
         current_mut = lin2mut.get(current_lin, frozenset())
-        # NEW mutations since current clade root
         mut_distance = len(current_mut - clade_root_mutset)
-
         start_new_clade = (mut_distance >= shared_mut_threshold) or (clade_path == "")
 
         if start_new_clade:
             parent_clade = clade_path if clade_path != "" else None
 
-            # Build the segment from the previous clade root to the *new* clade root:
+            # Build the segment from the previous clade root to the new clade root:
             # nodes on the path since last root (path_since_root) plus current node.
             segment_nodes = (path_since_root + [current_lin]) if clade_path != "" else [current_lin]
 
@@ -168,24 +236,8 @@ def cluster_lin_into_clades_with_meta(
                         "host_type": node_host if node_host is not None else "unknown",
                         "time": node_time
                     })
-            
-            
-            # # --- DEBUG: clade-defining segment summary ---
-            # host_counts = pd.Series([r["host_type"] for r in records]).value_counts(dropna=False).to_dict()
-            # print(
-            #     f"[DBG] New {new_clade}: "
-            #     f"parent={parent_clade}, segment_nodes={len(segment_nodes)}, "
-            #     f"n_defining={len(defining_set)}, start_time={lin2time.get(current_lin)}"
-            # )
-            # print(f"[DBG]   definers host_counts: {host_counts}")
-            # if host_counts.get("unknown", 0) > 0:
-            #     print("[DBG]   first few defining rows:", records[:min(3, len(records))])
 
-            
-            
-            
-            
-            # Register clade objects
+            # clade objects
             clade_to_lineages.setdefault(new_clade, set())
             per_clade_mut_df[new_clade] = pd.DataFrame(records, columns=["mutation", "emergence_lineage", "host_type", "time"])
             clade_meta_rows.append({
@@ -196,7 +248,7 @@ def cluster_lin_into_clades_with_meta(
                 "start_time": lin2time.get(current_lin)
             })
 
-            # Reset clade root state
+            # reset clade root state
             clade_root_mutset = current_mut
             clade_path = new_clade
             path_since_root = []  # reset path accumulator after starting a new clade
@@ -219,17 +271,17 @@ def cluster_lin_into_clades_with_meta(
 def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame],
                                clade_meta_df: pd.DataFrame):
     """
-    Assign a label to each clade from its *defining* mutations.
+    Assign a label to each clade from its defining mutations.
 
-    Rules
     -----
     - If the per-clade defining-mutation table is empty:
         * If parent_clade is None => label = 'founder' (root clade).
-        * Otherwise => raise ValueError (this should never happen).
+
     - Otherwise, every defining mutation must have host_type in {'normal','long_shedder'}.
       If any definer has missing/unknown host_type => raise ValueError.
+      
     - Majority vote between 'normal' and 'long_shedder' determines the label.
-      If a tie somehow occurs, label 'mixed' (shouldn't happen with odd thresholds).
+      If a tie somehow occurs, label 'mixed'.
 
     Returns
     -------
@@ -309,9 +361,4 @@ def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame],
         rows, columns=["clade","total_normal","total_long_shedder","total_unknown","label"]
     )
     return clade_labels, clade_summary_df
-
-
-
-
-
 
