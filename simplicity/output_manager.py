@@ -37,6 +37,7 @@ import ast
 import numpy as np
 from tqdm import tqdm
 import warnings
+from pathlib import Path
 
 def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
     """
@@ -867,9 +868,68 @@ def get_procomputed_matrix_table_filepath(tau_1,tau_2,tau_3,tau_4):
     file_name = f"precomputed_A_exponentials_tau1={tau_1}_tau2={tau_2}_tau3={tau_3}_tau4={tau_4}.pkl"
     data_dir = dm.get_data_dir()
     return os.path.join(data_dir,file_name)
-    
-    
+
+# -----------------------------------------------------------------------------
+
+def get_clustering_table_filepath(experiment_name: str, ssod: str) -> str:
+    """
+    gets the filepath: 07_Clustering/{SOD}_seed_{SEED}_clustering.csv
+    """
+    cluster_dir = dm.get_experiment_cluster_dir(experiment_name)
+    sod = dm.get_simulation_output_foldername_from_SSOD(ssod)  
+    seed = dm.get_seed_from_SSOD(ssod)                        
+    fname = f"{sod}_seed_{seed}_clustering.csv"
+    return os.path.join(cluster_dir, fname)
 
 
+def write_clustering_table(experiment_name: str, ssod: str, df: pd.DataFrame):
+    """
+    Writes the clustering CSV. 
+    """
+    path = get_clustering_table_filepath(experiment_name, ssod)
+    df.to_csv(path, index=False)
+
+def read_clustering_table(experiment_name: str, ssod: str) -> pd.DataFrame:
+    """
+    Reads the single clustering CSV and literal-evals nested columns.
+    """
+    path = get_clustering_table_filepath(experiment_name, ssod)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Clustering table not found: {path}")
+
+    # peek header to decide which converters to apply
+    import csv
+    with open(path, "r", newline="") as f:
+        reader = csv.reader(f)
+        header = next(reader)
+
+    converters = {}
+    for col in ("lineages", "defining_mutations"):
+        if col in header:
+            converters[col] = ast.literal_eval
+
+    return pd.read_csv(path, converters=converters) 
+
+def get_nextstrain_dataset_paths(experiment_name: str, ssod: str):
+    """
+    Returns (dataset_json_path, metadata_tsv_path, base_name) for a given SSOD.
+    """
+    # Base dir 
+    ns_root = Path(dm.get_nextstrain_dir(experiment_name))
+
+    # Get the original name parts
+    sod  = dm.get_simulation_output_foldername_from_SSOD(ssod)
+    seed = dm.get_seed_from_SSOD(ssod)
+
+    # Clean the long simulation name from underscores 
+    clean_sod_name = sod.replace("_", "")
+    
+    # Create the new base filename
+    base = f"seed{seed}_{clean_sod_name}"
+
+    dataset_json_path = ns_root / f"{base}-nextstrain.json"
+    metadata_tsv_path = ns_root / f"{base}-metadata.tsv"
+
+    return dataset_json_path, metadata_tsv_path, base
 
     
