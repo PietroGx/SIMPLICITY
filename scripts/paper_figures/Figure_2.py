@@ -256,9 +256,10 @@ def plot_figure_2(experiment_name):
      
     fig.subplots_adjust(top=0.95, bottom=0.05)
     
-    output_path = os.path.join("Data", f"Figure_2_{experiment_name}.tiff")
+    output_dir = os.path.join("Data", experiment_name)
+    output_path = os.path.join(output_dir, f"Figure_2}.tiff")
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    output_path = os.path.join("Data", "Figure_2.png")
+    output_path = os.path.join(output_dir, "Figure_2.png")
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Figure saved to: {output_path}")
     
