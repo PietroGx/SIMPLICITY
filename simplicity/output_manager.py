@@ -856,7 +856,31 @@ def get_procomputed_matrix_table_filepath(tau_1,tau_2,tau_3,tau_4):
     data_dir = dm.get_data_dir()
     return os.path.join(data_dir,file_name)
     
-    
+
+
+# -----------------------------------------------------------------------------
+
+def write_source_data(df, file_name: str, source_data_dir: str):
+    """
+    Save a pandas DataFrame as CSV into a figure's source data directory.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data to be written.
+    file_name : str
+        Name of the CSV file (e.g. 'panel_a_intra_host.csv').
+    source_data_dir : str
+        Directory path returned by dm.create_figure_source_data_dir().
+    """
+    if df is None or df.empty:
+        print(f"[Warning] Skipping {file_name} - empty or None dataframe.")
+        return
+
+    out_path = os.path.join(source_data_dir, file_name)
+    df.to_csv(out_path, index=False)
+    print(f"[SourceData] Saved: {out_path}")
+
 
 
 

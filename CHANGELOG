@@ -601,7 +601,13 @@
     * added scripts (back and frontend) to calculate and display entropy and clustering
     * clean and fixed minor bugs and experiment naming
     
-	
+2025-09-10 pietro gerletti
+
+    Version 1.1.1
+
+    * added get_figure_source_data_dir to dir manager
+    * added write_source_data to output manager
+    * update figure 2 to save source data
 	
 	
 	
