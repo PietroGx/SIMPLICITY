@@ -207,10 +207,32 @@ def get_ssod(sim_out_dir, seed_number):
         if os.path.basename(path) == target:
             return path
 
-    raise ValueError(f"Seed folder '{target}' not found in {sim_out_dir}")
+    raise ValueError(f"Seed folder '{target}' not found in {sim_out_dir}")  
 
-    
+def get_figure_source_data_dir(experiment_name: str, figure_name: str):
+    """
+    Create (if missing) and return the path to the figure-specific source data folder.
 
+    The base path is the experiment folder, e.g.:
+        Data/<experiment_name>/source_data/<figure_name>/
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of the experiment folder.
+    figure_name : str
+        Name of the figure
+
+    Returns
+    -------
+    str
+        Absolute path to the figure source data directory.
+    """
+    exp_dir = get_experiment_dir(experiment_name)
+    source_data_dir = os.path.join(exp_dir, "source_data", figure_name)
+    os.makedirs(source_data_dir, exist_ok=True)
+    print(f"[dir_manager] Source data directory ready: {source_data_dir}")
+    return source_data_dir
 
 
 
