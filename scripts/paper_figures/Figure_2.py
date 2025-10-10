@@ -86,9 +86,8 @@ def plot_figure_tempest_regression(experiment_name, ax, out_sim_dir_i=9):
     pm.apply_standard_axis_style(ax)
     
     fit_df = pd.DataFrame({
-        "slope": [fitted_tempest_regression.slope],
-        "intercept": [fitted_tempest_regression.intercept],
-        "r_value": [fitted_tempest_regression.rvalue]
+        "slope": [fitted_tempest_regression.coef_[0]],
+        "intercept": [fitted_tempest_regression.intercept_]
     })
 
     return {
