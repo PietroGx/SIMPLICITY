@@ -608,6 +608,8 @@
     * added get_figure_source_data_dir to dir manager
     * added write_source_data to output manager
     * update figure 2 to save source data
+    * updated population (cleaning data type before saving the sim output) 
+    * updated figure 3 to save source data
 	
 	
 	

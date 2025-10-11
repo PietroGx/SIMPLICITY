@@ -27,7 +27,7 @@ The set of all simulations is what we call an experiment.
 from experiment_script_runner import run_experiment_script
 import argparse
 
-experiment_name =  'SIMPLICITY_exp_output'
+experiment_name =  'SIMPLICITY_paper'
 
 def fixture_experiment_settings():
     

@@ -65,7 +65,7 @@ def plot_intra_host(ax):
     return {"panel_a_intra_host.csv": df}
 
 
-def plot_figure_tempest_regression(experiment_name, ax, out_sim_dir_i=9):
+def plot_figure_tempest_regression(experiment_name, ax, out_sim_dir_i=10):
     
     # parameter = 'nucleotide_substitution_rate'
     

@@ -25,6 +25,8 @@ from   simplicity.random_gen          import randomgen
 import pandas as pd
 import numpy as np
 
+import numpy as np
+
 class Population:
     '''
     The class defines a population for the SIMPLICITY simulations. It contains
@@ -493,15 +495,30 @@ class Population:
         return individuals_data
         
     def individuals_data_to_df(self):
-        # return population dictionary as data frame
+        # Returns population dictionary as a data frame.
         df = self.update_ih_lineages_trajectories()
         filtered_df = df[~df['state'].str.contains('susceptible')]
         filtered_df = filtered_df.drop('t_next_state', axis=1)
+
+        cols_to_sanitize = [
+            'new_infections', 
+            'IH_lineages_trajectory', 
+        ]
+        
+        for col in cols_to_sanitize:
+            if col in filtered_df.columns:
+                filtered_df[col] = filtered_df[col].apply(sanitize_recursively)
+        
         return filtered_df
     
     def phylogenetic_data_to_df(self):
-        # return phylogeny dictionary as data frame
-        return pd.DataFrame(self.phylogenetic_data)
+        # Returns phylogeny dictionary as a data frame.
+        df = pd.DataFrame(self.phylogenetic_data)
+
+        if not df.empty and 'Genome' in df.columns:
+            df['Genome'] = df['Genome'].apply(sanitize_recursively)
+        
+        return df
     
     def lineage_frequency_to_df(self):
         # return lineage_frequency as data frame
@@ -520,20 +537,35 @@ class Population:
         })
         
         return df
+        
+def sanitize_recursively(data):
+    """
+    Recursively traverses a data structure and converts any NumPy types
+    to their standard Python equivalents.
+    """
+    # If it's a list, recurse on each item
+    if isinstance(data, list):
+        return [sanitize_recursively(item) for item in data]
     
-    # def DEBUG_update_ih_to_df(self):
-    #     sim_time = [step[0] for step in self.DEBUG_update_ih]
-    #     delta_t = [step[1] for step in self.DEBUG_update_ih]
-    #     leap = [step[2] for step in self.DEBUG_update_ih]
+    # If it's a dictionary, recurse on each value
+    if isinstance(data, dict):
+        return {key: sanitize_recursively(value) for key, value in data.items()}
+
+    # If it's a NumPy integer, convert to a Python int
+    if isinstance(data, np.integer):
+        return int(data)
         
-    #     # Create a pandas DataFrame
-    #     df = pd.DataFrame({
-    #         'sim_time': sim_time,
-    #         'delta_t': delta_t,
-    #         'leap': leap
-    #     })
+    # If it's a NumPy float, convert to a Python float
+    if isinstance(data, np.floating):
+        return float(data)
         
-    #     return df
+    # If it's any other NumPy type (like np.str_ or np.bool_),
+    # the .item() method safely converts it to the equivalent Python type.
+    if isinstance(data, np.generic):
+        return data.item()
+
+    # Otherwise, if it's already a standard Python type, return it as is
+    return data
 
 # -----------------------------------------------------------------------------
 # =============================================================================

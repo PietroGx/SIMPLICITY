@@ -228,8 +228,10 @@ def add_custom_legend(fig, axs1, axs2=None):
     fig.subplots_adjust(bottom=0.20)
 
 
-def extended_simulation_trajectory(axs, ssod, experiment_name, threshold):
-
+def extended_simulation_trajectory(axs, experiment_name, sod, seed, threshold):
+    
+    ssod =  dm.get_ssod(sod, seed)
+    
     # --- Subplot 1: System trajectory ----------------------------------------
     trajectory_df = om.read_simulation_trajectory(ssod)
     time = trajectory_df['time'].tolist()
@@ -249,7 +251,7 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, threshold):
         fitness_trajectory_df = pd.read_csv(fitness_trajectory_file_path)
     except Exception as e:
         print(f"[ERROR] Reading fitness_trajectory.csv failed: {e}")
-        return
+        
 
     times = fitness_trajectory_df['Time'].tolist()
     means = fitness_trajectory_df['Mean'].tolist()
@@ -270,7 +272,7 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, threshold):
         pm.plot_lineages_colors_tab(ssod)  # Save color key figure
     except Exception as e:
         print(f"[ERROR] Lineage frequency or colormap failed: {e}")
-        return
+        
 
     filtered_df, _ = om.filter_lineage_frequency_df(lineage_frequency_df, threshold)
     colors = [pm.get_lineage_color(name, colormap_df) for name in filtered_df.columns]
@@ -296,7 +298,7 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, threshold):
         _, filtered_lineages = om.filter_lineage_frequency_df(lineage_freq_df, threshold)
     except Exception as e:
         print(f"[ERROR] Failed to process R Effective data: {e}")
-        return
+        
 
     for lineage in filtered_lineages:
         if lineage not in r_eff_lineages:
@@ -324,30 +326,25 @@ def extended_simulation_trajectory(axs, ssod, experiment_name, threshold):
     max_y3 = 1.0  
     axs[2].set_ylim(0, max_y3)
     
-    # # Collect max values from lineage series
-    # lineage_max_values = []
-    # for r in r_eff_lineages.values():
-    #     if isinstance(r, pd.Series):
-    #         rmax = r.max()
-    #         if pd.notna(rmax) and np.isfinite(rmax):
-    #             lineage_max_values.append(rmax)
-    
-    # # Add population-wide R_eff if valid
-    # if isinstance(r_eff_pop, pd.Series):
-    #     r_eff_pop_max = r_eff_pop.max()
-    #     if pd.notna(r_eff_pop_max) and np.isfinite(r_eff_pop_max):
-    #         lineage_max_values.append(r_eff_pop_max)
-    
-    # # Final max value with fallback
-    # if lineage_max_values:
-    #     max_y4 = max(lineage_max_values) * 1.2
-    # else:
-    #     print(f"[WARNING] No valid R_effective values found in {ssod}")
-    #     max_y4 = 1.0  # default
     max_y4 = 12
     axs[3].set_ylim(0, max_y4 * 1.2)
     
-    return [max_y1, max_y2, max_y3, max_y4]
+    
+    # Build prefix for source data
+    prefix = f"{os.path.basename(sod)}_{os.path.basename(ssod)}"
+
+    # Prepare source data dictionary
+    source_data = {
+        f"{prefix}_trajectory.csv": trajectory_df,
+        f"{prefix}_fitness.csv": fitness_trajectory_df,
+        f"{prefix}_lineage_frequency.csv": lineage_freq_df,
+        f"{prefix}_r_eff_population.csv": r_eff_pop,
+        f"{prefix}_r_eff_lineages.csv": pd.DataFrame(r_eff_lineages),
+        f"{prefix}_filtered_lineages.csv": pd.DataFrame(filtered_lineages),
+        f"{prefix}_r_filtered_plot.csv": pd.DataFrame(r_series),
+    }
+    
+    return [max_y1, max_y2, max_y3, max_y4], source_data
 
 
 
@@ -372,14 +369,22 @@ def load_tree_to_ax(ax, ssod, experiment_name):
         ax.axis('off')
 
 def figure_3(experiment_name, seed, threshold):
+
+    figure_name = "Figure_3"
+    source_dir = dm.get_figure_source_data_dir(experiment_name, figure_name)
+    source_data = {}
+    
     sim_dirs = dm.get_simulation_output_dirs(experiment_name)
 
     if len(sim_dirs) < 2:
         raise ValueError("Need at least 2 simulation output directories.")
 
-    ssod1 = dm.get_ssod(sim_dirs[0], seed)
-    ssod2 = dm.get_ssod(sim_dirs[1], seed)
+    sod1 = sim_dirs[0]
+    sod2 = sim_dirs[1]
 
+    ssod1 =  dm.get_ssod(sod1, seed)
+    ssod2 =  dm.get_ssod(sod2, seed)
+    
     # Create figure
     fig = plt.figure(figsize=(20, 14))
     gs = GridSpec(9, 7, figure=fig)
@@ -388,7 +393,10 @@ def figure_3(experiment_name, seed, threshold):
     axs1 = [fig.add_subplot(gs[0, 0:4])]
     for i in range(1, 4):
         axs1.append(fig.add_subplot(gs[i, 0:4], sharex=axs1[0]))
-    ylims1 = extended_simulation_trajectory(axs1, ssod1, experiment_name, threshold)
+        
+    # Collect and merge source data from the first simulation
+    ylims1, source_data_1 = extended_simulation_trajectory(axs1, experiment_name, sod1, seed, threshold)
+    source_data.update(source_data_1)
    
     # ------------------------------------------------------------------------- 
     ax_tree1 = fig.add_subplot(gs[0:4, 4:])
@@ -406,8 +414,11 @@ def figure_3(experiment_name, seed, threshold):
     axs2 = [fig.add_subplot(gs[5, 0:4])]
     for i in range(6, 9):
         axs2.append(fig.add_subplot(gs[i, 0:4], sharex=axs2[0]))
-    ylims2 = extended_simulation_trajectory(axs2, ssod2, experiment_name, threshold)
-
+    
+    # Collect and merge source data from the second simulation
+    ylims2, source_data_2 = extended_simulation_trajectory(axs2, experiment_name, sod2, seed, threshold)
+    source_data.update(source_data_2)
+    
     # set max y axis across corresponding plots
     for i in range(4):
         ymax = max(ylims1[i], ylims2[i])
@@ -429,15 +440,22 @@ def figure_3(experiment_name, seed, threshold):
     
     add_custom_legend(fig, axs1, axs2)
     
-    output_path = os.path.join("Data", f"Figure_3_{experiment_name}_seed{seed}.tiff")
+    output_dir = os.path.join("Data", experiment_name)
+    output_path = os.path.join(output_dir, f"Figure_3_seed{seed}.tiff")
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    output_path = os.path.join("Data", "Figure_3.png")
+    print(f"Figure_3 saved to: {output_path}")
+    
+    output_path = os.path.join(output_dir, f"Figure_3_seed{seed}.png")
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    print(f"Figure saved to: {output_path}")
+    print(f"Figure_3 saved to: {output_path}")
+    
+    for fname, df in source_data.items():
+        om.write_source_data(df, fname, source_dir)
+    
     plt.close(fig)
     
 def main():
-    experiment_name = 'SIMPLICITY_exp_output'
+    experiment_name = 'SIMPLICITY_paper_#1'
     seed = 7
     threshold = 0.05
     figure_3(experiment_name, seed, threshold)
