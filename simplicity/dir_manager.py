@@ -229,7 +229,7 @@ def get_figure_source_data_dir(experiment_name: str, figure_name: str):
         Absolute path to the figure source data directory.
     """
     exp_dir = get_experiment_dir(experiment_name)
-    source_data_dir = os.path.join(exp_dir, "source_data", figure_name)
+    source_data_dir = os.path.join(exp_dir, "paper_figures_source_data", figure_name)
     os.makedirs(source_data_dir, exist_ok=True)
     print(f"[dir_manager] Source data directory ready: {source_data_dir}")
     return source_data_dir
