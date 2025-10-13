@@ -227,6 +227,11 @@ def draw_stack_entropy(ax, freq_df, entropy_series, colormap, data_type):
     ax2.set_zorder(0)
     
     pm.apply_standard_axis_style(ax, True)
+    
+    plotted_data = pd.concat(
+        [freq_df, entropy_series.rename('Shannon_Entropy')], axis=1
+    )
+    return plotted_data
 
 
 def draw_violin(ax, counts_group1, counts_group2, ylabel):
@@ -253,6 +258,7 @@ def draw_violin(ax, counts_group1, counts_group2, ylabel):
     ax.set_ylabel(ylabel)
     ax.set_xlabel("")
     pm.apply_standard_axis_style(ax)
+    return df
 
 
 # -----------------------------------------------------------------------------
@@ -282,13 +288,18 @@ def plot_figure_4(include_clusters=False):
       │ (3,0) Immune clustered+entropy│                           │
       └───────────────────────────────┴───────────────────────────┘
     """
-    EXPERIMENT_NAME     = "SIMPLICITY_exp_output"
+    EXPERIMENT_NAME     = "SIMPLICITY_paper_#1"
     MIN_FINAL_TIME      = 300
     MAX_FINAL_TIME      = 450
     CUT_AFTER_MAX_TIME  = True
     SEED                = 7
     CLUSTER_THRESHOLD   = 5
     TAKEOVER_THRESHOLD  = 0.50
+    # ---------------------------------------------------------
+    fig_name_base = "Figure_4S" if include_clusters else "Figure_4"
+    source_data_dir = dm.get_figure_source_data_dir(EXPERIMENT_NAME, fig_name_base)
+    source_data = {}
+    
 
     sim_dirs = dm.get_simulation_output_dirs(EXPERIMENT_NAME)
     sim_out_dir_1, sim_out_dir_2 = sim_dirs[0], sim_dirs[1]
@@ -320,7 +331,7 @@ def plot_figure_4(include_clusters=False):
     ent_l1 = compute_shannon_entropy(freq_l1)
     ent_c1 = compute_shannon_entropy(freq_c1)
     cmap1 = pm.make_lineages_colormap(dm.get_ssod(sim_out_dir_1, SEED))
-
+    
     # Group 2: Immune waning phenotype model
     l2m2, freq_l2 = load_seed_data(
         sim_out_dir_2,
@@ -373,7 +384,7 @@ def plot_figure_4(include_clusters=False):
 
     # Build the figure + GridSpec depending on include_clusters ─═══════
     if not include_clusters:
-        fig_name = f"Figure_4_{EXPERIMENT_NAME}_seed{SEED}.tiff"
+        fig_name = f"Figure_4_{EXPERIMENT_NAME}_seed{SEED}"
         # Layout: 2 rows × 2 cols
         # Left column: two stack‐+entropy panels
         # Right column: one violin spanning both rows
@@ -389,25 +400,25 @@ def plot_figure_4(include_clusters=False):
         # Left, top (0,0): Linear raw + entropy
         ax00 = fig.add_subplot(gs[0, 0])
         ax00.set_title("Linear phenotype model")
-        draw_stack_entropy(
-            ax00,
-            freq_l1, ent_l1, cmap1, data_type='Lineage'
+        source_data["panel_a_linear_lineage_entropy.csv"] = draw_stack_entropy(
+            ax00, freq_l1, ent_l1, cmap1, data_type='Lineage'
         )
 
         # Left, bottom (1,0): Immune raw + entropy
         ax10 = fig.add_subplot(gs[1, 0])
         ax10.set_title("Immune waning phenotype model")
-        draw_stack_entropy(
-            ax10,
-            freq_l2, ent_l2, cmap2, data_type='Lineage'
+        source_data["panel_b_immune_waning_lineage_entropy.csv"] = draw_stack_entropy(
+            ax10, freq_l2, ent_l2, cmap2, data_type='Lineage'
         )
 
         # Right (spans rows 0–1, col 1): lineage‐level violin
         ax_violin = fig.add_subplot(gs[:, 1])
-        draw_violin(ax_violin, scl1, scl2, "Number of selective sweeps")
+        source_data["panel_e_violin_lineage_sweeps.csv"] = draw_violin(
+            ax_violin, scl1, scl2, "Number of selective sweeps"
+        )
 
     else:
-        fig_name = f"Figure_4S_{EXPERIMENT_NAME}_seed{SEED}.tiff"
+        fig_name = f"Figure_4S_{EXPERIMENT_NAME}_seed{SEED}"
         # Layout: 4 rows × 2 cols
         # Left column: four stack‐+entropy panels
         # Right column: two tall violin panels
@@ -423,51 +434,57 @@ def plot_figure_4(include_clusters=False):
         # Left, row 0 (freq_l1 + ent_l1)
         ax00 = fig.add_subplot(gs[0, 0])
         ax00.set_title("Linear phenotype model")
-        draw_stack_entropy(
-            ax00,
-            freq_l1, ent_l1, cmap1, data_type='Lineage'
+        source_data["panel_a_linear_lineage_entropy.csv"] = draw_stack_entropy(
+             ax00, freq_l1, ent_l1, cmap1, data_type='Lineage'
         )
 
         # Left, row 1 (freq_c1 + ent_c1)
         ax01 = fig.add_subplot(gs[1, 0])
         ax01.set_title("Immune waning phenotype model")
-        draw_stack_entropy(
-            ax01,
-            freq_l2, ent_l2, cmap2, data_type='Lineage'
+        source_data["panel_b_immune_waning_lineage_entropy.csv"] = draw_stack_entropy(
+             ax01, freq_l2, ent_l2, cmap2, data_type='Lineage'
         )
+        
         # Right, rows 0–1: lineage‐level violin
         ax_violin1 = fig.add_subplot(gs[0:2, 1])
-        draw_violin(ax_violin1, scl1, scl2, "Number of selective sweeps")
-        
+        source_data["panel_e_violin_lineage_sweeps.csv"] = draw_violin(
+            ax_violin1, scl1, scl2, "Number of selective sweeps"
+        )
         
         # Row 2 - SPACER
 
         # Left, row 2 (freq_l2 + ent_l2)
         ax02 = fig.add_subplot(gs[3, 0])
         ax02.set_title("Linear phenotype model")
-        draw_stack_entropy(
-            ax02,
-            freq_c1, ent_c1, cmap1, data_type='Clustered Lineage'
+        source_data["panel_s_c_linear_cluster_entropy.csv"] = draw_stack_entropy(
+            ax02, freq_c1, ent_c1, cmap1, data_type='Clustered Lineage'
         )
       
         # Left, row 3 (freq_c2 + ent_c2)
         ax03 = fig.add_subplot(gs[4, 0])
         ax03.set_title("Immune waning phenotype model")
-        draw_stack_entropy(
-            ax03,
-            freq_c2, ent_c2, cmap2, data_type='Clustered Lineage'
+        source_data["panel_s_d_immune_waning_cluster_entropy.csv"] = draw_stack_entropy(
+            ax03, freq_c2, ent_c2, cmap2, data_type='Clustered Lineage'
         )
 
         # Right, rows 2–3: cluster‐level violin
         ax_violin2 = fig.add_subplot(gs[3:5, 1])
-        draw_violin(ax_violin2, scc1, scc2, "Number of selective sweeps")
-
-   
-    output_path = os.path.join("Data", fig_name)
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    output_path = os.path.join("Data", f"{fig_name}.png")
+        source_data["panel_s_f_violin_cluster_sweeps.csv"] = draw_violin(
+            ax_violin2, scc1, scc2, "Number of selective sweeps"
+        )
+    
+    output_dir = os.path.join("Data", EXPERIMENT_NAME)
+    output_path = os.path.join(output_dir, f"{fig_name}.tiff")
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Figure saved to: {output_path}")
+    
+    output_path = os.path.join(output_dir, f"{fig_name}.png")
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    print(f"Figure saved to: {output_path}")
+    
+    for fname, df in source_data.items():
+        om.write_source_data(df, fname, source_data_dir)
+    
     plt.close(fig)
 
 if __name__ == "__main__":
