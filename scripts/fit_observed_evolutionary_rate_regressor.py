@@ -23,8 +23,11 @@ Created on Mon Feb 10 13:20:25 2025
 """
 import simplicity.plots_manager as pm 
 import simplicity.output_manager as om
+import simplicity.dir_manager as dm
 import simplicity.tuning.evolutionary_rate as er
 import argparse 
+import pandas as pd 
+import os
 
 def fit_models(experiment_name, model_types, data_type):
     
@@ -72,7 +75,7 @@ def fit_models(experiment_name, model_types, data_type):
         raise ValueError('invalid data_type, check data_type sintax!')
         
     # dic to store the aic of each model for fit report
-    aic_models = {}
+    model_metrics = {}
     # fit the models to the generated data
     for model_type in model_types:
         print('')
@@ -85,9 +88,16 @@ def fit_models(experiment_name, model_types, data_type):
         try:
             fit_result = er.fit_observed_substitution_rate_regressor(experiment_name,
                                                              df, model_type, weights)
-            aic_models[model_type] = fit_result.aic
-            print(f'saving plot in {experiment_name}/.')
+                                                             
+            metrics = {
+                'AIC': fit_result.aic,
+                'BIC': fit_result.bic,
+                'R2': fit_result.rsquared 
+            }
+            model_metrics[model_type] = metrics
+            
             plot_fit(experiment_name, fit_result, model_type, **kwargs)
+            print(f'saved plot in {experiment_name}/.')
         except Exception as e:
             print(e)
             raise ValueError(e)
@@ -96,7 +106,7 @@ def fit_models(experiment_name, model_types, data_type):
         print('###############################################################')
         print('')
     
-    return aic_models, df
+    return model_metrics, df
 
 def main():
     # Set up the argument parser
@@ -106,13 +116,24 @@ def main():
     
     # define model types for the fit
     model_types = ['log',
-                   'exp']
-                   # 'lin',
-                   # 'tan',
-                   # 'spline'] 
+                   'exp',
+                   'lin',
+                   'tan',
+                   'spline'] 
     
     # aic_models_combined, _ = fit_models(args.experiment_name, model_types, 'combined_rate')
-    aic_models, df = fit_models(args.experiment_name, model_types, 'single_rates')
+    model_metrics, df = fit_models(args.experiment_name, model_types, 'single_rates')
+    
+    # save fit scores
+    fit_comparison_df = pd.DataFrame.from_dict(model_metrics, orient='index')
+    
+    # sort the DataFrame by AIC 
+    fit_comparison_df = fit_comparison_df.sort_values(by='AIC')
+    output_filename = f"{args.experiment_name}_goodness_of_fit_comparison.csv"
+    output_filepath = os.path.join(dm.get_experiment_fit_result_dir(args.experiment_name), output_filename)
+    fit_comparison_df.to_csv(output_filepath)
+    
+    print(f"\n Goodness of fit comparison table saved to: {output_filepath}\n")
     
     # # print AIC for each model fit
     # sorted_aics_combined = sorted(aic_models_combined.items(), key=lambda item: item[1])
@@ -122,11 +143,11 @@ def main():
     #     print(f"{key}      {value}")
     
     # print AIC for each model fit
-    sorted_aics = sorted(aic_models.items(), key=lambda item: item[1])
+    sorted_aics = sorted(model_metrics.items(), key=lambda item: item[1]['AIC'])
     print('Comparison of rates fits with Akaike Information Criterion')
     print("Key    Value")
     for key, value in sorted_aics:
-        print(f"{key}      {value}")
+        print(f"{key:<10} {value['AIC']}") # Access the AIC value
     
     print('')
     print('df NSR / OSR:')
