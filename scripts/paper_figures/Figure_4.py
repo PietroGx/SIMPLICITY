@@ -27,7 +27,7 @@ import simplicity.output_manager as om
 import simplicity.dir_manager as dm
 import simplicity.plots_manager as pm
 
-pm.apply_plos_rcparams()
+pm.apply_rcparams()
 
 # -----------------------------------------------------------------------------
 # Utility Functions

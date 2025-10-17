@@ -622,6 +622,14 @@
     Version 1.1.3
 
     * updated OSR fit script to save goodness of fit scores table
+    
+2025-16-10 pietro gerletti
+
+    Version 1.1.4
+    
+    * updated scripts/plots/03_plot_trees.py to optionally plot trees or just saving their json files
+    * updated plot_manager.py
+    * updated scripts/paper_figures/* accordingly
 	
 	
 	

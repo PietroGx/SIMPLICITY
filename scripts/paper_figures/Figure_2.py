@@ -28,7 +28,7 @@ import simplicity.tuning.evolutionary_rate as er
 import simplicity.plots_manager as pm
 from simplicity.intra_host_model import Host
 
-pm.apply_plos_rcparams()
+pm.apply_rcparams()
 
 def plot_intra_host(ax):
     """
