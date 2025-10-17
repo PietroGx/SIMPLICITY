@@ -36,47 +36,52 @@ import simplicity.tuning.diagnosis_rate    as dr
 import simplicity.tuning.evolutionary_rate as er
 import simplicity.phenotype.weight         as pheno_weight
 
-def apply_plos_rcparams():
-    text_size = 16
+def apply_rcparams():
+    """Sets global matplotlib parameters to meet journal standards."""
+    # The journal recommends an 8pt font for the final figure size.
+    font_size = 16
+    
     plt.rcParams.update({
+        # --- Resolution & File Settings ---
         'savefig.dpi': 300,
-        'font.size': text_size,
-        'axes.labelsize': text_size,
-        'axes.titlesize': text_size,
-        'xtick.labelsize': text_size,
-        'ytick.labelsize': text_size,
-        'legend.fontsize': text_size,
-        'font.family': 'sans-serif',
-        'font.sans-serif': ['Arial'],  
-        'pdf.fonttype': 42,            
-        'ps.fonttype': 42,
-        'figure.dpi': 300
-    })
+        'figure.dpi': 300,
+        'pdf.fonttype': 42,  # Embed fonts in PDF for editability
+        'ps.fonttype': 42,   # Embed fonts in PS/EPS for editability
 
-apply_plos_rcparams()
+        # --- Font Settings ---
+        'font.size': font_size,
+        'font.family': 'sans-serif',
+        'font.sans-serif': ['Arial'], # Or 'Helvetica'
+        
+        # --- Label & Title Sizes ---
+        'axes.labelsize': font_size,
+        'axes.titlesize': font_size,
+        'xtick.labelsize': font_size,
+        'ytick.labelsize': font_size,
+        'legend.fontsize': font_size,
+    })
 
 def apply_standard_axis_style(ax, has_secondary_y=False):
     """
-    Apply PLOS-compliant style to an axis:
-    - 8pt font (inherited via rcParams)
-    - No top/right spines unless `has_secondary_y` is True
+    Apply a clean, consistent style to an axis.
+    - No top/right spines unless a secondary y-axis exists.
     """
     ax.spines['top'].set_visible(False)
     if not has_secondary_y:
         ax.spines['right'].set_visible(False)
-        
-    text_size = 16
-    # Ensure ticks and labels are 8pt (in case rcParams missed it)
-    ax.tick_params(labelsize=text_size)
-    ax.title.set_fontsize(text_size)
-    ax.xaxis.label.set_fontsize(text_size)
-    ax.yaxis.label.set_fontsize(text_size)
+    
+    # Line width should be at least 1pt. Default is usually fine.
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['bottom'].set_linewidth(1)
+    ax.tick_params(width=1)
 
-def save_plos_figure(fig, filepath):
+apply_rcparams()
+
+def save_figure(fig, filepath):
     """
-    Save figure as high-resolution TIFF (PLOS compatible).
+    Save figure as high-resolution png.
     """
-    fig.savefig(filepath, format='tiff', dpi=300, bbox_inches='tight')
+    fig.savefig(filepath, format='png', dpi=300, bbox_inches='tight')
     plt.close(fig)
 
 # -----------------------------------------------------------------------------
@@ -1048,10 +1053,10 @@ def plot_IH_lineage_distribution(experiment_name):
         patch.set_linewidth(1)
 
     # Apply axis labels
-    ax0.set_xlabel("Intra host lineages number")
-    ax0.set_ylabel("Proportion of individuals with x lineages")
+    ax0.set_xlabel("Intra host genomes number")
+    ax0.set_ylabel("Individuals with x genomes copies")
     ax1.set_xlabel("Intra host distinct lineages number")
-    ax1.set_ylabel("Proportion of individuals with x distinct lineages")
+    ax1.set_ylabel("Individuals with x distinct lineages")
 
     # Clean up
     axes[0].set_title("")
@@ -1061,12 +1066,21 @@ def plot_IH_lineage_distribution(experiment_name):
         apply_standard_axis_style(ax)
 
     plt.tight_layout()
+    
+    figure_name = 'IH_lineage_distribution'
+    
     figure_output_path = os.path.join(
         dm.get_experiment_output_dir(experiment_name),
-        f"{experiment_name}_IH_lineage_distribution.tiff"
-    )
-    print(f"Saving figure to: {figure_output_path}")
-    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+        f"{experiment_name}_{figure_name}.png")
+    plt.savefig(figure_output_path, format='png', dpi=300, bbox_inches='tight')
+    print(f"Saved figure to: {figure_output_path}")
+    
+    data_output_path = os.path.join(
+        dm.get_figure_source_data_dir(experiment_name, figure_name),
+        f"{experiment_name}_{figure_name}_source_data.csv")
+    df.to_csv(data_output_path, index=False)
+    print(f"Saved source data to: {data_output_path}")
+    
     plt.close(fig)
 
 def plot_IH_lineage_distribution_simulation(experiment_name):

@@ -34,7 +34,7 @@ import simplicity.output_manager as om
 import simplicity.plots_manager as pm
 import simplicity.dir_manager as dm
 
-pm.apply_plos_rcparams()
+pm.apply_rcparams()
 
 class RainbowLegendLine:
     """Dummy handle for a rainbow‐gradient line in the legend."""
