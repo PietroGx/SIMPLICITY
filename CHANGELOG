@@ -630,7 +630,12 @@
     * updated scripts/plots/03_plot_trees.py to optionally plot trees or just saving their json files
     * updated plot_manager.py
     * updated scripts/paper_figures/* accordingly
-	
+
+2025-17-10 pietro gerletti
+
+    Version 1.1.5
+    
+    * added panel labels to figures and minor graphic details
 	
 	
 	

@@ -1057,7 +1057,12 @@ def plot_IH_lineage_distribution(experiment_name):
     ax0.set_ylabel("Individuals with x genomes copies")
     ax1.set_xlabel("Intra host distinct lineages number")
     ax1.set_ylabel("Individuals with x distinct lineages")
-
+    
+    ax0.text(-0.1, 1.05, 'A', transform=ax0.transAxes,
+             fontweight='bold', va='top', ha='right')
+    ax1.text(-0.1, 1.05, 'B', transform=ax1.transAxes,
+             fontweight='bold', va='top', ha='right')
+             
     # Clean up
     axes[0].set_title("")
     axes[1].set_title("")
