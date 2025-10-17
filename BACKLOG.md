@@ -7,6 +7,7 @@ Created on Tue Feb 18 22:01:47 2025
 """
 
 ## Backlog
+- [ ] update linear model to baseline model in code
 
 ### Bug Fixes
 - [ ] slurm runner gets stuck if there are abrupt job terminations (like OOM or OOT errors): the job is not reported as failed and the runner does not submit a new job to slurm
