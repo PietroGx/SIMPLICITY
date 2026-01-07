@@ -128,32 +128,29 @@ def infection(population, from_long_shedder=False):
     '''
     # Convert sets to lists for random sampling
     if from_long_shedder:
-        # Infectious AND long shedders
+        # Infectious AND long-shedder
         infectious_i_list = sorted(population.infectious_i & population.long_shedder_i)
+        parent = population.rng4.choice(infectious_i_list)
     else: 
-        # Infectious but NOT long shedders
+        # Infectious but NOT long-shedder
         infectious_i_list = sorted(population.infectious_i - population.long_shedder_i)
+        infection_fitness = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
+        fitness_sum = sum(infection_fitness)
+        
+        if fitness_sum > 0:
+            weights = [f / fitness_sum for f in infection_fitness]
+        else:
+            # fallback to uniform probabilities if all fitness scores are zero
+            weights = [1 / len(infectious_i_list)] * len(infectious_i_list)
+        
+        parent = population.rng4.choice(infectious_i_list, p=weights)
         
     susceptibles_list = sorted(population.susceptibles_i)
     
-    infection_fitness = [population.individuals[i]['fitness_score'] for i in infectious_i_list]
-    fitness_sum = sum(infection_fitness)
-    
-    if fitness_sum > 0:
-        weights = [f / fitness_sum for f in infection_fitness]
-    else:
-        # fallback to uniform probabilities if all fitness scores are zero
-        weights = [1 / len(infectious_i_list)] * len(infectious_i_list)
-    
-    parent = population.rng4.choice(infectious_i_list, p=weights)
-   
     # select random patient to be infected
     new_infected_index = population.rng4.choice(susceptibles_list)
     population.exclude_i = {new_infected_index}
     new_inf = population.individuals[new_infected_index]
-
-    # update the active lineages number
-    population.active_lineages_n += new_inf['IH_lineages_number']
 
     # Move individual from susceptibles to infected
     population.susceptibles_i.discard(new_infected_index)
@@ -184,10 +181,14 @@ def infection(population, from_long_shedder=False):
     
     # assign transmitted lineage
     new_inf['inherited_lineage']  = transmitted_lineage
+    new_inf['IH_lineages_number'] += 1
     # update lineage trajectory
     new_inf['IH_lineages_trajectory'][transmitted_lineage] = {'ih_birth':None,'ih_death':None}
     # update mutation weight event timer
     new_inf['time_last_weight_event'] = population.time
+    
+    # update the active lineages number
+    population.active_lineages_n += new_inf['IH_lineages_number']
     
     # Append transmitted lineage + fitness
     new_lineages = new_inf['IH_lineages']

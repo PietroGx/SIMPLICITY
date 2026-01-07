@@ -702,7 +702,17 @@
     * added nexstrain.py
     * updated dir_manager.py
     * updated clustering.py
-	
+
+2026-07-01 pietro gerletti
+
+    Version 2.1.1
+    
+    * updated infection to use uniform parent selection for long-shedder transmissions
+    * updated _init_individuals to initialize susceptibles with zero lineages
+    * updated infection to sync active_lineages_n with individual lineages number
+    * moved SIMPLICITY v1 scripts to archive
+    * new OSR fitting script
+    
 	
 	
 	
