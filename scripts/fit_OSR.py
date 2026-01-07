@@ -4,7 +4,7 @@
 import argparse
 import numpy as np
 
-from experiment_script_runner import run_experiment_script
+from experiments.experiment_script_runner import run_experiment_script
 import simplicity.plots_manager as pm 
 import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
