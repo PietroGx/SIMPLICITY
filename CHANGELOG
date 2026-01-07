@@ -713,7 +713,12 @@
     * moved SIMPLICITY v1 scripts to archive
     * new OSR fitting script
     
-	
+2026-07-01 pietro gerletti
+
+    Version 2.1.2
+    
+    * updated OSR fitting logic to select all/normal/longshedders when fitting
+    * added script that only fits on normal individuals (base for double fitting separating long and normals)
 	
 	
 	
