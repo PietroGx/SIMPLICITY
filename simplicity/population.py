@@ -198,10 +198,10 @@ class Population:
                      'new_infections'  : [],
                      
                      'IH_lineages'   : [],
-                     'IH_unique_lineages_number': 1,
-                     'IH_lineages_number'    : 1,
+                     'IH_unique_lineages_number': 0, #1
+                     'IH_lineages_number'    : 0,    #1
                      'IH_lineages_max': self.rng3.integers(1,5),
-                     'IH_lineages_fitness_score' : [1],
+                     'IH_lineages_fitness_score' : [], #1
                      'IH_lineages_trajectory': {}, # lineage name : [ih_time_start, ih_time_end]
                      'time_last_weight_event': 0, # time since infection or last mutation
                      'fitness_score'     :  1e-6  # fitness floor (individual fitness)
@@ -227,9 +227,12 @@ class Population:
             rate = - self.host_model['normal'].A[state_t][state_t]
             dic[i]['t_next_state'] = self.rng3.exponential(scale=1/rate) 
             
-            dic[i]['state']        = 'infected'
-            dic[i]['IH_lineages']  = ['wt']
-            dic[i]['inherited_lineage']  = 'wt'
+            dic[i]['state']                     = 'infected'
+            dic[i]['IH_lineages']               = ['wt']
+            dic[i]['IH_lineages_fitness_score'] = [1e-6]
+            dic[i]['IH_unique_lineages_number'] = 1 
+            dic[i]['IH_lineages_number']        = 1
+            dic[i]['inherited_lineage']         = 'wt'
             dic[i]['IH_lineages_trajectory']['wt'] = {'ih_birth':None,'ih_death':None}
             
             self.susceptibles_i.remove(i)  
