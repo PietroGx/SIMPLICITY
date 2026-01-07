@@ -383,34 +383,41 @@ def filter_sequencing_files_by_simulation_lenght(files, min_sim_lenght):
 
 def create_combined_sequencing_df(seeeded_simulations_output_directory, 
                                   min_seq_number=0,
-                                  min_sim_lenght=0):
+                                  min_sim_lenght=0,
+                                  target_host_type=None):
     '''
-    seeeded_simulations_output_directory ==> path to subfolder of 
-                                             experiment_name/04_Output/
-    
-    Join all sequencing_data_regression.csv files of different 
-    seeded simulation runs (SAME PARAMETERS, different seeds) 
-    in a single df and returns it (for tempest regression).
+    Join all sequencing_data_regression.csv files.
+    Optionally filters by target_host_type ('normal' or 'long_shedder').
     '''
     print('##################################################################')
     print(f"processing simulation batch: {os.path.basename(seeeded_simulations_output_directory)}")
+    if target_host_type:
+        print(f"Filtering for Host Type: {target_host_type}")
+
     csv_files = glob.glob(os.path.join(seeeded_simulations_output_directory,'**',
                                        'sequencing_data_regression.csv'),
-                                        recursive=True)
+                                       recursive=True)
 
     filtered_csv_files = filter_sequencing_files_by_simulation_lenght(csv_files, min_sim_lenght)
     print(f'Keeping files with at least {min_seq_number} sequences')
     print('')
     data_frames = []
-    # Concatenate all DataFrames into one
+    
     for csv_file in filtered_csv_files:
-       # Read each CSV file into a DataFrame
        try:
            df = pd.read_csv(csv_file)
-           # only add df if they contain at least min_seq_number sequences
+           
+           # filter by host type
+           if target_host_type:
+               if 'Host_type' in df.columns:
+                   df = df[df['Host_type'] == target_host_type]
+               else:
+                   pass
+           # Check sequence count AFTER filtering 
            if len(df) >= min_seq_number:
                data_frames.append(df)
-       except: pass # skip empty files
+       except: pass 
+       
     print('Total kept files: ', len(data_frames))
     try:
         combined_df = pd.concat(data_frames, ignore_index=True)
@@ -424,53 +431,61 @@ def create_combined_sequencing_df(seeeded_simulations_output_directory,
 def get_combined_OSR_vs_parameter_csv_file_path(experiment_name,
                                                 parameter,
                                                 min_seq_number,
-                                                min_sim_lenght):
-    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
+                                                min_sim_lenght,
+                                                target_host_type=None):
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
+    
+    # Add a suffix if a specific host type filter is used
+    type_suffix = f"_{target_host_type}" if target_host_type else ""
+    
     csv_file_path = os.path.join(experiment_output_dir, 
-      f'{experiment_name}_combined_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}.csv')
+      f'{experiment_name}_combined_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}{type_suffix}.csv')
     return csv_file_path
 
 def write_combined_OSR_vs_parameter_csv(experiment_name, 
                                         parameter, 
                                         min_seq_number=0,
-                                        min_sim_lenght=0):
+                                        min_sim_lenght=0,
+                                        target_host_type=None):
     ''' Create df of observed substitution rate (tempest regression on joint data) and parameter values
     '''
     csv_file_path = get_combined_OSR_vs_parameter_csv_file_path(experiment_name, 
                                                                 parameter, 
                                                                 min_seq_number,
-                                                                min_sim_lenght)
+                                                                min_sim_lenght,
+                                                                target_host_type)
+    
     if os.path.exists(csv_file_path):
-        # print(f'{csv_file_path} already exists, continuing...')
         pass
     else:
-        # Get seeded simulations output subfolders
         simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
-     
         results = []
         for simulation_output_dir in simulation_output_dirs:
-            # Read the parameter from the settings file
             parameter_value = sm.get_parameter_value_from_simulation_output_dir(
-                                                  simulation_output_dir, parameter)
+                                                simulation_output_dir, parameter)
             
-            # Perform regression for the settings output folder
             combined_df = create_combined_sequencing_df(simulation_output_dir, 
                                                         min_seq_number,
-                                                        min_sim_lenght)
-            if combined_df is None: 
+                                                        min_sim_lenght,
+                                                        target_host_type)
+            if combined_df is None or combined_df.empty: 
                 pass
             else:
-                observed_substitution_rate = er.tempest_regression(combined_df).coef_[0] # substitution rate per site per year
-                results.append({str(parameter): parameter_value, 
-                                'observed_substitution_rate': observed_substitution_rate})
-        # add results to df
+                try:
+                    observed_substitution_rate = er.tempest_regression(combined_df).coef_[0]
+                    results.append({str(parameter): parameter_value, 
+                                    'observed_substitution_rate': observed_substitution_rate})
+                except Exception as e:
+                    print(f"Regression failed for {simulation_output_dir}: {e}")
+
         results_df = pd.DataFrame(results)
-        
-        # Sort the results by the 'parameter' values
-        df = results_df.sort_values(by=str(parameter))
-    
-        # Save the results to a CSV file
-        df.to_csv(csv_file_path, index=False)
+        if not results_df.empty:
+            df = results_df.sort_values(by=str(parameter))
+            df.to_csv(csv_file_path, index=False)
+        else:
+            print("No results to write for combined OSR.")
+
+
         
 def read_combined_OSR_vs_parameter_csv(experiment_name, 
                                        parameter,
@@ -484,113 +499,143 @@ def read_combined_OSR_vs_parameter_csv(experiment_name,
     return combined_observed_substitution_rates_df
 
 def get_OSR_vs_parameter_csv_file_path(experiment_name,
-                                        parameter,
-                                        min_seq_number,
-                                        min_sim_lenght):
-    experiment_output_dir     = dm.get_experiment_output_dir(experiment_name)
-    csv_file_path = os.path.join(experiment_output_dir, 
-      f'{experiment_name}_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}.csv')
-    return csv_file_path
+                                       parameter,
+                                       min_seq_number,
+                                       min_sim_lenght,
+                                       target_host_type=None):
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     
+    type_suffix = f"_{target_host_type}" if target_host_type else ""
+    
+    csv_file_path = os.path.join(experiment_output_dir, 
+      f'{experiment_name}_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}{type_suffix}.csv')
+    return csv_file_path
+
 def write_OSR_vs_parameter_csv(experiment_name, 
-                                parameter, 
-                                min_seq_number=0,
-                                min_sim_lenght=0):
+                               parameter, 
+                               min_seq_number=0,
+                               min_sim_lenght=0,
+                               target_host_type=None):
     ''' Create df of observed substitution rate (tempest regression) and parameter values
     '''
     csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name,
-                                                      parameter,
-                                                      min_seq_number,
-                                                      min_sim_lenght)
-    # if the file exists already, does nothing
+                                                       parameter,
+                                                       min_seq_number,
+                                                       min_sim_lenght,
+                                                       target_host_type)
+    
     if os.path.exists(csv_file_path):
-        # print(f'{csv_file_path} already exists, continuing...')
         pass
-    # create the df and saves it to csv 
     else:
-        # Get seeded simulations output subfolders
         simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
         results = []
-        # loop over each simulation_output_dir
         for simulation_output_dir in simulation_output_dirs:
-            # Read the parameter from the settings file
             parameter_value = sm.get_parameter_value_from_simulation_output_dir(
-                                                  simulation_output_dir, parameter)
+                                                simulation_output_dir, parameter)
             seeded_simulation_output_dirs = dm.get_seeded_simulation_output_dirs(simulation_output_dir)
-            # loop over each seeded_simulation_output_dir
+            
             for seeded_simulation_output_dir in seeded_simulation_output_dirs:
                 try:
-                    # get simulation final time
                     final_time = read_final_time(seeded_simulation_output_dir)
-                    # read sequencing_data
                     sequencing_data = read_sequencing_data(seeded_simulation_output_dir)
+                    
+                    # filter by host type
+                    if target_host_type:
+                        if 'Host_type' in sequencing_data.columns:
+                            sequencing_data = sequencing_data[sequencing_data['Host_type'] == target_host_type]
+                    
+                    # Check sequence count AFTER filtering
                     seq_number = len(sequencing_data)
-                    # filter by simulation lenght and seq_number
+                    
                     if final_time >= min_sim_lenght and seq_number >= min_seq_number:
-                        # Perform regression for each sequencing file
-                        observed_substitution_rate = er.tempest_regression(sequencing_data).coef_[0] # substitution rate per site per year
+                        observed_substitution_rate = er.tempest_regression(sequencing_data).coef_[0]
                         results.append({
                             parameter: parameter_value, 
                             'observed_substitution_rate': observed_substitution_rate,
-                            'simulation_final_time':read_final_time(seeded_simulation_output_dir),
+                            'simulation_final_time': read_final_time(seeded_simulation_output_dir),
                             'settings_final_time': sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, 'final_time')
-                                       })
-                except: pass # only add files that are present
+                                        })
+                except: pass 
         
-        # add fit results to df
-        df = pd.DataFrame(results)
-        
-        # Sort the df by the 'parameter' values
-        df = df.sort_values(by=str(parameter))
-        
-        # Save to a CSV file
-        df.to_csv(csv_file_path, index=False)
+        results_df = pd.DataFrame(results)
+        if not results_df.empty:
+            df = results_df.sort_values(by=str(parameter))
+            df.to_csv(csv_file_path, index=False)
+        else:
+            print("No results to write for individual OSR.")
 
 def read_OSR_vs_parameter_csv(experiment_name, 
                               parameter,
                               min_seq_number,
-                              min_sim_lenght):
+                              min_sim_lenght,
+                              target_host_type=None):
+    
     csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name,
-                                                      parameter,
-                                                      min_seq_number,
-                                                      min_sim_lenght)
+                                                       parameter,
+                                                       min_seq_number,
+                                                       min_sim_lenght,
+                                                       target_host_type)
+    
+    if not os.path.exists(csv_file_path):
+        print(f"[Warning] File not found: {csv_file_path}")
+        return pd.DataFrame()
+        
     observed_substitution_rates_df = pd.read_csv(csv_file_path)
     return observed_substitution_rates_df
 
 def get_mean_std_OSR(experiment_name,
                      parameter,
                      min_seq_number,
-                     min_sim_lenght):
+                     min_sim_lenght,
+                     target_host_type=None):
+    
     write_OSR_vs_parameter_csv(experiment_name, 
                                parameter, 
                                min_seq_number, 
-                               min_sim_lenght)
+                               min_sim_lenght,
+                               target_host_type)
+    
     df = read_OSR_vs_parameter_csv(experiment_name,
                                    parameter,
                                    min_seq_number,
-                                   min_sim_lenght)
+                                   min_sim_lenght,
+                                   target_host_type)
+    
+    if df.empty:
+        return pd.DataFrame()
+
     df_mean_std = df.groupby(parameter)['observed_substitution_rate'].agg(['mean','std']).reset_index()
     return df_mean_std
 
-def get_fit_results_filepath(experiment_name, model_type):
+def get_fit_results_filepath(experiment_name, model_type, target_host_type=None):
     experiment_fit_result_dir = dm.get_experiment_fit_result_dir(experiment_name)
-    filename = f'{experiment_name}_{model_type}_fit_results.csv'
-    return os.path.join(experiment_fit_result_dir,filename)
+    
+    type_suffix = f"_{target_host_type}" if target_host_type else ""
+    filename = f'{experiment_name}_{model_type}_fit_results{type_suffix}.csv'
+    
+    return os.path.join(experiment_fit_result_dir, filename)
 
-def write_fit_results_csv(experiment_name, model_type, fit_result):
-    fit_results_filepath = get_fit_results_filepath(experiment_name, model_type)
+def write_fit_results_csv(experiment_name, model_type, fit_result, target_host_type=None):
+    # Pass target_host_type to get unique filepath
+    fit_results_filepath = get_fit_results_filepath(experiment_name, model_type, target_host_type)
+    
     # Save best-fit parameters to CSV
     param_dict = {name: param.value for name, param in fit_result.params.items()}
     df = pd.DataFrame.from_dict(param_dict, orient='index', columns=['Best Fit'])
     df.to_csv(fit_results_filepath, index=True, header=True)
-    print(f'saved fits results to: {fit_results_filepath}')
+    print(f'Saved fit results to: {fit_results_filepath}')
 
-def read_fit_results_csv(experiment_name, model_type):
-    fit_results = get_fit_results_filepath(experiment_name, model_type)
-    df = pd.read_csv(fit_results,index_col=0)
+def read_fit_results_csv(experiment_name, model_type, target_host_type=None):
+    fit_results = get_fit_results_filepath(experiment_name, model_type, target_host_type)
+    
+    if not os.path.exists(fit_results):
+        print(f"[Warning] Fit results file not found: {fit_results}")
+        return None
+
+    df = pd.read_csv(fit_results, index_col=0)
     best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
     return best_fit_df
-    
+
 # -----------------------------------------------------------------------------
 #                              Tree exporter
 # -----------------------------------------------------------------------------
