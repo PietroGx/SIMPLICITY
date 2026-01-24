@@ -62,7 +62,8 @@ class Simplicity:
         # print('')
         # print('Saving sequencing dataset...')
         om.save_sequencing_dataset(self.simulation_output, 
-                                      self.output_directory)
+                                      self.output_directory,
+                                      self.population.sequence_long_shedders)
         # print('DONE.')
         # print('')
         # print('Saving lineage individuals data...')

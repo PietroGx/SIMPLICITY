@@ -26,36 +26,38 @@ def generate_nsr_settings(min_nsr, max_nsr, steps, n_seeds):
 
     return user_set_experiment_settings
 
-def run_fitting(experiment_name, parameter='nucleotide_substitution_rate', 
+def run_fitting(experiment_name, experiment_number, parameter='nucleotide_substitution_rate', 
                       min_seq=30, min_len=100, model_type='exp'):
     print(f"\n[Fitting] Starting OSR fit for: {experiment_name}")
-
+    
+    experiment_numbered_name = f'{experiment_name}_#{experiment_number}' 
+    
     try:
         # Generate CSVs
-        om.write_combined_OSR_vs_parameter_csv(experiment_name, parameter, min_seq, min_len)
-        om.write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq, min_len)
+        om.write_combined_OSR_vs_parameter_csv(experiment_numbered_name, parameter, min_seq, min_len)
+        om.write_OSR_vs_parameter_csv(experiment_numbered_name, parameter, min_seq, min_len)
         
         # Read Data
-        OSR_single = om.read_OSR_vs_parameter_csv(experiment_name, parameter, min_seq, min_len)
+        OSR_single = om.read_OSR_vs_parameter_csv(experiment_numbered_name, parameter, min_seq, min_len)
         
         if OSR_single.empty:
-            print(f"[Warning] No data found for {experiment_name}.")
+            print(f"[Warning] No data found for {experiment_numbered_name}.")
             return
 
         # Fit Model
         print(f'[Fitting] Fitting {model_type} model...')
         fit_result = er.fit_observed_substitution_rate_regressor(
-            experiment_name, OSR_single, model_type, weights=None
+            experiment_numbered_name, OSR_single, model_type, weights=None
         )
 
         # Get Stats
-        OSR_combined = om.read_combined_OSR_vs_parameter_csv(experiment_name, parameter, min_seq, min_len)
-        OSR_mean = om.get_mean_std_OSR(experiment_name, parameter, min_seq, min_len)
+        OSR_combined = om.read_combined_OSR_vs_parameter_csv(experiment_numbered_name, parameter, min_seq, min_len)
+        OSR_mean = om.get_mean_std_OSR(experiment_numbered_name, parameter, min_seq, min_len)
 
         # Plot
         print('[Plotting] Saving plot...')
         pm.plot_OSR_fit_figure(
-            experiment_name, fit_result, OSR_single, OSR_combined, OSR_mean,
+            experiment_numbered_name, fit_result, OSR_single, OSR_combined, OSR_mean,
             model_type, min_seq, min_len
         )
         print("[Fitting] SUCCESS. Plot saved.")
@@ -84,7 +86,7 @@ def main():
 
     # 3. Run Fitting (Immediately follows because step 2 waited)
     print("\n[Manager] Simulations complete. Starting Fitting...")
-    run_fitting(args.name)
+    run_fitting(args.name, args.exp_num)
 
 if __name__ == "__main__":
     main()

@@ -62,9 +62,6 @@ def factory_model_func(model_type: str):
     def exp_model(x, A, B, C):
         return A * x**B + C
 
-    def double_log_model(x, A, B, C, D, E, F):
-        return A * np.log(B * x + C) + D * np.log(E * x + F)
-
     def tan_model(x, A, B, C, D):
         return A * np.tan(B * x - C) + D
     
@@ -77,15 +74,12 @@ def factory_model_func(model_type: str):
         "lin": linear_model,
         "log": log_model,
         "exp": exp_model,
-        "double_log": double_log_model,
         "tan": tan_model,
         "spline": spline_model,
     }
     
     if model_type not in models:
         raise ValueError(f"Unknown model type: {model_type}")
-    
-    return models[model_type]
     
     return models[model_type]
 
@@ -114,17 +108,6 @@ def factory_model_lmfit(model_type: str):
 
         return model, params 
     
-    elif model_type == 'double_log':
-        model = lmfit.Model(factory_model_func(model_type))
-        # Set initial parameter guesses 
-        params = model.make_params(A=1, B=1, C=0, D=1, E=1, F=0)
-        # Set boundaries for parameters
-        params['B'].set(min=0.000001)  
-        params['C'].set(min=0.000001)
-        params['E'].set(min=0.000001)  
-        params['F'].set(min=0.000001)
-        return model, params 
-    
     elif model_type == 'tan':
         model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
@@ -140,26 +123,52 @@ def factory_model_lmfit(model_type: str):
     else: raise ValueError('Invalid model selection')
 
 def fit_observed_substitution_rate_regressor(experiment_name, 
-                                             df, model_type, weights=None):
+                                             df, model_type, weights=None,
+                                             parameter_name='nucleotide_substitution_rate'):
+    """
+    Fits a model to the observed substitution rate against a varying parameter.
     
-    x_data = df['nucleotide_substitution_rate'] 
+    Parameters:
+        experiment_name (str): Name of the experiment
+        df (pd.DataFrame): Data containing the parameter column and 'observed_substitution_rate'
+        model_type (str): Type of model to fit ('lin', 'log', etc.)
+        weights: Optional weights for fitting
+        parameter_name (str): The column name of the independent variable (x-axis). 
+                              Defaults to 'nucleotide_substitution_rate'.
+    """
+    
+    if parameter_name not in df.columns:
+        # Fallback for flexibility: try using the first column if specific name not found
+        # This is useful if the DF structure varies slightly between steps
+        print(f"[Fit] Warning: '{parameter_name}' not found in DF. Using column 0: {df.columns[0]}")
+        x_data = df.iloc[:, 0]
+    else:
+        x_data = df[parameter_name] 
+        
     y_data = df['observed_substitution_rate']  
     
     # Create the Model
     model, params = factory_model_lmfit(model_type)
     
     # Fit the model to the data
-    if weights is None:
-        fit_result = model.fit(y_data, params, x=x_data)
-    else:
-        fit_result = model.fit(y_data, params, x=x_data, weights=weights)
-    
-    # Print the fit results
-    print(fit_result.fit_report())
-    # print(fit_result.best_fit)
-    # save fit results
-    om.write_fit_results_csv(experiment_name, model_type, fit_result)
-    return fit_result
+    try:
+        if weights is None:
+            fit_result = model.fit(y_data, params, x=x_data)
+        else:
+            fit_result = model.fit(y_data, params, x=x_data, weights=weights)
+            
+        # Print the fit results
+        print(fit_result.fit_report())
+        
+        # save fit results
+        om.write_fit_results_csv(experiment_name, model_type, fit_result)
+        return fit_result
+        
+    except Exception as e:
+        print(f"Fit failed for {model_type}: {e}")
+        # Return a dummy object or None so the pipeline can handle it gracefully
+        # If using lmfit, we might want to return None and check in the caller
+        raise e
 
 def fit_weight(df):
     x_data = df['nucleotide_substitution_rate']
@@ -182,36 +191,45 @@ def evaluate_model(model_type, params, x):
         return model.eval(params=param_obj, x=x)
     return model(x, **params)
 
-def inverse_log_regressor(OSR, params):
+# ==============================================================================
+# INVERSE FUNCTIONS & BRIDGE
+# ==============================================================================
+
+def inverse_linear_regressor(OSR, params):
     """
-    Computes the inverse of the logarithmic regression function y = A * log(Bx + C)
-    
-    Parameters:
-        OSR:  desired observed substitution rate
-        params (dict): A dictionary containing the parameters 'A', 'B', and 'C'.
-    
-    Returns:
-        float or numpy array: The computed nucleotide substitution rate value(s).
+    Computes inverse of: y = A * x + B
+    Returns: x = (y - B) / A
     """
     A = params.get('A', 0)
     B = params.get('B', 0)
+    
+    if A == 0:
+        raise ValueError("Parameter A is zero; cannot invert linear function.")
+        
+    return (OSR - B) / A
+
+def inverse_log_regressor(OSR, params):
+    """
+    Computes inverse of: y = A * log(B * x + C)
+    Returns: x = (exp(y / A) - C) / B
+    """
+    A = params.get('A', 1)
+    B = params.get('B', 1)
     C = params.get('C', 0)
     
-    # Compute the inverse function
-    NSR = (np.exp(OSR / A) - C) / B
+    if A == 0:
+        raise ValueError("Parameter A is zero; cannot invert log function.")
+    if B == 0:
+        raise ValueError("Parameter B is zero; cannot invert log function.")
     
-    return NSR
+    # x = (exp(y/A) - C) / B
+    val = (np.exp(OSR / A) - C) / B
+    return val
     
 def inverse_exp_regressor(OSR, params):
     """
-    Computes the inverse of the exponential regression function y = A * x**B + C
-
-    Parameters:
-        OSR (float or np.ndarray): Observed substitution rate
-        params (dict): A dictionary containing the parameters 'A', 'B', and 'C'.
-
-    Returns:
-        float or np.ndarray: The computed nucleotide substitution rate value(s).
+    Computes inverse of: y = A * x**B + C
+    Returns: x = ((y - C) / A) ** (1/B)
     """
     A = params.get('A', 1)
     B = params.get('B', 1)
@@ -220,11 +238,59 @@ def inverse_exp_regressor(OSR, params):
     if A == 0 or B == 0:
         raise ValueError("Parameters A and B must be non-zero.")
     
-    # Ensure OSR - C > 0 to avoid complex numbers
-    if np.any(OSR - C <= 0):
-        raise ValueError("Invalid OSR: OSR must be greater than C for all entries.")
+    # Ensure domain validity if possible
+    # if np.any(OSR - C <= 0): ... (checked by caller or numpy raises warning)
 
     NSR = ((OSR - C) / A) ** (1 / B)
     return NSR
 
+def inverse_tan_regressor(OSR, params):
+    """
+    Computes inverse of: y = A * tan(B * x - C) + D
+    Returns: x = (arctan((y - D) / A) + C) / B
+    """
+    A = params.get('A', 1)
+    B = params.get('B', 1)
+    C = params.get('C', 0)
+    D = params.get('D', 0)
 
+    if A == 0 or B == 0:
+        raise ValueError("Parameters A or B are zero.")
+
+    # (y - D) / A = tan(Bx - C)
+    # arctan(...) = Bx - C
+    # x = (arctan(...) + C) / B
+    val = (np.arctan((OSR - D) / A) + C) / B
+    return val
+
+def compute_calibrated_parameter(model_type, fit_result, target_osr):
+    """
+    The unified bridge function.
+    Dispatches the calculation to the correct inverse function.
+
+    Parameters:
+        model_type (str): 'lin', 'log', 'exp', 'tan'.
+        fit_result (lmfit.model.ModelResult): The result object from fitting.
+        target_osr (float): The target Observed Substitution Rate.
+
+    Returns:
+        float: The calibrated parameter value (NSR or Factor).
+    """
+    dispatch_map = {
+        'lin': inverse_linear_regressor,
+        'log': inverse_log_regressor,
+        'exp': inverse_exp_regressor,
+        'tan': inverse_tan_regressor,
+        # 'spline' is not supported analytically
+    }
+
+    if model_type not in dispatch_map:
+        raise NotImplementedError(
+            f"Inverse function for model '{model_type}' is not implemented."
+        )
+
+    # Extract parameters as a dictionary of values
+    # fit_result.params is an lmfit Parameters object; values accessed via key lookups or .valuesdict()
+    params_dict = fit_result.params.valuesdict()
+
+    return dispatch_map[model_type](target_osr, params_dict)

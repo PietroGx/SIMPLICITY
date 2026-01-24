@@ -60,6 +60,7 @@ def write_standard_parameters_values():
         "max_runtime": 86000, 
         "phenotype_model": 'immune_waning',  # or 'linear'
         "sequencing_rate": 0.05,
+        "sequence_long_shedders": False,
         "seed": None
     }
     with open(filename, "w") as file:
@@ -86,7 +87,8 @@ def write_parameter_specs():
         "final_time":                    {"type": "int", "min": 0},    
         "max_runtime":                   {"type": "int", "min": 0},
         "phenotype_model":               {"type": "str"},
-        "sequencing_rate":               {"type": "float", "min": 0, "max": 1}
+        "sequencing_rate":               {"type": "float", "min": 0, "max": 1},
+        "sequence_long_shedders":        {"type": "bool"}
         }
 
     with open(filename, "w") as file:
@@ -228,6 +230,7 @@ def write_simulation_parameters(file_path,
                                 max_runtime, 
                                 phenotype_model,
                                 sequencing_rate,
+                                sequence_long_shedders,
                                 seed
                                 ):
     settings = {
@@ -250,6 +253,7 @@ def write_simulation_parameters(file_path,
         "max_runtime": max_runtime,
         "phenotype_model": phenotype_model,
         "sequencing_rate": sequencing_rate,
+        "sequence_long_shedders" :sequence_long_shedders,
         "seed": seed
     }
     
@@ -354,6 +358,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                     settings["max_runtime"],
                                     settings["phenotype_model"],
                                     settings["sequencing_rate"],
+                                    settings["sequence_long_shedders"],
                                     settings["seed"]
                                     )
 
