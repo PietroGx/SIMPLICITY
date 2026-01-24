@@ -68,7 +68,9 @@ def fixture_experiment_settings():
         "nucleotide_substitution_rate": 0.0001,
         'infected_individuals_at_start': 300,
         'R' : 1.03,
-        'final_time': 600
+        'final_time': 600,
+        'long_shedders_ratio': 0.01,
+        'sequence_long_shedders': True
     }
     
     # ---------- OR import them from file -------------------------------------
@@ -267,7 +269,7 @@ def main(runner:str, test_number:int, compare_to: int = None):
 if __name__ == "__main__":
     import time
     start = time.time()
-    main('serial',1)#,compare_to=4)
+    main('serial',6)#,compare_to=4)
     elapsed = time.time() - start
     mins, secs = divmod(elapsed, 60)
     print(f"Test completed in {int(mins)} min {secs:.2f} sec")

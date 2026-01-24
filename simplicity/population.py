@@ -37,6 +37,7 @@ class Population:
                  rng3,rng4,rng5,rng6,
                  long_shedders_ratio=0,
                  long_evo_rate_f = 1,
+                 sequence_long_shedders=False,
                  reservoir=100000):
         
         # counter for inf reactions
@@ -61,6 +62,7 @@ class Population:
         self.long_shedders_ratio = long_shedders_ratio
         self.long_evo_rate_f = long_evo_rate_f # weight factor for long shedders substitution rate
         self.long_shedders = 0 # number of long shedders
+        self.sequence_long_shedders = sequence_long_shedders
          
         self.reservoir = reservoir   # size of total population (not everyone is 
                                      # susceptible at the beginning, when 
@@ -606,6 +608,7 @@ def create_population(parameters):
     
     long_shedders_ratio = parameters['long_shedders_ratio']
     long_evo_rate_f     = parameters['long_evo_rate_f']
+    sequence_long_shedders = parameters['sequence_long_shedders']
     
     ih_model_parameters = {
         'tau_1': parameters['tau_1'],
@@ -625,7 +628,7 @@ def create_population(parameters):
     
     # create population
     pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5,rng6, 
-                     long_shedders_ratio, long_evo_rate_f)
+                     long_shedders_ratio, long_evo_rate_f, sequence_long_shedders)
     return pop
         
         

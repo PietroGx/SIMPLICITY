@@ -46,8 +46,8 @@ def apply_plos_rcparams():
         'xtick.labelsize': text_size,
         'ytick.labelsize': text_size,
         'legend.fontsize': text_size,
-        'font.family': 'sans-serif',
-        'font.sans-serif': ['Arial'],  
+#        'font.family': 'sans-serif',
+#        'font.sans-serif': ['Arial'],  
         'pdf.fonttype': 42,            
         'ps.fonttype': 42,
         'figure.dpi': 300
@@ -1843,7 +1843,8 @@ def plot_OSR_and_IH_lineages_by_parameter(experiment_name,
     print(f'Figure saved under: {output_path}')
     plt.close()
 
-def plot_OSR_fit_figure(experiment_name, 
+def plot_OSR_fit_figure(experiment_name,
+                parameter,
                 fit_result,
                 OSR_single_sim_data,
                 OSR_combined_sim_data,
@@ -1853,7 +1854,6 @@ def plot_OSR_fit_figure(experiment_name,
                 min_sim_lenght):
     ''' plot fit of nucleotide substitution rate / observed substitution rates curve
     '''
-    parameter = 'nucleotide_substitution_rate'
     
     line_color = 'black' #'#DE8F05' # orange
     scatter_color = '#DE8F05'# orange
@@ -1863,7 +1863,7 @@ def plot_OSR_fit_figure(experiment_name,
     # Create figure and axes
     fig, ax = plt.subplots(1,1, figsize=(8,6))
     
-    x_data = OSR_single_sim_data['nucleotide_substitution_rate']
+    x_data = OSR_single_sim_data[parameter]
 
     # scatterplot Estimated OSR - single simulation
     sns.scatterplot(x=parameter, y='observed_substitution_rate', 
@@ -1877,7 +1877,7 @@ def plot_OSR_fit_figure(experiment_name,
                  zorder=1)
     
     # scatterplot combined regression points (as comparison)
-    sns.scatterplot(x='nucleotide_substitution_rate', y='observed_substitution_rate', marker='X',
+    sns.scatterplot(x=parameter, y='observed_substitution_rate', marker='X',
         label='Combined tempest regression estimate of OSR', data=OSR_combined_sim_data,
         color=combined_OSR_marker_color,alpha=1, ax=ax,
         zorder=2)

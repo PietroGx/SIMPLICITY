@@ -42,8 +42,8 @@ def hamming(lineage):
         if reference[mutation[0]] != mutation[1]:
             distance += 1
             
-    epsilon = 1e-6  # fitness floor
-    distance = max(distance, epsilon)
+    #epsilon = 1e-6  # fitness floor
+    #distance = max(distance, epsilon)
     
     return distance 
 

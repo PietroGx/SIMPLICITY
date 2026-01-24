@@ -56,14 +56,14 @@ def diagnosis(population, seq_rate=0):
         for lineage_name in population.individuals[diagnosed_individual_i]['IH_lineages']:
             genome = population.get_lineage_genome(lineage_name)
             population.sequencing_data.append({
-                'individual index': diagnosed_individual_i,
-                'sequencing time' : population.time,
-                'lineage name'    : lineage_name,
+                'individual_index': diagnosed_individual_i,
+                'sequencing_time' : population.time,
+                'lineage_name'    : lineage_name,
                 'sequence'        : genome,
-                'sequence lenght' : len(genome),
-                'individual type' : population.individuals[diagnosed_individual_i]['type'],
-                'infection duration' : population.time - population.individuals[diagnosed_individual_i]['t_infection'],
-                'intra-host lineage index' :i
+                'sequence_lenght' : len(genome),
+                'individual_type' : population.individuals[diagnosed_individual_i]['type'],
+                'infection_duration' : population.time - population.individuals[diagnosed_individual_i]['t_infection'],
+                'intra-host_lineage_index' :i
             })
             i += 1
 
