@@ -730,8 +730,11 @@
     * changed read_sequencing_data to read_sequencing_data_regression in output_manager
     * refactored write sequencing data to optionally sequence long shedders, parameter passed to parameters file and manager
     
-    
-	
+2026-27-01 pietro gerletti
+
+    Version 2.1.4
+
+    * updated osr_long script and om_manager to write long sequencing data correctly
 	
 	
 	

@@ -32,7 +32,7 @@ def generate_nsr_settings(min_val, max_val, steps, n_seeds):
     def user_set_experiment_settings():
         varying_params = {'nucleotide_substitution_rate': nsr_list}
         fixed_params = {
-            'infected_individuals_at_start': 10,
+            'infected_individuals_at_start': 100,
             'final_time': 365 * 3,
             'R': 1.05,
             'sequencing_rate': 0.1
@@ -66,10 +66,11 @@ def generate_ls_factor_settings(calibrated_nsr, min_val, max_val, steps, n_seeds
         varying_params = {'long_evo_rate_f': factor_list}
         fixed_params = {
             'nucleotide_substitution_rate': calibrated_nsr,
-            'infected_individuals_at_start': 10, 
+            'infected_individuals_at_start': 100, 
             'final_time': 365 * 3,
             'R': 1.05,
             'sequencing_rate': 1,
+            'long_shedders_ratio': 0.01,
             'sequence_long_shedders':True
         }
         return (varying_params, fixed_params, n_seeds)
@@ -267,11 +268,13 @@ def run_fitting_step(experiment_name, experiment_number, parameter_name, individ
             experiment_numbered_name, parameter_name, min_seq, min_len, individual_type=individual_type, include_outliers=True
         )
 
-        print('[Plotting] Generating Fit Figure...')
+        print('[Plotting] Generating Fit Figures...')
         pm.plot_OSR_fit_figure(
             experiment_numbered_name, parameter_name, best_fit_result, OSR_all, OSR_combined, OSR_mean,
             best_model_type, min_seq, min_len
         )
+        pm.plot_combined_tempest_regressions(experiment_numbered_name, parameter_name, 
+                                      min_seq, min_len, individual_type)
         
         return best_fit_result, best_model_type
 
@@ -302,7 +305,7 @@ def main():
     
     # Stage 2: Factor Sweep
     parser.add_argument('--factor-min', type=float, default=1.0, help="Min Long Shedder Factor")
-    parser.add_argument('--factor-max', type=float, default=10.0, help="Max Long Shedder Factor")
+    parser.add_argument('--factor-max', type=float, default=1000.0, help="Max Long Shedder Factor")
     parser.add_argument('--factor-steps', type=int, default=15)
 
     # Targets

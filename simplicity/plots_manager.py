@@ -359,7 +359,7 @@ def plot_tempest_regression(sequencing_data_df,
     apply_standard_axis_style(ax)
     
 def plot_combined_tempest_regressions(experiment_name, parameter, 
-                                      min_seq_number=0, min_sim_lenght=0, 
+                                      min_seq_number=0, min_sim_lenght=0, individual_type=None,
                                       y_axis_max=0.1):
     """
     Plot a grid of tempest regressions for each simulation, grouped by a parameter value.
@@ -404,7 +404,8 @@ def plot_combined_tempest_regressions(experiment_name, parameter,
         sequencing_data_df = om.create_combined_sequencing_df(
             simulation_output_dir, 
             min_seq_number=min_seq_number,
-            min_sim_lenght=min_sim_lenght
+            min_sim_lenght=min_sim_lenght,
+            individual_type = individual_type
         )
 
         if sequencing_data_df is None:
@@ -427,7 +428,7 @@ def plot_combined_tempest_regressions(experiment_name, parameter,
     # Define save path
     figure_output_path = os.path.join(
         experiment_plots_dir, 
-        f"{experiment_name}_combined_regression.tiff"
+        f"{experiment_name}_combined_regressions.tiff"
     )
 
     print(f"Saving figure to: {figure_output_path}")
@@ -1892,7 +1893,7 @@ def plot_OSR_fit_figure(experiment_name,
     ax.set_xlabel(f'{parameter}')
     ax.set_ylabel('observed substitution rate')
     ax.set_xscale('log')
-    ax.set_yscale('log')
+    ax.set_yscale('log') 
     ax.set_xlim(x_data.min(),x_data.max()*1.1)
     
     plt.tight_layout()

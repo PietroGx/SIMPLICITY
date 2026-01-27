@@ -128,91 +128,7 @@ def archive_experiment(experiment_name):
 # -----------------------------------------------------------------------------
 #                            read and write simulation output
 # -----------------------------------------------------------------------------
-#def save_sequencing_dataset(simulation_output, output_path):
-#    """
-#    Writes the simulated sequencing data to a FASTA file.
-#    A genome from simulation_output.sequencing_data contains
-#    [
-#       patient id,
-#       time of sequencing,
-#       single encoded genome,
-#       len(genome) (number of substitutions),
-#       individuals[patient]['type'],
-#       infection lenght
-#       intra-host genome id (integer)
-#    ]
-#    """
-#    try:
-#        # dataframe for phylogenetic regression
-#        sequencing_data = simulation_output.sequencing_data
-#        sequencing_data_regression_dic = []
-#        # paths for files to save
-#        fasta_file_path = os.path.join(output_path,'sequencing_data.fasta')
-#        data_regression_file_path = os.path.join(output_path,'sequencing_data_regression.csv')
-#        data_file_path = os.path.join(output_path,'sequencing_data.csv')
-#        
-#        # open fasta file to write on
-#        with open(fasta_file_path, 'w') as fasta_file:
-#             # loop over the list of sequencing data, getting the identifiers
-#             # and the sequences to write them in the fasta file
-#             for individual_sequencing_data in sequencing_data:
-#                # get seq ID
-#                individual_index         = individual_sequencing_data['individual_index']
-#                intra_host_lineage_index = individual_sequencing_data['intra-host_lineage_index']
-#                sequencing_time          = individual_sequencing_data['sequencing_time']
-#                lineage_name             = individual_sequencing_data['lineage_name']
-#                sequence                 = individual_sequencing_data['sequence']
-#                individual_type          = individual_sequencing_data['individual_type']
-#              
-#                sequences_id =f'>{individual_index}_{intra_host_lineage_index}_time_{sequencing_time:.2f}_lin_{lineage_name}'
-#                # Write the sequence identifier
-#                fasta_file.write(f"{sequences_id}\n")
-#                # get full genome
-#                decoded_genome = decode_genome(sequence)
-#                # remove ' from genome string and write to fasta
-#                genome = decoded_genome.replace("'","")
-#                # Write the sequence data
-#                fasta_file.write(f"{genome}\n")     
-#                
-#                
-#                # add sequence data to df for regression 
-#                sequencing_data_regression_dic.append({
-#                    'Sequencing_time': round(sequencing_time/365.25,4), #seq time in years
-#                    'Distance_from_root': dis.hamming(sequence)/len(dis.reference),  # normalized hamming distance
-#                    'individual_type': individual_type
-#                           })
-#        # save dictionary of sequencing data for regression
-#        with open(data_regression_file_path, mode='w', newline='') as file:
-#            # Create a DictWriter object and pass the fieldnames (keys of the dictionary)
-#            # Use the keys of the first dictionary to get the column names
-#            fieldnames = sequencing_data_regression_dic[0].keys()  
-#            writer = csv.DictWriter(file, fieldnames=fieldnames)
-#            
-#            # Write the header (column names)
-#            writer.writeheader()
-#            
-#            # Write the rows (the actual data)
-#            writer.writerows(sequencing_data_regression_dic)
-#            
-#        # save dictionary of sequencing data for regression
-#        with open(data_file_path, mode='w', newline='') as file:
-#            # Create a DictWriter object and pass the fieldnames (keys of the dictionary)
-#            # Use the keys of the first dictionary to get the column names
-#            fieldnames = sequencing_data[0].keys()  
-#            writer = csv.DictWriter(file, fieldnames=fieldnames)
-#            
-#            # Write the header (column names)
-#            writer.writeheader()
-#            
-#            # Write the rows (the actual data)
-#            writer.writerows(sequencing_data)
-#            
-#    except:
-#            if simulation_output.sequencing_data == []:
-#                print('No individuals sequenced during simulation, not saving FASTA file')
-#                print('')
-#            else: 
-#                raise ValueError('There is something wrong with the sequencing data')
+
 
 def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedders=False):
     """
@@ -226,10 +142,10 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
       and includes them in the regression CSV.
     
     Outputs:
-    1. sequencing_data.fasta: Random surveillance sequences (if available).
-    2. sequencing_data_long.fasta: All lineages from long-shedders (if flagged & available).
+    1. sequencing_data.fasta: Random surveillance sequences 
+    2. sequencing_data_long.fasta: All lineages from long-shedders 
     3. sequencing_data_regression.csv: Combined metrics for both groups.
-    4. sequencing_data.csv: Raw surveillance metadata (if available).
+    4. sequencing_data.csv: Raw surveillance metadata 
     """
     
     # Ensure output directory exists
@@ -243,11 +159,11 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
         data_regression_file_path = os.path.join(output_path, 'sequencing_data_regression.csv')
         data_file_path = os.path.join(output_path, 'sequencing_data.csv')
 
-        # List to collect data for the regression CSV (will combine surveillance + long shedders)
+        # List to collect data for the regression CSV (combine surveillance + long shedders)
         sequencing_data_regression_dic = []
 
         # ==============================================================================
-        # PART A: Process Random Surveillance Data (Standard)
+        # Process Random Surveillance Data 
         # ==============================================================================
         sequencing_data = simulation_output.sequencing_data
         
@@ -278,7 +194,7 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
                         'individual_type': ind_type
                     })
             
-            # Save Original Sequencing Metadata CSV
+            # Save Sequencing Metadata CSV
             with open(data_file_path, mode='w', newline='') as file:
                 fieldnames = sequencing_data[0].keys()  
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -286,7 +202,7 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
                 writer.writerows(sequencing_data)
 
         # ==============================================================================
-        # PART B: Process All Long Shedders (Optional)
+        # Process All Long Shedders (Optional)
         # ==============================================================================
         long_shedder_entries = [] # Buffer
         
@@ -295,8 +211,8 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
             # Iterate through all individuals to find long shedders
             for i, ind_data in simulation_output.individuals.items():
                 
-                # Filter: Only Long Shedders who were actually infected
-                if ind_data['type'] == 'long_shedder' and ind_data['t_infection'] is not None:
+                # Filter: Only Long Shedders who were infected and completed their infection course before the end of a simulation
+                if ind_data['type'] == 'long_shedder' and ind_data['state'] == 'recovered':
                     
                     # 1. Determine Sequencing Time
                     if ind_data['t_not_infectious'] is not None:
