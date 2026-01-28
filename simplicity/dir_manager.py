@@ -33,7 +33,7 @@ _data_dir = DEFAULT_DATA_DIR
 
 # set env variables 
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(10)
-os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(500)
+os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(250)
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 def set_data_dir(path):
