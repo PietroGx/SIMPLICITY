@@ -428,11 +428,11 @@ def plot_combined_tempest_regressions(experiment_name, parameter,
     # Define save path
     figure_output_path = os.path.join(
         experiment_plots_dir, 
-        f"{experiment_name}_combined_regressions.tiff"
+        f"{experiment_name}_combined_regressions_{individual_type}.png"
     )
 
     print(f"Saving figure to: {figure_output_path}")
-    plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
+    plt.savefig(figure_output_path, format='png', dpi=100, bbox_inches='tight')
     plt.close(fig)
 
 
