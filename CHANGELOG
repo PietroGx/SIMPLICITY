@@ -601,6 +601,7 @@
     * added scripts (back and frontend) to calculate and display entropy and clustering
     * clean and fixed minor bugs and experiment naming
     
+<<<<<<< HEAD
 
 2025-23-07 pietro gerletti
 
@@ -756,6 +757,59 @@
     * updated diagnosis_rate.py and the rest of the code accordingly 
     
     
+=======
+2025-09-10 pietro gerletti
+
+    Version 1.1.1
+
+    * added get_figure_source_data_dir to dir manager
+    * added write_source_data to output manager
+    * update figure 2 to save source data
+    * updated population (cleaning data type before saving the sim output) 
+    * updated figure 3 to save source data
+
+2025-13-10 pietro gerletti
+
+    Version 1.1.2
+
+	  * updated figure 4 to save source data
+	
+2025-15-10 pietro gerletti
+
+    Version 1.1.3
+
+    * updated OSR fit script to save goodness of fit scores table
+    
+2025-16-10 pietro gerletti
+
+    Version 1.1.4
+    
+    * updated scripts/plots/03_plot_trees.py to optionally plot trees or just saving their json files
+    * updated plot_manager.py
+    * updated scripts/paper_figures/* accordingly
+
+2025-17-10 pietro gerletti
+
+    Version 1.1.5
+    
+    * added panel labels to figures and minor graphic details
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+>>>>>>> main
 	
 	
 	

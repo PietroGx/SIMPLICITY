@@ -47,6 +47,10 @@ def run_experiment_script(runner:str,
         run_experiment(f'{experiment_name}_#{experiment_number}', 
                        user_set_experiment_settings,             
                        simplicity_runner  = runner_module,
+<<<<<<< HEAD
+=======
+                       plot_trajectory    = False,
+>>>>>>> main
                        archive_experiment = False)
     except Exception as e:
         print(f'The simulation failed to run: {e}')

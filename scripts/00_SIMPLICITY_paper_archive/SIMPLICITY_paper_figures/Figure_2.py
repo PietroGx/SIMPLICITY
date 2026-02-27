@@ -16,6 +16,7 @@
 
 import os
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn           as sns
 import matplotlib.gridspec as gridspec
@@ -27,7 +28,7 @@ import simplicity.tuning.evolutionary_rate as er
 import simplicity.plots_manager as pm
 from simplicity.intra_host_model import Host
 
-pm.apply_plos_rcparams()
+pm.apply_rcparams()
 
 def plot_intra_host(ax):
     """
@@ -39,7 +40,12 @@ def plot_intra_host(ax):
     """
     ax.text(-0.1, 1.05, "A", transform=ax.transAxes,
             fontsize=16, fontweight='bold', va='top', ha='left')
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_2.py
     ih_model = Host(tau_1=2.86, tau_2=3.91, tau_3=7.5, tau_4=8)
+=======
+    
+    ih_model = Host()
+>>>>>>> main:scripts/paper_figures/Figure_2.py
     time = 50
     step = 0.1
     
@@ -60,13 +66,23 @@ def plot_intra_host(ax):
     ax.legend(loc = 'upper left')
 
     pm.apply_standard_axis_style(ax)
-
-
-def plot_figure_tempest_regression(experiment_name, ax, out_sim_dir_i=9):
     
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_2.py
     ax.text(-0.1, 1.05, "B", transform=ax.transAxes,
             fontsize=16, fontweight='bold', va='top', ha='left')
     # parameter = 'nucleotide_substitution_rate'
+=======
+    # build figure source data
+    df = pd.DataFrame({"time_d": t, "p_inf": p_inf, "p_det": p_det, "p_rec": p_rec})
+    return {"panel_a_intra_host.csv": df}
+
+
+def plot_figure_tempest_regression(experiment_name, ax, out_sim_dir_i=10):
+    
+    ax.text(-0.1, 1.05, "B", transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
+    
+>>>>>>> main:scripts/paper_figures/Figure_2.py
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
     simulation_output_dir = simulation_output_dirs[out_sim_dir_i]
     # param = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter)
@@ -82,12 +98,30 @@ def plot_figure_tempest_regression(experiment_name, ax, out_sim_dir_i=9):
                                fitted_tempest_regression,
                                ax)
     pm.apply_standard_axis_style(ax)
+    
+    fit_df = pd.DataFrame({
+        "slope": [fitted_tempest_regression.coef_[0]],
+        "intercept": [fitted_tempest_regression.intercept_]
+    })
+
+    return {
+        "panel_b_tempest_raw.csv": sequencing_data_df,
+        "panel_b_tempest_fit.csv": fit_df
+    }
+
 
 def plot_OSR_fit_figure(experiment_name, ax):
     ''' plot fit of nucleotide substitution rate / observed substitution rates curve
     '''
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_2.py
     ax.text(-0.1, 1.05, "C", transform=ax.transAxes,
             fontsize=16, fontweight='bold', va='top', ha='left')
+=======
+    
+    ax.text(-0.05, 1.05, "C", transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
+    
+>>>>>>> main:scripts/paper_figures/Figure_2.py
     parameter = 'nucleotide_substitution_rate'
     model_type = 'exp'
     min_seq_number=30
@@ -193,36 +227,74 @@ def plot_OSR_fit_figure(experiment_name, ax):
     
     pm.apply_standard_axis_style(ax)
     
+    # save source data  -----------------------------------------------
+    fit_curve_df = pd.DataFrame({
+        parameter: x_data,
+        "fitted_observed_substitution_rate": fit_result.best_fit
+    })
+
+    fit_params_df = pd.DataFrame({
+        "A": [A],
+        "B": [B],
+        "C": [C],
+        "model_type": [model_type]
+    })
+
+    target_point_df = pd.DataFrame({
+        parameter: [used_nsr],
+        "observed_substitution_rate": [OSR_target]
+    })
+
+    
+    return {
+        "panel_c_OSR_single_simulations.csv": OSR_single_sim_data,
+        "panel_c_OSR_combined_regression.csv": OSR_combined_sim_data,
+        "panel_c_OSR_mean_std.csv": OSR_mean_data,
+        "panel_c_OSR_fit_curve.csv": fit_curve_df,
+        "panel_c_OSR_fit_params.csv": fit_params_df,
+        "panel_c_OSR_target_point.csv": target_point_df
+    }
+    
 
 def plot_figure_2(experiment_name):
+
+    source_dir = dm.get_figure_source_data_dir(experiment_name, "Figure_2")
+    source_data = {}
+
     fig = plt.figure(figsize=(20, 15))
     gs = gridspec.GridSpec(2, 2, figure=fig)
-
+    
     # Subplot 1: Intra-host model 
     ax1 = fig.add_subplot(gs[0, 0])
-    plot_intra_host(ax1)
+    source_data.update(plot_intra_host(ax1))
 
     # Subplot 2: Tempest regression 
     ax2 = fig.add_subplot(gs[0, 1])
-    plot_figure_tempest_regression(experiment_name, ax2)
+    source_data.update(plot_figure_tempest_regression(experiment_name, ax2))
 
     # Subplot 3: OSR fit 
     ax3 = fig.add_subplot(gs[1, 0:2])
-    plot_OSR_fit_figure(experiment_name, ax3)
+    source_data.update(plot_OSR_fit_figure(experiment_name, ax3))
      
     fig.subplots_adjust(top=0.95, bottom=0.05)
     
-    output_path = os.path.join("Data", f"Figure_2_{experiment_name}.tiff")
+    output_dir = os.path.join("Data", experiment_name)
+    output_path = os.path.join(output_dir, "Figure_2.tiff")
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    output_path = os.path.join("Data", "Figure_2.png")
+    output_path = os.path.join(output_dir, "Figure_2.png")
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Figure saved to: {output_path}")
+    
+    # Write all source data
+    for fname, df in source_data.items():
+        om.write_source_data(df, fname, source_dir)
+    
     plt.close(fig)
 
 
 def main(): 
     
-    plot_figure_2(experiment_name="OSR_fit")
+    plot_figure_2(experiment_name="OSR_fit_#1")
     
 if __name__ == '__main__':
     main() 
