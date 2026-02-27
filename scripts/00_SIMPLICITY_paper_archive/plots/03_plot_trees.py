@@ -26,7 +26,7 @@ import simplicity.plots_manager as pm
 import simplicity.dir_manager as dm
 from tqdm import tqdm
 
-def generate_and_plot_trees(experiment_name,seeded_simulation_output_dir):
+def generate_and_plot_trees(experiment_name,seeded_simulation_output_dir, plot_trees=False):
     ''' Generate and plot infection and phylogenetic tree of seeded simulation.
     ''' 
     print(seeded_simulation_output_dir)
@@ -93,14 +93,16 @@ def generate_and_plot_trees(experiment_name,seeded_simulation_output_dir):
                           tree_type = 'phylogenetic',
                           tree_subtype = 'circular')
     print('')
-    print('Plotting circular trees...')
-    pm.plot_circular_tree(ete_inf_tree,
+    
+    if plot_trees:
+        print('Plotting circular trees...')
+        pm.plot_circular_tree(ete_inf_tree,
                           'infection',
                           colormap_df,
                           individuals_lineages,
                           ete_inf_tree_filepath)
-    print('')
-    pm.plot_circular_tree(ete_phylo_tree,
+        print('')
+        pm.plot_circular_tree(ete_phylo_tree,
                           'phylogenetic',
                           colormap_df,
                           individuals_lineages,
@@ -164,7 +166,13 @@ def main():
     
     parser = argparse.ArgumentParser(description="Plot")
     parser.add_argument('experiment_name', type=str, help="experiment name")
+    parser.add_argument('--plot-trees', action='store_true',help="Add this flag to plot trees")
     args = parser.parse_args()
+    
+    if args.plot_trees:
+      plot_trees = True
+    else:
+      plot_trees = False
     
     experiment_name= args.experiment_name
     time_threshold = 365
@@ -173,7 +181,7 @@ def main():
                                                        time_threshold, 
                                                        lineage_number_threshold)
     for selected_ssod in tqdm(selected_ssods, desc="Building trees"):
-        generate_and_plot_trees(experiment_name, selected_ssod)
+        generate_and_plot_trees(experiment_name, selected_ssod, plot_trees)
     print('Tree plotting completed.')
     print(f'Selected seeds: {seeds}')
         

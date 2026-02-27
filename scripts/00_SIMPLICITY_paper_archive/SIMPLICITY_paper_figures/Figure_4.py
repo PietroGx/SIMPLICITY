@@ -27,7 +27,7 @@ import simplicity.output_manager as om
 import simplicity.dir_manager as dm
 import simplicity.plots_manager as pm
 
-pm.apply_plos_rcparams()
+pm.apply_rcparams()
 
 # -----------------------------------------------------------------------------
 # Utility Functions
@@ -193,7 +193,11 @@ def count_sweeps(series_bool, min_days_above_threshold=21):
 # Plotting Helpers
 # -----------------------------------------------------------------------------
 
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
 def draw_stack_entropy(ax, freq_df, entropy_series, colormap, data_type, label):
+=======
+def draw_stack_entropy(ax, freq_df, entropy_series, colormap, data_type, label, setylabels=True, setxlabel=True):
+>>>>>>> main:scripts/paper_figures/Figure_4.py
     """
     ax:             A single Axes object
     freq_df:        DataFrame indexed by time; each column is a lineage (frequency over time)
@@ -201,14 +205,20 @@ def draw_stack_entropy(ax, freq_df, entropy_series, colormap, data_type, label):
     colormap:       result of pm.make_lineages_colormap(...) for coloring each lineage
     data_type:      lineage or cluster, used for axis label
     """
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
     ax.text(-0.1, 1.05, label, transform=ax.transAxes,
             fontsize=16, fontweight='bold', va='top', ha='left')
+=======
+    ax.text(-0.1, 1.13, label, transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
+
+>>>>>>> main:scripts/paper_figures/Figure_4.py
     # Entropy 
     ax.plot(entropy_series.index, entropy_series.values, "k-", linewidth=2)
-    ax.set_ylabel("Entropy")
+    
     ax.set_zorder(1)
     ax.patch.set_visible(False) 
-    ax.set_xlabel("Time (d)")
+    
 
     # Stackplot of frequencies
     ax2 = ax.twinx()
@@ -222,12 +232,24 @@ def draw_stack_entropy(ax, freq_df, entropy_series, colormap, data_type, label):
         edgecolors="black",
         linewidth=0.1
     )
-    ax2.set_ylabel(f"{data_type} Frequency")
+    
+    if setxlabel:
+      ax.set_xlabel("Time (d)")
+    
+    if setylabels:
+      ax.set_ylabel("Entropy")
+      ax2.set_ylabel(f"{data_type} Frequency")
+      
     ax2.set_ylim(0,1)
     ax2.set_xlim(0,max(freq_nonan.index))
     ax2.set_zorder(0)
     
     pm.apply_standard_axis_style(ax, True)
+    
+    plotted_data = pd.concat(
+        [freq_df, entropy_series.rename('Shannon_Entropy')], axis=1
+    )
+    return plotted_data
 
 
 def draw_violin(ax, counts_group1, counts_group2, ylabel, label):
@@ -238,7 +260,7 @@ def draw_violin(ax, counts_group1, counts_group2, ylabel, label):
     ylabel:          string for the y-axis label
     """
     df = pd.DataFrame({
-        "Group": ["Linear model  "] * len(counts_group1) + ["  Immune waning model***"] * len(counts_group2),
+        "Group": ["Baseline model"] * len(counts_group1) + ["IW model***"] * len(counts_group2),
         "Count": counts_group1 + counts_group2
     })
     sns.violinplot(
@@ -251,11 +273,16 @@ def draw_violin(ax, counts_group1, counts_group2, ylabel, label):
         hue="Group",
         legend=False
     )
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
     ax.text(-0.1, 1.05, label, transform=ax.transAxes,
+=======
+    ax.text(-0.1, 1.055, label, transform=ax.transAxes,
+>>>>>>> main:scripts/paper_figures/Figure_4.py
             fontsize=16, fontweight='bold', va='top', ha='left')
     ax.set_ylabel(ylabel)
     ax.set_xlabel("")
     pm.apply_standard_axis_style(ax)
+    return df
 
 
 # -----------------------------------------------------------------------------
@@ -285,13 +312,18 @@ def plot_figure_4(include_clusters=False):
       │ (3,0) Immune clustered+entropy│                           │
       └───────────────────────────────┴───────────────────────────┘
     """
-    EXPERIMENT_NAME     = "SIMPLICITY_exp_output"
+    EXPERIMENT_NAME     = "SIMPLICITY_paper_#1"
     MIN_FINAL_TIME      = 300
     MAX_FINAL_TIME      = 450
     CUT_AFTER_MAX_TIME  = True
     SEED                = 7
     CLUSTER_THRESHOLD   = 5
     TAKEOVER_THRESHOLD  = 0.50
+    # ---------------------------------------------------------
+    fig_name_base = "Figure_4S" if include_clusters else "Figure_4"
+    source_data_dir = dm.get_figure_source_data_dir(EXPERIMENT_NAME, fig_name_base)
+    source_data = {}
+    
 
     sim_dirs = dm.get_simulation_output_dirs(EXPERIMENT_NAME)
     sim_out_dir_1, sim_out_dir_2 = sim_dirs[0], sim_dirs[1]
@@ -323,7 +355,7 @@ def plot_figure_4(include_clusters=False):
     ent_l1 = compute_shannon_entropy(freq_l1)
     ent_c1 = compute_shannon_entropy(freq_c1)
     cmap1 = pm.make_lineages_colormap(dm.get_ssod(sim_out_dir_1, SEED))
-
+    
     # Group 2: Immune waning phenotype model
     l2m2, freq_l2 = load_seed_data(
         sim_out_dir_2,
@@ -376,7 +408,7 @@ def plot_figure_4(include_clusters=False):
 
     # Build the figure + GridSpec depending on include_clusters ─═══════
     if not include_clusters:
-        fig_name = f"Figure_4_{EXPERIMENT_NAME}_seed{SEED}.tiff"
+        fig_name = f"Figure_4_{EXPERIMENT_NAME}_seed{SEED}"
         # Layout: 2 rows × 2 cols
         # Left column: two stack‐+entropy panels
         # Right column: one violin spanning both rows
@@ -391,26 +423,44 @@ def plot_figure_4(include_clusters=False):
 
         # Left, top (0,0): Linear raw + entropy
         ax00 = fig.add_subplot(gs[0, 0])
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
         ax00.set_title("Linear phenotype model")
         draw_stack_entropy(
             ax00,
             freq_l1, ent_l1, cmap1, data_type='Lineage', label='A'
+=======
+        ax00.set_title("Baseline phenotype model")
+        source_data["panel_a_linear_lineage_entropy.csv"] = draw_stack_entropy(
+            ax00, freq_l1, ent_l1, cmap1, data_type='Lineage', label = 'A'
+>>>>>>> main:scripts/paper_figures/Figure_4.py
         )
 
         # Left, bottom (1,0): Immune raw + entropy
         ax10 = fig.add_subplot(gs[1, 0])
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
         ax10.set_title("Immune waning phenotype model")
         draw_stack_entropy(
             ax10,
             freq_l2, ent_l2, cmap2, data_type='Lineage', label='B'
+=======
+        ax10.set_title("IW phenotype model")
+        source_data["panel_b_immune_waning_lineage_entropy.csv"] = draw_stack_entropy(
+            ax10, freq_l2, ent_l2, cmap2, data_type='Lineage', label = 'B'
+>>>>>>> main:scripts/paper_figures/Figure_4.py
         )
 
         # Right (spans rows 0–1, col 1): lineage‐level violin
         ax_violin = fig.add_subplot(gs[:, 1])
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
         draw_violin(ax_violin, scl1, scl2, "Number of selective sweeps", label='C')
+=======
+        source_data["panel_e_violin_lineage_sweeps.csv"] = draw_violin(
+            ax_violin, scl1, scl2, "Number of selective sweeps", label = 'C'
+        )
+>>>>>>> main:scripts/paper_figures/Figure_4.py
 
     else:
-        fig_name = f"Figure_4S_{EXPERIMENT_NAME}_seed{SEED}.tiff"
+        fig_name = f"Figure_4S_{EXPERIMENT_NAME}_seed{SEED}"
         # Layout: 4 rows × 2 cols
         # Left column: four stack‐+entropy panels
         # Right column: two tall violin panels
@@ -425,6 +475,7 @@ def plot_figure_4(include_clusters=False):
 
         # Left, row 0 (freq_l1 + ent_l1)
         ax00 = fig.add_subplot(gs[0, 0])
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
         ax00.set_title("Linear phenotype model")
         draw_stack_entropy(
             ax00,
@@ -437,16 +488,37 @@ def plot_figure_4(include_clusters=False):
         draw_stack_entropy(
             ax01,
             freq_l2, ent_l2, cmap2, data_type='Lineage', label='B'
+=======
+        ax00.set_title("Baseline phenotype model")
+        source_data["panel_a_linear_lineage_entropy.csv"] = draw_stack_entropy(
+             ax00, freq_l1, ent_l1, cmap1, data_type='Lineage', label = 'A', setylabels=False, setxlabel=False
         )
+
+        # Left, row 1 (freq_c1 + ent_c1)
+        ax01 = fig.add_subplot(gs[1, 0], sharex=ax00, sharey=ax00)
+        ax01.set_title("IW phenotype model")
+        source_data["panel_b_immune_waning_lineage_entropy.csv"] = draw_stack_entropy(
+             ax01, freq_l2, ent_l2, cmap2, data_type='Lineage', label = '', setylabels=False
+>>>>>>> main:scripts/paper_figures/Figure_4.py
+        )
+        plt.setp(ax00.get_xticklabels(), visible=False)
+        
         # Right, rows 0–1: lineage‐level violin
         ax_violin1 = fig.add_subplot(gs[0:2, 1])
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
         draw_violin(ax_violin1, scl1, scl2, "Number of selective sweeps",label='E')
         
+=======
+        source_data["panel_e_violin_lineage_sweeps.csv"] = draw_violin(
+            ax_violin1, scl1, scl2, "Number of selective sweeps", label = 'C'
+        )
+>>>>>>> main:scripts/paper_figures/Figure_4.py
         
         # Row 2 - SPACER
 
         # Left, row 2 (freq_l2 + ent_l2)
         ax02 = fig.add_subplot(gs[3, 0])
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
         ax02.set_title("Linear phenotype model")
         draw_stack_entropy(
             ax02,
@@ -459,18 +531,51 @@ def plot_figure_4(include_clusters=False):
         draw_stack_entropy(
             ax03,
             freq_c2, ent_c2, cmap2, data_type='Clustered Lineage', label='D'
+=======
+        ax02.set_title("Baseline phenotype model")
+        source_data["panel_s_c_linear_cluster_entropy.csv"] = draw_stack_entropy(
+            ax02, freq_c1, ent_c1, cmap1, data_type='Clustered Lineage', label = 'B',setylabels=False, setxlabel=False
         )
+      
+        # Left, row 3 (freq_c2 + ent_c2)
+        ax03 = fig.add_subplot(gs[4, 0], sharex=ax02, sharey=ax02)
+        ax03.set_title("IW phenotype model")
+        source_data["panel_s_d_immune_waning_cluster_entropy.csv"] = draw_stack_entropy(
+            ax03, freq_c2, ent_c2, cmap2, data_type='Clustered Lineage', label = '', setylabels=False
+>>>>>>> main:scripts/paper_figures/Figure_4.py
+        )
+        plt.setp(ax02.get_xticklabels(), visible=False)
 
         # Right, rows 2–3: cluster‐level violin
         ax_violin2 = fig.add_subplot(gs[3:5, 1])
+<<<<<<< HEAD:scripts/00_SIMPLICITY_paper_archive/SIMPLICITY_paper_figures/Figure_4.py
         draw_violin(ax_violin2, scc1, scc2, "Number of selective sweeps", label='F')
+=======
+        source_data["panel_s_f_violin_cluster_sweeps.csv"] = draw_violin(
+            ax_violin2, scc1, scc2, "Number of selective sweeps", label = 'D'
+        )
+        
+        # Labels for the A panel group
+        fig.text(0.08, 0.72, 'Lineage Frequency', va='center', rotation='vertical')
+        fig.text(0.56, 0.72, 'Entropy', va='center', rotation='vertical')
+>>>>>>> main:scripts/paper_figures/Figure_4.py
 
-   
-    output_path = os.path.join("Data", fig_name)
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    output_path = os.path.join("Data", f"{fig_name}.png")
+        # Labels for the B panel group
+        fig.text(0.08, 0.29, 'Clustered Lineage Frequency', va='center', rotation='vertical')
+        fig.text(0.56, 0.29, 'Entropy', va='center', rotation='vertical')
+    
+    output_dir = os.path.join("Data", EXPERIMENT_NAME)
+    output_path = os.path.join(output_dir, f"{fig_name}.tiff")
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Figure saved to: {output_path}")
+    
+    output_path = os.path.join(output_dir, f"{fig_name}.png")
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    print(f"Figure saved to: {output_path}")
+    
+    for fname, df in source_data.items():
+        om.write_source_data(df, fname, source_data_dir)
+    
     plt.close(fig)
 
 if __name__ == "__main__":
