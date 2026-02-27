@@ -164,7 +164,7 @@ def main():
     parser.add_argument('--min', type=float, default=1e-5, help="Min NSR for sweep")
     parser.add_argument('--max', type=float, default=1e-3, help="Max NSR for sweep")
     parser.add_argument('--steps', type=int, default=10, help="Number of NSR points")
-    parser.add_argument('--n_seeds', type=int, default=100, help="Seeds per point")
+    parser.add_argument('--seeds', type=int, default=100, help="Seeds per point")
     parser.add_argument('--model', type=str, default='exp', choices=['lin', 'log', 'exp', 'tan'], help="Fit model")
     
     # Target Empirical Parameters (Step 1, 3, & 4)
