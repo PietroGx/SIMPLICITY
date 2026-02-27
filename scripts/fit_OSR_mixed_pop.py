@@ -97,8 +97,15 @@ def fit_calibration_curve(experiment_name, parameter='nucleotide_substitution_ra
         OSR_combined = om.read_combined_OSR_vs_parameter_csv(experiment_name, parameter, min_seq, min_len)
         OSR_mean = om.get_mean_std_OSR(experiment_name, parameter, min_seq, min_len)
         pm.plot_OSR_fit_figure(
-            experiment_name, fit_result, OSR_single, OSR_combined, OSR_mean,
-            model_type, min_seq, min_len
+            experiment_name=experiment_name, 
+            parameter=parameter,                 
+            fit_result=fit_result, 
+            OSR_single=OSR_single, 
+            OSR_combined=OSR_combined, 
+            OSR_mean=OSR_mean,
+            model_type=model_type, 
+            min_seq_number=min_seq, 
+            min_sim_lenght=min_len               
         )
         print(f"[Fitting] SUCCESS. Calibration curve '{model_type}' established.")
         return fit_result
