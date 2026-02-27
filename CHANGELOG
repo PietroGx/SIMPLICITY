@@ -745,6 +745,16 @@
     * renamed normal individuals to standard individuals
     * Added a separate diagnosis reaction (in extrande) for long shedders with an independent rate
     
+2026-27-02 pietro gerletti
+
+    Version 2.2.1
+
+    * Updated poisson process math in mutation.py
+    * Added diagnosed_standard and long counters
+    * Added mixed pop OSR fitting script 
+    * Added test for diagnosis and mutation rate
+    * updated diagnosis_rate.py and the rest of the code accordingly 
+    
     
 	
 	

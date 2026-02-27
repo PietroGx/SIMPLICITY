@@ -54,6 +54,8 @@ class Population:
         self.susceptibles = size - I_0 # number of susceptible individuals
         self.infected     = I_0        # number of infected individuals
         self.diagnosed    = 0          # number of diagnosed individuals
+        self.diagnosed_standard = 0    #
+        self.diagnosed_long     = 0    # 
         self.recovered    = 0          # number of recovered individuals
 
         self.long_shedders = 0   # number of long shedders
@@ -73,15 +75,20 @@ class Population:
                                      # susceptible) 
                                      
         # individuals ---------------------------------------------------------
-        self.individuals = {}          # store individuals data
-        self.reservoir_i    = set()    # set of indices of individuals in the reservoir
+        self.individuals = {}             #  store individuals data
+        self.reservoir_i          = set() # set of indices of individuals in the reservoir
         
-        self.susceptibles_i = set()    # set of susceptible individuals indices  
-        self.infected_i     = set()    # set of infected individuals indices 
-        self.diagnosed_i    = set()    # set of diagnosed individuals indices
-        self.recovered_i    = set()    # set of recovered individuals indices
+        self.susceptibles_i       = set() # set of susceptible individuals indices  
         
-        self.long_shedder_i = set()    # set of long shedder individuals
+        self.infected_i           = set() # set of infected individuals indices 
+        self.long_shedder_i       = set() # set of infected long shedder individuals
+        
+        self.diagnosed_i          = set() # set of diagnosed individuals indices
+        self.diagnosed_standard_i = set() #
+        self.diagnosed_long_i     = set() # 
+        
+        self.recovered_i          = set() # set of recovered individuals indices
+        
         
         
         self.infectious_standard_i = set()
@@ -90,7 +97,7 @@ class Population:
         
         self.detectables_standard_i = set()
         self.detectables_long_i     = set()
-        self.detectables_i         = set() # set of detectable individuals indices 
+        self.detectables_i          = set() # set of detectable individuals indices 
         
         self.exclude_i      = set()    # set to store the newly infected individual (excludes it from states update at time of infection)
         
@@ -142,6 +149,7 @@ class Population:
         
        # ih model -------------------------------------------------------------
         self.update_ih_mode = 'matrix'
+        self.ih_model_parameters = ih_model_parameters
         self.host_model = {'standard': 
                                   h.Host(tau_1=ih_model_parameters["tau_1"],
                                   tau_2=ih_model_parameters["tau_2"],

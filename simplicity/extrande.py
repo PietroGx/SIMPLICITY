@@ -103,8 +103,22 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     beta_long = parameters['R_long']/ tau_inf_long
     
     # print(f'R: {R} Beta: {beta}')
-    k_ds = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate_standard"], parameters["tau_3"])
-    k_dl = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate_long"], parameters["tau_3_long"])
+    k_ds = dr.get_k_d_from_diagnosis_rate(
+        parameters["diagnosis_rate_standard"], 
+        parameters["tau_1"], 
+        parameters["tau_2"], 
+        parameters["tau_3"], 
+        parameters["tau_4"]
+    )
+
+    k_dl = dr.get_k_d_from_diagnosis_rate(
+        parameters["diagnosis_rate_long"], 
+        parameters["tau_1"], 
+        parameters["tau_2"], 
+        parameters["tau_3_long"], 
+        parameters["tau_4"]
+    )
+    
     k_v = parameters["IH_virus_emergence_rate"]
     NSR = parameters["nucleotide_substitution_rate"]
     L = len(ref.get_reference())

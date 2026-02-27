@@ -894,7 +894,7 @@ def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
 #                          Diagnosis rate plots
 # -----------------------------------------------------------------------------
     
-def plot_effective_theoretical_diagnosis_rate(experiment_name):
+def plot_effective_theoretical_diagnosis_rate(experiment_name,individual_type):
     """
     Plot effective vs. theoretical diagnosis rate as a scatter plot with regression fit.
 
@@ -914,7 +914,7 @@ def plot_effective_theoretical_diagnosis_rate(experiment_name):
     std_effective_rates = []
 
     for simulation_output_dir in simulation_output_dirs:
-        diagnosis_rates, std_effective_rate = dr.get_diagnosis_rates(simulation_output_dir)
+        diagnosis_rates, std_effective_rate = dr.get_diagnosis_rates(simulation_output_dir,individual_type)
         diagnosis_rates_coord.append(diagnosis_rates)
         std_effective_rates.append(std_effective_rate)
 
