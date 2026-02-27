@@ -76,6 +76,11 @@ def diagnosis(population, from_long_shedder, seq_rate=0):
     population.active_lineages_n -= population.individuals[diagnosed_individual_i]['IH_lineages_number']
     
     population.diagnosed += 1
+    if from_long_shedder:               
+        population.diagnosed_long += 1
+    else:
+        population.diagnosed_standard += 1
+    
     # set patient as diagnosed
     population.individuals[diagnosed_individual_i]['t_not_infectious'] = population.time
     population.individuals[diagnosed_individual_i]['state'] = 'diagnosed'
@@ -118,7 +123,10 @@ def diagnosis(population, from_long_shedder, seq_rate=0):
     if from_long_shedder:
         population.long_shedder_i.discard(diagnosed_individual_i)
         population.long_shedders -= 1
-
+        population.diagnosed_long_i.add(diagnosed_individual_i)
+    else:
+        population.diagnosed_standard_i.add(diagnosed_individual_i)
+        
     # add a susceptible back in from reservoir
     population.susceptibles += 1
     new_susceptible_index = population.reservoir_i.pop()

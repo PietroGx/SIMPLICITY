@@ -24,7 +24,7 @@ import simplicity.settings_manager as sm
 import concurrent.futures
 
 
-def run_seeded_simulations(experiment_name, run_seeded_simulation, plot_trajectory):
+def run_seeded_simulations(experiment_name, run_seeded_simulation):
     """Implements run_seeded_simulations (see simplicity.runners).
 
     Uses CPython built-in concurrent.futures.ProcessPoolExecutor.
@@ -44,7 +44,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation, plot_trajecto
 
         # submit
         for seeded_simulation_parameters_path in seeded_simulation_parameters_paths:
-            args = (run_seeded_simulation, seeded_simulation_parameters_path, experiment_name, plot_trajectory)
+            args = (run_seeded_simulation, seeded_simulation_parameters_path, experiment_name)
             futures_to_args[pool.submit(*args)] = args
             submitted += 1
         
