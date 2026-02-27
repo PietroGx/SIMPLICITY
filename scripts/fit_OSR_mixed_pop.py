@@ -47,7 +47,7 @@ def get_expected_lineages(t, k_v, cap_min, cap_max):
 
 def calculate_expected_lineage_days(tau_1, tau_2, tau_3, tau_4, k_d, k_v, cap_min, cap_max, dt=0.5):
     """
-    Numerically integrates W = \int N_lin(t) * S(t) dt 
+    Numerically integrates W = int N_lin(t) * S(t) dt 
     """
     # Get matrix B
     B = dr.get_B(tau_1, tau_2, tau_3, tau_4, k_i=k_d)
@@ -242,7 +242,7 @@ def main():
     if args.verify and args.runner != 'slurm':
         if args.runner == 'serial': runner_module = simplicity.runners.serial
         else: runner_module = simplicity.runners.multiprocessing
-        verify_mixed_simulation(runner_module, NSR_base, args.M, args.r, args.target_osr, args.n_seeds)
+        verify_mixed_simulation(runner_module, NSR_base, args.M, args.r, args.target_osr, args.seeds)
 
 if __name__ == "__main__":
     main()
