@@ -84,7 +84,7 @@ def infection_tree(seeded_simulation_output_dir):
         t_not_infectious=0,
         
         fitness_score=0,
-        infection_type='normal',
+        infection_type='standard',
         lineage='wt'
     )
     tree.append(root)

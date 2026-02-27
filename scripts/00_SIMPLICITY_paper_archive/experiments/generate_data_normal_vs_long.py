@@ -29,7 +29,7 @@ from experiment_script_runner import run_experiment_script
 import simplicity.settings_manager as sm
 import argparse
 
-experiment_name =  'generate_data_normal_vs_long'
+experiment_name =  'generate_data_standard_vs_long'
 
 def user_set_experiment_settings():
     

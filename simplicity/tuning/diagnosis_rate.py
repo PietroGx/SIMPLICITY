@@ -28,7 +28,7 @@ import simplicity.settings_manager as sm
 import os 
 import pandas as pd 
 
-def get_B(k_i,tau_3 = 7.5):
+def get_B(k_i,tau_3):
         '''
         Generate the matrix that defines the intra-host model of SARS-CoV-2 
         pathogenesis with diagnosis
@@ -80,7 +80,7 @@ def get_B(k_i,tau_3 = 7.5):
             start = start+c[0]
         return B
 
-def get_diagnosis_rate_in_percent(k_d,tau_3 = 7.5):
+def get_diagnosis_rate_in_percent(k_d,tau_3):
     '''
     refer to method paper to read the math behind this.
     '''
@@ -97,7 +97,7 @@ def get_diagnosis_rate_in_percent(k_d,tau_3 = 7.5):
     prob_t = np.matmul(Bt,p_t0) 
     return prob_t[-1]    
 
-def get_k_d_from_diagnosis_rate(target_diagnosis_rate_in_percent, tau_3 = 7.5):
+def get_k_d_from_diagnosis_rate(target_diagnosis_rate_in_percent, tau_3):
     """
     linear search to find k_d value that correspond to desired diagnosis rate 
     in percent (0.00-1)
@@ -108,7 +108,7 @@ def get_k_d_from_diagnosis_rate(target_diagnosis_rate_in_percent, tau_3 = 7.5):
     max_iter=10000
     step = 0.0001
     k_d = 0.0001
-    diagnosis_rate_in_percent = get_diagnosis_rate_in_percent(k_d)
+    diagnosis_rate_in_percent = get_diagnosis_rate_in_percent(k_d, tau_3)
     iter_count = 0
 
     # Loop until output is close to the target or max iterations reached

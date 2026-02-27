@@ -10,14 +10,14 @@ Panels:
   C: SOD2 lineage frequency (raw)
   D: SOD2 clustered frequency (shared_mut_threshold = --cluster-threshold)
   E: 5 violins of GENETIC distance per TRANSMISSION EVENT:
-     - 7.5d "normal" from BASELINE SOD of --exp-name (SOD with long_shedders_ratio == 0)
+     - 7.5d "standard" from BASELINE SOD of --exp-name (SOD with long_shedders_ratio == 0)
      - one violin per tau_3_long from INDEX filtered by evo=5, R=3, ratio=0.01
        (first experiment #1, first SOD; we aggregate ALL seeds in that SOD)
 
 CLI:
   --cluster-threshold  int
   --seed               int
-  --exp-name           str (default: generate_data_normal_vs_long_#1)
+  --exp-name           str (default: generate_data_standard_vs_long_#1)
   --freq-threshold     float (default: 0.01)  # min peak freq to show a lineage in A/C
   --debug              flag to print diagnostics
 
@@ -166,7 +166,7 @@ def get_sod1_sod2(exp_name, debug=False):
             print("  [DEBUG] SOD:", s)
     return sods[0], sods[1]
 
-def get_exp_normal_sod(exp_name, tol=1e-12, debug=False):
+def get_exp_standard_sod(exp_name, tol=1e-12, debug=False):
     """
     Return the SOD from this experiment whose 'long_shedders_ratio' is zero
     (within tolerance). If none equals zero, return the one with the smallest ratio.
@@ -291,8 +291,8 @@ def collect_groups(exp_name, seed, debug=False):
       baseline_sod, groups_list
     where groups_list = [(label, donor_type, sod_path), ...] with taus sorted.
     """
-    base_sod = get_exp_normal_sod(exp_name, debug=debug)
-    groups = [(BASELINE_TAU_LABEL, "normal", base_sod)]
+    base_sod = get_exp_standard_sod(exp_name, debug=debug)
+    groups = [(BASELINE_TAU_LABEL, "standard", base_sod)]
 
     df = read_index_csv(INDEX_CSV)
     evo = pd.to_numeric(df.get("long_evo_rate_f"), errors="coerce")
@@ -571,8 +571,8 @@ def main():
     ap = argparse.ArgumentParser(description="Build Figure 3 (long shedders) with caching and progress")
     ap.add_argument("--cluster-threshold", type=int, default=5, help="Clustering threshold (default 5)")
     ap.add_argument("--seed", type=int, default=1, help="Seed number for A-D (default 1)")
-    ap.add_argument("--exp-name", type=str, default="generate_data_normal_vs_long_#1",
-                    help="Experiment name (default generate_data_normal_vs_long_#1)")
+    ap.add_argument("--exp-name", type=str, default="generate_data_standard_vs_long_#1",
+                    help="Experiment name (default generate_data_standard_vs_long_#1)")
     ap.add_argument("--freq-threshold", type=float, default=0.05,
                     help="Min peak lineage freq to display in A/C (default 0.01)")
     ap.add_argument("--debug", action="store_true", help="Print debug info (experiments/SODs/SSODs/groups)")

@@ -92,7 +92,7 @@ def infection_tree(data):
         t_infectious=0,
         t_not_infectious=0,
         fitness_score=0,
-        infection_type='normal',
+        infection_type='standard',
         lineage='wt'
     )
     root.inherited_lineage = None  # Patient zero did not inherit from anyone.

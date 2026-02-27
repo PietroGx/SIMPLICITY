@@ -51,71 +51,101 @@ def sub_events(rng, NSR, L, dt, IH_lineages):
     
     return events
 
-def get_individual_mutation_weight(population, i, NSR, L):
+def get_individual_mutation_weight(population, i, rate, L):
+    '''
+    Calculate weight for an individual based on time elapsed since last event.
+    Formula: 1 - exp(-rate * delta_t * L)
+    '''
     delta_t = population.time - population.individuals[i]['time_last_weight_event']
-    weight  = 1 - np.exp(-NSR*delta_t*L)
-    if population.individuals[i]['type'] == 'long_shedder':
-        weight = weight*population.long_evo_rate_f
+    weight  = 1 - np.exp(-rate * delta_t * L)
     return weight
-
 
 def select_positions(population, L, NSR, dt):
     '''
-    Select genome positions to mutate, using per-individual weights scaled by lineage count.
-
+    Select genome positions to mutate using two parallel Poisson processes.
+    
     Returns:
         positions         : list of pooled genome indices to mutate
-        mutating_lineages   : list of [individual_id, lineage_id] per mutation
+        mutating_lineages : list of [individual_id, lineage_id] per mutation
         sub_number        : number of mutations this time step
     '''
     rng = population.rng5
 
-    lineage_list = []
-    weights = []
+    # define Groups 
+    ids_long   = population.long_shedder_i
+    ids_standard = population.infected_i - population.long_shedder_i
 
-    # Step 1: Build full list of active lineages and per-lineage weights
-    for i in sorted(population.infected_i):
-        w_i = get_individual_mutation_weight(population, i, NSR, L)
+    # define Rates
+    rate_standard = NSR
+    rate_long   = population.NSR_long  
+
+    # build Pools and Weights
+    pool_standard = []
+    weights_standard = []
+    # sorted for reproducibility 
+    for i in sorted(ids_standard): 
+        w_i = get_individual_mutation_weight(population, i, rate_standard, L)
         n_lin = population.individuals[i]['IH_lineages_number']
-
         for j in range(n_lin):
-            lineage_list.append([i, j])
-            weights.append(w_i)
+            pool_standard.append([i, j])
+            weights_standard.append(w_i)
 
-    # Step 2: Ensure count matches population record
-    if len(lineage_list) != population.active_lineages_n:
-        raise ValueError("Mismatch in active_lineages_n")
+    pool_long = []
+    weights_long = []
+    for i in sorted(ids_long):
+        w_i = get_individual_mutation_weight(population, i, rate_long, L)
+        n_lin = population.individuals[i]['IH_lineages_number']
+        for j in range(n_lin):
+            pool_long.append([i, j])
+            weights_long.append(w_i)
 
-    total_lineages = len(lineage_list)
+    # poisson draws
+    total_lineages_standard = len(pool_standard)
+    total_lineages_long   = len(pool_long)
 
-    # Step 3: Sample number of substitutions (based on total active lineages)
-    sub_number = sub_events(rng, NSR, L, dt, total_lineages)
+    sub_number_standard = sub_events(rng, rate_standard, L, dt, total_lineages_standard) if total_lineages_standard > 0 else 0
+    sub_number_long   = sub_events(rng, rate_long,   L, dt, total_lineages_long)   if total_lineages_long > 0   else 0
+
+    sub_number = sub_number_standard + sub_number_long
 
     if sub_number == 0:
         return 'No substitutions'
 
-    # Step 4: Normalize weights for sampling
-    weights = np.array(weights, dtype=float)
-    weights /= weights.sum()
-
-    # Step 5: Select which lineages to mutate
-    selected_indices = rng.choice(total_lineages, size=sub_number, replace=True, p=weights)
-
-    positions = []
+    # slect Targets and merge
     mutating_lineages = []
 
-    # Step 6: For each selected lineage, pick random genome position
-    for lineage_idx_in_mutated_set, idx in enumerate(selected_indices):
-        i, j = lineage_list[idx]
+    if sub_number_standard > 0:
+        weights_standard = np.array(weights_standard, dtype=float)
+        w_sum = weights_standard.sum()
+        if w_sum > 0:
+            weights_standard /= w_sum
+        else:
+            weights_standard = np.ones(total_lineages_standard) / total_lineages_standard
+            
+        selected_indices_standard = rng.choice(total_lineages_standard, size=sub_number_standard, replace=True, p=weights_standard)
+        for idx in selected_indices_standard:
+            mutating_lineages.append(pool_standard[idx])
+
+    if sub_number_long > 0:
+        weights_long = np.array(weights_long, dtype=float)
+        w_sum = weights_long.sum()
+        if w_sum > 0:
+            weights_long /= w_sum
+        else:
+            weights_long = np.ones(total_lineages_long) / total_lineages_long
+            
+        selected_indices_long = rng.choice(total_lineages_long, size=sub_number_long, replace=True, p=weights_long)
+        for idx in selected_indices_long:
+            mutating_lineages.append(pool_long[idx])
+
+    # generate pooled ppsitions 
+    positions = []
+    for k in range(sub_number):
         genome_pos = rng.integers(0, L)
-        pooled_pos = lineage_idx_in_mutated_set * L + genome_pos  # matches mutating_lineages
-    
+        pooled_pos = k * L + genome_pos
         positions.append(pooled_pos)
-        mutating_lineages.append([i, j])
 
     return np.array(positions), mutating_lineages, sub_number
-
-
 
 def map_to_lin(positions,L):
     '''
@@ -421,7 +451,7 @@ def update_lineages(population, sub_coord_dicmap):
         
         parent_lineage_genome = population.get_lineage_genome(parent_lineage_name)
         new_lineage_genome = copy.deepcopy(parent_lineage_genome)
-        new_lineage_genome.append([coord[2],coord[3]])
+        new_lineage_genome.append([int(coord[2]), str(coord[3])])
         new_lineage_genome.sort(key=lambda x: x[0])  # sort by position
         
         new_row_dict = {'Time_emergence'  : population.time,

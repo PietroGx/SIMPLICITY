@@ -35,16 +35,10 @@ class Population:
                  size,I_0,
                  ih_model_parameters,
                  rng3,rng4,rng5,rng6,
+                 NSR_long,
                  long_shedders_ratio=0,
-                 long_evo_rate_f = 1,
                  sequence_long_shedders=False,
                  reservoir=100000):
-        
-        # counter for inf reactions
-        self.count_infections = 0
-        # self.count_infections_from_long_shedders = 0
-        
-        # self.DEBUG_update_ih = []
         
         # random number generator
         self.rng3 = rng3 # for intra-host model states update
@@ -52,44 +46,68 @@ class Population:
         self.rng5 = rng5 # for mutation model
         self.rng6 = rng6 # for synthetic sequencing data
         
-        # compartments and population groups ---------------------------------
         self.size = size
-        self.susceptibles = size-I_0 # number of susceptible individuals
-        self.infected     = I_0 # compartment - number of infected individuals
-        self.diagnosed    = 0   # compartment - number of diagnosed individuals
-        self.recovered    = 0   # compartment - number of recovered individuals
-        
         self.long_shedders_ratio = long_shedders_ratio
-        self.long_evo_rate_f = long_evo_rate_f # weight factor for long shedders substitution rate
-        self.long_shedders = 0 # number of long shedders
-        self.sequence_long_shedders = sequence_long_shedders
-         
+        
+        # compartments and population groups ---------------------------------
+        
+        self.susceptibles = size - I_0 # number of susceptible individuals
+        self.infected     = I_0        # number of infected individuals
+        self.diagnosed    = 0          # number of diagnosed individuals
+        self.recovered    = 0          # number of recovered individuals
+
+        self.long_shedders = 0   # number of long shedders
+        
+        self.infectious_standard = 0
+        self.infectious_long     = 0
+        self.infectious          = 0 # number of infectious individuals
+        
+        self.detectables_standard = 0
+        self.detectables_long     = 0
+        self.detectables          = 0 # number of detectable individuals
+        
         self.reservoir = reservoir   # size of total population (not everyone is 
                                      # susceptible at the beginning, when 
                                      # individuals get removed from the system
                                      # new ones from the reservoir become 
                                      # susceptible) 
+                                     
+        # individuals ---------------------------------------------------------
+        self.individuals = {}          # store individuals data
+        self.reservoir_i    = set()    # set of indices of individuals in the reservoir
+        
+        self.susceptibles_i = set()    # set of susceptible individuals indices  
+        self.infected_i     = set()    # set of infected individuals indices 
+        self.diagnosed_i    = set()    # set of diagnosed individuals indices
+        self.recovered_i    = set()    # set of recovered individuals indices
+        
+        self.long_shedder_i = set()    # set of long shedder individuals
         
         
-        self.infectious_normal = 0
-        self.infectious_long   = 0
+        self.infectious_standard_i = set()
+        self.infectious_long_i     = set()
+        self.infectious_i          = set() # set of infectious individuals indices
         
-        self.infectious   = self.infectious_normal + self.infectious_long # number of infectious individuals
-        self.detectables  = 0        # number of detectable individuals
+        self.detectables_standard_i = set()
+        self.detectables_long_i     = set()
+        self.detectables_i         = set() # set of detectable individuals indices 
+        
+        self.exclude_i      = set()    # set to store the newly infected individual (excludes it from states update at time of infection)
         
         # set attributes for evolutionary model ===============================
-        
         self.ref_genome      = ref.get_reference()  # sequence of reference genome
         self.L_lin           = len(self.ref_genome) # lenght of reference genome
         self.active_lineages_n = I_0                # number of IH viruses in the 
                                                     # infected population
+        self.NSR_long = NSR_long # long shedders substitution rate
         
         # Phylogenetic tree data ----------------------------------------------
+        self.sequence_long_shedders = sequence_long_shedders
         self.phylogenetic_data = [{  'Time_emergence'  : 0,
                                      'Lineage_name'    : 'wt',
                                      'Lineage_parent'  : None,
                                      'Genome'          : [],
-                                     'Host_type'       : 'normal',
+                                     'Host_type'       : 'standard',
                                      'Total_infections': 0
                                  }]
         self._phylo_name_map = { row['Lineage_name']: row for row in self.phylogenetic_data }
@@ -99,8 +117,8 @@ class Population:
         
         self.lineage_frequency = [] # count lineage frequency in the population
         
-        # =====================================================================
-        
+        # -------------------------------------------------------------------------   
+
         self.consensus_snapshot = [[[],1,0]] # [sequence, lineage_frequency, w_t(t_sim)]
         self.consensus_sequences_t = [[[],0]] # list to store consensus everytime is calculated in a simulation [consensus,t]
         
@@ -122,15 +140,14 @@ class Population:
         self.R_effective_trajectory = []
         self.fitness_trajectory = []
         
-        
        # ih model -------------------------------------------------------------
         self.update_ih_mode = 'matrix'
-        self.host_model = {'normal': 
+        self.host_model = {'standard': 
                                   h.Host(tau_1=ih_model_parameters["tau_1"],
                                   tau_2=ih_model_parameters["tau_2"],
                                   tau_3=ih_model_parameters["tau_3"],
                                   tau_4=ih_model_parameters["tau_4"],
-                                  update_mode = self.update_ih_mode) ,  # intra host model for normal individuals 
+                                  update_mode = self.update_ih_mode) ,  # intra host model for standard individuals 
         
                            'long_shedder': 
                                   h.Host(tau_1=ih_model_parameters["tau_1"],
@@ -139,25 +156,15 @@ class Population:
                                   tau_4=ih_model_parameters["tau_4"],
                                   update_mode = self.update_ih_mode)   # intra host model for long-shedders
                            }
-        
-        
-        # individuals ---------------------------------------------------------
-        self.individuals = {}          # store individuals data
-        
-        self.reservoir_i    = set()    # set of indices of individuals in the reservoir
-        self.susceptibles_i = set()    # set of susceptible individuals indices  
-        self.infected_i     = set()    # set of infected individuals indices 
-        self.exclude_i      = set()    # set to store the newly infected individual (excludes it from states update at time of infection)
-        self.diagnosed_i    = set()    # set of diagnosed individuals indices
-        self.recovered_i    = set()    # set of recovered individuals indices
-        
-        self.long_shedder_i = set()    # set of long shedder individuals
-        
-        self.infectious_i = set()   # set of infectious individuals indices
-        self.detectable_i        = set()   # set of detectable individuals indices 
+        # -------------------------------------------------------------------------
+        # counter for inf reactions
+        self.count_infections = 0
+        # self.count_infections_from_long_shedders = 0
         
         # dictionary with all individuals data 
         self.individuals = self._init_individuals(size,I_0)
+        
+        
     # -------------------------------------------------------------------------   
     # -------------------------------------------------------------------------
     def _init_individuals(self,size,I_0):
@@ -190,7 +197,7 @@ class Population:
                      't_infectious': None,
                      't_not_infectious': None,
                      
-                     'type'        : 'normal',
+                     'type'        : 'standard',
                      'state_t'     : 0,
                      't_next_state': None,
                      'state'       : 'susceptible',
@@ -226,7 +233,7 @@ class Population:
             dic[i]['state_t']      = 0
             # sample next jump time from exp dist.
             state_t = dic[i]['state_t']
-            rate = - self.host_model['normal'].A[state_t][state_t]
+            rate = - self.host_model['standard'].A[state_t][state_t]
             dic[i]['t_next_state'] = self.rng3.exponential(scale=1/rate) 
             
             dic[i]['state']                     = 'infected'
@@ -258,14 +265,6 @@ class Population:
        genome = next((d['Genome'] for d in self.phylogenetic_data if d['Lineage_name'] == lineage_name))
        # print(f'{lineage_name} Genome: ', genome)
        return genome
-   
-    # def get_next_ih_transition(self):
-    #     ''' Get the next earliest time of an individual ih transition (for look ahead in extrande.)
-    #     '''
-    #     return min(
-    #     (self.individuals[i]['t_next_state'] for i in self.infected_i if self.individuals[i]['t_next_state'] is not None),
-    #     default=float('inf'))
-    
     # -------------------------------------------------------------------------
     #                               Updates
     # -------------------------------------------------------------------------
@@ -274,107 +273,12 @@ class Population:
         # update the time 
         self.time = time
         
-    def _update_states_jump(self):
-        """
-        Update intra-host state for all infected individuals using the jump process.
-        Handles:
-          - advancing intra-host state
-          - scheduling next transition
-          - tracking infectious and detectable status
-          - transitioning recovered individuals
-        """
-        
-        to_update = [
-            i for i in sorted(self.infected_i)
-            if self.individuals[i]['t_next_state'] is not None and self.time >= self.individuals[i]['t_next_state']
-        ]
-
-        # Precompute transitions and rates
-        ids = []
-        scales = []
-        
-        for i in to_update:
-            individual = self.individuals[i]
-            individual['state_t'] += 1  # Move to next intra-host state
-    
-            # Update recovered individuals (state 20 = end of process) 
-            if individual['state_t'] >= 20:
-                individual['state'] = 'recovered'
-                individual['t_not_infectious'] = self.time
-                individual['t_next_state'] = None
-    
-                # Update compartments
-                self.infected -= 1
-                self.recovered += 1
-                
-                # Update sets
-                self.infected_i.remove(i)
-                self.recovered_i.add(i)
-    
-                # Remove from detectable sets if present
-                self.detectable_i.discard(i)
-    
-                # Update active virus count
-                self.active_lineages_n -= individual['IH_lineages_number']
-    
-                # Replace individual from reservoir
-                new_susceptible_index = self.reservoir_i.pop()
-                self.susceptibles_i.add(new_susceptible_index)
-                self.susceptibles += 1
-                continue  
-    
-            
-            # Prepare for vectorized sampling of next intra-host transition time
-            rate = -individual['model'].A[individual['state_t']][individual['state_t']]
-            if rate > 0:
-               ids.append(i)
-               scales.append(1 / rate)
-            else:
-                raise ValueError(f"Invalid transition rate at state {individual['state_t']} for individual {i}")
-    
-            # Update infectious status (states 5–18) 
-            if 4 < individual['state_t'] < 19 and individual['type'] == 'normal':
-                if i not in self.infectious_i:
-                    self.infectious_i.add(i)
-                    individual['t_infectious'] = self.time
-            else:
-                if i in self.infectious_i:
-                    self.infectious_i.remove(i)
-                    individual['t_not_infectious'] = self.time
-    
-            # Update detectable status (states 5–19) 
-            if 4 < individual['state_t'] < 20:
-                self.detectable_i.add(i)
-            else:
-                self.detectable_i.discard(i)
-        
-        # Vectorized sampling of next intra-host transition times
-        if ids:
-            samples = self.rng3.exponential(scale=np.array(scales))
-            for i, dt in zip(ids, samples):
-                self.individuals[i]['t_next_state'] += dt
-        
-        # Update compartments
-        
-        # Infectious but NOT long shedders
-        infectious_normal_i = sorted(self.infectious_i - self.long_shedder_i)
-        # Infectious AND long shedders
-        infectious_long_i = sorted(self.infectious_i & self.long_shedder_i)
-        
-        self.infectious_normal = len(infectious_normal_i)
-        print(self.infectious_normal)
-        self.infectious_long  = len(infectious_long_i)
-        print(self.infectious_long)
-        self.infectious = len(self.infectious_i)
-        assert self.infectious == self.infectious_normal + self.infectious_long 
-        self.detectables = len(self.detectable_i)
-    
     def _update_states_matrix(self, delta_t, individual_type):
         """
         General intra-host state updater for a pop group using its host_model.
         """
         
-        if individual_type == 'normal':
+        if individual_type == 'standard':
             
             infected_to_update = [i for i in self.infected_i if i not in self.exclude_i and 
                                                                 i not in self.long_shedder_i]
@@ -413,7 +317,7 @@ class Population:
     
                 self.infected_i.remove(i)
                 self.infectious_i.discard(i)
-                self.detectable_i.discard(i)
+                self.detectables_i.discard(i)
                 self.recovered_i.add(i)
                 
                 self.long_shedder_i.discard(i)
@@ -433,12 +337,11 @@ class Population:
     
             # Detectable update (5–19)
             if 4 < new_state < 20:
-                if individual_type != 'long_shedder':
-                    self.detectable_i.add(i)
+                self.detectables_i.add(i)
             else:
-                self.detectable_i.discard(i)
+                self.detectables_i.discard(i)
     
-            # Infectious update (5–18 for normal individuals)
+            # Infectious update (5–18 for standard individuals)
             if 4 < new_state < 19:
                 if i not in self.infectious_i:
                     self.infectious_i.add(i)
@@ -460,30 +363,27 @@ class Population:
         self.exclude_i = set()
         
         # Update compartments
+        self.infectious_standard_i = sorted(self.infectious_i - self.long_shedder_i)
+        self.infectious_long_i = sorted(self.infectious_i & self.long_shedder_i)
         
-        # Infectious but NOT long shedders
-        infectious_normal_i = sorted(self.infectious_i - self.long_shedder_i)
-        # Infectious AND long shedders
-        infectious_long_i = sorted(self.infectious_i & self.long_shedder_i)
+        self.detectables_standard_i = sorted(self.detectables_i - self.long_shedder_i)
+        self.detectables_long_i = sorted(self.detectables_i & self.long_shedder_i)
         
-        self.infectious_normal = len(infectious_normal_i)
-        # print('NORMAL: ', self.infectious_normal)
-        self.infectious_long  = len(infectious_long_i)
-        # print('LONG: ',self.infectious_long)
         self.infectious = len(self.infectious_i)
-        assert self.infectious == self.infectious_normal + self.infectious_long 
-        self.detectables = len(self.detectable_i)
+        self.infectious_standard = len(self.infectious_standard_i)
+        self.infectious_long  = len(self.infectious_long_i)
         
+        self.detectables = len(self.detectables_i)
+        self.detectables_long = len(self.detectables_long_i)
+        self.detectables_standard = len(self.detectables_standard_i)
         
-        self.detectables = len(self.detectable_i)
         self.long_shedders = len(self.long_shedder_i)
 
-        
     def update_states(self, delta_t):
         if self.update_ih_mode == "jump":
             self._update_states_jump()
         elif self.update_ih_mode == "matrix":
-            self._update_states_matrix(delta_t,'normal')
+            self._update_states_matrix(delta_t,'standard')
             self._update_states_matrix(delta_t, 'long_shedder')
         else:
             raise ValueError(f"Unknown update_mode: {self.update_mode}")
@@ -607,8 +507,10 @@ def create_population(parameters):
     seed     = parameters['seed']
     
     long_shedders_ratio = parameters['long_shedders_ratio']
-    long_evo_rate_f     = parameters['long_evo_rate_f']
+    M_nsr_long    = parameters['M_nsr_long']
     sequence_long_shedders = parameters['sequence_long_shedders']
+    
+    NSR_long = parameters['nucleotide_substitution_rate'] * M_nsr_long
     
     ih_model_parameters = {
         'tau_1': parameters['tau_1'],
@@ -627,22 +529,8 @@ def create_population(parameters):
     rng6 = randomgen(seeds_generator.integers(0,10000)) # for synthetic sequencing data
     
     # create population
-    pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5,rng6, 
-                     long_shedders_ratio, long_evo_rate_f, sequence_long_shedders)
+    pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5,rng6, NSR_long,
+                     long_shedders_ratio, sequence_long_shedders)
     return pop
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+
