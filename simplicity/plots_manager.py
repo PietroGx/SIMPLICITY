@@ -796,10 +796,10 @@ def plot_intra_host(experiment_name, intra_host_model, time, step):
     
 def plot_comparison_intra_host_models(experiment_name, intra_host_model):
     """
-    Compare intra-host model dynamics for normal vs. long-shedder individuals.
+    Compare intra-host model dynamics for standard vs. long-shedder individuals.
 
     Two curves are plotted:
-    - One for typical infectious period (normal)
+    - One for typical infectious period (standard)
     - One for long shedders (immunocompromised)
 
     Parameters
@@ -814,10 +814,10 @@ def plot_comparison_intra_host_models(experiment_name, intra_host_model):
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    # Normal individual curve
-    t_normal = np.arange(0, 50, 0.1)
-    y_normal = intra_host_model._data_plot_model(0, 50, 0.1)
-    ax.plot(t_normal, y_normal, color='orange', label='Normal')
+    # standard individual curve
+    t_standard = np.arange(0, 50, 0.1)
+    y_standard = intra_host_model._data_plot_model(0, 50, 0.1)
+    ax.plot(t_standard, y_standard, color='orange', label='standard')
 
     # Immunocompromised individual curve
     intra_host_model.A = intra_host_model._matrix(133.5)
@@ -1468,7 +1468,7 @@ def plot_infection_tree(root,
     
     def nodeattrfunc(node):
         
-        if node.infection_type == 'normal':
+        if node.infection_type == 'standard':
             return 'color="{}", label="{}",'.format(get_node_color(node, 
                                                                   coloring, 
                                                                   tree_data, 

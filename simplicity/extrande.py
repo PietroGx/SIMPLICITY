@@ -96,14 +96,15 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     Returns helper functions for extrande (SIMPLICITY engine).
     """
     # model parameters
-    tau_inf_normal = parameters['tau_2'] + parameters['tau_3']
-    beta_normal = parameters["R"] / tau_inf_normal
+    tau_inf_standard = parameters['tau_2'] + parameters['tau_3']
+    beta_standard = parameters["R"] / tau_inf_standard
     
     tau_inf_long = parameters['tau_2'] + parameters['tau_3_long']
     beta_long = parameters['R_long']/ tau_inf_long
     
     # print(f'R: {R} Beta: {beta}')
-    k_d = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate"], parameters["tau_3"])
+    k_ds = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate_standard"], parameters["tau_3"])
+    k_dl = dr.get_k_d_from_diagnosis_rate(parameters["diagnosis_rate_long"], parameters["tau_3_long"])
     k_v = parameters["IH_virus_emergence_rate"]
     NSR = parameters["nucleotide_substitution_rate"]
     L = len(ref.get_reference())
@@ -115,7 +116,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     last_consensus_snapshot = {"t_snapshot": 0, "consensus": []} if use_consensus else None
     
     def compute_upperbound(population):
-        propensities, params = SIDR.SIDR_propensities(population, beta_normal, beta_long, k_d, k_v, seq_rate)
+        propensities, params = SIDR.SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v, seq_rate)
         # a0 = sum(rate for rate, _ in propensities)
         B = np.sum(params) * population.infected
         # print(f"B = {B}")
@@ -181,7 +182,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
                 return reaction_id
     
     def reaction_step(population, B):
-        propensities, _ = SIDR.SIDR_propensities(population, beta_normal, beta_long, k_d, k_v, seq_rate)
+        propensities, _ = SIDR.SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v, seq_rate)
         tau_2 = rng2.uniform(0, B)
         return fire_reaction(population, propensities, tau_2)
     

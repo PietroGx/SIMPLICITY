@@ -135,7 +135,7 @@ def subplot_A_intra_host(ax, tau3_long_values, baseline_tau3=BASELINE_TAU3):
     tvals = np.arange(0, float(TIME_GRID_DAYS), 1.0)
     color_map = {}
 
-    # Baseline (normal) first
+    # Baseline (standard) first
     try:
         host = ih.Host(tau_1=2.86, tau_2=3.91, tau_3=float(baseline_tau3), tau_4=8.0)
         y = host.data_plot_ih_solution(0, TIME_GRID_DAYS, 1)[0]
@@ -192,13 +192,13 @@ def subplot_B_violins(ax, df_index, tau3_long_values, seed_number, baseline_tau3
         if sod is not None:
             ssod = get_ssod_for_seed(sod, seed_number)
             if ssod is not None:
-                dur = durations_for_group_from_ssod(ssod, which_type="normal")
+                dur = durations_for_group_from_ssod(ssod, which_type="standard")
                 if dur.size > 0:
                     labels.append(f"{float(baseline_tau3):g}d")
                     data.append(dur)
                     colors.append(color_map.get(float(baseline_tau3), None))
                 else:
-                    print("[WARN] No durations found for baseline (normal) violin.")
+                    print("[WARN] No durations found for baseline (standard) violin.")
         else:
             print(f"[WARN] Skipping baseline violin; no SOD for '{exp_name}'.")
 

@@ -23,22 +23,23 @@ Created on Fri Mar 28 12:51:33 2025
 """
 import numpy as np
 
-def SIDR_propensities(population, beta_normal, beta_long, k_d, k_v, seq_rate):
-    propensities_params = [beta_normal, beta_long, k_d, k_v]
+def SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v, seq_rate):
+    propensities_params = [beta_standard, beta_long, k_ds, k_dl, k_v]
     # system propensities
     # reaction_id, reaction_rate, action
     propensities = [
-        ('infection_normal', beta_normal * population.infectious_normal, lambda: infection(population, from_long_shedder=False)),
-        ('infection_long',   beta_long * population.infectious_long  ,   lambda: infection(population, from_long_shedder=True)),
-        ('diagnosis',        k_d * population.detectables,               lambda: diagnosis(population, seq_rate)),
-        ('add_ih_lineage',   k_v * population.infected,                  lambda: add_lineage(population))
+        ('infection_standard', beta_standard * population.infectious_standard, lambda: infection(population, from_long_shedder=False)),
+        ('infection_long',     beta_long * population.infectious_long  ,       lambda: infection(population, from_long_shedder=True)),
+        ('diagnosis_standard', k_ds * population.detectables_standard,         lambda: diagnosis(population, from_long_shedder=False, seq_rate=seq_rate)),
+        ('diagnosis_long',     k_dl * population.detectables_long,             lambda: diagnosis(population, from_long_shedder=True, seq_rate=seq_rate)),
+        ('add_ih_lineage',     k_v * population.infected,                      lambda: add_lineage(population))
     ]
     # print('a1:',beta * population.infectious)
     # print('a2:',k_d * population.detectables)
     # print('a3:',k_v * population.infected)
     return propensities, propensities_params
 
-def diagnosis(population, seq_rate=0):
+def diagnosis(population, from_long_shedder, seq_rate=0):
     '''
     Select an infected (and detectable) individual at random and tags it
     as "diagnosed". Update the infected and diagnosed compartments. 
@@ -46,9 +47,13 @@ def diagnosis(population, seq_rate=0):
     '''
     population.infected -= 1
     
-    # select random patient to be diagnosed
-    diagnosed_individual_i = population.rng4.choice(sorted(population.detectable_i))
-    
+    if from_long_shedder:
+        # select random patient to be diagnosed
+        diagnosed_individual_i = population.rng4.choice(population.detectables_long_i)
+    else:
+        # select random patient to be diagnosed
+        diagnosed_individual_i = population.rng4.choice(population.detectables_standard_i)
+        
     if population.rng6.uniform(0, 1) < seq_rate:
         # store sequencing data
         # patient_id, time, genome, subst number, patient type, infection duration, ih lineage number
@@ -87,12 +92,32 @@ def diagnosis(population, seq_rate=0):
         population.infectious_i.remove(diagnosed_individual_i)
         population.infectious -= 1
     
-    population.detectable_i.remove(diagnosed_individual_i)
+        if from_long_shedder:
+            population.infectious_long -= 1
+            population.infectious_long_i.remove(diagnosed_individual_i)
+        else: 
+            population.infectious_standard -= 1
+            population.infectious_standard_i.remove(diagnosed_individual_i)
+    
+    # update detectables
+    population.detectables_i.remove(diagnosed_individual_i)
     population.detectables -= 1
+    
+    if from_long_shedder:
+        population.detectables_long -= 1
+        population.detectables_long_i.remove(diagnosed_individual_i)
+    else:
+        population.detectables_standard -= 1
+        population.detectables_standard_i.remove(diagnosed_individual_i)
     
     # update diagnosed and infected
     population.infected_i.discard(diagnosed_individual_i)
     population.diagnosed_i.add(diagnosed_individual_i)
+    
+    # update long shedders
+    if from_long_shedder:
+        population.long_shedder_i.discard(diagnosed_individual_i)
+        population.long_shedders -= 1
 
     # add a susceptible back in from reservoir
     population.susceptibles += 1
@@ -117,7 +142,7 @@ def infect_long_shedder(population, new_infected_index):
         
     
     else:
-        individual_type = 'normal'
+        individual_type = 'standard'
         
     return individual_type
 
@@ -160,14 +185,6 @@ def infection(population, from_long_shedder=False):
     new_inf['t_infection'] = population.time
     # state
     new_inf['state'] = 'infected'
-    
-    if population.update_ih_mode == 'jump':
-        # Sample first jump time from exponential distribution
-        individual_type = new_inf['type']
-        rate = - population.host_model[individual_type].A[0][0]
-        new_inf['t_next_state'] = (
-        population.time + population.rng3.exponential(scale=1 / rate)
-        )
         
     # parent
     new_inf['parent'] = parent

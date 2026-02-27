@@ -89,7 +89,7 @@ def get_clustering_for_ssod(
             "label": labels_s.get(clade, ""),
             "n_lineages": len(lineages),
             "n_defining": len(definers_list),
-            "n_def_normal": sum(1 for d in definers_list if str(d.get("host_type","")).lower().startswith("normal")),
+            "n_def_standard": sum(1 for d in definers_list if str(d.get("host_type","")).lower().startswith("standard")),
             "n_def_long":   sum(1 for d in definers_list if "long" in str(d.get("host_type","")).lower()),
             "lineages": repr(lineages),
             "defining_mutations": repr(definers_list),
@@ -196,7 +196,7 @@ def cluster_lin_into_clades_with_meta(
         if v.startswith("long"):
             return "long_shedder"
         if v.startswith("norm"):
-            return "normal"
+            return "standard"
         if v in ("", "none", "nan", "unknown"):
             return None
         return v
@@ -277,16 +277,16 @@ def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame],
     - If the per-clade defining-mutation table is empty:
         * If parent_clade is None => label = 'founder' (root clade).
 
-    - Otherwise, every defining mutation must have host_type in {'normal','long_shedder'}.
+    - Otherwise, every defining mutation must have host_type in {'standard','long_shedder'}.
       If any definer has missing/unknown host_type => raise ValueError.
       
-    - Majority vote between 'normal' and 'long_shedder' determines the label.
+    - Majority vote between 'standard' and 'long_shedder' determines the label.
       If a tie somehow occurs, label 'mixed'.
 
     Returns
     -------
-    clade_labels : pd.Series mapping clade -> {'normal','long_shedder','founder','mixed'}
-    clade_summary_df : DataFrame with ['clade','total_normal','total_long_shedder','total_unknown','label']
+    clade_labels : pd.Series mapping clade -> {'standard','long_shedder','founder','mixed'}
+    clade_summary_df : DataFrame with ['clade','total_standard','total_long_shedder','total_unknown','label']
     """
     labels = {}
     rows = []
@@ -302,7 +302,7 @@ def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame],
                 labels[clade] = "founder"
                 rows.append({
                     "clade": clade,
-                    "total_normal": 0,
+                    "total_standard": 0,
                     "total_long_shedder": 0,
                     "total_unknown": 0,
                     "label": "founder",
@@ -321,14 +321,14 @@ def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame],
             "long": "long_shedder",
             "long-shedder": "long_shedder",
             "longshedder": "long_shedder",
-            "norm": "normal",
+            "norm": "standard",
             "none": "unknown",
             "nan": "unknown",
             "": "unknown",
         })
 
         counts = tmp["host_type"].value_counts(dropna=False).to_dict()
-        total_normal = int(counts.get("normal", 0))
+        total_standard = int(counts.get("standard", 0))
         total_long   = int(counts.get("long_shedder", 0))
         total_unknown = int(counts.get("unknown", 0))
 
@@ -336,13 +336,13 @@ def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame],
             bad = tmp[tmp["host_type"] == "unknown"].head(5)
             raise ValueError(
                 f"[label_clades_from_definers] Found {total_unknown} 'unknown' definers in clade '{clade}'. "
-                f"Expected only 'normal'/'long_shedder'. Examples:\n{bad}"
+                f"Expected only 'standard'/'long_shedder'. Examples:\n{bad}"
             )
 
-        if total_long > total_normal:
+        if total_long > total_standard:
             label = "long_shedder"
-        elif total_normal > total_long:
-            label = "normal"
+        elif total_standard > total_long:
+            label = "standard"
         else:
             # should not happen if threshold is odd
             label = "mixed"
@@ -350,7 +350,7 @@ def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame],
         labels[clade] = label
         rows.append({
             "clade": clade,
-            "total_normal": total_normal,
+            "total_standard": total_standard,
             "total_long_shedder": total_long,
             "total_unknown": total_unknown,
             "label": label
@@ -358,7 +358,7 @@ def label_clades_from_definers(per_clade_mut_df: dict[str, pd.DataFrame],
 
     clade_labels = pd.Series(labels)
     clade_summary_df = pd.DataFrame(
-        rows, columns=["clade","total_normal","total_long_shedder","total_unknown","label"]
+        rows, columns=["clade","total_standard","total_long_shedder","total_unknown","label"]
     )
     return clade_labels, clade_summary_df
 

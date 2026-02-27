@@ -130,7 +130,7 @@ def _fastest_growth_winner(F_clade: pd.DataFrame, lower=0.01, upper=0.50, sustai
 
 def _label_for_pie(raw_label: str):
     """
-    Normalize labels to {'normal','long','mixed','founder'}.
+    Normalize labels to {'standard','long','mixed','founder'}.
     Safe against None/NaN.
     """
     if raw_label is None:
@@ -145,7 +145,7 @@ def _label_for_pie(raw_label: str):
     if v.startswith("long"):
         return "long"
     if v.startswith("norm"):
-        return "normal"
+        return "standard"
     if v == "mixed":
         return "mixed"
     if v == "founder":
@@ -180,12 +180,12 @@ def compute_clade_metric_winners_for_ssod(exp_name: str, sod: str, ssod: str, cl
         if not clade:
             return None
         raw = clade_labels.get(clade)
-        if raw in ("normal", "long_shedder", "founder"):
+        if raw in ("standard", "long_shedder", "founder"):
             return _label_for_pie(raw)
         row = clade_meta_df.loc[clade_meta_df["clade"] == clade]
         if not row.empty and (row["parent_clade"].iloc[0] is None or row["n_defining"].iloc[0] == 0):
             return "founder"
-        return _label_for_pie(raw if raw is not None else "normal")
+        return _label_for_pie(raw if raw is not None else "standard")
 
     F_nr = F_clade.reindex(columns=non_root).dropna(axis=1, how="all") if non_root else F_clade.iloc[:, 0:0]
 
@@ -218,8 +218,8 @@ def add_clade_and_panel_legend(fig, fontsize=10, pad=0.012):
     from matplotlib.patches import Patch
     from matplotlib.transforms import Bbox
 
-    colors = {"normal":"#4daf4a","long":"#e41a1c","mixed":"#377eb8","founder":"#8172B2"}
-    label_order = ["normal","long","mixed","founder"]
+    colors = {"standard":"#4daf4a","long":"#e41a1c","mixed":"#377eb8","founder":"#8172B2"}
+    label_order = ["standard","long","mixed","founder"]
     clade_handles = [Patch(facecolor=colors[k], edgecolor="white", label=k) for k in label_order]
 
     panel_desc = ["i. Peak frequency",
@@ -303,14 +303,14 @@ def summarize_sod_to_pies(experiment_name: str,
 
     df = pd.DataFrame(results)
 
-    # Normalize labels to {'normal','long','mixed','founder'}; leave NaN as-is
+    # Normalize labels to {'standard','long','mixed','founder'}; leave NaN as-is
     for col in ["peak_label", "burden_label", "survival_label", "growth_label"]:
         df[col] = df[col].map(_label_for_pie)
 
     # Counting helper
     def _counts(col_name: str):
         s = df[col_name].dropna()
-        order = ["normal", "long", "mixed", "founder"]
+        order = ["standard", "long", "mixed", "founder"]
         c = s.value_counts().reindex(order, fill_value=0)
         n = int(c.sum())
         return c, n
@@ -326,8 +326,8 @@ def summarize_sod_to_pies(experiment_name: str,
         fig = axes[0].figure
 
     # Visual config
-    colors = {"normal": "#4daf4a", "long": "#e41a1c", "mixed": "#377eb8", "founder": "#8172B2"}
-    label_order = ["normal", "long", "mixed", "founder"]
+    colors = {"standard": "#4daf4a", "long": "#e41a1c", "mixed": "#377eb8", "founder": "#8172B2"}
+    label_order = ["standard", "long", "mixed", "founder"]
     metrics = ["peak_label", "burden_label", "survival_label", "growth_label"]
     panel_labels = ["i.", "ii.", "iii.", "iv."]
     panel_titles = {

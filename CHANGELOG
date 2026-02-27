@@ -737,7 +737,15 @@
     * updated osr_long script and om_manager to write long sequencing data correctly
 	
 	
-	
+2026-24-02 pietro gerletti
+
+    Version 2.2.0
+
+    * Updated mutation model to allow separate poisson process for each subpopulation (heterogeneous rates)
+    * renamed normal individuals to standard individuals
+    * Added a separate diagnosis reaction (in extrande) for long shedders with an independent rate
+    
+    
 	
 	
 	

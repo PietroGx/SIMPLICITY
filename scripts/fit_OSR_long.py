@@ -98,7 +98,7 @@ def plot_osr_df_scatter(df, parameter_name, experiment_name, individual_type=Non
     palette = sns.color_palette("tab20", n_colors=n_colors)
     param_to_color = dict(zip(unique_params, palette))
 
-    # Plot Normal
+    # Plot standard
     sns.stripplot(
         data=df_sorted[df_sorted['is_outlier'] == 0], 
         x='param_str',           
@@ -130,7 +130,7 @@ def plot_osr_df_scatter(df, parameter_name, experiment_name, individual_type=Non
     
     # Legend
     legend_elements = [
-        Line2D([0], [0], marker='o', color='w', label='Normal',
+        Line2D([0], [0], marker='o', color='w', label='standard',
                markerfacecolor='gray', markersize=8),
         Line2D([0], [0], marker='X', color='w', label='Outlier',
                markeredgecolor='gray', markersize=8, linestyle='None')
@@ -309,16 +309,16 @@ def main():
     parser.add_argument('--factor-steps', type=int, default=15)
 
     # Targets
-    parser.add_argument('--target-osr-normal', type=float, required=True, help="Target OSR for Normal Hosts")
+    parser.add_argument('--target-osr-standard', type=float, required=True, help="Target OSR for standard Hosts")
     parser.add_argument('--target-osr-ls', type=float, required=True, help="Target OSR for Long Shedders")
 
     args = parser.parse_args()
 
     # --------------------------------------------------------------------------
-    # STAGE 1: CALIBRATE NSR (Normal Hosts)
+    # STAGE 1: CALIBRATE NSR (standard Hosts)
     # --------------------------------------------------------------------------
     print("\n" + "="*60)
-    print("STAGE 1: Calibrating Baseline NSR (Normal Hosts)")
+    print("STAGE 1: Calibrating Baseline NSR (standard Hosts)")
     print("="*60)
     
     exp_name_1 = f"{args.name}_Step1"
@@ -330,7 +330,7 @@ def main():
     
     # 1.2 Run Fitting
     fit_res_1, model_1 = run_fitting_step(
-        exp_name_1, args.exp_num, 'nucleotide_substitution_rate', 'normal'
+        exp_name_1, args.exp_num, 'nucleotide_substitution_rate', 'standard'
     )
     
     if not fit_res_1:
@@ -338,9 +338,9 @@ def main():
         return
 
     # 1.3 Calculate Calibrated NSR
-    calibrated_nsr = er.compute_calibrated_parameter(model_1, fit_res_1, args.target_osr_normal)
+    calibrated_nsr = er.compute_calibrated_parameter(model_1, fit_res_1, args.target_osr_standard)
     print(f"\n>> STAGE 1 COMPLETE")
-    print(f">> Target OSR (Normal): {args.target_osr_normal}")
+    print(f">> Target OSR (standard): {args.target_osr_standard}")
     print(f">> Calibrated NSR:      {calibrated_nsr:.6e}")
     
     
