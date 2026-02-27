@@ -50,7 +50,7 @@ def calculate_expected_lineage_days(tau_1, tau_2, tau_3, tau_4, k_d, k_v, cap_mi
     Numerically integrates W = int N_lin(t) * S(t) dt 
     """
     # Get matrix B
-    B = dr.get_B(tau_1, tau_2, tau_3, tau_4, k_i=k_d)
+    B = dr.get_B(tau_1, tau_2, tau_3, tau_4, k_d=k_d)
     
     # Setup the numerical integration
     W = 0.0
