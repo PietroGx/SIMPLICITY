@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 import argparse
 import numpy as np
 import scipy.linalg
@@ -13,7 +14,6 @@ import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
 import simplicity.dir_manager as dm
 
-from simplicity.runme import run_experiment
 from experiments.experiment_script_runner import run_experiment_script
 
 def generate_homogeneous_settings(min_nsr, max_nsr, steps, n_seeds):
@@ -38,30 +38,27 @@ def generate_homogeneous_settings(min_nsr, max_nsr, steps, n_seeds):
 
     return user_set_experiment_settings
 
+
 def get_expected_lineages(t, k_v, cap_min, cap_max):
     """Calculates E[N_lin(t)] averaged over the uniform distribution of caps."""
     caps = np.arange(cap_min, cap_max + 1)
-    # Lineages grow linearly, but cannot exceed the cap
     lineages = np.minimum(1 + k_v * t, caps)
     return np.mean(lineages)
 
+
 def calculate_expected_lineage_days(tau_1, tau_2, tau_3, tau_4, k_d, k_v, cap_min, cap_max, dt=0.5):
-    """
-    Numerically integrates W = int N_lin(t) * S(t) dt 
-    """
-    # Get matrix B
+    """Numerically integrates W = int N_lin(t) * S(t) dt """
     B = dr.get_B(tau_1, tau_2, tau_3, tau_4, k_d=k_d)
     
-    # Setup the numerical integration
     W = 0.0
-    p = np.zeros(21) # Note: get_B returns a 21x21 matrix (including the 0 column at the end)
+    p = np.zeros(21) 
     p[0] = 1.0 
     
     B_dt = scipy.linalg.expm(B * dt)
     t = 0.0
     
     while True:
-        S_t = np.sum(p[0:20]) # Only sum the 20 transient infected states
+        S_t = np.sum(p[0:20]) 
         
         if S_t < 1e-6:
             break
@@ -73,6 +70,7 @@ def calculate_expected_lineage_days(tau_1, tau_2, tau_3, tau_4, k_d, k_v, cap_mi
         t += dt
         
     return W
+
 
 def fit_calibration_curve(experiment_name, parameter='nucleotide_substitution_rate', 
                           min_seq=30, min_len=100, model_type='exp'):
@@ -114,6 +112,7 @@ def fit_calibration_curve(experiment_name, parameter='nucleotide_substitution_ra
         print(f"[Error] Curve fitting failed: {e}")
         return None
 
+
 def calculate_time_fractions(r, T_norm, T_long):
     """Calculates F_norm and F_long (Equations 10 & 11)."""
     denominator = ((1 - r) * T_norm) + (r * T_long)
@@ -121,10 +120,11 @@ def calculate_time_fractions(r, T_norm, T_long):
     F_long = (r * T_long) / denominator
     return F_norm, F_long
 
-def verify_mixed_simulation(runner_module, NSR_base, M, r, target_osr, n_seeds):
+
+def verify_mixed_simulation(runner_type, NSR_base, M, r, target_osr, n_seeds, exp_num):
     """Runs a single mixed simulation using the derived parameters to verify the math."""
     print("\n[Verification] Launching verification simulation...")
-    exp_name = "Verification_Mixed_OSR_Run"
+    verify_name = "Verification_Mixed_OSR"
     
     def verify_settings():
         varying_params = {}
@@ -138,13 +138,18 @@ def verify_mixed_simulation(runner_module, NSR_base, M, r, target_osr, n_seeds):
         }
         return (varying_params, fixed_params, n_seeds) 
 
-    run_experiment(exp_name, verify_settings, simplicity_runner=runner_module, archive_experiment=False)
+    # Dispatch using the robust wrapper script
+    run_experiment_script(runner_type, exp_num, verify_settings, verify_name)
     
+    exp_numbered_name = f"{verify_name}_#{exp_num}"
+
     # Calculate Global OSR of the mixed run
-    sim_dirs = dm.get_simulation_output_dirs(exp_name)
-    if not sim_dirs: return
+    sim_dirs = dm.get_simulation_output_dirs(exp_numbered_name)
+    if not sim_dirs: 
+        print(f"[Verification Error] No directories found for {exp_numbered_name}.")
+        return
     
-    seq_df_mixed = om.create_combined_sequencing_df(sim_dirs[0], individual_type=None) # None = Global Mix
+    seq_df_mixed = om.create_combined_sequencing_df(sim_dirs[0], individual_type=None) 
     if seq_df_mixed is not None and not seq_df_mixed.empty:
         fit_mixed = er.tempest_regression(seq_df_mixed)
         actual_osr = fit_mixed.coef_[0]
@@ -159,21 +164,47 @@ def verify_mixed_simulation(runner_module, NSR_base, M, r, target_osr, n_seeds):
         print("=========================================================\n")
 
 
+def save_calculated_parameters(exp_numbered_name, target_osr, M, r, F_norm, F_long, NSR_eff, NSR_base):
+    """Saves the math output to a text file in the experiment directory."""
+    out_dir = os.path.join("Data", exp_numbered_name)
+    os.makedirs(out_dir, exist_ok=True)
+    out_file = os.path.join(out_dir, "calculated_parameters.txt")
+    
+    with open(out_file, "w") as f:
+        f.write("=========================================================\n")
+        f.write(" CALIBRATION PIPELINE RESULTS\n")
+        f.write("=========================================================\n")
+        f.write(f" Target OSR mixed     : {target_osr:.6f}\n")
+        f.write(f" Target Multiplier (M): {M:.2f}\n")
+        f.write(f" Population ratio (r) : {r:.4f}\n")
+        f.write(f" Time Fractions       : F_norm = {F_norm:.3f}, F_long = {F_long:.3f}\n")
+        f.write("---------------------------------------------------------\n")
+        f.write(f" NSR required         : {NSR_eff:.6e}\n")
+        f.write(f" Calculated NSR_base    : {NSR_base:.6e}\n")
+        f.write(f" Calculated NSR_long    : {NSR_base * M:.6e}\n")
+        f.write("=========================================================\n")
+    print(f"[Pipeline] Saved calculation summary to {out_file}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Heterogeneous Evolutionary Rate Calibration Pipeline")
     
     # Runner Settings
-    parser.add_argument('--name', type=str, default="Calibration_Sweep", help="Experiment Name")
+    parser.add_argument('--name', type=str, default="calibration_run", help="Experiment Name")
     parser.add_argument('--runner', type=str, choices=['serial', 'multiprocessing', 'slurm'], default='serial')
     parser.add_argument('--exp-num', type=int, default=1)
     
     # Sweep Parameters (Step 2)
     parser.add_argument('--min', type=float, default=1e-5, help="Min NSR for sweep")
-    parser.add_argument('--max', type=float, default=1e-3, help="Max NSR for sweep")
+    parser.add_argument('--max', type=float, default=1e-2, help="Max NSR for sweep")
     parser.add_argument('--steps', type=int, default=10, help="Number of NSR points")
     parser.add_argument('--seeds', type=int, default=100, help="Seeds per point")
     parser.add_argument('--model', type=str, default='exp', choices=['lin', 'log', 'exp', 'tan'], help="Fit model")
     
+    # Filter Parameters for regression
+    parser.add_argument('--min-seq', type=int, default=30, help="Minimum sequences required to keep simulation")
+    parser.add_argument('--min-len', type=int, default=100, help="Minimum simulation length (days) required")
+
     # Target Empirical Parameters (Step 1, 3, & 4)
     parser.add_argument('--target-osr', type=float, required=True, help="Empirical mixed OSR to target (e.g., 0.0008)")
     parser.add_argument('--M', type=float, required=True, help="Empirical rate multiplier (OSR_long / OSR_norm)")
@@ -190,11 +221,16 @@ def main():
 
     # --- STEP 2: Homogeneous Sweep ---
     settings_func = generate_homogeneous_settings(args.min, args.max, args.steps, args.seeds)
-    print("\n[Pipeline] Phase 1: Launching homogeneous calibration sweep...")
+    print(f"\n[Pipeline] Phase 1: Launching homogeneous calibration sweep...")
     run_experiment_script(args.runner, args.exp_num, settings_func, args.name)
     
     # --- STEP 2b: Fit Curve ---
-    fit_result = fit_calibration_curve(experiment_numbered_name, model_type=args.model)
+    fit_result = fit_calibration_curve(
+        experiment_numbered_name, 
+        model_type=args.model, 
+        min_seq=args.min_seq, 
+        min_len=args.min_len
+    )
     if not fit_result: return
 
     # --- STEP 3: Inverse Math (NSR_eff) ---
@@ -245,11 +281,12 @@ def main():
     print(f" Calculated NSR_long    : {NSR_base * args.M:.6e}")
     print("=========================================================\n")
 
+    # Save output to txt file
+    save_calculated_parameters(experiment_numbered_name, args.target_osr, args.M, args.r, F_norm, F_long, NSR_eff, NSR_base)
+
     # --- Verify the Math ---
-    if args.verify and args.runner != 'slurm':
-        if args.runner == 'serial': runner_module = simplicity.runners.serial
-        else: runner_module = simplicity.runners.multiprocessing
-        verify_mixed_simulation(runner_module, NSR_base, args.M, args.r, args.target_osr, args.seeds)
+    if args.verify:
+        verify_mixed_simulation(args.runner, NSR_base, args.M, args.r, args.target_osr, args.seeds, args.exp_num)
 
 if __name__ == "__main__":
     main()

@@ -28,8 +28,8 @@ def immune_waning_fitness_score(population,lineage_genome,consensus):
     
     fitness_score = infected_fraction*distance_from_weighted_consensus + non_infected_fraction/population.active_lineages_n
     
-    epsilon = 1e-6  # fitness floor
-    fitness_score = max(fitness_score, epsilon)
+    #epsilon = 1e-6  # fitness floor
+    #fitness_score = max(fitness_score, epsilon)
     
     return fitness_score
 
