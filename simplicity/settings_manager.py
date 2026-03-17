@@ -510,6 +510,23 @@ def read_OSR_NSR_regressor_parameters():
     df = pd.read_csv(file_path,index_col=0)
     best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
     return best_fit_df
+    
+def get_n_seeds_from_experiment_settings(experiment_name):
+    """Reads n_seeds from the specific setting JSON file."""
+    
+    # Use the exact helper you specified
+    settings_dir = dm.get_experiment_settings_dir(experiment_numbered_name)
+    
+    # Use the exact naming convention
+    file_path = os.path.join(settings_dir, f"{experiment_numbered_name}_n_seeds.json")
+    
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Missing seeds setting file: {file_path}")
+        
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+        
+    return int(data['n_seeds'])
 
 
 

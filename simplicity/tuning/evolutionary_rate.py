@@ -56,14 +56,14 @@ def factory_model_func(model_type: str):
     def linear_model(x, A, B):
         return A * x + B
 
-    def log_model(x, A, B, C):
-        return A * np.log(B * x + C)
+    def log_model(x, A, B):
+        return A * np.log(B * x)
 
-    def exp_model(x, A, B, C):
-        return A * x**B + C
+    def exp_model(x, A, B):
+        return A * x**B 
 
-    def tan_model(x, A, B, C, D):
-        return A * np.tan(B * x - C) + D
+    def tan_model(x, A, B, C):
+        return A * np.tan(B * x - C)
     
     # Define knot positions for the spline 
     knots = np.logspace(-3, 0, 6)
@@ -95,23 +95,21 @@ def factory_model_lmfit(model_type: str):
     elif model_type == 'log':
         model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
-        params = model.make_params(A=1, B=1, C=1)
+        params = model.make_params(A=0.9, B=0.7)
         # Set boundaries for parameters
         params['B'].set(min=0.000001)  
-        params['C'].set(min=0.000001)
         return model, params 
     
     elif model_type == 'exp':
         model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
-        params = model.make_params(A=0.9, B=0.7, C=0.5)
-
+        params = model.make_params(A=0.9, B=0.7)
         return model, params 
     
     elif model_type == 'tan':
         model = lmfit.Model(factory_model_func(model_type))
         # Set initial parameter guesses 
-        params = model.make_params(A=1, B=1, C=0, D=0)
+        params = model.make_params(A=1, B=1, C=0)
         return model, params 
     
     if model_type == 'spline':
@@ -210,30 +208,28 @@ def inverse_linear_regressor(OSR, params):
 
 def inverse_log_regressor(OSR, params):
     """
-    Computes inverse of: y = A * log(B * x + C)
-    Returns: x = (exp(y / A) - C) / B
+    Computes inverse of: y = A * log(B * x)
+    Returns: x = (exp(y / A)) / B
     """
     A = params.get('A', 1)
     B = params.get('B', 1)
-    C = params.get('C', 0)
     
     if A == 0:
         raise ValueError("Parameter A is zero; cannot invert log function.")
     if B == 0:
         raise ValueError("Parameter B is zero; cannot invert log function.")
     
-    # x = (exp(y/A) - C) / B
-    val = (np.exp(OSR / A) - C) / B
+    # x = (exp(y/A)) / B
+    val = (np.exp(OSR / A)) / B
     return val
     
 def inverse_exp_regressor(OSR, params):
     """
-    Computes inverse of: y = A * x**B + C
-    Returns: x = ((y - C) / A) ** (1/B)
+    Computes inverse of: y = A * x**B 
+    Returns: x = ((y) / A) ** (1/B)
     """
     A = params.get('A', 1)
     B = params.get('B', 1)
-    C = params.get('C', 0)
     
     if A == 0 or B == 0:
         raise ValueError("Parameters A and B must be non-zero.")
@@ -241,26 +237,25 @@ def inverse_exp_regressor(OSR, params):
     # Ensure domain validity if possible
     # if np.any(OSR - C <= 0): ... (checked by caller or numpy raises warning)
 
-    NSR = ((OSR - C) / A) ** (1 / B)
+    NSR = ((OSR) / A) ** (1 / B)
     return NSR
 
 def inverse_tan_regressor(OSR, params):
     """
-    Computes inverse of: y = A * tan(B * x - C) + D
-    Returns: x = (arctan((y - D) / A) + C) / B
+    Computes inverse of: y = A * tan(B * x - C)
+    Returns: x = (arctan((y) / A) + C) / B
     """
     A = params.get('A', 1)
     B = params.get('B', 1)
     C = params.get('C', 0)
-    D = params.get('D', 0)
 
     if A == 0 or B == 0:
         raise ValueError("Parameters A or B are zero.")
 
-    # (y - D) / A = tan(Bx - C)
+    # (y) / A = tan(Bx - C)
     # arctan(...) = Bx - C
     # x = (arctan(...) + C) / B
-    val = (np.arctan((OSR - D) / A) + C) / B
+    val = (np.arctan((OSR) / A) + C) / B
     return val
 
 def compute_calibrated_parameter(model_type, fit_result, target_osr):
