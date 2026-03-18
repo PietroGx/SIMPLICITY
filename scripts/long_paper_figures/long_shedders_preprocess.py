@@ -10,6 +10,25 @@ import simplicity.output_manager as om
 import simplicity.clustering as cl
 from simplicity.phenotype.distance import hamming_iw
 
+import os
+
+def safe_read_csv(filepath):
+    """Safely attempts to read a CSV, returning an empty DataFrame if it fails."""
+    if not os.path.exists(filepath):
+        print(f"[Skip] File not found (job pending?): {filepath}")
+        return pd.DataFrame()
+        
+    try:
+        df = pd.read_csv(filepath)
+        return df
+    except pd.errors.EmptyDataError:
+        print(f"[Skip] File is empty (job running?): {filepath}")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"[Error] Unexpected issue reading {filepath}: {e}")
+        return pd.DataFrame()
+        
+
 def read_master_log(exp_num):
     """Reads the master grid log to find available parameters."""
     log_path = f"Data/master_grid_log_#{int(exp_num)}.csv"
@@ -17,7 +36,7 @@ def read_master_log(exp_num):
     if not os.path.exists(log_path):
         raise FileNotFoundError(f"Master log not found at {log_path}. Did the experiment run?")
         
-    return pd.read_csv(log_path)
+    return safe_read_csv(log_path)
 
 def get_baseline_sod(exp_num):
     """Returns the first SOD for the standard calibration baseline."""

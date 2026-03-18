@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 Prepare interactive Nextstrain (Auspice v2) datasets from SIMPLICITY outputs.
 
@@ -30,6 +27,7 @@ import simplicity.output_manager as om
 import simplicity.tree.tree_builder as tb
 import simplicity.clustering as clustering
 import simplicity.plots_manager as pm
+from long_shedders_preprocess import get_grid_sod
 
 # ---------------- helpers ----------------
 
@@ -241,9 +239,18 @@ def main():
     ap = argparse.ArgumentParser(
         description="Prepare Nextstrain (Auspice) datasets from SIMPLICITY outputs."
     )
-    mx = ap.add_mutually_exclusive_group(required=True)
+    mx = ap.add_mutually_exclusive_group(required=False)
     mx.add_argument("--experiment", type=str, help="Process ALL SSODs in this experiment")
     mx.add_argument("--ssod", type=str, help="Process a single seeded_simulation_output_dir")
+    
+    # --- NEW GRID PARAMETERS ---
+    ap.add_argument("--M", type=float, help="Grid parameter M")
+    ap.add_argument("--R", type=float, default=4.0, help="Grid parameter R_long")
+    ap.add_argument("--ratio", type=float, default=0.12, help="Grid parameter long_shedders_ratio")
+    ap.add_argument("--tau", type=float, default=90.0, help="Grid parameter tau_3_long")
+    ap.add_argument("--seed", type=int, help="Specific seed number")
+    ap.add_argument("--exp-num", type=int, default=1, help="Experiment run iteration")
+
     ap.add_argument("--start-date", default="2020-01-01", type=str,
                     help="Simulation start date (YYYY-MM-DD)")
     ap.add_argument("--time-units", default="days", choices=["days", "years"],
@@ -258,18 +265,24 @@ def main():
         # process all SSODs under the experiment (no GUI)
         ssods = []
         for sod in dm.get_simulation_output_dirs(args.experiment):
-            ssod_list = dm.get_seeded_simulation_output_dirs(sod)
-            ssods.extend(ssod_list)
+            ssods.extend(dm.get_seeded_simulation_output_dirs(sod))
         if not ssods:
-            # print("No seeded simulations found for this experiment.")
             return
-        # print(ssods)
         for ssod in ssods:
             process_ssod(ssod, start_date, args.time_units, args.shared_mut_threshold)
         return
 
-    # else: single SSOD process and launch Auspice
-    ssod = args.ssod
+    # RESOLVE SINGLE SSOD (Either manually provided OR built from parameters)
+    if args.M is not None and args.seed is not None:
+        print(f"[*] Building path for M={args.M}, tau={args.tau}, R={args.R}, ratio={args.ratio}, seed={args.seed}...")
+        sod = get_grid_sod(args.M, args.ratio, args.tau, args.R, args.exp_num)
+        ssod = dm.get_ssod(sod, args.seed)
+    elif args.ssod:
+        ssod = args.ssod
+    else:
+        print("[Error] You must provide either --ssod, --experiment, OR grid parameters (--M and --seed).")
+        return
+
     process_ssod(ssod, start_date, args.time_units, args.shared_mut_threshold)
 
     # determine dataset directory and launch Auspice

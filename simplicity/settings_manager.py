@@ -511,7 +511,7 @@ def read_OSR_NSR_regressor_parameters():
     best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
     return best_fit_df
     
-def get_n_seeds_from_experiment_settings(experiment_name):
+def get_n_seeds_from_experiment_settings(experiment_numbered_name):
     """Reads n_seeds from the specific setting JSON file."""
     
     # Use the exact helper you specified
