@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['CHANGELOG', 'BACKLOG.md', 'simplicity/population_model.py', 'simplicity/population.py', 'tests/test_diag_mut_rates.py']
+recent_files = ['CHANGELOG', 'BACKLOG.md', 'scripts/fit_OSR_mixed_pop.py', 'tests/test_local_runme.py', 'simplicity/tuning/diagnosis_rate.py']
 
 [main]
 version = 0.2.0
