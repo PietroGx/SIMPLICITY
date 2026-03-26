@@ -1,5 +1,7 @@
 #!/bin/bash
-# SIMPLICITY DATA RECONSTRUCTION (SLURM + PIXZ + PROGRESS)
+# ==============================================================================
+# SIMPLICITY RECONSTRUCTION (SLURM + HIGH-SPEED + AUTO-VERIFY)
+# ==============================================================================
 EXPORT_DIR="Data_Export"
 TARGET_DIR="Data"
 FLAG="$1"
@@ -15,16 +17,35 @@ ARCHIVES=($(ls "$EXPORT_DIR"/simplicity_export_*.tar.xz 2>/dev/null))
 if [ ${#ARCHIVES[@]} -eq 0 ]; then echo "No archives found."; exit 1; fi
 
 mkdir -p "$TARGET_DIR"
+
+echo "--- STEP 1: MULTI-CORE EXTRACTION ---"
 for archive in "${ARCHIVES[@]}"; do
-    echo "Processing $(basename "$archive")..."
-    if [[ "$FLAG" == "--internal" ]]; then
-        pixz -d < "$archive" | tar -x -C .
-    else
-        if command -v pv &> /dev/null; then
-            pv "$archive" | pixz -d | tar -x -C .
-        else
-            pixz -d < "$archive" | tar -x -C .
-        fi
-    fi
+    echo " -> Extracting $(basename "$archive")"
+    pixz -d -i "$archive" | tar -x -C .
 done
-echo "Reconstruction complete in $TARGET_DIR/"
+
+echo "--- STEP 2: DATA VERIFICATION ---"
+ERRORS=0
+mapfile -t EXTRACTED < <(find "$TARGET_DIR" -maxdepth 1 -mindepth 1 -type d)
+echo " -> Found ${#EXTRACTED[@]} directories in $TARGET_DIR/"
+
+if [ ${#EXTRACTED[@]} -eq 0 ]; then
+    echo " -> ERROR: No directories were extracted."
+    ERRORS=$((ERRORS+1))
+else
+    for folder in "${EXTRACTED[@]}"; do
+        SIZE=$(du -sk "$folder" | cut -f1)
+        if [ "$SIZE" -lt 100 ]; then
+            echo " -> WARNING: $folder is suspiciously empty (${SIZE}KB)."
+            ERRORS=$((ERRORS+1))
+        fi
+    done
+fi
+
+echo "=========================================================="
+if [ "$ERRORS" -eq 0 ]; then
+    echo "SUCCESS: Reconstruction and verification complete."
+else
+    echo "WARNING: $ERRORS anomaly/anomalies detected in extracted data!"
+fi
+echo "=========================================================="
