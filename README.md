@@ -38,8 +38,15 @@ git clone https://github.com/PietroGx/SIMPLICITY.git
 cd SIMPLICITY
 pip install -r docs/requirements.txt
 ```
-or use the `simplicity.yml` file to create the conda environment.
+or use the `simplicity.yml` file to create the conda environment:
 
+```
+conda env create -f environment.yml -n simplicity
+```
+Then install the package (-e for editable install)
+```
+pip install -e .
+```
 ---
 
 ## SIMPLICITY Usage and Output
