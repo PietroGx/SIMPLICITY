@@ -29,7 +29,7 @@ The 2.2.x release transitions the model from acute-only dynamics to a generalize
 
 ### Installation
 
-> 🐍 Requires **Python 3.12 or later**
+> 🐍 Requires **Python 3.11 or later**
 
 Clone the repository and install dependencies:
 
@@ -46,6 +46,10 @@ conda env create -f environment.yml -n simplicity
 Then install the package (-e for editable install)
 ```
 pip install -e .
+```
+Test the installation:
+```
+python tests/test_local_runme.py 
 ```
 ---
 
