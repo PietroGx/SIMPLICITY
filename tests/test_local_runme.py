@@ -267,12 +267,15 @@ def main(runner:str, test_number:int, compare_to: int = None):
         compare_experiment_outputs(current_experiment_name, benchmark_experiment_name)
 
 ##### </actual test>
-
+import time
+import argparse
 if __name__ == "__main__":
-    import time
+    parser = argparse.ArgumentParser(description="Run local simulation tests.")
+    parser.add_argument('--test_n', type=int, required=True, help="The test number to execute.")
+    args = parser.parse_args()
+
     start = time.time()
-    main('serial',3)#,compare_to=4)
+    main('serial', args.test_n) #,compare_to=4)
     elapsed = time.time() - start
     mins, secs = divmod(elapsed, 60)
-    print(f"Test completed in {int(mins)} min {secs:.2f} sec")
-    
+    print(f"Test completed in {int(mins)} min {secs:.2f} sec")    

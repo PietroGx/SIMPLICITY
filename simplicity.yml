@@ -17,6 +17,7 @@ dependencies:
   - tqdm
   - pip
   - pip:
+      - PyQt5
       - ete3
       - graphviz
       - memory-profiler
