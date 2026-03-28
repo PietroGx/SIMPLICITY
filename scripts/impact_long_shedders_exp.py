@@ -10,6 +10,7 @@ import pandas as pd
 import simplicity.settings_manager as sm
 import simplicity.tuning.diagnosis_rate as dr
 import simplicity.tuning.evolutionary_rate as er
+import simplicity.plots_manager as pm  # <-- Added correct import for plots
 from experiments.experiment_script_runner import run_experiment_script
 
 from fit_OSR_mixed_pop import (
@@ -25,8 +26,8 @@ EXP_NAME = "impact_long_shedders"
 
 # Experiment Overrides (Defaults - will be updated by argparse)
 USER_FIXED_PARAMS = {
-    "population_size": 5000,
-    "infected_individuals_at_start": 500,
+    "population_size": 1000,
+    "infected_individuals_at_start": 100,
     "R": 1.1,
     "final_time": 1095,
     "IH_virus_emergence_rate": 0.1,
@@ -74,7 +75,6 @@ def dispatch_scenario(scenario_name, duration_D, ratio, r_freq, nsr_eff, sp, arg
         seq_long = False
     else:
         # Long-shedder Logic
-        # CORRECTED: Subtracting latent period (tau_1) along with tau_2 and tau_4
         tau_3_long = duration_D - (tau_1 + tau_2 + tau_4)
         R_long = r_freq * (tau_3_long / 7.0)
         
@@ -127,9 +127,9 @@ def main():
     parser.add_argument('--exp-num', type=int, required=True, help="Experiment number")
     parser.add_argument('--runner', type=str, choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
     
-    # New Population Inputs
-    parser.add_argument('--pop-size', type=int, default=5000, help="Total population size")
-    parser.add_argument('--start-infections', type=int, default=500, help="Initial number of infected individuals")
+    # Population Inputs
+    parser.add_argument('--pop-size', type=int, default=1000, help="Total population size")
+    parser.add_argument('--start-infections', type=int, default=100, help="Initial number of infected individuals")
 
     # Sweep Setup
     parser.add_argument('--min-nsr', type=float, default=1e-5, help="Min NSR for baseline sweep")
@@ -179,6 +179,27 @@ def main():
         f.write(f"M_nsr_long used: {m_nsr_long}\n")
         f.write(f"Population Size: {args.pop_size}\n")
         f.write(f"Starting Infections: {args.start_infections}\n")
+
+    print("\n[Phase 1] Generating Calibration Plots (Tempest grids and Curve Fit)...")
+    try:
+        # 1. Plot the grid of root-to-tip tempest regressions
+        pm.plot_combined_tempest_regressions(
+            experiment_name=exp_numbered_name, 
+            parameter='nucleotide_substitution_rate',
+            individual_type='standard'
+        )
+        
+        # 2. Plot the 3-panel OSR vs NSR calibration curve fit
+        pm.plot_OSR_fit(
+            experiment_name=exp_numbered_name,
+            fit_result=fit_result,
+            model_type='exp',
+            min_seq_number=30,    
+            min_sim_lenght=300    
+        )
+        print(f"Plots successfully generated and saved to the experiment plots directory.")
+    except Exception as e:
+        print(f"Warning: Could not generate calibration plots. Error: {e}")
 
     # --- Phase 2 & 3: Definition and Sequential Submission ---
     print("\n[Phase 2 & 3] Dispatching Scenarios...")
