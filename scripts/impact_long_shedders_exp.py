@@ -28,7 +28,7 @@ EXP_NAME = "impact_long_shedders"
 USER_FIXED_PARAMS = {
     "population_size": 1000,
     "infected_individuals_at_start": 100,
-    "R": 1.1,
+    "R": 1.05,
     "final_time": 1095,
     "IH_virus_emergence_rate": 0.1,
 }
@@ -132,8 +132,8 @@ def main():
     parser.add_argument('--start-infections', type=int, default=100, help="Initial number of infected individuals")
 
     # Sweep Setup
-    parser.add_argument('--min-nsr', type=float, default=1e-5, help="Min NSR for baseline sweep")
-    parser.add_argument('--max-nsr', type=float, default=1e-3, help="Max NSR for baseline sweep")
+    parser.add_argument('--min-nsr', type=float, default=3e-5, help="Min NSR for baseline sweep")
+    parser.add_argument('--max-nsr', type=float, default=3e-4, help="Max NSR for baseline sweep")
 
     args = parser.parse_args()
 
