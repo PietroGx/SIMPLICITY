@@ -360,7 +360,7 @@ def plot_tempest_regression(sequencing_data_df,
     
 def plot_combined_tempest_regressions(experiment_name, parameter, 
                                       min_seq_number=0, min_sim_lenght=0, individual_type=None,
-                                      y_axis_max=0.1):
+                                      y_axis_max=0.01):
     """
     Plot a grid of tempest regressions for each simulation, grouped by a parameter value.
 

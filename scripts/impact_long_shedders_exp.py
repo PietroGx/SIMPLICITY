@@ -10,7 +10,7 @@ import pandas as pd
 import simplicity.settings_manager as sm
 import simplicity.tuning.diagnosis_rate as dr
 import simplicity.tuning.evolutionary_rate as er
-import simplicity.plots_manager as pm  # <-- Added correct import for plots
+import simplicity.plots_manager as pm  
 from experiments.experiment_script_runner import run_experiment_script
 
 from fit_OSR_mixed_pop import (
@@ -133,7 +133,7 @@ def main():
 
     # Sweep Setup
     parser.add_argument('--min-nsr', type=float, default=3e-5, help="Min NSR for baseline sweep")
-    parser.add_argument('--max-nsr', type=float, default=3e-4, help="Max NSR for baseline sweep")
+    parser.add_argument('--max-nsr', type=float, default=5e-4, help="Max NSR for baseline sweep")
 
     args = parser.parse_args()
 
@@ -157,7 +157,7 @@ def main():
     settings_func = generate_homogeneous_settings(
         min_nsr=args.min_nsr, 
         max_nsr=args.max_nsr, 
-        steps=10, 
+        steps=8, 
         n_seeds=args.seeds
     ) 
     run_experiment_script(args.runner, args.exp_num, settings_func, experiment_name) 
