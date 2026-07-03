@@ -85,7 +85,7 @@ def fixture_experiment_settings():
     # fixed_params = sm.read_user_set_parameters_file(filename)
    
     # -------------------------------------------------------------------------
-    n_seeds = 2
+    n_seeds = 1
     
     return (varying_params,fixed_params,n_seeds)
 

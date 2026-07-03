@@ -1,816 +1,622 @@
-2024-09-12 jbescudie
-
-	Version 0.2.0
-
-	* refactoring decoupled core modules from managers (simulation.Simplicity has still a dependency to output_manager)
-	* added runners API + 3 impementations (serial, multiproccessing, slurm)
-        * added test suite (currently only for single-experiment)
-
-2025-01-17 pietro gerletti
-
-	Version 0.2.1
-
-	* commented out slurm part of fixtures to run on local machine
-	* implemented test for single seeded simulation
-	* added print("----------------------") before genome import for more readibility
-	* fixed bug creating ghost Data folder. Data is created in working directory! Use config.set_data_dir(path) to change
-	* moved create population step into simulation.py, enhancing decoupling
-	* moved sequencing dataset writing function to output manager
-	* fixed bug causing output path to be wrong 
-	* fixed bug causing plot not to be saved 
-	* moved plots to plots_manager
-	* renamed output variable names for more consistency
-        * renamed variant_inf_count (in population) to lineage_frequency
- 	* moved all the output files writing responsibilities to output_manager
-        * implemented plotting from saved data files 
-        * tested and debugged new plot
-        * updated simulation class
-        * fixed naming in output manager.save_sequencing_dataset
-        * fixed bug causing dataset for regression to be saved wrongly
-        * added genome decoder
-   	* fixed bugs on infection tree - now it works again
-   	* infection tree does not store the full sequence anymore but one can get it from individuals_data.csv
-   	* Wrote test for infection tree
-   	* updated nexus tree export function
-        * Wrote test for phylogenetic tree
-   	* updated phylogenetic tree function (now tree built from phylogenetic_data.csv)
-   	* updated simulation.run for verbose output
-   	* fixed import bug in phylogenetic_data that caused an error in the tree building
-   	* fixed fasta file writing - now is written correctly
-   	* fixed genome decoder - now all mutations are introduced in the reference genome when decoding
-   	* implemented tree-builder module (updating old infection tree and phylogenetic tree files)
-        * created tests for trees
-   	* fixed variable name conflict causing bug in tree rendering
-   	* created and tested new runme for local machines
-
-2025-01-24 pietro gerletti
-
-	Version 0.2.2
-
-	* updated setup.py and yml env file
-	* updated and corrected imports paths
-	* updated runme.py to have consistent signatures wuth tests
-	* added exception handling in output_manager.setup_output_directory
-	* added exception handling in settings_manager.read_settings_and_write_simulation_parameters
-	* implemented and tested complete test for local code serial runner
-	* implemented and tested complete test for local code multiprocessing runner
-	
-2025-01-29 pietro gerletti
-
-	Version 0.2.3
-	
-	* wrote test for HPC_runme
-	* updated config with MAX_PARALLEL_SIMULATIONS env variables
-	* updated multiproccessing runner env MAX_PARALLEL_SIMULATIONS name
-	* updated test for HPC_runme
-	* updated slurm runner to accomodate new unit_run signature
-	* new tests and runners  work
-
-2025-04-02 pietro gerletti
-
-	Version 0.3.0
-	
-	* updated info for users on test_local_runme
-	* testing parameter space for e/u regression - created test file 
-	* sklearn added to dependencies
-	* changed value of runtime_max in settings manager (3600)
-        * added exception handling to config.get_output_directory
-    	* added exception handling to config.get_simulation_parameters_dir	
-    	* updated standard values dictionary and fixed parameter names conflicts
-  	* rewrote and updated tempest regression funcs and plots 
-        * moved tempest regression plots to plot_manager
-  	* added script to extract plots to Data/00_Tempest_regression_plots
-        * updated test_parameter_space - now parameter space exploration routine running locally
-	* created script explore_u_parameter_space
-	
-2025-05-02 pietro gerletti
-
-	Version 0.3.1
-	
-	* updated plot manager to use Agg instead of Qt for slurm plotting
-	* found bug that causes simulation plots to be created also when plot set to False (on HPC)
-	
-2025-09-02 pietro gerletti
-
-	Version 0.3.2
-	
-	* fixed bug caused by storing bool as string in env var (slurm runner)
-	* updated test_parameter_space and explore_u_parameter_space
-   	* added exception handling to plot_combined_regressions
-    	* fixed subplot order in plot_manager.plot_combined_regressions
-    	* added config.get_experiment_dir
-    	* added statistics_simulations_lenght.py script 
-    	* removed parameter_search.py - working on new tuning routine 
-    	* fixed subplot titles in plot_manager.plot_combined_regressions
-    	* updated slurm runner to save log files in correct folder
-    	* updated setup.py
-    
-2025-11-02 pietro gerletti
-
-	Version 0.3.3
-	
-	* added (in test phase) script to fit a log curve to u/e plot
-	* updated yml env file (adding lmfit)
-	* updated setup.py
-
-2025-11-02 pietro gerletti
-
-	Version 0.3.4
-	
-	* fitting u log script works 
-	* moved plotting from statistics_simulations_lenght to plot manager 
-	* updated host.py by making get_A_matrix function available outside of class
-	* updated kd_parametrization.py 
-	* added explore_R_k_d_parameter_space.py to scripts
-	* updated setup.py 
-
-2025-12-02 pietro gerletti
-
-	Version 0.3.5
-	
-	* moved fitting plot to plot manager
-	* added option to plot fit on loglog or semilog scale
-	* added function to filters files for tempest regression by simulation lenght
-	* studying u fit - added scripts to explore u parameter behaviour
-
-2025-14-02 pietro gerletti
-
-	Version 0.3.6
-	
-	* moved experiments scripts in omonimous folder 
-	* added script to perform and plot u regression on experiment folder
-	* added min_sim_lenght arg to plot u regression functions and script
-
-2025-13-02 pietro gerletti
-
-	Version 0.4.0
-	
-	* added tau_3 to parameters file and implemented way to pass it to host class (now infection lenght can be set when running a simulation)
-	* removed the setting.json file from the data flow (deprecated, new data flow does not need it) 
-	* renamed config.py to dir_manager.py and added functions there
-	* moved all the missing plots to plot_manager.py 
-	* added experiment script for tau_3 / u relation 
-	* updated combined regression plot to accept any parameter (to plot effect of tau_3 on u)
-
-2025-17-02 pietro gerletti
-
-	Version 0.4.1
-	
-	* combined regression plot has same ylim values for subplots
-	
-2025-18-02 pietro gerletti
-
-	Version 0.5.0
-	
-	* updated setting and dir manager. now n_seeds is saved to a file (01_exp_settings/)
-	* updated runme accordingly 
-	* added script to count how many simulation ran successfully in an experiment
-	* updated setup.py
-	
-2025-19-02 pietro gerletti
-
-	Version 0.5.1
-	
-	* updated slurm runner to save mapping of job id to seeded simulation path
-	* added slurm logs and maps folders to directory manager
-	* updated slurm runner 
-	* added script to parse slurm errors 
-	* updated script/experiments  to correct for new functions signatures
-	* added backlog file
-	* updated parse_slurm_error_files script
-	* updated check_completed_simulation
-	* updated slurm runner with runtime and memory specifications
-	
-2025-20-02 pietro gerletti
-
-	Version 0.5.2
-	
-	* updated slurm runner to correct err and out files signatures
-	* moved parse_slurm_error_files.py to slurm_diagnostics and renamed it to slurm_error_summary.py
-	* updated slurm_error_summary.py 
-	* added test for HPC OOM errors
-	* updated slurm runner asking 20gb for jobs
-	* renamed OOM script to diagnosis_OOM_errors and changed runner to local
-	* updated dir_manager env var to only run 150 simulations in parallel
-	* updated explore_popsize_impact_on_u
-	* updated backlog
-
-2025-21-02 pietro gerletti
-
-	Version 0.5.3
-	
-	* updated OOMM error script for memory profiling with mprof
-	* updatted extrande to give periodic updates on simulation status 
-	* added profiler to extrande
-	* updated explore_popsize_impact_on_u script (for memory profiling experiment)
-	* added fetch_error_seeded_simulation_parameters.py
-	* updated extrande to save info of infected vs runtime
-	* added plot to plot infected vs runtime 
-	
-2025-21-02 pietro gerletti
-
-	Version 0.5.4
-	
-	* updated check completed simulations with new functions from dir_manager
-	* payed off technical debt with dir_manager
-	* updated backlog
-	* removed extrande profiling plot
-	* added results folder to repo
-	* saved memory profiling plots and data to results
-
-2025-23-02 pietro gerletti
-
-	Version 0.6.0
-	
-	* now diagnosis rate in parameters is passed as percentual (0-1)
-	* renamed k_d parametrization to diagnosis_rate.py and updated functions
-	* added get_simulation_parameters_of_simulation_output_dir to dir_manager
-	* added get_effective_diagnosis_rate and get_diagnosis_rates to diagnosis_rate.py 
-	* updated and renamed explore_R_diagnosis_rate_parameter_space.py
-	
-2025-24-02 pietro gerletti
-
-	Version 0.6.1
-	
-	* added plot - regression theoretical vs effective diagnosis rate
-	* added plot - heatmap of R vs diagnosis rate (mapping accuracy score for diagnosis rate)
-	* updated setup.py 
-	* updated yml file (added seaborn)
-	* updated extrande - now tau_inf is calculated from tau parameter values. This way the upperbound keeps being correct if tau_3 is changed
-	* created script to generate IH lineage data for testing model
-	* updated and standardized experiment scripts structure
-	* moved get_simulation_parameters_of_simulation_output_dir to settings manager
-	* moved get_seeded_simulation_parameters_paths back to settings manager 
-	* moved get_experiment_settings_file_path to settings manager
-	* moved get_n_seeds_file_path to settings manager
-	* added get_all_individuals_data_for_simulation_output_dir to output manager
-	* added plot_IH_lineage_distribution to plot manager
-	* updated settings manager to fix silent bug (code would work with invalid named parameters)
-	
-2025-25-02 pietro gerletti
-
-	Version 0.7.0
-	
-	* moved scripts for plots into scripts/plots
-	* added read_simulation_trajectory to output manager
-	* changed output_path to seeded_simulation_output_dir in output manager
-	* added get_IH_lineages_data_experiment and get_IH_lineages_data_simulation to output manager
-	* updated plot_IH_lineage_distribution in plot manager
-	* updated population and output manager to save susceptibles in trajectory
-	* updated plot_trajectory in plot manager
-	* created psedocode of fetch_seeded_simulation_parameters_from_job_id
-	
-2025-25-02 pietro gerletti
-
-	Version 0.7.1
-	
-	* updated standard parameters values 
-	* updated plot_IH_lineage_distribution to save figure
-	
-2025-28-02 pietro gerletti
-
-	Version 0.7.2
-	
-	* updated tuning.evolutionary rate with different models to fit u
-	* updated plot of u fitting
-	* updated script to fit u and plot results
-	* added spline to the fitting 
-	* added weights to the fitting
-
-2025-28-02 pietro gerletti
-
-	Version 0.7.3
-	
-	* updating tempest plots and scripts
-
-2025-01-03 pietro gerletti
-
-	Version 0.8.0
-	
-	* updated tempest regression, plots and fit logic and dataflow 
-	* added scatterplot for tempest regression observed evolutionary rate values for single seeded simulations output
-	* added fit curve to observed evolutionary rates ensamble (1 estimate per simulation, NSEEDs points per parameter value for the fit)
-	* added plot for fit to observed evolutionary rates ensamble
-	* added read_final_time to output_manager
-	* added functionality to filter by min_sim_lenght in build_observed_evolutionary_rates_vs_parameter_df
-
-2025-02-03 pietro gerletti
-
-	Version 0.8.1
-	
-	* added mean scatter plot on plot_observed_evolutionary_rates_fit
-	* updated om (for saving observed_evolutionary_rates_csv with different names if filtered by sim_lenght)
-	* updated plot_observed_evolutionary_rates_fit to accomodate new signature 
-	* updated plot_observed_evolutionary_rates_fit to use seaboarn consistently
-    * updated evolutionary_rate.py - now functions that are responsibility of output_manager are moved 
-    * deleted obsolete functions from evolutionary_rate.py and plot_manager
-    * finished refactoring of tempest regression results csv writing and reading 
-    * added option to filter sequencing data for tempest regression by number of sequences present in the file 
-
-2025-03-03 pietro gerletti
-
-	Version 0.8.2
-	
-	* updated names and signatures of OER related functions in output_manager and plots_manager
-	* updated script for simulating OER fit data (running for 3 years, updated er range)
-	* updating phenotype model weights plot function
-	
-2025-04-03 pietro gerletti
-
-	Version 0.8.3
-	
-	* updated generate_OER_data script - this is the experiment used to fit the curve
-	* added script to plot OER fit for figure in paper
-	* now fit_observed_evolutionary_rate_regressor saves the fit results to a file 
-	* added inverse_log_regressor to evolutionary_rate.py (get e from OER after fit)
-	
-2025-05-03 pietro gerletti
-
-	Version 0.9.0
-	
-	* changed NAMES: observed_evolutionary_rate to observed substitution rate (OER to OSR)
-	* changed NAMES: evolutionary_rate to molecular_substituion rate (MSR)
-	* added script to generate user set parameters json file 
-	* added functions to read and write standard parameters to a file 
-	* added function to write generated user set parameters json file 
-	* added Data/00_reference_parameters to repo
-
-2025-06-03 pietro gerletti
-
-	Version 0.9.1
-	
-	* updated plot_tempest_regression.py
-	* added plot2E to plot manager
-	* added get_experiment_plots_dir to dir_manager
-	* now simulation saves all the consensus sequences generated over a simulation in the population class
-	
-2025-07-03 pietro gerletti
-	
-	Version 0.10.0
-	
-	* changed NAMES: molecular_substituion rate (MSR) to nucleotide substitution rate (NSR)
-	* added plot tau3/OSR
-
-2025-12-03 pietro gerletti
-	
-	Version 0.11.0
-	
-	* refactored tree building (a lot of changes here!)
-	* added get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir) to dm
-	* added plot_lineages_colors_tab, get_lineage_color, make_lineages_colormap to plot manager
-	* added circular tree plot with ete3 to plot manager
-	
-2025-13-03 pietro gerletti
-	
-	Version 0.11.1
-	
-	* added R effective data processing
-	* added R effective plot
-	* polished plot manager and output manager for better readability
-	* added script to plot R effective plots for selected seeds folders
-
-2025-13-03 pietro gerletti
-	
-	Version 0.12.0
-	
-	* updated extrande, population, phenotype.update to fix fitness score tracking
-	* updated simulation trajectory plot
-	* added lineage colors to simulation trajectory plot
-	* changed how lineage_frequency is stored and saved
-	
-2025-18-03 pietro gerletti
-	
-	Version 0.13.0
-	
-	* changed named of population methods data and phylogeny to individuals_data_to_df/phylogenetic_data_to_df
-	* updated and cleaned population class (track_fitness now called update_fitness trajectory)
-	* refactored population class, evolution.mutations module and phenotype.update module (only working with lineages names, genomes now stored in population.phylogenetic_data)
-	* updated plot_manager: now lineages color are based on lineage time of emergence and have unique labels
-	
-2025-19-03 pietro gerletti
-	
-	Version 0.13.1
-	
-	* Updated path to save simulation plots and lineages tabs
-	* updated name of simulation trajectory plots and lineages tabs
-	* added script to sort plots by seed number
-	* prepared new experiment to run (generate_data_trees_and_R_eff)
-
-2025-20-03 pietro gerletti
-	
-	Version 0.14.0
-	
-	* Changed the way we store R_effective trajectory (correcting mistake in calculations)
-	* Updated tree_plotting script to automatically filter by seeds shared by simulations after filtering
-	* added average R line to R_effective plot
-	
-2025-20-03 pietro gerletti
-	
-	Version 0.14.1
-	
-	* Working on fixing R effective plot.
-	
-2025-27-03 pietro gerletti
-	
-	Version 0.15.0
-	
-	* changed list of indices in population class to python sets and updated code accordingly
-	* individuals store t_not_infectious (for R calculation)
-	* individuals store time and number of infection caused.	
-	* refactored population.add_variant for clarity
-	* refactored infection tree builder for clarity and efficiency
-	* added experiment_example_runme
-	* updated write_experiment_settings and create generate_experiment_settings in sm
-	* updated runme
-	* changed simulation settings files and folders naming (to shorten them up)
-	                                   
-2025-28-03 pietro gerletti
-	
-	Version 0.15.1
-	
-	* added R_eff and time_infectiousness plot for model check and validation
-
-2025-29-03 pietro gerletti
-	
-	Version 0.16.0
-	
-	* Updated test local runme to compare experiment runs
-	* refactored extrande for modularity
-	* updated add_variant reaction
-	* updated infection reaction
-	* updated code to ensure randomness is  100% reproducible (e.g. sorting sets)
-	* refactored population class, now less responsibilities
-	* added population_model module (SIDR reactions)
-	* new refactored code passsed tests!!
-
-2025-29-03 pietro gerletti
-	
-	Version 0.16.01
-	
-	* changed extrande steps order to ensure correctness of simulation
-
-2025-30-03 pietro gerletti
-	
-	Version 0.16.02
-	
-	* Changed host to intra_host_model.py
-	* Refactored Intra-host Model: Matrix Exponential → Jump Process
-	* Each state transition now triggered by exponential waiting time (Exp(1/rate))
-	* State updates now occur only when t >= t_next_state
-	* Vectorized sampling of waiting times for all individuals that will transition in ih state
-	* Refactored update_states and joined together (update_state, recovery, infectious, detectables updates)
-	* Updated look-ahead time horizon to min 1h max = next ih update
-	
-2025-31-03 pietro gerletti
-	
-	Version 0.16.03
-	
-	* added code to intra-host to debug intra host traverse time dependency on delta t
-	* changed random to random_gen to avoid conflicts
-	* update intra_host.py (better matrix exponential, multiprocessing works)
-	* updated R_eff experiment script to test model
-	* updated look ahead function
-	* updated how I assiign new jump time to intra host staates in update states()
-	* updated intra_host.py (cleaner and more efficient code)
-
-2025-01-04 pietro gerletti
-	
-	Version 0.16.04
-	
-	* updated intra-host model py file
-	* added both matrix and jump proces option to update intra-host model
-
-2025-04-04 pietro gerletti
-	
-	Version 0.16.05
-	
-	* added precomputation of matrix exponentials for ih model       
-               	                                    
-2025-04-04 pietro gerletti
-	
-	Version 0.16.06
-	
-	* fixed L/delta_t bug    
-	* limited min max (0.04 - 1 day) step size for system state updates (not extrande steps)
-
-202533-05-04 pietro gerletti
-	
-	Version 0.16.07
-	
-	* update SIDR to add reactions labels 
-	* added progress bar to simulation and cleaned code output
-	* added plot of avg infection time
-
-2025-07-04 pietro gerletti
-	
-	Version 0.16.08
-	
-	* added infection tree (transmission chain), subtree filtering by lineage and plot with his infections
-	
-	
-2025-24-04 pietro gerletti
-	
-	Version 0.16.09
-	
-	* added delta_t_ih_updates debugger (writing csv file with relevant info)
-	
-2025-24-04 pietro gerletti
-	
-	Version 0.16.10
-	
-	* updated plot_his_simulations_length.py for better visualization
-	* updated R_eff_ih_check.py to filter simulations by final time 
-	* changed ih update min delta_t size to 0.04
-	
-2025-28-04 pietro gerletti
-	
-	Version 0.16.11
-	
-	* changed ih update min delta_t size to 0.16 (4h)
-	* renamed and moved R_eff_ih_check.py to scripts (R_vs_time_inf.py)
-	* updated tree related files 
-	
-2025-30-04 pietro gerletti
-	
-	Version 0.16.12
-	
-	* removed ih timestep debugger
-	* updated extrande (ih dt accumulator also in leap step)
-	* updated update_fitness to improve immune waning model (now we account for the initial phase in which the population is not yet exposed to the virus)
-
-2025-04-05 pietro gerletti
-	
-	Version 0.17.00
-	
-	* renamed: IH_virus_number > IH_lineages_number, lineages_number > IH_unique_lineages_number, IH_virus_max > IH_lineages_max, IH_virus_fitness > IH_lineages_fitness_score, fitness > fitness_score 
-	* added intra host lineage trajectories
-	* added plots for R_effective
-	
-2025-06-05 pietro gerletti
-	
-	Version 0.17.01
-	
-	* Prepared the files to rerun the experiments for the publication
-	
-2025-08-05 pietro gerletti
-	
-	Version 0.17.02
-	
-	* removed the C parameter from exp curve fit 
-	* added the C parameter to exp curve fit 
-	* added bootstrapping CI calculation for model fit 
-	* updated bootstrap function
-	* back to stderr CI for OSR fit plots
-	* updated om.create_combined_sequencing_df
-	* removed CI from plot 
-	* updated plot OSR fit
-
-2025-08-05 pietro gerletti
-	
-	Version 0.18.00
-	
-	* updated generate_user_set_parameters_file.py
-	* updated standard best_fit parameter values
-	* added inverse_exp_regressor function
-	* added plot for IH lineage variability  vs inf period (tau_3/OSR/IH_variability)
-	
-2025-21-05 pietro gerletti
-	
-	Version 1.0.0
-	
-	* updated license
-	
-2025-27-05 pietro gerletti
-
-    Version 1.0.1
-
-    * Standardized all plotting functions to comply with journal formatting
-    * Unified text size, font, and axis styling across all figures.
-    * Removed top and right plot spines.
-    * Applied apply_standard_axis_style() to all matplotlib axes.
-    * Replaced default save format with TIFF (300 dpi, bbox_inches='tight') 
-    * Verified and cleaned axis labels; updated units and text per figure
-    * Added printed confirmation of saved figure path 
-
-2025-04-06 pietro gerletti
-
-    Version 1.1.0
-
-    * added paper's figures scripts
-    * added build_tree module
-    * added scripts (back and frontend) to calculate and display entropy and clustering
-    * clean and fixed minor bugs and experiment naming
-    
-<<<<<<< HEAD
-
-2025-23-07 pietro gerletti
-
-    Version 2.0.0
-
-    * added tau_1, tau_2, tau_4 to settings manager 
-    * updated code to include long shedders subpopulation 
-    * added figure 1,2,3 for long shedders paper
-    * removed plot_simulation bool from runners
-    * updated check simulations script
-
-2025-27-07 pietro gerletti
-
-    Version 2.0.01
-
-    * updated fitness to relative fitness (it was already used as such in selection process)
-    * improved how fitness floor is handled (epsilon)
-    * removed 1 based hamming distance
-    * added temporal weight to genome selection for substitution assignment
-    
-2025-27-07 pietro gerletti
-
-    Version 2.0.02
-    
-    * updated plot to show normed fitness value 
-    * added plots for long shedder exps 
-    * removed long shedders from consensus calculation
-
-2025-02-08 pietro gerletti
-
-    Version 2.0.03
-    
-    * reverted changes in fitness (not normed fitness store, normed before selection)
-    * added fitness entropy calculation for better plotting
-    * added and tested reaction for long shedders infection rate
-
-2025-04-08 pietro gerletti
-
-    Version 2.0.04
-    
-    * updated long shedder figure 3
-    * updated long shedders experiment settings
-    * updated long shed stats plot
-	
-2025-05-08 pietro gerletti
-
-    Version 2.0.05
-    
-    * faster evolution in long shedders
-    * higher viral diversity in long shedders
-    * updated plots stats and clustering module
-    
-2025-06-08 pietro gerletti
-
-    Version 2.0.06
-    
-    * work in progress on clustering
-    * lower r long in test experiment and fitted NSR
-    
-2025-11-08 pietro gerletti
-
-    Version 2.0.07
-    
-    * updated seqeuncing data storage (for tree plots)
-    * updated newick and nexus tree exporter
-
-2025-21-08 pietro gerletti
-
-    Version 2.0.08
-    
-    * updated clustering algorithm
-    * added long_evo_rate_f parameter to population class
-    * updated scripts folder order
-    * added OSR fit scripts for long shedders experiments
-    * added batch fit pipeline and slurm scheduler
-	
-2025-22-08 pietro gerletti
-
-    Version 2.0.09
-    
-    * added tracking of total infections per lineage
-    * updated figure 4 
-    * update slurm batch submission script
-
-2025-04-09 pietro gerletti
-
-    Version 2.0.10
-    
-    * updated figures and long shedders experiments
-
-2025-29-09 pietro gerletti
-
-    Version 2.1.0
-    
-    * added get_experiment_cluster_dir and get_seed_from_SSOD to dm
-    * added get_clustering_table_filepath, write_clustering_table and read_clustering_table to output manager
-    * added get_clustering_for_ssod to clustering (write and read clustering results)
-    * added get_nextstrain_dataset_paths to output manager
-    * added nexstrain.py
-    * updated dir_manager.py
-    * updated clustering.py
-
-2026-07-01 pietro gerletti
-
-    Version 2.1.1
-    
-    * updated infection to use uniform parent selection for long-shedder transmissions
-    * updated _init_individuals to initialize susceptibles with zero lineages
-    * updated infection to sync active_lineages_n with individual lineages number
-    * moved SIMPLICITY v1 scripts to archive
-    * new OSR fitting script
-    
-2026-07-01 pietro gerletti
-
-    Version 2.1.2
-    
-    * updated OSR fitting logic to select all/normal/longshedders when fitting
-    * added script that only fits on normal individuals (base for double fitting separating long and normals)
-	
-2026-21-01 pietro gerletti
-
-    Version 2.1.3
-    
-    * added script for fitting NSR and Factor_long (2 separate rates for normal and long individuals)
-    * refactored plotting functions for OSR fit
-    * refactored OSR fitting write and read functions in output_manager to accept any parameter
-    * changed read_sequencing_data to read_sequencing_data_regression in output_manager
-    * refactored write sequencing data to optionally sequence long shedders, parameter passed to parameters file and manager
-    
-2026-27-01 pietro gerletti
-
-    Version 2.1.4
-
-    * updated osr_long script and om_manager to write long sequencing data correctly
-	
-	
-2026-24-02 pietro gerletti
-
-    Version 2.2.0
-
-    * Updated mutation model to allow separate poisson process for each subpopulation (heterogeneous rates)
-    * renamed normal individuals to standard individuals
-    * Added a separate diagnosis reaction (in extrande) for long shedders with an independent rate
-    
-2026-27-02 pietro gerletti
-
-    Version 2.2.1
-
-    * Updated poisson process math in mutation.py
-    * Added diagnosed_standard and long counters
-    * Added mixed pop OSR fitting script 
-    * Added test for diagnosis and mutation rate
-    * updated diagnosis_rate.py and the rest of the code accordingly 
-    
-    
-=======
-2025-09-10 pietro gerletti
-
-    Version 1.1.1
-
-    * added get_figure_source_data_dir to dir manager
-    * added write_source_data to output manager
-    * update figure 2 to save source data
-    * updated population (cleaning data type before saving the sim output) 
-    * updated figure 3 to save source data
-
-2025-13-10 pietro gerletti
-
-    Version 1.1.2
-
-	  * updated figure 4 to save source data
-	
-2025-15-10 pietro gerletti
-
-    Version 1.1.3
-
-    * updated OSR fit script to save goodness of fit scores table
-    
-2025-16-10 pietro gerletti
-
-    Version 1.1.4
-    
-    * updated scripts/plots/03_plot_trees.py to optionally plot trees or just saving their json files
-    * updated plot_manager.py
-    * updated scripts/paper_figures/* accordingly
-
-2025-17-10 pietro gerletti
-
-    Version 1.1.5
-    
-    * added panel labels to figures and minor graphic details
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
->>>>>>> main
-	
-	
-	
-	
+# SIMPLICITY — Changelog
+
+All notable changes to this project are documented here.
+Ordered by version number. Dates use YYYY-MM-DD.
+
+------------------------------------------------------------------------
+
+## Version 2.3.0 — 2026-07-03 — pietro gerletti
+
+Long-shedder NSR refactor: independent absolute rate + in-context calibration pipeline.
+
+* Replaced factor-based long-shedder rate (M_nsr_long) with an independent
+  absolute parameter nucleotide_substitution_rate_long (settings_manager,
+  population). create_population now reads the long rate directly.
+* Raised R_long parameter spec upper bound to 100.
+* Fixed individual_type column-casing bug in write_OSR_vs_parameter_csv
+  (was 'Individual_type'); standard-only OSR filtering now works, and a
+  missing type column raises instead of silently returning mixed data.
+* Added experiment_group parameter to fit-results path/writer/reader
+  (output_manager) and threaded it through fit_observed_substitution_rate_regressor
+  (evolutionary_rate) so per-group fits no longer overwrite each other.
+* Added two-stage in-context calibration script (impact_long_shedders_cal_2.py):
+  long NSR per tau group derived from the existing long calibration, standard
+  NSR calibrated inside the mixed population; writes a frozen calibration table.
+* Rewrote impact_long_shedders_exp.py to consume the frozen table with
+  independent standard and long NSRs, internal table-path derivation, and a
+  sibling import of the experiment runner.
+* Added calibration-curve plotting script (plot_impact_ls_calibration.py) and
+  SOT sanity-check plot (plot_sot_sanity_regressions.py): global-clock and
+  intra-host-clock (distance from infecting strain via hamming_iw) regressions.
+* Added tmux session launcher (start_simplicity_session.sh).
+* Fixed intra-host lineage trajectory bug (ih_death < ih_birth) and the
+  np.float64 serialization of IH_lineages_trajectory (future runs).
+
+------------------------------------------------------------------------
+
+## Version 2.2.1 — 2026-02-27 — pietro gerletti
+
+* Updated Poisson-process math in mutation.py.
+* Added diagnosed_standard and diagnosed_long counters.
+* Added mixed-population OSR fitting script.
+* Added test for diagnosis and mutation rate.
+* Updated diagnosis_rate.py and dependent code.
+
+## Version 2.2.0 — 2026-02-24 — pietro gerletti
+
+* Updated mutation model to allow a separate Poisson process per subpopulation
+  (heterogeneous rates).
+* Renamed "normal" individuals to "standard" individuals.
+* Added a separate diagnosis reaction (extrande) for long shedders with an
+  independent rate.
+
+## Version 2.1.4 — 2026-01-27 — pietro gerletti
+
+* Updated osr_long script and output_manager to write long sequencing data
+  correctly.
+
+## Version 2.1.3 — 2026-01-21 — pietro gerletti
+
+* Added script for fitting NSR and Factor_long (separate rates for normal and
+  long individuals).
+* Refactored OSR-fit plotting functions.
+* Refactored OSR fitting write/read functions in output_manager to accept any
+  parameter.
+* Renamed read_sequencing_data to read_sequencing_data_regression.
+* Write-sequencing-data now optionally sequences long shedders (parameter passed
+  through the parameters file and manager).
+
+## Version 2.1.2 — 2026-01-07 — pietro gerletti
+
+* Updated OSR fitting logic to select all / normal / long-shedders when fitting.
+* Added script that fits only on normal individuals (basis for double fitting
+  that separates long and normal).
+
+## Version 2.1.1 — 2026-01-07 — pietro gerletti
+
+* Updated infection to use uniform parent selection for long-shedder transmissions.
+* Updated _init_individuals to initialize susceptibles with zero lineages.
+* Updated infection to sync active_lineages_n with individual lineage counts.
+* Moved SIMPLICITY v1 scripts to archive.
+* New OSR fitting script.
+
+## Version 2.1.0 — 2025-09-29 — pietro gerletti
+
+* Added get_experiment_cluster_dir and get_seed_from_SSOD to dir_manager.
+* Added get_clustering_table_filepath, write_clustering_table, read_clustering_table
+  to output_manager.
+* Added get_clustering_for_ssod to clustering (write/read clustering results).
+* Added get_nextstrain_dataset_paths to output_manager and nextstrain.py.
+* Updated dir_manager.py and clustering.py.
+
+## Version 2.0.10 — 2025-09-04 — pietro gerletti
+
+* Updated figures and long-shedders experiments.
+
+## Version 2.0.09 — 2025-08-22 — pietro gerletti
+
+* Added tracking of total infections per lineage.
+* Updated figure 4.
+* Updated slurm batch submission script.
+
+## Version 2.0.08 — 2025-08-21 — pietro gerletti
+
+* Updated clustering algorithm.
+* Added long_evo_rate_f parameter to the population class.
+* Updated scripts folder order.
+* Added OSR fit scripts for long-shedders experiments.
+* Added batch fit pipeline and slurm scheduler.
+
+## Version 2.0.07 — 2025-08-11 — pietro gerletti
+
+* Updated sequencing data storage (for tree plots).
+* Updated Newick and Nexus tree exporters.
+
+## Version 2.0.06 — 2025-08-06 — pietro gerletti
+
+* Work in progress on clustering.
+* Lower R_long in test experiment and fitted NSR.
+
+## Version 2.0.05 — 2025-08-05 — pietro gerletti
+
+* Faster evolution in long shedders; higher viral diversity in long shedders.
+* Updated stats/clustering plotting module.
+
+## Version 2.0.04 — 2025-08-04 — pietro gerletti
+
+* Updated long-shedder figure 3 and experiment settings.
+* Updated long-shedder stats plot.
+
+## Version 2.0.03 — 2025-08-02 — pietro gerletti
+
+* Reverted fitness change (store non-normed fitness, norm before selection).
+* Added fitness entropy calculation for better plotting.
+* Added and tested reaction for long-shedder infection rate.
+
+## Version 2.0.02 — 2025-07-27 — pietro gerletti
+
+* Updated plot to show normed fitness value.
+* Added plots for long-shedder experiments.
+* Removed long shedders from consensus calculation.
+
+## Version 2.0.01 — 2025-07-27 — pietro gerletti
+
+* Updated fitness to relative fitness (already used as such in selection).
+* Improved fitness-floor handling (epsilon).
+* Removed 1-based Hamming distance.
+* Added temporal weight to genome selection for substitution assignment.
+
+## Version 2.0.0 — 2025-07-23 — pietro gerletti
+
+* Added tau_1, tau_2, tau_4 to settings_manager.
+* Updated code to include the long-shedders subpopulation.
+* Added figures 1, 2, 3 for the long-shedders paper.
+* Removed plot_simulation bool from runners.
+* Updated check-simulations script.
+
+## Version 1.1.5 — 2025-10-17 — pietro gerletti
+
+* Added panel labels to figures and minor graphic details.
+
+## Version 1.1.4 — 2025-10-16 — pietro gerletti
+
+* Updated scripts/plots/03_plot_trees.py to optionally plot trees or only save
+  their JSON files.
+* Updated plot_manager.py and scripts/paper_figures/* accordingly.
+
+## Version 1.1.3 — 2025-10-15 — pietro gerletti
+
+* Updated OSR fit script to save a goodness-of-fit scores table.
+
+## Version 1.1.2 — 2025-10-13 — pietro gerletti
+
+* Updated figure 4 to save source data.
+
+## Version 1.1.1 — 2025-10-09 — pietro gerletti
+
+* Added get_figure_source_data_dir to dir_manager.
+* Added write_source_data to output_manager.
+* Updated figures 2 and 3 to save source data.
+* Updated population (cleaning data types before saving simulation output).
+
+## Version 1.1.0 — 2025-06-04 — pietro gerletti
+
+* Added paper figures scripts.
+* Added build_tree module.
+* Added scripts (back and front end) to calculate and display entropy and clustering.
+* Cleaned and fixed minor bugs and experiment naming.
+
+## Version 1.0.1 — 2025-05-27 — pietro gerletti
+
+* Standardized all plotting functions to comply with journal formatting
+  (unified text size, font, axis styling; removed top/right spines).
+* Applied apply_standard_axis_style() to all matplotlib axes.
+* Replaced default save format with TIFF (300 dpi, bbox_inches='tight').
+* Verified and cleaned axis labels; updated units and text per figure.
+* Added printed confirmation of saved figure path.
+
+## Version 1.0.0 — 2025-05-21 — pietro gerletti
+
+* Updated license.
+
+## Version 0.18.00 — 2025-05-08 — pietro gerletti
+
+* Updated generate_user_set_parameters_file.py.
+* Updated standard best-fit parameter values.
+* Added inverse_exp_regressor function.
+* Added plot for IH lineage variability vs infection period (tau_3 / OSR / IH variability).
+
+## Version 0.17.02 — 2025-05-08 — pietro gerletti
+
+* Iterated on exp curve fit C parameter (removed, then re-added).
+* Added bootstrapping CI calculation for model fit; later reverted to stderr CI
+  for OSR fit plots.
+* Updated om.create_combined_sequencing_df.
+* Updated plot OSR fit (removed CI from plot).
+
+## Version 0.17.01 — 2025-05-06 — pietro gerletti
+
+* Prepared files to rerun the experiments for the publication.
+
+## Version 0.17.00 — 2025-05-04 — pietro gerletti
+
+* Renamed IH fields: IH_virus_number > IH_lineages_number,
+  lineages_number > IH_unique_lineages_number, IH_virus_max > IH_lineages_max,
+  IH_virus_fitness > IH_lineages_fitness_score, fitness > fitness_score.
+* Added intra-host lineage trajectories.
+* Added plots for R_effective.
+
+## Version 0.16.12 — 2025-04-30 — pietro gerletti
+
+* Removed ih timestep debugger.
+* Updated extrande (ih dt accumulator also in leap step).
+* Updated update_fitness to improve the immune-waning model (accounts for the
+  initial phase before the population is exposed to the virus).
+
+## Version 0.16.11 — 2025-04-28 — pietro gerletti
+
+* Changed ih update min delta_t size to 0.16 (4h).
+* Renamed and moved R_eff_ih_check.py to scripts (R_vs_time_inf.py).
+* Updated tree-related files.
+
+## Version 0.16.10 — 2025-04-24 — pietro gerletti
+
+* Updated plot_his_simulations_length.py for better visualization.
+* Updated R_eff_ih_check.py to filter simulations by final time.
+* Changed ih update min delta_t size to 0.04.
+
+## Version 0.16.09 — 2025-04-24 — pietro gerletti
+
+* Added delta_t_ih_updates debugger (writes a CSV with relevant info).
+
+## Version 0.16.08 — 2025-04-07 — pietro gerletti
+
+* Added infection tree (transmission chain), subtree filtering by lineage, and
+  plot with its infections.
+
+## Version 0.16.07 — 2025-04-05 — pietro gerletti
+
+* Updated SIDR to add reaction labels.
+* Added progress bar to simulation and cleaned console output.
+* Added plot of average infection time.
+
+## Version 0.16.06 — 2025-04-04 — pietro gerletti
+
+* Fixed L/delta_t bug.
+* Limited min/max (0.04–1 day) step size for system-state updates
+  (not extrande steps).
+
+## Version 0.16.05 — 2025-04-04 — pietro gerletti
+
+* Added precomputation of matrix exponentials for the ih model.
+
+## Version 0.16.04 — 2025-04-01 — pietro gerletti
+
+* Updated intra-host model file.
+* Added both matrix and jump-process options to update the intra-host model.
+
+## Version 0.16.03 — 2025-03-31 — pietro gerletti
+
+* Added intra-host debugging for traverse-time dependency on delta_t.
+* Renamed random to random_gen to avoid conflicts.
+* Updated intra_host.py (better matrix exponential; multiprocessing works;
+  cleaner, more efficient code).
+* Updated R_eff experiment script and look-ahead function.
+* Updated new-jump-time assignment for intra-host states in update_states().
+
+## Version 0.16.02 — 2025-03-30 — pietro gerletti
+
+* Renamed host to intra_host_model.py.
+* Refactored intra-host model: matrix exponential → jump process.
+* State transitions now triggered by exponential waiting times (Exp(1/rate));
+  state updates occur only when t >= t_next_state.
+* Vectorized sampling of waiting times for all transitioning individuals.
+* Merged update_state/recovery/infectious/detectables updates.
+* Updated look-ahead horizon (min 1h, max = next ih update).
+
+## Version 0.16.01 — 2025-03-29 — pietro gerletti
+
+* Changed extrande step order to ensure simulation correctness.
+
+## Version 0.16.0 — 2025-03-29 — pietro gerletti
+
+* Updated test local runme to compare experiment runs.
+* Refactored extrande for modularity; updated add_variant and infection reactions.
+* Ensured 100% reproducible randomness (e.g. sorting sets).
+* Refactored population class (fewer responsibilities).
+* Added population_model module (SIDR reactions).
+* Refactored code passed tests.
+
+## Version 0.15.1 — 2025-03-28 — pietro gerletti
+
+* Added R_eff and time_infectiousness plot for model check and validation.
+
+## Version 0.15.0 — 2025-03-27 — pietro gerletti
+
+* Changed lists of indices in the population class to Python sets; updated code
+  accordingly.
+* Individuals store t_not_infectious (for R calculation), and time/number of
+  infections caused.
+* Refactored population.add_variant and the infection tree builder for clarity
+  and efficiency.
+* Added experiment_example_runme.
+* Updated write_experiment_settings and added generate_experiment_settings in
+  settings_manager; updated runme.
+* Shortened simulation settings file/folder naming.
+
+## Version 0.14.1 — 2025-03-20 — pietro gerletti
+
+* Working on fixing the R_effective plot.
+
+## Version 0.14.0 — 2025-03-20 — pietro gerletti
+
+* Changed how R_effective trajectory is stored (corrected a calculation mistake).
+* Updated tree_plotting to filter by seeds shared across simulations after filtering.
+* Added average-R line to the R_effective plot.
+
+## Version 0.13.1 — 2025-03-19 — pietro gerletti
+
+* Updated path and names for simulation plots and lineage tabs.
+* Added script to sort plots by seed number.
+* Prepared new experiment (generate_data_trees_and_R_eff).
+
+## Version 0.13.0 — 2025-03-18 — pietro gerletti
+
+* Renamed population methods data/phylogeny to
+  individuals_data_to_df/phylogenetic_data_to_df.
+* Updated and cleaned the population class (track_fitness → update_fitness_trajectory).
+* Refactored population class, evolution.mutations, and phenotype.update (work
+  only with lineage names; genomes stored in population.phylogenetic_data).
+* Updated plot_manager: lineage colors based on time of emergence with unique labels.
+
+## Version 0.12.0 — 2025-03-13 — pietro gerletti
+
+* Updated extrande, population, and phenotype.update to fix fitness-score tracking.
+* Updated simulation trajectory plot and added lineage colors to it.
+* Changed how lineage_frequency is stored and saved.
+
+## Version 0.11.1 — 2025-03-13 — pietro gerletti
+
+* Added R_effective data processing and plot.
+* Polished plot_manager and output_manager for readability.
+* Added script to plot R_effective for selected seed folders.
+
+## Version 0.11.0 — 2025-03-12 — pietro gerletti
+
+* Refactored tree building (many changes).
+* Added get_simulation_output_foldername_from_SSOD to dir_manager.
+* Added plot_lineages_colors_tab, get_lineage_color, make_lineages_colormap to
+  plot_manager.
+* Added circular tree plot with ete3 to plot_manager.
+
+## Version 0.10.0 — 2025-03-07 — pietro gerletti
+
+* Renamed molecular substitution rate (MSR) to nucleotide substitution rate (NSR).
+* Added tau_3 / OSR plot.
+
+## Version 0.9.1 — 2025-03-06 — pietro gerletti
+
+* Updated plot_tempest_regression.py and added plot2E to plot_manager.
+* Added get_experiment_plots_dir to dir_manager.
+* Simulation now saves all consensus sequences generated over a run in the
+  population class.
+
+## Version 0.9.0 — 2025-03-05 — pietro gerletti
+
+* Renamed observed_evolutionary_rate → observed substitution rate (OER → OSR).
+* Renamed evolutionary_rate → molecular_substitution rate (MSR).
+* Added script to generate a user-set parameters JSON file.
+* Added functions to read/write standard parameters to a file.
+* Added Data/00_reference_parameters to the repo.
+
+## Version 0.8.3 — 2025-03-04 — pietro gerletti
+
+* Updated generate_OER_data script (the experiment used to fit the curve).
+* Added script to plot OER fit for the paper figure.
+* fit_observed_evolutionary_rate_regressor now saves fit results to a file.
+* Added inverse_log_regressor to evolutionary_rate.py (get e from OER after fit).
+
+## Version 0.8.2 — 2025-03-03 — pietro gerletti
+
+* Updated names/signatures of OER-related functions in output_manager and
+  plots_manager.
+* Updated script for simulating OER fit data (3-year runs, updated er range).
+* Updated phenotype-model weights plot function.
+
+## Version 0.8.1 — 2025-03-02 — pietro gerletti
+
+* Added mean scatter plot to plot_observed_evolutionary_rates_fit; updated it to
+  use seaborn consistently.
+* Updated output_manager (save observed_evolutionary_rates_csv with distinct
+  names when filtered by sim length).
+* Moved output-manager responsibilities out of evolutionary_rate.py; deleted
+  obsolete functions.
+* Finished refactoring tempest-regression results CSV writing/reading.
+* Added option to filter sequencing data by number of sequences present.
+
+## Version 0.8.0 — 2025-03-01 — pietro gerletti
+
+* Updated tempest regression, plots, fit logic, and data flow.
+* Added scatterplot of observed evolutionary-rate values for single seeded outputs.
+* Added fit curve to the observed-evolutionary-rates ensemble (1 estimate per
+  simulation; NSEEDS points per parameter value) and its plot.
+* Added read_final_time to output_manager.
+* Added min_sim_length filtering in build_observed_evolutionary_rates_vs_parameter_df.
+
+## Version 0.7.3 — 2025-02-28 — pietro gerletti
+
+* Updating tempest plots and scripts.
+
+## Version 0.7.2 — 2025-02-28 — pietro gerletti
+
+* Updated tuning.evolutionary_rate with different models to fit u; updated the
+  fitting plot and script.
+* Added spline and weights to the fitting.
+
+## Version 0.7.1 — 2025-02-25 — pietro gerletti
+
+* Updated standard parameter values.
+* Updated plot_IH_lineage_distribution to save the figure.
+
+## Version 0.7.0 — 2025-02-25 — pietro gerletti
+
+* Moved plotting scripts into scripts/plots.
+* Added read_simulation_trajectory to output_manager.
+* Renamed output_path → seeded_simulation_output_dir in output_manager.
+* Added get_IH_lineages_data_experiment and get_IH_lineages_data_simulation.
+* Updated plot_IH_lineage_distribution.
+* Population and output_manager now save susceptibles in the trajectory.
+* Updated plot_trajectory.
+* Created pseudocode for fetch_seeded_simulation_parameters_from_job_id.
+
+## Version 0.6.1 — 2025-02-24 — pietro gerletti
+
+* Added regression plot (theoretical vs effective diagnosis rate) and R-vs-
+  diagnosis-rate heatmap.
+* Updated setup.py and yml (added seaborn).
+* Updated extrande: tau_inf computed from tau parameter values so the upper bound
+  stays correct if tau_3 changes.
+* Created script to generate IH lineage data for model testing.
+* Standardized experiment-script structure.
+* Moved several parameter/settings helpers into settings_manager.
+* Added get_all_individuals_data_for_simulation_output_dir and
+  plot_IH_lineage_distribution.
+* Fixed silent bug where invalid parameter names were accepted.
+
+## Version 0.6.0 — 2025-02-23 — pietro gerletti
+
+* Diagnosis rate in parameters is now passed as a percentage (0–1).
+* Renamed k_d parametrization to diagnosis_rate.py and updated functions.
+* Added get_simulation_parameters_of_simulation_output_dir to dir_manager.
+* Added get_effective_diagnosis_rate and get_diagnosis_rates to diagnosis_rate.py.
+* Updated and renamed explore_R_diagnosis_rate_parameter_space.py.
+
+## Version 0.5.4 — 2025-02-21 — pietro gerletti
+
+* Updated check_completed_simulations with new dir_manager functions.
+* Paid off dir_manager technical debt; updated backlog.
+* Removed extrande profiling plot.
+* Added results folder to repo; saved memory-profiling plots/data to results.
+
+## Version 0.5.3 — 2025-02-21 — pietro gerletti
+
+* Updated OOM error script for memory profiling with mprof.
+* Updated extrande to give periodic simulation-status updates and added a profiler.
+* Updated explore_popsize_impact_on_u (memory-profiling experiment).
+* Added fetch_error_seeded_simulation_parameters.py.
+* Extrande saves infected-vs-runtime info; added the corresponding plot.
+
+## Version 0.5.2 — 2025-02-20 — pietro gerletti
+
+* Corrected err/out file signatures in the slurm runner.
+* Moved parse_slurm_error_files.py to slurm_diagnostics as slurm_error_summary.py
+  and updated it.
+* Added test for HPC OOM errors; slurm jobs now request 20GB.
+* Renamed OOM script to diagnosis_OOM_errors (local runner).
+* Limited parallel simulations to 150 via dir_manager env var.
+* Updated explore_popsize_impact_on_u and the backlog.
+
+## Version 0.5.1 — 2025-02-19 — pietro gerletti
+
+* Slurm runner saves a job-id → seeded-simulation-path mapping.
+* Added slurm logs and maps folders to dir_manager.
+* Added script to parse slurm errors; updated it.
+* Updated scripts/experiments for new function signatures.
+* Added backlog file; updated check_completed_simulation.
+* Added runtime and memory specifications to the slurm runner.
+
+## Version 0.5.0 — 2025-02-18 — pietro gerletti
+
+* n_seeds is now saved to a file (01_exp_settings/); updated runme accordingly.
+* Added script to count successful simulations in an experiment.
+* Updated setup.py.
+
+## Version 0.4.1 — 2025-02-17 — pietro gerletti
+
+* Combined-regression plot uses the same ylim across subplots.
+
+## Version 0.4.0 — 2025-02-13 — pietro gerletti
+
+* Added tau_3 to the parameters file and a way to pass it to the Host class
+  (infection length settable per simulation).
+* Removed the deprecated settings.json from the data flow.
+* Renamed config.py to dir_manager.py and added functions.
+* Moved remaining plots to plot_manager.py.
+* Added tau_3/u experiment script; combined-regression plot accepts any parameter.
+
+## Version 0.3.6 — 2025-02-14 — pietro gerletti
+
+* Moved experiment scripts into an eponymous folder.
+* Added script to perform and plot u regression on an experiment folder.
+* Added min_sim_length arg to u-regression functions and script.
+
+## Version 0.3.5 — 2025-02-12 — pietro gerletti
+
+* Moved fitting plot to plot_manager.
+* Added option to plot fit on log-log or semilog scale.
+* Added function to filter files for tempest regression by simulation length.
+* Studying u fit; added scripts to explore u-parameter behavior.
+
+## Version 0.3.4 — 2025-02-11 — pietro gerletti
+
+* u log-fit script works.
+* Moved plotting from statistics_simulations_length to plot_manager.
+* Made get_A_matrix available outside the Host class.
+* Updated kd_parametrization.py; added explore_R_k_d_parameter_space.py.
+* Updated setup.py.
+
+## Version 0.3.3 — 2025-02-11 — pietro gerletti
+
+* Added (test phase) script to fit a log curve to the u/e plot.
+* Updated yml (added lmfit) and setup.py.
+
+## Version 0.3.2 — 2025-02-09 — pietro gerletti
+
+* Fixed bug from storing bool as string in env var (slurm runner).
+* Updated test_parameter_space and explore_u_parameter_space.
+* Added exception handling to plot_combined_regressions; fixed its subplot
+  order and titles.
+* Added config.get_experiment_dir and statistics_simulations_length.py.
+* Removed parameter_search.py (working on new tuning routine).
+* Slurm runner saves log files in the correct folder; updated setup.py.
+
+## Version 0.3.1 — 2025-05-02 — pietro gerletti
+
+* Updated plot_manager to use Agg instead of Qt for slurm plotting.
+* Found bug causing simulation plots to be created even when plotting is off (HPC).
+
+## Version 0.3.0 — 2025-04-02 — pietro gerletti
+
+* Updated test_local_runme user info; created parameter-space test file.
+* Added sklearn to dependencies; changed runtime_max in settings_manager (3600).
+* Added exception handling to config.get_output_directory and
+  config.get_simulation_parameters_dir.
+* Updated standard values dictionary; fixed parameter-name conflicts.
+* Rewrote tempest regression functions and plots; moved them to plot_manager.
+* Added script to extract plots to Data/00_Tempest_regression_plots.
+* Parameter-space exploration runs locally; created explore_u_parameter_space.
+
+## Version 0.2.3 — 2025-01-29 — pietro gerletti
+
+* Wrote test for HPC_runme.
+* Added MAX_PARALLEL_SIMULATIONS env variable to config; updated the
+  multiprocessing runner env name.
+* Updated slurm runner for the new unit_run signature.
+* New tests and runners work.
+
+## Version 0.2.2 — 2025-01-24 — pietro gerletti
+
+* Updated setup.py and yml env file; corrected import paths.
+* Made runme.py signatures consistent with tests.
+* Added exception handling in output_manager.setup_output_directory and
+  settings_manager.read_settings_and_write_simulation_parameters.
+* Implemented and tested complete tests for the local serial and multiprocessing
+  runners.
+
+## Version 0.2.1 — 2025-01-17 — pietro gerletti
+
+* Commented out the slurm part of fixtures to run locally.
+* Implemented test for single seeded simulation.
+* Fixed ghost-Data-folder bug (Data created in working directory; use
+  config.set_data_dir(path) to change).
+* Moved create-population into simulation.py and sequencing-dataset writing into
+  output_manager.
+* Fixed wrong output path and unsaved-plot bugs; moved plots to plots_manager.
+* Renamed output variables for consistency (variant_inf_count → lineage_frequency).
+* Implemented plotting from saved data files; tested and debugged.
+* Fixed infection tree and wrote tests for it; tree no longer stores the full
+  sequence (available from individuals_data.csv).
+* Updated Nexus tree export; wrote test for phylogenetic tree (built from
+  phylogenetic_data.csv).
+* Fixed fasta writing and the genome decoder (all mutations introduced when
+  decoding).
+* Implemented tree-builder module; created tree tests.
+* Fixed variable-name conflict in tree rendering.
+* Created and tested new runme for local machines.
+
+## Version 0.2.0 — 2024-09-12 — jbescudie
+
+* Refactoring: decoupled core modules from managers (simulation.Simplicity still
+  depends on output_manager).
+* Added runners API + 3 implementations (serial, multiprocessing, slurm).
+* Added test suite (currently only single-experiment).

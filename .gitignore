@@ -1,3 +1,8 @@
 docs/build/
 __pycache__/
 simplicity.egg-info
+# --- session 2.3.0 additions ---
+slurm_logs/
+Data/
+Figure_*.png
+structure.txt

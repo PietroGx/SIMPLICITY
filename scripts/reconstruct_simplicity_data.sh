@@ -5,15 +5,16 @@
 EXPORT_DIR="Data_Export"
 TARGET_DIR="Data"
 FLAG="$1"
+SLURM_EXTRAS="$2"
 
 if [[ "$FLAG" == "--slurm" ]]; then
     echo "Submitting reconstruction job to SLURM..."
-    sbatch --job-name="simp_rec" --cpus-per-task=16 --mem=64G --time=02:00:00 \
+    sbatch ${SLURM_EXTRAS} --job-name="simp_rec" --cpus-per-task=16 --mem=64G --time=02:00:00 \
            --mail-type=END --wrap="./scripts/reconstruct_simplicity_data.sh --internal"
     exit 0
 fi
 
-ARCHIVES=($(ls "$EXPORT_DIR"/simplicity_export_*.tar.xz 2>/dev/null))
+ARCHIVES=($(ls "$EXPORT_DIR"/simplicity_export_*.xz 2>/dev/null))
 if [ ${#ARCHIVES[@]} -eq 0 ]; then echo "No archives found."; exit 1; fi
 
 mkdir -p "$TARGET_DIR"

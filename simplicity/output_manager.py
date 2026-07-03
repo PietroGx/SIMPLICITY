@@ -301,15 +301,30 @@ def save_individuals_data(simulation_output, seeded_simulation_output_dir):
                                                "individuals_data.csv")
     individuals_data.to_csv(individuals_data_file_path)
     
+def _np_safe_literal_eval(value):
+    """ast.literal_eval that tolerates numpy scalar reprs like np.float64(x).
+
+    individuals_data.csv serializes dict values as np.float64(...)/np.int64(...),
+    which are ast.Call nodes and crash ast.literal_eval. Unwrap them to bare
+    literals first, then parse. Non-string / already-parsed values pass through.
+    """
+    import re
+    if not isinstance(value, str):
+        return value
+    unwrapped = re.sub(r'np\.(?:float64|float32|int64|int32|bool_)\(([^()]*)\)',
+                       r'\1', value)
+    return ast.literal_eval(unwrapped)
+
+
 def read_individuals_data(seeded_simulation_output_dir):
     trajectory_file_path = os.path.join(seeded_simulation_output_dir,
                                         "individuals_data.csv")
     df = pd.read_csv(trajectory_file_path, index_col=0,low_memory=False)
     df['type'] = df['type'].astype(str)
-    df['IH_lineages'] = df['IH_lineages'].apply(ast.literal_eval)
-    df['IH_lineages_fitness_score'] = df['IH_lineages_fitness_score'].apply(ast.literal_eval) 
-    df['new_infections'] = df['new_infections'].apply(ast.literal_eval)
-    df['IH_lineages_trajectory'] = df['IH_lineages_trajectory'].apply(ast.literal_eval)
+    df['IH_lineages'] = df['IH_lineages'].apply(_np_safe_literal_eval)
+    df['IH_lineages_fitness_score'] = df['IH_lineages_fitness_score'].apply(_np_safe_literal_eval) 
+    df['new_infections'] = df['new_infections'].apply(_np_safe_literal_eval)
+    df['IH_lineages_trajectory'] = df['IH_lineages_trajectory'].apply(_np_safe_literal_eval)
     return df
 
 def save_phylogenetic_data(simulation_output, seeded_simulation_output_dir):
@@ -572,8 +587,14 @@ def write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq_number=0, min
                 final_time = read_final_time(ssod)
                 sequencing_data = read_sequencing_data_regression(ssod)
                 
-                if individual_type and 'Individual_type' in sequencing_data.columns:
-                    sequencing_data = sequencing_data[sequencing_data['Individual_type'] == individual_type]
+                if individual_type:
+                    if 'individual_type' not in sequencing_data.columns:
+                        raise KeyError(
+                            "individual_type filtering requested but 'individual_type' "
+                            f"column is absent in {ssod}. Refusing to return unfiltered "
+                            "(mixed standard + long_shedder) OSR data."
+                        )
+                    sequencing_data = sequencing_data[sequencing_data['individual_type'] == individual_type]
                 
                 seq_number = len(sequencing_data)
                 
@@ -741,17 +762,18 @@ def get_mean_std_OSR(experiment_name,
     df_mean_std = df.groupby(parameter)['observed_substitution_rate'].agg(['mean','std']).reset_index()
     return df_mean_std
 
-def get_fit_results_filepath(experiment_name, model_type, individual_type=None):
+def get_fit_results_filepath(experiment_name, model_type, individual_type=None, experiment_group=None):
     experiment_fit_result_dir = dm.get_experiment_fit_result_dir(experiment_name)
     
     type_suffix = f"_{individual_type}" if individual_type else ""
-    filename = f'{experiment_name}_{model_type}_fit_results{type_suffix}.csv'
+    group_suffix = f"_{experiment_group}" if experiment_group else ""
+    filename = f'{experiment_name}_{model_type}_fit_results{type_suffix}{group_suffix}.csv'
     
     return os.path.join(experiment_fit_result_dir, filename)
 
-def write_fit_results_csv(experiment_name, model_type, fit_result, individual_type=None):
-    # Pass individual_type to get unique filepath
-    fit_results_filepath = get_fit_results_filepath(experiment_name, model_type, individual_type)
+def write_fit_results_csv(experiment_name, model_type, fit_result, individual_type=None, experiment_group=None):
+    # Pass individual_type and experiment_group to get unique filepath
+    fit_results_filepath = get_fit_results_filepath(experiment_name, model_type, individual_type, experiment_group)
     
     # Save best-fit parameters to CSV
     param_dict = {name: param.value for name, param in fit_result.params.items()}
@@ -759,8 +781,8 @@ def write_fit_results_csv(experiment_name, model_type, fit_result, individual_ty
     df.to_csv(fit_results_filepath, index=True, header=True)
     print(f'Saved fit results to: {fit_results_filepath}')
 
-def read_fit_results_csv(experiment_name, model_type, individual_type=None):
-    fit_results = get_fit_results_filepath(experiment_name, model_type, individual_type)
+def read_fit_results_csv(experiment_name, model_type, individual_type=None, experiment_group=None):
+    fit_results = get_fit_results_filepath(experiment_name, model_type, individual_type, experiment_group)
     
     if not os.path.exists(fit_results):
         print(f"[Warning] Fit results file not found: {fit_results}")

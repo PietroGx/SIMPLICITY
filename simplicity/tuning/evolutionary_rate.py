@@ -122,7 +122,8 @@ def factory_model_lmfit(model_type: str):
 
 def fit_observed_substitution_rate_regressor(experiment_name, 
                                              df, model_type, weights=None,
-                                             parameter_name='nucleotide_substitution_rate'):
+                                             parameter_name='nucleotide_substitution_rate',
+                                             experiment_group=None):
     """
     Fits a model to the observed substitution rate against a varying parameter.
     
@@ -159,7 +160,7 @@ def fit_observed_substitution_rate_regressor(experiment_name,
         print(fit_result.fit_report())
         
         # save fit results
-        om.write_fit_results_csv(experiment_name, model_type, fit_result)
+        om.write_fit_results_csv(experiment_name, model_type, fit_result, experiment_group=experiment_group)
         return fit_result
         
     except Exception as e:

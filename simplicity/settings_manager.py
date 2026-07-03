@@ -56,7 +56,7 @@ def write_standard_parameters_values():
         "diagnosis_rate_long"    : 0.1, # in percentage, will be converted to kdl in model 
         "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
         "nucleotide_substitution_rate":  0.00008759,  # e in theoretical model equations
-        "M_nsr_long": 1, # ratio to calculate long shedders NSR from base NSR
+        "nucleotide_substitution_rate_long":  0.00008759,  # absolute NSR for long shedders
         "final_time": 365,
         "max_runtime": 86000, 
         "phenotype_model": 'immune_waning',  # or 'linear'
@@ -81,7 +81,7 @@ def write_parameter_specs():
         "infected_individuals_at_start": {"type": "int", "min": 0},
         "R":                             {"type": "float", "min": 0, "max": 20},
         "R_long":                        {"type": "float", "min": 0, "max": 20},
-        "M_nsr_long":                    {"type": "float"},
+        "nucleotide_substitution_rate_long":  {"type": "float", "min": 0, "max": 1},
         "diagnosis_rate_standard":       {"type": "float", "min": 0, "max": 1},
         "diagnosis_rate_long":           {"type": "float", "min": 0, "max": 1},
         "IH_virus_emergence_rate":       {"type": "float", "min": 0},
@@ -224,7 +224,7 @@ def write_simulation_parameters(file_path,
                                 infected_individuals_at_start, 
                                 R,
                                 R_long,
-                                M_nsr_long,
+                                nucleotide_substitution_rate_long,
                                 diagnosis_rate_standard,
                                 diagnosis_rate_long,
                                 IH_virus_emergence_rate,
@@ -247,7 +247,7 @@ def write_simulation_parameters(file_path,
         "infected_individuals_at_start": infected_individuals_at_start,
         "R": R,
         "R_long": R_long,
-        "M_nsr_long": M_nsr_long,
+        "nucleotide_substitution_rate_long": nucleotide_substitution_rate_long,
         "diagnosis_rate_standard": diagnosis_rate_standard, 
         "diagnosis_rate_long":diagnosis_rate_long,
         "IH_virus_emergence_rate" : IH_virus_emergence_rate,
@@ -273,7 +273,7 @@ def generate_filename_from_params(params: dict):
     "infected_individuals_at_start": "init",
     "R": "R",
     "R_long": "Rl",
-    "M_nsr_long": "M",
+    "nucleotide_substitution_rate_long": "NSR_long",
     "diagnosis_rate_standard": "kds",
     "diagnosis_rate_long": "kdl",
     "IH_virus_emergence_rate": "kv",
@@ -355,7 +355,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                     settings["infected_individuals_at_start"],
                                     settings["R"],
                                     settings["R_long"],
-                                    settings["M_nsr_long"],
+                                    settings["nucleotide_substitution_rate_long"],
                                     settings["diagnosis_rate_standard"],
                                     settings["diagnosis_rate_long"],
                                     settings["IH_virus_emergence_rate"],
