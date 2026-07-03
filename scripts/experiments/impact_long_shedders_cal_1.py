@@ -21,7 +21,6 @@ def user_set_experiment_settings(seeds, ranges):
         }
 
         fixed_params = {
-            'M_nsr_long': 1.0,
             'long_shedders_ratio': 1.0,
             'R': 1.0,
             'R_long': 1.5,
