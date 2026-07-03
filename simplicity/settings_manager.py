@@ -167,25 +167,55 @@ def read_n_seeds_file(experiment_name):
 def generate_experiment_settings(varying_params: dict, fixed_params: dict = None):
     """
     Generates a list of parameter combinations from varying and fixed parameters.
-    
+
     Args:
         varying (dict): Parameters for which all combinations should be generated.
+                        An optional reserved key '_scenario_groups' may hold a list
+                        of dicts, one per "group" (e.g. one per experiment scenario).
+                        Within each group dict, list/tuple-valued entries are that
+                        group's own local varying axis (expanded independently of
+                        every other group); scalar entries are fixed overrides for
+                        that group only. This lets correlated parameter sets (e.g.
+                        different NSR sweep ranges per scenario) be submitted as a
+                        single combined experiment instead of one experiment per
+                        group.
         fixed (dict): Parameters that should have the same value across all combinations.
-    
+
     Returns:
         List[dict]: A list of dictionaries with combined parameter sets.
     """
     fixed_params = fixed_params or {}
+    varying_params = dict(varying_params or {})
+    scenario_groups = varying_params.pop('_scenario_groups', None)
 
-    keys, values = zip(*varying_params.items()) if varying_params else ([], [])
-    combinations = list(itertools.product(*values)) if values else [()]
+    if scenario_groups is None:
+        keys, values = zip(*varying_params.items()) if varying_params else ([], [])
+        combinations = list(itertools.product(*values)) if values else [()]
 
+        experiment_settings = []
+        for combo in combinations:
+            setting = dict(zip(keys, combo))
+            setting.update(copy.deepcopy(fixed_params))  # Avoid mutation
+            experiment_settings.append(setting)
+
+        return experiment_settings
+
+    # Grouped path: each group expands its own list-valued keys independently,
+    # so different groups can vary different parameters over different ranges.
     experiment_settings = []
-    for combo in combinations:
-        setting = dict(zip(keys, combo))
-        setting.update(copy.deepcopy(fixed_params))  # Avoid mutation
-        experiment_settings.append(setting)
-    
+    for group in scenario_groups:
+        group_varying = {k: v for k, v in group.items() if isinstance(v, (list, tuple))}
+        group_fixed = {k: v for k, v in group.items() if not isinstance(v, (list, tuple))}
+
+        keys, values = zip(*group_varying.items()) if group_varying else ([], [])
+        combinations = list(itertools.product(*values)) if values else [()]
+
+        for combo in combinations:
+            setting = dict(zip(keys, combo))
+            setting.update(copy.deepcopy(fixed_params))
+            setting.update(copy.deepcopy(group_fixed))
+            experiment_settings.append(setting)
+
     return experiment_settings
 
 def write_experiment_settings(experiment_name: str, experiment_settings: list, n_seeds: int):

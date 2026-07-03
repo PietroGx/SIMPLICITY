@@ -31,6 +31,7 @@ import argparse
 import pandas as pd
 
 from experiment_script_runner import run_experiment_script
+from impact_long_shedders_config import USER_FIXED_PARAMS
 
 EXP_NAME = "impact_long_shedders"
 
@@ -39,16 +40,9 @@ EXP_NAME = "impact_long_shedders"
 SETUP_DIR_TEMPLATE = "Data/impact_long_shedders_calibration_setup_data_#{exp_num}"
 TABLE_FILENAME = "nsr_calibration_table.csv"
 
-# Fixed experiment overrides. MUST match the population context used during
-# calibration (USER_FIXED_PARAMS in impact_long_shedders_cal_2.py), so the
-# calibrated standard NSR remains valid for these runs.
-USER_FIXED_PARAMS = {
-    "population_size": 1000,
-    "infected_individuals_at_start": 100,
-    "R": 1.05,
-    "final_time": 1095,
-    "IH_virus_emergence_rate": 0.1,
-}
+# USER_FIXED_PARAMS (shared with impact_long_shedders_cal_2.py) MUST match the
+# population context used during calibration, so the calibrated standard NSR
+# remains valid for these runs.
 
 # Columns the frozen table must contain.
 REQUIRED_COLUMNS = [

@@ -5,6 +5,42 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.3.1 — 2026-07-03 — pietro gerletti
+
+Calibration pipeline fixes + unification following the 2.3.0 refactor.
+
+* Fixed tau_3_long derivation: now correctly
+  inf_duration_long - (tau_1+tau_2+tau_4) instead of the raw duration,
+  computed by the new shared impact_long_shedders_config.py (SCENARIOS,
+  USER_FIXED_PARAMS, derive_scenario_params, unique_long_taus) used by
+  cal_1, cal_2 and exp so the value can't drift out of sync again. Requires
+  recalibrating calibrate_long_nsr under a fresh experiment number.
+* Fixed impact_long_shedders_cal_2.py's broken
+  `from experiments.experiment_script_runner import ...` import (sibling
+  import, matching cal_1/exp).
+* Added an opt-in `_scenario_groups` mechanism to
+  settings_manager.generate_experiment_settings (backward compatible) so
+  cal_2 now submits every scenario's standard-NSR sweep as ONE combined
+  SLURM experiment instead of five separate ones; per-scenario fitting
+  reads the merged experiment back and groups by
+  (tau_3_long, long_shedders_ratio).
+* NSR sweep ranges (cal_1 long-NSR grid, cal_2 per-scenario standard-NSR
+  sweeps) now live in a user-editable reference file
+  (Data/00_Reference_parameters/impact_long_shedders_nsr_ranges.json)
+  instead of being hardcoded, so they can be retuned between runs.
+* cal_1 now saves its long-NSR calibration-fit plot into the experiment's
+  own 05_Plots folder automatically (new
+  long_nsr_calibration_plot.py, shared with the now-thin
+  check_calibration.py CLI wrapper).
+* Added submit_sanity_plot.sh: dispatches plot_sot_sanity_regressions.py as
+  its own SLURM job per long-shedder scenario (heavy hamming_iw cost no
+  longer runs inline).
+* Added run_impact_long_shedders_pipeline.py: single entry point running
+  cal_1 -> cal_2 -> exp -> sanity plots under one shared --exp-num, with a
+  persistent execution log (SLURM-monitor polling noise filtered out).
+
+------------------------------------------------------------------------
+
 ## Version 2.3.0 — 2026-07-03 — pietro gerletti
 
 Long-shedder NSR refactor: independent absolute rate + in-context calibration pipeline.
