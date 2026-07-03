@@ -3,6 +3,13 @@ __pycache__/
 simplicity.egg-info
 # --- session 2.3.0 additions ---
 slurm_logs/
-Data/
 Figure_*.png
 structure.txt
+
+# Data/ holds simulation outputs and machine-local reference parameter files
+# (standard_values.json, parameter_specs.json, ...) -- keep those ignored,
+# but track the hand-edited NSR sweep ranges as versioned config.
+Data/*
+!Data/00_Reference_parameters/
+Data/00_Reference_parameters/*
+!Data/00_Reference_parameters/impact_long_shedders_nsr_ranges.json
