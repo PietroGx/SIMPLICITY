@@ -475,9 +475,16 @@ class Population:
         
             for lineage in lineage_traj_dic:
                 if lineage_traj_dic[lineage].get('ih_birth') is None:
-                    lineage_traj_dic[lineage]['ih_birth'] = row['t_infectious']
+                    lineage_traj_dic[lineage]['ih_birth'] = row['t_infection']
                 if lineage_traj_dic[lineage].get('ih_death') is None:
-                    lineage_traj_dic[lineage]['ih_death'] = row['t_not_infectious']
+                    lineage_traj_dic[lineage]['ih_death'] = row['t_not_infected']
+                # normalize numpy scalars to plain floats for clean CSV
+                # serialization; None left as-is (still-infected hosts
+                # have no t_not_infected and keep ih_death = None)
+                if lineage_traj_dic[lineage].get('ih_birth') is not None:
+                    lineage_traj_dic[lineage]['ih_birth'] = float(lineage_traj_dic[lineage]['ih_birth'])
+                if lineage_traj_dic[lineage].get('ih_death') is not None:
+                    lineage_traj_dic[lineage]['ih_death'] = float(lineage_traj_dic[lineage]['ih_death'])
         
             individuals_data.at[idx, 'IH_lineages_trajectory'] = lineage_traj_dic
         return individuals_data
@@ -515,10 +522,9 @@ def create_population(parameters):
     seed     = parameters['seed']
     
     long_shedders_ratio = parameters['long_shedders_ratio']
-    M_nsr_long    = parameters['M_nsr_long']
     sequence_long_shedders = parameters['sequence_long_shedders']
     
-    NSR_long = parameters['nucleotide_substitution_rate'] * M_nsr_long
+    NSR_long = parameters['nucleotide_substitution_rate_long']
     
     ih_model_parameters = {
         'tau_1': parameters['tau_1'],
