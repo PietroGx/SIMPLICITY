@@ -45,6 +45,17 @@ SCENARIOS = [
 
 TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
 
+# Experiment name stems (numbered with _#{exp_num} by run_experiment_script).
+# Single source of truth so cal_1, cal_2 and the pipeline orchestrator can
+# never disagree on where Stage 1's output lives.
+LONG_NSR_EXP_NAME = "impact_long_shedders_calibration_lng_nsr"
+STD_NSR_SWEEP_NAME = "impact_long_shedders_calibration_std_nsr"
+
+# Shared color palette for the calibration-fit plots (long-NSR per tau group,
+# standard-NSR per scenario), keyed by scenario name so both plots look
+# consistent with each other.
+DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+
 # Fixed experiment overrides shared by cal_2 and exp (mirrors the population
 # context of the impact experiment). Single source of truth -- previously
 # duplicated verbatim in both scripts.

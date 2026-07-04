@@ -44,9 +44,9 @@ import simplicity.tuning.evolutionary_rate as er
 # this file's own directory is always importable so the sibling import below
 # resolves in both cases.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from impact_long_shedders_config import SCENARIOS, TAU_ROUND, derive_scenario_params
-
-DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+from impact_long_shedders_config import (
+    SCENARIOS, TAU_ROUND, DEFAULT_COLORS, derive_scenario_params,
+)
 
 
 def _tau_labels_and_colors(sp):
@@ -177,7 +177,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Standalone rerun of the long-shedder NSR calibration fit/plot.")
     parser.add_argument('--experiment-name', type=str, required=True,
-                        help="Numbered long-calibration experiment, e.g. calibrate_long_nsr_#3.")
+                        help="Numbered long-calibration experiment, e.g. "
+                            "impact_long_shedders_calibration_lng_nsr_#3.")
     parser.add_argument('--target-osr', type=float, default=0.00205)
     parser.add_argument('--model', type=str, default='exp',
                         choices=['lin', 'log', 'exp', 'tan'])

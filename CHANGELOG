@@ -5,6 +5,34 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.3.2 — 2026-07-03 — pietro gerletti
+
+Fixes found running the 2.3.1 pipeline for real on the HPC, plus the
+standard-NSR calibration plot and a naming cleanup.
+
+* Removed leftover 'M_nsr_long' from cal_1's fixed_params (dead parameter
+  since the 2.3.0 factor->absolute-rate refactor; every cal_1 combo was
+  silently failing check_parameters_names until this was caught on a real
+  run).
+* Fixed submit_sanity_plot.sh: dropped 'set -u' -- conda's own activate.d
+  hooks reference $CONDA_BUILD with no default, which is fatal under
+  nounset. Matches why submit_plots.sh never used set -u either.
+* Pipeline log file no longer fills up with blank lines from the SLURM
+  runner's polling wait (an empty string didn't match any of the three
+  named noise regexes, so it passed straight through); also now flushes
+  per line instead of once at the end, so the log is readable in real time.
+* Renamed the long-NSR calibration experiment from calibrate_long_nsr to
+  impact_long_shedders_calibration_lng_nsr, matching the
+  impact_long_shedders_calibration_std_nsr naming already used for cal_2's
+  merged sweep. Both names now live in impact_long_shedders_config.py
+  (LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME) as the single source of truth.
+* Added a standard-NSR calibration-fit plot to cal_2 (per scenario,
+  mirroring cal_1's long-NSR plot), saved into
+  impact_long_shedders_calibration_std_nsr_#N/05_Plots/ -- previously only
+  Stage 1's long-NSR calibration produced a figure.
+
+------------------------------------------------------------------------
+
 ## Version 2.3.1 — 2026-07-03 — pietro gerletti
 
 Calibration pipeline fixes + unification following the 2.3.0 refactor.

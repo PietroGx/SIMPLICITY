@@ -44,6 +44,8 @@ import subprocess
 import pandas as pd
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_DIR)
+from impact_long_shedders_config import LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME
 
 _NOISE_PATTERNS = [
     re.compile(r'^SimulationsStatus\('),
@@ -133,7 +135,7 @@ def main():
     parser.add_argument('--exp-seeds', type=int, default=25,
                         help="Seeds per scenario, final production stage.")
     parser.add_argument('--skip-cal1', action='store_true',
-                        help="Reuse an already-computed calibrate_long_nsr_#{exp_num} "
+                        help=f"Reuse an already-computed {LONG_NSR_EXP_NAME}_#{{exp_num}} "
                             "instead of rerunning Stage 1.")
     parser.add_argument('--log-file', type=str, default=None,
                         help="Defaults to "
@@ -153,7 +155,7 @@ def main():
         _log(log_fh, f"\n===== impact_long_shedders pipeline: exp_num={args.exp_num} =====")
 
         if args.skip_cal1:
-            _log(log_fh, f"[skip] cal_1 skipped; reusing calibrate_long_nsr_#{args.exp_num}")
+            _log(log_fh, f"[skip] cal_1 skipped; reusing {LONG_NSR_EXP_NAME}_#{args.exp_num}")
         else:
             run_stage([py, cal1_path,
                       "--exp-num", str(args.exp_num),
@@ -182,8 +184,8 @@ def main():
         summary_lines = [
             "\n===== Pipeline summary =====",
             f"Frozen calibration table : {table_path}",
-            f"Long calibration exp     : calibrate_long_nsr_#{args.exp_num}",
-            f"Standard-NSR sweep exp   : impact_long_shedders_calibration_std_nsr_#{args.exp_num}",
+            f"Long calibration exp     : {LONG_NSR_EXP_NAME}_#{args.exp_num}",
+            f"Standard-NSR sweep exp   : {STD_NSR_SWEEP_NAME}_#{args.exp_num}",
             f"Production experiments   : impact_long_shedders_<scenario>_#{args.exp_num}",
             "Sanity plot jobs submitted:",
         ]
