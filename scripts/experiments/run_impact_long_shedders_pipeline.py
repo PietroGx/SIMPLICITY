@@ -75,9 +75,12 @@ def run_stage(cmd, log_fh):
     for raw_line in proc.stdout:
         line = raw_line.rstrip("\n")
         print(line)
-        if not _is_slurm_monitor_noise(line):
+        # Blank lines (printed liberally as visual spacing, and repeatedly by
+        # the SLURM runner's polling wait) carry no diagnostic value in a
+        # saved log -- drop them along with the named noise patterns.
+        if line.strip() and not _is_slurm_monitor_noise(line):
             log_fh.write(line + "\n")
-    log_fh.flush()
+            log_fh.flush()
     proc.wait()
 
     if proc.returncode != 0:
