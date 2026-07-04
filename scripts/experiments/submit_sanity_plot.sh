@@ -12,8 +12,12 @@
 # on SLURM, not inline after impact_long_shedders_exp.py).
 #
 # Usage: sbatch submit_sanity_plot.sh <exp_num> <scenario> <target_osr_std> <target_osr_long>
+#
+# No 'set -u': conda's own activate.d hooks (e.g. referencing $CONDA_BUILD
+# with no default) are not nounset-safe and would abort here before
+# 'conda activate' even finishes. Same reason submit_plots.sh has no set -u.
 # ============================================================================
-set -euo pipefail
+set -eo pipefail
 
 EXP_NUM="$1"
 SCENARIO="$2"
