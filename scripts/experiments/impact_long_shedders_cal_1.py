@@ -6,7 +6,7 @@ import numpy as np
 
 import simplicity.settings_manager as sm
 from experiment_script_runner import run_experiment_script
-from impact_long_shedders_config import unique_long_taus, read_nsr_ranges
+from impact_long_shedders_config import LONG_NSR_EXP_NAME, unique_long_taus, read_nsr_ranges
 from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
 
@@ -39,7 +39,7 @@ def run_isolated_calibration(exp_num, runner, seeds, target_osr_long):
     print(" PHASE 1: ISOLATED LONG-SHEDDER CALIBRATION (R_long=1.5, 100% LS)")
     print("=========================================================\n")
 
-    exp_name = "calibrate_long_nsr"
+    exp_name = LONG_NSR_EXP_NAME
     ranges = read_nsr_ranges()['cal1_long_nsr']
     settings_func = user_set_experiment_settings(seeds, ranges)
 

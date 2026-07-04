@@ -18,10 +18,11 @@
 #
 # Per scenario, two independent absolute rates are derived:
 #   1. nucleotide_substitution_rate_long  -- from the EXISTING long-shedder
-#      calibration experiment (calibrate_long_nsr_#{exp_num}, produced by
-#      impact_long_shedders_cal_1.py under the SAME exp_num -- this pipeline
-#      always runs cal_1 -> cal_2 -> exp sequentially under one shared
-#      number), per tau_3_long group, exp-fit + inverted at target long OSR.
+#      calibration experiment (impact_long_shedders_calibration_lng_nsr_#{exp_num},
+#      produced by impact_long_shedders_cal_1.py under the SAME exp_num --
+#      this pipeline always runs cal_1 -> cal_2 -> exp sequentially under one
+#      shared number), per tau_3_long group, exp-fit + inverted at target
+#      long OSR.
 #   2. nucleotide_substitution_rate (standard) -- calibrated IN-CONTEXT: a
 #      mixed-population NSR sweep with the long side fully frozen, fitting OSR
 #      measured in STANDARD individuals only, inverted at target standard OSR.
@@ -39,6 +40,9 @@ import os
 import argparse
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")  # headless / cluster-safe
+import matplotlib.pyplot as plt
 
 import simplicity.settings_manager as sm
 import simplicity.dir_manager as dm
@@ -47,14 +51,14 @@ import simplicity.tuning.evolutionary_rate as er
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    SCENARIOS, TAU_ROUND, USER_FIXED_PARAMS, derive_scenario_params, read_nsr_ranges,
+    SCENARIOS, TAU_ROUND, USER_FIXED_PARAMS, DEFAULT_COLORS,
+    LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME, derive_scenario_params, read_nsr_ranges,
 )
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 EXP_NAME = "impact_long_shedders_calibration"
-STD_NSR_SWEEP_NAME = "impact_long_shedders_calibration_std_nsr"
 
 
 # =============================================================================
@@ -228,9 +232,14 @@ def compute_standard_nsr_per_scenario(numbered, scenarios_frozen, target_osr_std
     master_df = pd.concat(all_rows, ignore_index=True)
     clean_df = master_df[master_df['is_outlier'] == 0]
 
+    plt.figure(figsize=(10, 6))
+    color_by_name = {frozen["scenario_name"]: DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+                     for i, frozen in enumerate(scenarios_frozen)}
+
     std_nsr_by_scenario = {}
     for frozen in scenarios_frozen:
         name = frozen["scenario_name"]
+        color = color_by_name[name]
         key_tau = round(frozen["tau_3_long"], TAU_ROUND)
         key_ratio = round(frozen["long_shedders_ratio"], TAU_ROUND)
 
@@ -244,6 +253,10 @@ def compute_standard_nsr_per_scenario(numbered, scenarios_frozen, target_osr_std
                 f"'{name}' (tau_3_long={key_tau}, long_shedders_ratio={key_ratio}) "
                 f"in {numbered}.")
 
+        plt.scatter(group_df['nucleotide_substitution_rate'],
+                   group_df['observed_substitution_rate'],
+                   color=color, alpha=0.15, s=10)
+
         fit_result = er.fit_observed_substitution_rate_regressor(
             numbered, group_df, model_type,
             parameter_name='nucleotide_substitution_rate',
@@ -252,6 +265,28 @@ def compute_standard_nsr_per_scenario(numbered, scenarios_frozen, target_osr_std
         nsr_std = er.compute_calibrated_parameter(model_type, fit_result, target_osr_std)
         std_nsr_by_scenario[name] = float(nsr_std)
         print(f"          {name}: calibrated standard NSR = {nsr_std:.8f}")
+
+        x_vals = np.linspace(group_df['nucleotide_substitution_rate'].min(),
+                            group_df['nucleotide_substitution_rate'].max(), 100)
+        y_vals = fit_result.eval(x=x_vals)
+        plt.plot(x_vals, y_vals, color=color, linewidth=2, label=f"{name} fit")
+        plt.plot(nsr_std, target_osr_std, marker='*', markersize=12,
+                color=color, markeredgecolor='black')
+
+    plt.axhline(target_osr_std, color='black', linestyle='--', linewidth=1.5,
+              label='Target OSR')
+    plt.title('Standard NSR Calibration by Scenario (in-context, mixed population)')
+    plt.xlabel('Input Nucleotide Substitution Rate (NSR)')
+    plt.ylabel('Observed Substitution Rate (OSR, standard individuals)')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    plot_path = os.path.join(dm.get_experiment_plots_dir(numbered),
+                             f'{numbered}_std_nsr_calibration_fit.png')
+    plt.savefig(plot_path, dpi=300)
+    plt.close()
+    print(f"\nCalibration plot saved to: {plot_path}")
 
     return std_nsr_by_scenario
 
@@ -285,7 +320,7 @@ def main():
 
     # This pipeline always runs cal_1 -> cal_2 sequentially under the same
     # exp_num, so the long calibration to read from is fixed, not passed in.
-    long_calib_exp = f"calibrate_long_nsr_#{args.exp_num}"
+    long_calib_exp = f"{LONG_NSR_EXP_NAME}_#{args.exp_num}"
 
     setup_dir = f"Data/{EXP_NAME}_setup_data_#{args.exp_num}"
     os.makedirs(setup_dir, exist_ok=True)
