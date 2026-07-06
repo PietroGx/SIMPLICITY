@@ -5,6 +5,37 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.0 — 2026-07-06 — pietro gerletti
+
+Added Figures 3 and 4 for the long-shedders paper.
+
+* Figure 3 (pies + 2 PCAs): Panel A reuses the existing clade-winner pies,
+  scoped to one selected scenario instead of the whole grid. Panel B is a
+  metrics PCA (Peak/Burden/Survival/Growth), one point per seed across all
+  five scenarios. Panel C is a sequence-space PCA (SNP presence/absence
+  matrix built from phylogenetic_data.csv's sparse genome representation)
+  for the selected scenario, plus a per-seed excess-Hamming-divergence
+  consistency check (long-shedder vs. standard) computed independently per
+  seed so pooling raw sequences across seeds never introduces a batch
+  effect. New scripts/nature_plots/fig3_{preprocess_data,plots,save}.py.
+* Extended get_clade_winners into get_clade_metrics
+  (long_shedders_preprocess.py): the same clustering pass now also returns
+  the continuous value achieved by long-origin clades per metric (0.0 when
+  none exist, e.g. every control seed), not just the categorical winner
+  label. Added get_lineage_labels for the per-lineage (not per-clade)
+  version Figure 4 needs.
+* Figure 4: one phylogenetic tree per scenario (same seed), rendered with
+  baltic and colored by the same long/standard/mixed/founder labels as
+  Figure 3's pies. Uses baltic.loadNewick rather than loadJSON (which has an
+  undefined-name bug in the published 0.3.0 release) -- required adding an
+  opt-in label_internal_nodes fix to simplicity/tree/newick.py, gated by
+  tree_type so infection-tree Newick export is provably unaffected. New
+  scripts/nature_plots/fig4_{preprocess_data,plots,save}.py.
+* submit_plots.sh: added "3" and "4" branches (and into "all").
+* Added baltic to simplicity.yml (pip).
+
+------------------------------------------------------------------------
+
 ## Version 2.3.2 — 2026-07-03 — pietro gerletti
 
 Fixes found running the 2.3.1 pipeline for real on the HPC, plus the

@@ -881,7 +881,11 @@ def export_tree(tree,
                               tree_subtype,
                               file_type)
         print(f'saving newick file: {newick_filepath}')
-        nwk.write_newick_file(root, newick_filepath)
+        # Only phylogenetic-tree internal nodes ARE lineage-emergence points;
+        # infection-tree internal nodes are transmission events, so labeling
+        # them by lineage would misrepresent the tree (see newick.py).
+        nwk.write_newick_file(root, newick_filepath,
+                              label_internal_nodes=(tree_type == 'phylogenetic'))
     print('')
     print('Tree file exported successfully.')
 

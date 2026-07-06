@@ -44,8 +44,38 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 
 ------------------------------------------------------------------------
 
+## Figures 3 & 4 (long-shedders paper)
+
+- [x] Figure 3: pies (one selected scenario) + metrics PCA (Peak/Burden/
+      Survival/Growth, all scenarios, one point per seed) + sequence-space
+      PCA (selected scenario) + per-seed excess-Hamming-divergence
+      consistency check — new
+      `scripts/nature_plots/fig3_{preprocess_data,plots,save}.py`.
+- [x] Extended `get_clade_winners` into `get_clade_metrics`
+      (`long_shedders_preprocess.py`): same clustering pass now also returns
+      continuous long-origin values per metric, not just the categorical
+      winner. Added `get_lineage_labels` (per-lineage, not per-clade).
+- [x] Figure 4: 5-scenario phylogenetic tree comparison (same seed), colored
+      by the same long/standard/mixed/founder labels as Figure 3 — new
+      `scripts/nature_plots/fig4_{preprocess_data,plots,save}.py`, via
+      `baltic.loadNewick` + an opt-in `label_internal_nodes` fix to
+      `simplicity/tree/newick.py` (gated to phylogenetic trees only —
+      infection-tree Newick export is unaffected).
+- [x] `submit_plots.sh`: added `"3"` and `"4"` branches (and into `"all"`).
+
+------------------------------------------------------------------------
+
 ## Backlog
 
+- [ ] Figure 3 Panel B: try the long-vs-standard contrast version of the 4
+      metrics (instead of/alongside the current raw long-origin values) —
+      deferred during design, worth comparing once real data exists.
+- [ ] Figure 3 Panel C: test whether `max_long_per_individual` subsampling is
+      needed for the sequence-space PCA (full long-shedder data vs.
+      subsampled) once real experiment output exists.
+- [ ] Figure 3 Panel C: verify the per-seed pairwise-Hamming cap (200 sampled
+      pairs) in the consistency check is generous enough once real genome
+      counts per seed are known; tune if not.
 
 ------------------------------------------------------------------------
 

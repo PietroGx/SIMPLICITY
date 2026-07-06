@@ -29,13 +29,33 @@ run_fig2() {
         > slurm_logs/fig2/plots_${SLURM_JOB_ID}.log 2> slurm_logs/fig2/plots_${SLURM_JOB_ID}.err
 }
 
+run_fig3() {
+    python scripts/nature_plots/fig3_save.py \
+        --seed "$SEED" \
+        --format "$FORMAT" \
+        > slurm_logs/fig3/plots_${SLURM_JOB_ID}.log 2> slurm_logs/fig3/plots_${SLURM_JOB_ID}.err
+}
+
+run_fig4() {
+    python scripts/nature_plots/fig4_save.py \
+        --seed "$SEED" \
+        --format "$FORMAT" \
+        > slurm_logs/fig4/plots_${SLURM_JOB_ID}.log 2> slurm_logs/fig4/plots_${SLURM_JOB_ID}.err
+}
+
 if [ "$FIG_CHOICE" == "1" ]; then
     python scripts/nature_plots/fig1_save.py > slurm_logs/fig1/plots_${SLURM_JOB_ID}.log 2> slurm_logs/fig1/plots_${SLURM_JOB_ID}.err
 elif [ "$FIG_CHOICE" == "2" ]; then
     run_fig2
+elif [ "$FIG_CHOICE" == "3" ]; then
+    run_fig3
+elif [ "$FIG_CHOICE" == "4" ]; then
+    run_fig4
 elif [ "$FIG_CHOICE" == "all" ]; then
     python scripts/nature_plots/fig1_save.py > slurm_logs/fig1/plots_${SLURM_JOB_ID}.log 2> slurm_logs/fig1/plots_${SLURM_JOB_ID}.err
     run_fig2
+    run_fig3
+    run_fig4
 else
     echo "Error: Invalid argument '$FIG_CHOICE'."
     exit 1

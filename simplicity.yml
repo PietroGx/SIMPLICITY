@@ -21,3 +21,4 @@ dependencies:
       - ete3
       - graphviz
       - memory-profiler
+      - baltic
