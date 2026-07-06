@@ -132,23 +132,26 @@ def cache_and_aggregate_hamming(exp_num, M, R, ratio, tau_values):
             
     return pd.DataFrame(rows)
 
-# --- Figure 4 Extractors (Clade Winners) ---
-def _peak_winner(F_clade):
-    if F_clade.empty or F_clade.shape[1] == 0: return None
-    return F_clade.max(axis=0).idxmax()
+# --- Figure 3/4 Extractors (Clade Winners + continuous long-origin values) ---
+def _peak_values(F_clade):
+    """{clade: max frequency reached}."""
+    if F_clade.empty or F_clade.shape[1] == 0: return {}
+    return F_clade.max(axis=0).to_dict()
 
-def _survival_winner(F_clade, eps=1e-4):
-    if F_clade.empty or F_clade.shape[1] == 0: return None
+def _survival_durations(F_clade, eps=1e-4):
+    """{clade: duration spent above eps frequency}."""
+    if F_clade.empty or F_clade.shape[1] == 0: return {}
     times = F_clade.index.to_numpy(dtype=float)
     durations = {}
     for clade in F_clade.columns:
         mask = F_clade[clade].to_numpy(dtype=float) > eps
         if not mask.any(): durations[clade] = 0.0
         else: durations[clade] = float(times[len(mask) - 1 - mask[::-1].argmax()] - times[mask.argmax()])
-    return max(durations.items(), key=lambda kv: kv[1])[0]
+    return durations
 
-def _fastest_growth_winner(F_clade, lower=0.01, upper=0.50):
-    if F_clade.empty or F_clade.shape[1] == 0: return None
+def _growth_crossing_times(F_clade, lower=0.01, upper=0.50):
+    """{clade: time to cross lower->upper frequency} (only clades that cross both)."""
+    if F_clade.empty or F_clade.shape[1] == 0: return {}
     times = F_clade.index.to_numpy(dtype=float)
     candidates = {}
     for clade in F_clade.columns:
@@ -158,19 +161,32 @@ def _fastest_growth_winner(F_clade, lower=0.01, upper=0.50):
         over_upper = times[y >= upper]
         if len(over_lower) > 0 and len(over_upper) > 0 and over_upper[0] > over_lower[0]:
             candidates[clade] = over_upper[0] - over_lower[0]
-    return min(candidates.items(), key=lambda kv: kv[1])[0] if candidates else None
+    return candidates
 
-def get_clade_winners(ssod, cluster_threshold):
-    """Evaluates peak, burden, survival, and growth winners for a single SSOD."""
+def _resolve_label(clade_labels, clade):
+    if not clade: return "standard"
+    raw = str(clade_labels.get(clade, "standard")).lower()
+    if "long" in raw: return "long"
+    if "mix" in raw: return "mixed"
+    if "founder" in raw: return "founder"
+    return "standard"
+
+def _clade_analysis(ssod, cluster_threshold):
+    """
+    Shared clustering + per-clade metric computation for one SSOD. Returns
+    (F_nr, clade_to_lineages, totals, clade_labels) so get_clade_winners/
+    get_clade_metrics/get_lineage_labels can all derive their result from a
+    single clustering pass.
+    """
     phylo_df = om.read_phylogenetic_data(ssod)
     lf = om.read_lineage_frequency(ssod)
-    
+
     clade_to_lineages, _, per_clade_mut_df, clade_meta_df = cl.cluster_lin_into_clades_with_meta(
         phylo_df, shared_mut_threshold=cluster_threshold
     )
     clade_labels_series, _ = cl.label_clades_from_definers(per_clade_mut_df, clade_meta_df)
     clade_labels = clade_labels_series.to_dict() if clade_labels_series is not None else {}
-    
+
     # Build Clade Freq DF
     F_lineage = lf.pivot(index="Time_sampling", columns="Lineage_name", values="Frequency_at_t").sort_index()
     series = []
@@ -183,30 +199,79 @@ def get_clade_winners(ssod, cluster_threshold):
     non_root = clade_meta_df.loc[(clade_meta_df["parent_clade"].notna()) & (clade_meta_df["n_defining"] > 0), "clade"].tolist()
     F_nr = F_clade.reindex(columns=non_root).dropna(axis=1, how="all") if non_root else pd.DataFrame()
 
-    # Calculate Winners
-    peak_winner = _peak_winner(F_nr)
-    survival_winner = _survival_winner(F_nr)
-    growth_winner = _fastest_growth_winner(F_nr)
-    
-    # Burden Winner
+    # Burden per clade
     lin_to_total = dict(zip(phylo_df["Lineage_name"], phylo_df.get("Total_infections", np.zeros(len(phylo_df)))))
     totals = {clade: sum(int(lin_to_total.get(l, 0)) for l in members) for clade, members in clade_to_lineages.items()}
+
+    return F_nr, clade_to_lineages, totals, clade_labels
+
+def get_clade_winners(ssod, cluster_threshold):
+    """Evaluates peak, burden, survival, and growth winners for a single SSOD."""
+    return get_clade_metrics(ssod, cluster_threshold)["winners"]
+
+def get_clade_metrics(ssod, cluster_threshold):
+    """
+    Like get_clade_winners, but also returns the continuous value achieved by
+    long-origin clades for each of the 4 metrics -- 0.0 if no long-origin
+    clade exists in this seed (e.g. every 'control' seed: a legitimate "no
+    long-shedder impact" data point, not an error).
+
+    Returns {"winners": {Peak, Burden, Survival, Growth -> category label},
+             "values":  {Peak, Burden, Survival, Growth -> float}}
+    """
+    F_nr, _clade_to_lineages, totals, clade_labels = _clade_analysis(ssod, cluster_threshold)
+
+    peak_values = _peak_values(F_nr)
+    survival_durations = _survival_durations(F_nr)
+    growth_crossings = _growth_crossing_times(F_nr)
+
+    peak_winner = max(peak_values.items(), key=lambda kv: kv[1])[0] if peak_values else None
+    survival_winner = max(survival_durations.items(), key=lambda kv: kv[1])[0] if survival_durations else None
+    growth_winner = min(growth_crossings.items(), key=lambda kv: kv[1])[0] if growth_crossings else None
     burden_winner = max(totals.items(), key=lambda kv: kv[1])[0] if totals else None
 
-    # Resolve labels
-    def resolve_label(clade):
-        if not clade: return "standard"
-        raw = str(clade_labels.get(clade, "standard")).lower()
-        if "long" in raw: return "long"
-        if "mix" in raw: return "mixed"
-        if "founder" in raw: return "founder"
-        return "standard"
+    winners = {
+        "Peak": _resolve_label(clade_labels, peak_winner),
+        "Burden": _resolve_label(clade_labels, burden_winner),
+        "Survival": _resolve_label(clade_labels, survival_winner),
+        "Growth": _resolve_label(clade_labels, growth_winner),
+    }
 
+    def is_long(clade):
+        return _resolve_label(clade_labels, clade) == "long"
+
+    long_peak = [v for c, v in peak_values.items() if is_long(c)]
+    long_survival = [v for c, v in survival_durations.items() if is_long(c)]
+    long_growth = [v for c, v in growth_crossings.items() if is_long(c)]
+    long_burden = [v for c, v in totals.items() if is_long(c)]
+
+    values = {
+        # Peak/Survival: strongest single long-origin clade.
+        "Peak": max(long_peak) if long_peak else 0.0,
+        "Survival": max(long_survival) if long_survival else 0.0,
+        # Burden is additive (infection counts), so sum across long clades.
+        "Burden": float(sum(long_burden)) if long_burden else 0.0,
+        # Growth: crossing TIME is smaller-is-faster; invert to a rate so
+        # "bigger value = more long-shedder impact" holds for all 4 metrics,
+        # and "no long clade" consistently means 0.0, not a misleadingly
+        # "instant" crossing time.
+        "Growth": (1.0 / min(long_growth)) if long_growth else 0.0,
+    }
+
+    return {"winners": winners, "values": values}
+
+def get_lineage_labels(ssod, cluster_threshold):
+    """
+    {lineage_name: normalized_label} for every lineage in this SSOD's tree
+    (long/standard/mixed/founder) -- the per-lineage counterpart to
+    get_clade_metrics's clade-level aggregates. Used to color Figure 4's
+    tree comparison with the same color language as Figure 3's pies/PCA.
+    """
+    _F_nr, clade_to_lineages, _totals, clade_labels = _clade_analysis(ssod, cluster_threshold)
     return {
-        "Peak": resolve_label(peak_winner),
-        "Burden": resolve_label(burden_winner),
-        "Survival": resolve_label(survival_winner),
-        "Growth": resolve_label(growth_winner)
+        lineage: _resolve_label(clade_labels, clade)
+        for clade, lineages in clade_to_lineages.items()
+        for lineage in lineages
     }
 
 def summarize_sod_pies(sod, cluster_threshold, min_days):
