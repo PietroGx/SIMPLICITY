@@ -26,8 +26,10 @@
 # thin sequencer that aborts immediately if any stage fails. All stage
 # output is echoed live AND appended to --log-file, except the SLURM
 # runner's periodic polling noise (simplicity/runners/slurm.py's
-# SimulationsStatus(...) prints and "submitted/release up to N seeded
-# simulations" lines), which is dropped from the log file only.
+# SimulationsStatus(...) prints and "submitted N seeded simulations" lines),
+# which is dropped from the log file only. The old "release up to N seeded
+# simulations" ping was removed at the source (slurm.py no longer prints it
+# at all -- it fired on every poll cycle once jobs started turning over).
 #
 # NSR sweep ranges are NOT arguments here -- they live in the user-editable
 # Data/00_Reference_parameters/impact_long_shedders_nsr_ranges.json (see
@@ -53,7 +55,6 @@ from impact_long_shedders_config import (
 _NOISE_PATTERNS = [
     re.compile(r'^SimulationsStatus\('),
     re.compile(r'^submitted \d+ seeded simulations$'),
-    re.compile(r'^release up to \d+ seeded simulations$'),
 ]
 
 

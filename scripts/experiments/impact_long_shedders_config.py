@@ -182,25 +182,27 @@ def read_nsr_ranges():
 # argument, so it never has to touch the run_seeded_simulations(...) interface
 # shared uniformly by the serial/multiprocessing/slurm runner modules.
 #
-# Defaults below are set from real sacct data for the isolated long-NSR
-# calibration grid (population_size=1000, final_time=1200): MaxRSS ranged
-# 0.29-0.45G across all 36 grid points, elapsed time up to ~88 min. 2G gives
-# real headroom over observed memory use (vs. the old blanket 8G every job
-# used to request regardless of actual need). Time limit is kept at the
-# existing 1-day default -- observed elapsed time has more headroom already,
-# and unlike memory there's no cost to leaving it generous.
+# The baseline default (2G/1 day) is set exactly once, in
+# simplicity.dir_manager, alongside every other simplicity-wide env var --
+# not redefined here, so there's a single literal source for it. 2G was set
+# from real sacct data on the isolated long-NSR calibration grid
+# (population_size=1000, final_time=1200): MaxRSS ranged 0.29-0.45G across
+# all 36 grid points -- real headroom over that, well below the old blanket
+# 8G every job used to request regardless of actual need. Time limit stays
+# at 1 day: observed elapsed time (up to ~88 min) has even more headroom
+# already, and unlike memory there's no cost to leaving it generous.
 # =============================================================================
-DEFAULT_SLURM_MEM = "2G"
-DEFAULT_SLURM_TIME = "1-00:00:00"
-
-
 def add_slurm_resource_args(parser):
     """Add --slurm-mem/--slurm-time to an argparse parser (shared wiring so
-    every stage script exposes the same two flags identically)."""
-    parser.add_argument('--slurm-mem', type=str, default=DEFAULT_SLURM_MEM,
-                        help=f"Per-task SLURM memory request (default: {DEFAULT_SLURM_MEM}).")
-    parser.add_argument('--slurm-time', type=str, default=DEFAULT_SLURM_TIME,
-                        help=f"Per-task SLURM time limit (default: {DEFAULT_SLURM_TIME}).")
+    every stage script exposes the same two flags identically). Defaults come
+    from the env vars dir_manager already set on import, not a second
+    hardcoded copy of the same values."""
+    parser.add_argument('--slurm-mem', type=str, default=os.environ["SIMPLICITY_SLURM_MEM"],
+                        help="Per-task SLURM memory request "
+                            f"(default: {os.environ['SIMPLICITY_SLURM_MEM']}).")
+    parser.add_argument('--slurm-time', type=str, default=os.environ["SIMPLICITY_SLURM_TIME"],
+                        help="Per-task SLURM time limit "
+                            f"(default: {os.environ['SIMPLICITY_SLURM_TIME']}).")
 
 
 def set_slurm_resource_env(mem, time):

@@ -31,10 +31,16 @@ os.makedirs(DEFAULT_DATA_DIR,exist_ok=True)
 # Global variable to store the data directory path
 _data_dir = DEFAULT_DATA_DIR
 
-# set env variables 
+# set env variables
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(10)
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(500)
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
+# Per-task SLURM resource request defaults (2G/1 day, from real sacct data on
+# the isolated long-NSR calibration grid -- see impact_long_shedders_config).
+# CLI scripts that expose --slurm-mem/--slurm-time overwrite these with the
+# user's chosen value before submitting; this is just the baseline.
+os.environ["SIMPLICITY_SLURM_MEM"] = "2G"
+os.environ["SIMPLICITY_SLURM_TIME"] = "1-00:00:00"
 
 def set_data_dir(path):
     """Set the data directory path."""
