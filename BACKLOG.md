@@ -25,11 +25,11 @@ Working list of blockers, active refactors, features, and technical debt.
       `R_long = R_long_per_week * tau_3_long / 7.0`
       (`derive_scenario_params`). Most tau groups were calibrated at the
       wrong R_long. Fixed via a shared
-      `derive_r_long(R_long_per_week, tau_3_long)` helper and a per-tau
+      `derive_r_long(r_long_weekly_rate, tau_3_long)` helper and a per-tau
       `_scenario_groups` submission in cal_1.py (same mechanism cal_2
       already uses) -- each context scales its own weekly baseline
-      (`CAL1_ISOLATED_FIXED_PARAMS["R_long"]`=1.5 for cal_1, `sp["R_long"]`
-      for cal_2/exp) by that point's own `tau_3_long/7`.
+      (`CAL1_R_LONG_WEEKLY_RATE`=1.5 for cal_1, `sp["R_long"]` for cal_2/exp)
+      by that point's own `tau_3_long/7`.
       **Recalibration required**: any experiment run before this fix used
       the wrong R_long for cal_1's grid and must be redone under a fresh
       `--exp-num`.
@@ -60,6 +60,17 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
       hardcoded parameter set the pipeline uses now lives in that one config
       file (still intentionally distinct values from `USER_FIXED_PARAMS`,
       just no longer duplicated inline in a script).
+- [x] **Config/pipeline separation** — settings-construction
+      (`user_set_experiment_settings`, `build_scenario_groups`,
+      `build_scenario_settings`) was still defined inline in cal_1.py/
+      cal_2.py/exp.py, not in the config file, so "what parameters get
+      built" and "how the pipeline runs" were mixed together in all three
+      scripts. Moved all of it into `impact_long_shedders_config.py`
+      (`build_cal1_settings`, `build_cal2_scenario_groups`/
+      `build_cal2_settings`, `build_exp_scenario_settings`, `lookup_long_nsr`)
+      — the three stage scripts now only parse args, call these builders,
+      and dispatch/handle I/O. No stage script constructs a parameter dict
+      itself anymore.
 
 
 ------------------------------------------------------------------------

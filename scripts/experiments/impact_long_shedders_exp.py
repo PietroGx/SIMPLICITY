@@ -32,7 +32,7 @@ import pandas as pd
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    USER_FIXED_PARAMS, add_slurm_resource_args, set_slurm_resource_env,
+    build_exp_scenario_settings, add_slurm_resource_args, set_slurm_resource_env,
 )
 
 EXP_NAME = "impact_long_shedders"
@@ -41,10 +41,6 @@ EXP_NAME = "impact_long_shedders"
 # --exp-num; not passed as an argument.
 SETUP_DIR_TEMPLATE = "Data/impact_long_shedders_calibration_setup_data_#{exp_num}"
 TABLE_FILENAME = "nsr_calibration_table.csv"
-
-# USER_FIXED_PARAMS (shared with impact_long_shedders_cal_2.py) MUST match the
-# population context used during calibration, so the calibrated standard NSR
-# remains valid for these runs.
 
 # Columns the frozen table must contain.
 REQUIRED_COLUMNS = [
@@ -78,44 +74,10 @@ def load_calibration_table(path):
     return df
 
 
-def build_scenario_settings(row, n_seeds):
-    """
-    Build the fixed-only settings for one scenario row.
-
-    Empty varying_params -> a single simulation point (see
-    generate_experiment_settings: combinations = [()] when no varying params).
-    """
-    is_control = float(row["long_shedders_ratio"]) == 0.0
-
-    fixed = USER_FIXED_PARAMS.copy()
-    fixed.update({
-        "long_shedders_ratio": float(row["long_shedders_ratio"]),
-        "tau_3_long": float(row["tau_3_long"]),
-        "R_long": float(row["R_long"]),
-        "nucleotide_substitution_rate": float(row["nucleotide_substitution_rate"]),
-        "sequence_long_shedders": (not is_control),
-    })
-
-    # Long NSR: set only when a long side exists. For control the table value
-    # may be empty/NaN; we must not write NaN into the parameters.
-    if not is_control:
-        long_nsr = row["nucleotide_substitution_rate_long"]
-        if pd.isna(long_nsr):
-            raise ValueError(
-                f"Scenario '{row['scenario_name']}' has long_shedders_ratio>0 "
-                f"but no nucleotide_substitution_rate_long in the table.")
-        fixed["nucleotide_substitution_rate_long"] = float(long_nsr)
-
-    def make_settings():
-        return ({}, fixed.copy(), n_seeds)
-
-    return make_settings
-
-
 def dispatch_scenario(row, exp_num, runner, n_seeds):
     """Dispatch a single scenario run. Blocks until the runner completes."""
     name = row["scenario_name"]
-    settings_func = build_scenario_settings(row, n_seeds)
+    settings_func = build_exp_scenario_settings(row, n_seeds)
 
     print(f"\n{'='*60}")
     print(f"[Dispatch] {EXP_NAME}_{name}")

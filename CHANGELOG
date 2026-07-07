@@ -5,6 +5,41 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.6 — 2026-07-07 — pietro gerletti
+
+Config/pipeline separation: config.py builds parameter settings, the three
+stage scripts only run things.
+
+* Root problem: cal_1.py/cal_2.py/exp.py each built their own simulation
+  parameter dicts inline (user_set_experiment_settings, build_scenario_groups,
+  build_scenario_settings), scattered across three files with
+  impact_long_shedders_config.py only holding raw data (SCENARIOS,
+  fixed-param dicts, NSR ranges) -- and CAL1_ISOLATED_FIXED_PARAMS carried a
+  key literally named "R_long" holding a WEEKLY RATE, fed into
+  derive_r_long() to produce the actual (different) "R_long" model
+  parameter. Same name, two meanings, passed through a function of the same
+  name -- confusing and easy to miswire.
+* All settings-construction moved into impact_long_shedders_config.py:
+  build_cal1_settings(seeds, ranges), build_cal2_scenario_groups(nsr_ranges,
+  long_nsr_by_tau) + build_cal2_settings(scenario_groups, seeds),
+  build_exp_scenario_settings(row, n_seeds), plus lookup_long_nsr. The three
+  stage scripts now only: parse CLI args, call these builders, dispatch via
+  run_experiment_script, and handle their own stage-specific I/O
+  (calibration-fit reading, table writing) -- no stage script constructs a
+  parameter dict itself anymore.
+* Renamed the isolated-context weekly-rate constant to
+  CAL1_R_LONG_WEEKLY_RATE (module-level, kept OUT of
+  CAL1_ISOLATED_FIXED_PARAMS -- it is never itself a simulation parameter,
+  only ever an input to derive_r_long). derive_r_long's parameter renamed
+  r_long_weekly_rate throughout. "Weekly rate" and "R_long" (the model
+  parameter) are now never spelled the same way anywhere in this pipeline.
+* Verified locally: re-ran the same synthetic end-to-end checks as 2.4.4/
+  2.4.5 (grid shape, per-tau R_long scaling, control-row NaN handling)
+  against the new builder functions -- identical results to before the move,
+  confirming this is a pure reorganization with no behavior change.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.5 — 2026-07-07 — pietro gerletti
 
 Follow-up to 2.4.4: R_long is a weekly rate, and must be normalized by

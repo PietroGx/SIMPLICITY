@@ -10,34 +10,39 @@
 # (at your option) any later version.
 #
 # ============================================================================
-# impact_long_shedders -- SHARED CONFIG
+# impact_long_shedders -- PIPELINE CONFIG
 # ----------------------------------------------------------------------------
-# Single source of truth for the scenario definitions and fixed parameters
-# shared by impact_long_shedders_cal_1.py, impact_long_shedders_cal_2.py and
-# impact_long_shedders_exp.py. Sections below are ordered the same way the
-# pipeline itself runs: shared/foundational definitions first, then Stage 1
-# (cal_1), Stage 2 (cal_2), Stage 3 (exp), then cross-cutting infrastructure
-# (NSR ranges file, SLURM resources) used across stages.
+# Single place that knows HOW TO BUILD the parameter settings for every
+# pipeline stage. impact_long_shedders_cal_1.py / _cal_2.py / _exp.py only
+# RUN things: parse CLI args, call a build_*_settings() function below to get
+# a ready-to-submit settings callable, dispatch it via run_experiment_script,
+# and handle stage-specific I/O (reading calibration fits back, writing the
+# frozen table, printing). They never construct simulation parameter dicts
+# themselves -- if a parameter dict needs to change, this is the only file
+# to touch.
 #
-# NSR sweep ranges are NOT hardcoded here: they live in a user-editable JSON
-# file under Data/00_Reference_parameters/, since they get retuned between
-# pipeline runs by inspecting the calibration-fit plots. This module only
-# knows how to read that file (auto-creating it with sane defaults the first
-# time) and write it back.
+# NSR sweep ranges are the one exception: they live in a user-editable JSON
+# file under Data/00_Reference_parameters/ (read_nsr_ranges, below), since
+# they get retuned between pipeline runs by inspecting the calibration-fit
+# plots this pipeline produces.
 # ============================================================================
 
 import os
 import json
 
+import numpy as np
+import pandas as pd
+
 import simplicity.dir_manager as dm
+import simplicity.settings_manager as sm
 
 # =============================================================================
-# SHARED / FOUNDATIONAL -- used by every stage
+# SHARED SCENARIO DATA -- used by every stage
 # =============================================================================
 # One entry per scenario. `inf_duration_long` is the raw clinical long-shedding
-# duration (days); tau_3_long is DERIVED from it (see derive_scenario_params)
-# as tau_3_long = inf_duration_long - (tau_1 + tau_2 + tau_4). `control` has no
-# long side, so inf_duration_long is unused (None).
+# duration (days); the model parameter tau_3_long is DERIVED from it (see
+# derive_tau_3_long) as tau_3_long = inf_duration_long - (tau_1+tau_2+tau_4).
+# `control` has no long side, so inf_duration_long is unused (None).
 SCENARIOS = [
     {"name": "control",   "inf_duration_long": None,  "long_shedders_ratio": 0.00},
     {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.01},
@@ -55,39 +60,51 @@ LONG_NSR_EXP_NAME = "impact_long_shedders_calibration_lng_nsr"
 STD_NSR_SWEEP_NAME = "impact_long_shedders_calibration_std_nsr"
 
 
+# =============================================================================
+# SHARED MATH -- tau_3_long / R_long derivation
+# ----------------------------------------------------------------------------
+# R_long is a MODEL PARAMETER: simplicity/extrande.py's get_helpers divides
+# it by a long shedder's whole infectious period to get a per-day
+# transmission rate (beta_long = R_long / (tau_2+tau_3_long)) -- the standard
+# beta = R/infectious_duration relationship. Because infectious duration
+# varies a lot between scenarios, R_long is never a single constant: it is a
+# fixed WEEKLY infection rate scaled by the number of weeks
+# (tau_3_long / 7) that group's long shedders actually shed for, so beta_long
+# stays roughly constant across scenarios while total R_long grows with
+# duration.
+#
+# "Weekly rate" and "R_long" are deliberately different names below -- a
+# weekly rate is only ever an INPUT to derive_r_long, never itself the value
+# assigned to a simulation's "R_long" parameter.
+# =============================================================================
 def phase_offset(sp):
     """Sum of the non-long-shedding infection phases (tau_1+tau_2+tau_4)."""
     return sp["tau_1"] + sp["tau_2"] + sp["tau_4"]
 
 
-def derive_r_long(R_long_per_week, tau_3_long):
-    """Total long-shedder reproduction number over the whole (corrected)
-    long-shedding duration, given the model's baseline weekly infection rate
-    for a long shedder (R_long_per_week -- e.g. sp['R_long'] for production,
-    CAL1_ISOLATED_FIXED_PARAMS['R_long'] for cal_1's isolated context).
-    R depends on how long someone stays infectious, so R_long_per_week is
-    normalized to a per-week rate and scaled by the number of weeks
-    (tau_3_long/7) the long shedder actually sheds for. Single source of
-    truth for this formula -- used both to freeze each scenario's R_long
-    (derive_scenario_params, below) and to drive cal_1's isolated
-    per-tau_3_long calibration groups, so the isolated calibration never runs
-    a tau_3_long/R_long combination that production won't actually use."""
-    return R_long_per_week * tau_3_long / 7.0
-
-
 def derive_tau_3_long(scenario, sp):
-    """Corrected long-shedding duration: inf_duration_long - (tau_1+tau_2+tau_4)
-    for a long-shedder scenario, or sp's own tau_3_long default for control.
-    Split out of derive_scenario_params so unique_long_taus doesn't need an R
-    value it has no use for."""
+    """Corrected long-shedding duration: inf_duration_long - phase_offset(sp)
+    for a long-shedder scenario, or sp's own tau_3_long default for control."""
     if scenario["long_shedders_ratio"] == 0.0:
         return float(sp["tau_3_long"])
     return float(scenario["inf_duration_long"]) - phase_offset(sp)
 
 
+def derive_r_long(r_long_weekly_rate, tau_3_long):
+    """The actual R_long model parameter for a tau_3_long-day long-shedding
+    duration, given a fixed weekly infection rate. See the module docstring
+    above for why this scaling exists. Single source of truth for this
+    formula -- used both to freeze each production scenario's R_long
+    (derive_scenario_params, below) and to drive cal_1's isolated
+    per-tau_3_long calibration groups (build_cal1_settings, further down)."""
+    return r_long_weekly_rate * tau_3_long / 7.0
+
+
 def derive_scenario_params(scenario, sp):
     """
-    Derive the frozen long-side parameters for one scenario.
+    Derive the frozen long-side parameters for one production scenario.
+    Uses sp['R_long'] as the weekly-rate baseline (simplicity's own default
+    long-shedder infection rate).
 
     Returns a dict with: scenario_name, long_shedders_ratio, tau_3_long,
     R_long, sequence_long_shedders, is_long.
@@ -97,7 +114,8 @@ def derive_scenario_params(scenario, sp):
     tau_3_long = derive_tau_3_long(scenario, sp)
 
     if ratio == 0.0:
-        # Control: no long shedders. Use standard defaults; long NSR unused.
+        # Control: no long shedders, so R_long is never actually used by the
+        # simulation -- keep sp's raw default rather than deriving anything.
         return {
             "scenario_name": name,
             "long_shedders_ratio": 0.0,
@@ -129,31 +147,52 @@ def unique_long_taus(sp):
 
 # =============================================================================
 # STAGE 1 (cal_1) -- isolated long-shedder NSR calibration
+# ----------------------------------------------------------------------------
+# A 100% long-shedder population, used ONLY to calibrate the long-shedder NSR
+# in isolation -- deliberately different from USER_FIXED_PARAMS (Stage 2/3's
+# mixed production population), not a duplicate of it.
 # =============================================================================
-# cal_1's isolated-calibration context: a 100% long-shedder population, used
-# ONLY to calibrate the long-shedder NSR in isolation -- deliberately
-# different from USER_FIXED_PARAMS (the mixed production population), not a
-# duplicate of it. Still belongs in one place rather than inline in cal_1.py.
-#
-# "R_long" here is this isolated context's OWN baseline weekly long-shedder
-# infection rate (deliberately different from sp['R_long'], the production
-# default) -- NOT the final per-simulation R_long. cal_1 sweeps tau_3_long
-# across unique_long_taus(sp), and the actual R_long fed to each grid point
-# must scale with its own tau_3_long via derive_r_long(R_long_per_week=
-# CAL1_ISOLATED_FIXED_PARAMS['R_long'], tau) -- the same formula every
-# production scenario uses -- otherwise every point would run at the same
-# raw weekly rate regardless of duration, which would invalidate the
-# calibrated NSR for every tau except by coincidence. cal_1.py derives this
-# per tau_3_long group via the '_scenario_groups' mechanism (same one cal_2
-# uses for its own per-scenario grid), overriding this dict's own "R_long".
+# This isolated context's OWN weekly R_long rate (see the "SHARED MATH"
+# section above) -- deliberately different from sp['R_long'] (production's
+# default). NOT itself a simulation parameter: only ever fed through
+# derive_r_long, below, to get the actual per-tau_3_long-group R_long.
+CAL1_R_LONG_WEEKLY_RATE = 1.5
+
 CAL1_ISOLATED_FIXED_PARAMS = {
     "long_shedders_ratio": 1.0,
     "R": 1.0,
-    "R_long": 1.5,
     "infected_individuals_at_start": 100,
     "final_time": 720,
     "sequence_long_shedders": True,
+    # R_long deliberately absent: build_cal1_settings derives it per
+    # tau_3_long group via derive_r_long(CAL1_R_LONG_WEEKLY_RATE, tau).
 }
+
+
+def build_cal1_settings(seeds, ranges):
+    """
+    Returns a zero-arg make_settings callable ready for run_experiment_script:
+    one group per tau_3_long value (see unique_long_taus), each sweeping the
+    same NSR grid, with R_long correctly scaled to that group's own duration
+    (rather than a single fixed value shared by every group regardless of
+    duration).
+    """
+    sp = sm.read_standard_parameters_values()
+
+    def make_settings():
+        nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
+        scenario_groups = [
+            {
+                'nucleotide_substitution_rate': nsr_values,
+                'tau_3_long': tau,
+                'R_long': derive_r_long(CAL1_R_LONG_WEEKLY_RATE, tau),
+            }
+            for tau in unique_long_taus(sp)
+        ]
+        varying_params = {'_scenario_groups': scenario_groups}
+        return (varying_params, CAL1_ISOLATED_FIXED_PARAMS.copy(), seeds)
+
+    return make_settings
 
 
 # =============================================================================
@@ -176,12 +215,104 @@ USER_FIXED_PARAMS = {
 DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 
 
+def lookup_long_nsr(long_nsr_by_tau, tau_3_long):
+    """Exact (rounded) match lookup. Raises on miss -- never silently guesses."""
+    key = round(float(tau_3_long), TAU_ROUND)
+    if key not in long_nsr_by_tau:
+        raise KeyError(
+            f"No calibrated long NSR for tau_3_long={key}. "
+            f"Available keys: {sorted(long_nsr_by_tau.keys())}. "
+            f"Check that the scenario tau matches the calibration experiment.")
+    return long_nsr_by_tau[key]
+
+
+def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_tau):
+    """
+    One group dict per scenario: its own nucleotide_substitution_rate sweep
+    (list -> that group's local varying axis) plus its fixed tau_3_long/
+    long_shedders_ratio/R_long/sequence_long_shedders/long-NSR overrides.
+
+    long_nsr_by_tau is Stage 1's calibration-fit result (computed by cal_2.py
+    from already-run simulation output, not parameter setup -- passed in
+    rather than recomputed here).
+
+    Returns (scenario_groups, scenarios_frozen).
+    """
+    sp = sm.read_standard_parameters_values()
+    scenario_groups = []
+    scenarios_frozen = []
+
+    for scenario in SCENARIOS:
+        frozen = derive_scenario_params(scenario, sp)
+        scenarios_frozen.append(frozen)
+
+        name = frozen["scenario_name"]
+        r = nsr_ranges[name]
+        nsr_list = np.logspace(np.log10(r['min']), np.log10(r['max']), r['steps']).tolist()
+
+        group = {
+            "long_shedders_ratio": frozen["long_shedders_ratio"],
+            "tau_3_long": frozen["tau_3_long"],
+            "R_long": frozen["R_long"],
+            "sequence_long_shedders": frozen["sequence_long_shedders"],
+            "nucleotide_substitution_rate": [float(x) for x in nsr_list],
+        }
+        if frozen["is_long"]:
+            group["nucleotide_substitution_rate_long"] = lookup_long_nsr(
+                long_nsr_by_tau, frozen["tau_3_long"])
+
+        scenario_groups.append(group)
+
+    return scenario_groups, scenarios_frozen
+
+
+def build_cal2_settings(scenario_groups, seeds):
+    """Zero-arg make_settings callable ready for run_experiment_script,
+    submitting every scenario's sweep as ONE combined experiment."""
+    def make_settings():
+        varying_params = {'_scenario_groups': scenario_groups}
+        return (varying_params, USER_FIXED_PARAMS.copy(), seeds)
+    return make_settings
+
+
 # =============================================================================
 # STAGE 3 (exp) -- production runs
+# ----------------------------------------------------------------------------
+# Reuses USER_FIXED_PARAMS (Stage 2, above) as-is: the production population
+# context must match the one cal_2 calibrated the standard NSR against.
 # =============================================================================
-# exp reuses USER_FIXED_PARAMS (Stage 2, above) as-is: the production
-# population context must match the one cal_2 calibrated the standard NSR
-# against. Nothing new is defined for this stage.
+def build_exp_scenario_settings(row, n_seeds):
+    """
+    Zero-arg make_settings callable for one row of the frozen calibration
+    table (a single simulation point per scenario -- empty varying_params,
+    see generate_experiment_settings: combinations = [()] when there are no
+    varying params).
+    """
+    is_control = float(row["long_shedders_ratio"]) == 0.0
+
+    fixed = USER_FIXED_PARAMS.copy()
+    fixed.update({
+        "long_shedders_ratio": float(row["long_shedders_ratio"]),
+        "tau_3_long": float(row["tau_3_long"]),
+        "R_long": float(row["R_long"]),
+        "nucleotide_substitution_rate": float(row["nucleotide_substitution_rate"]),
+        "sequence_long_shedders": (not is_control),
+    })
+
+    # Long NSR: set only when a long side exists. For control the table value
+    # may be empty/NaN; we must not write NaN into the parameters.
+    if not is_control:
+        long_nsr = row["nucleotide_substitution_rate_long"]
+        if pd.isna(long_nsr):
+            raise ValueError(
+                f"Scenario '{row['scenario_name']}' has long_shedders_ratio>0 "
+                f"but no nucleotide_substitution_rate_long in the table.")
+        fixed["nucleotide_substitution_rate_long"] = float(long_nsr)
+
+    def make_settings():
+        return ({}, fixed.copy(), n_seeds)
+
+    return make_settings
 
 
 # =============================================================================
