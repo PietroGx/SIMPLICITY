@@ -40,12 +40,15 @@ import re
 import sys
 import argparse
 import subprocess
+from datetime import datetime
 
 import pandas as pd
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
-from impact_long_shedders_config import LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME
+from impact_long_shedders_config import (
+    LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME, add_slurm_resource_args,
+)
 
 _NOISE_PATTERNS = [
     re.compile(r'^SimulationsStatus\('),
@@ -140,6 +143,7 @@ def main():
     parser.add_argument('--log-file', type=str, default=None,
                         help="Defaults to "
                             "Data/pipeline_logs/impact_long_shedders_pipeline_#{exp_num}.log")
+    add_slurm_resource_args(parser)
     args = parser.parse_args()
 
     log_file = args.log_file or os.path.join(
@@ -151,8 +155,11 @@ def main():
     cal2_path = os.path.join(SCRIPT_DIR, "impact_long_shedders_cal_2.py")
     exp_path = os.path.join(SCRIPT_DIR, "impact_long_shedders_exp.py")
 
+    slurm_res_args = ["--slurm-mem", args.slurm_mem, "--slurm-time", args.slurm_time]
+
     with open(log_file, "a") as log_fh:
-        _log(log_fh, f"\n===== impact_long_shedders pipeline: exp_num={args.exp_num} =====")
+        _log(log_fh, f"\n===== impact_long_shedders pipeline: exp_num={args.exp_num} "
+                    f"@ {datetime.now().isoformat(timespec='seconds')} =====")
 
         if args.skip_cal1:
             _log(log_fh, f"[skip] cal_1 skipped; reusing {LONG_NSR_EXP_NAME}_#{args.exp_num}")
@@ -161,19 +168,22 @@ def main():
                       "--exp-num", str(args.exp_num),
                       "--runner", args.runner,
                       "--seeds", str(args.cal_seeds),
-                      "--target-osr-long", str(args.target_osr_long)], log_fh)
+                      "--target-osr-long", str(args.target_osr_long),
+                      *slurm_res_args], log_fh)
 
         run_stage([py, cal2_path,
                   "--exp-num", str(args.exp_num),
                   "--runner", args.runner,
                   "--target-osr-std", str(args.target_osr_std),
                   "--target-osr-long", str(args.target_osr_long),
-                  "--seeds", str(args.cal_seeds)], log_fh)
+                  "--seeds", str(args.cal_seeds),
+                  *slurm_res_args], log_fh)
 
         run_stage([py, exp_path,
                   "--exp-num", str(args.exp_num),
                   "--runner", args.runner,
-                  "--seeds", str(args.exp_seeds)], log_fh)
+                  "--seeds", str(args.exp_seeds),
+                  *slurm_res_args], log_fh)
 
         submitted = submit_sanity_plots(
             args.exp_num, args.target_osr_std, args.target_osr_long, log_fh)

@@ -6,7 +6,10 @@ import numpy as np
 
 import simplicity.settings_manager as sm
 from experiment_script_runner import run_experiment_script
-from impact_long_shedders_config import LONG_NSR_EXP_NAME, unique_long_taus, read_nsr_ranges
+from impact_long_shedders_config import (
+    LONG_NSR_EXP_NAME, CAL1_ISOLATED_FIXED_PARAMS, unique_long_taus, read_nsr_ranges,
+    add_slurm_resource_args, set_slurm_resource_env,
+)
 from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
 
@@ -20,16 +23,7 @@ def user_set_experiment_settings(seeds, ranges):
             'tau_3_long': unique_long_taus(sp),  # corrected: D - (tau_1+tau_2+tau_4)
         }
 
-        fixed_params = {
-            'long_shedders_ratio': 1.0,
-            'R': 1.0,
-            'R_long': 1.5,
-            'infected_individuals_at_start': 100,
-            'final_time': 1200,
-            'sequence_long_shedders': True
-        }
-
-        return (varying_params, fixed_params, seeds)
+        return (varying_params, CAL1_ISOLATED_FIXED_PARAMS.copy(), seeds)
 
     return make_settings
 
@@ -65,8 +59,10 @@ def main():
     parser.add_argument('--target-osr-long', type=float, default=0.00205,
                         help="Target long OSR, used only for the diagnostic "
                             "calibration-fit plot (not for the grid itself).")
+    add_slurm_resource_args(parser)
     args = parser.parse_args()
 
+    set_slurm_resource_env(args.slurm_mem, args.slurm_time)
     run_isolated_calibration(args.exp_num, args.runner, args.seeds, args.target_osr_long)
 
 

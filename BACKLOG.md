@@ -40,6 +40,11 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
       run plotting on slurm for production-scale runs — new
       `submit_sanity_plot.sh`, dispatched once per long-shedder scenario by
       the pipeline script.
+- [x] cal_1's isolated-calibration `fixed_params` moved out of the script body
+      into `impact_long_shedders_config.CAL1_ISOLATED_FIXED_PARAMS` — every
+      hardcoded parameter set the pipeline uses now lives in that one config
+      file (still intentionally distinct values from `USER_FIXED_PARAMS`,
+      just no longer duplicated inline in a script).
 
 
 ------------------------------------------------------------------------
@@ -88,7 +93,21 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 
 ## Technical Debt
 
-- [ ] Memory and runtime requests to slurm are hardcoded in the runner.
+- [x] Memory and runtime requests to slurm are hardcoded in the runner —
+      fixed: `simplicity/runners/slurm.py` now reads `SIMPLICITY_SLURM_MEM`/
+      `SIMPLICITY_SLURM_TIME` env vars (same pattern already used for
+      `SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM`, so the shared
+      `run_seeded_simulations(...)` interface across serial/multiprocessing/
+      slurm didn't need to change). `impact_long_shedders_config.py` exposes
+      `add_slurm_resource_args`/`set_slurm_resource_env` so cal_1/cal_2/exp/
+      the pipeline orchestrator all expose identical `--slurm-mem`/
+      `--slurm-time` flags. Memory default lowered to `2G` based on real
+      `sacct` data on the isolated long-NSR calibration grid (MaxRSS
+      0.29–0.45G across 36 tasks) — down from the old blanket `8G` every job
+      used to request regardless of actual need. Time limit kept at the
+      existing `1-00:00:00` default (observed elapsed time up to ~88 min
+      already has plenty of headroom there, and unlike memory there's no
+      cost to leaving it generous).
 - [ ] Env variables are set in dir_manager (should be set elsewhere, or rename
       dir_manager).
 - [ ] Tree builder (lines 43, 78): a tree node stores only the first of the IH

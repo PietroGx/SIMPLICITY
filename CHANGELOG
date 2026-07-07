@@ -5,6 +5,31 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.1 — 2026-07-06 — pietro gerletti
+
+Configurable SLURM resources (found real numbers from sacct data on a
+completed run) and one more parameter-duplication cleanup.
+
+* simplicity/runners/slurm.py: --mem/--time per task are no longer hardcoded
+  (8G/24h for every job regardless of need) -- now read from
+  SIMPLICITY_SLURM_MEM/SIMPLICITY_SLURM_TIME env vars, same pattern already
+  used for SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM, so the
+  run_seeded_simulations(...) interface shared by serial/multiprocessing/
+  slurm didn't need to change. Memory default lowered to 2G from real sacct
+  data on the isolated long-NSR calibration grid (MaxRSS 0.29-0.45G across
+  36 completed tasks); time limit kept at the existing 1-00:00:00 default.
+* impact_long_shedders_config.py: added add_slurm_resource_args/
+  set_slurm_resource_env so cal_1, cal_2, exp, and the pipeline orchestrator
+  all expose identical --slurm-mem/--slurm-time flags.
+* Moved cal_1's inline isolated-calibration fixed_params dict into
+  impact_long_shedders_config.CAL1_ISOLATED_FIXED_PARAMS -- every hardcoded
+  parameter set the pipeline uses now lives in one config file.
+* Pipeline orchestrator log header now includes a timestamp, so re-reading
+  the (append-only) log file doesn't get confused between separate runs
+  under the same --exp-num.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.0 — 2026-07-06 — pietro gerletti
 
 Added Figures 3 and 4 for the long-shedders paper.

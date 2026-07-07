@@ -67,6 +67,19 @@ USER_FIXED_PARAMS = {
     "IH_virus_emergence_rate": 0.1,
 }
 
+# cal_1's isolated-calibration context: a 100% long-shedder population, used
+# ONLY to calibrate the long-shedder NSR in isolation -- deliberately
+# different from USER_FIXED_PARAMS (the mixed production population), not a
+# duplicate of it. Still belongs in one place rather than inline in cal_1.py.
+CAL1_ISOLATED_FIXED_PARAMS = {
+    "long_shedders_ratio": 1.0,
+    "R": 1.0,
+    "R_long": 1.5,
+    "infected_individuals_at_start": 100,
+    "final_time": 1200,
+    "sequence_long_shedders": True,
+}
+
 
 def phase_offset(sp):
     """Sum of the non-long-shedding infection phases (tau_1+tau_2+tau_4)."""
@@ -158,3 +171,40 @@ def read_nsr_ranges():
         print(f"[note] {path} not found; writing defaults.")
         write_default_nsr_ranges()
         return read_nsr_ranges()
+
+
+# =============================================================================
+# SLURM per-task resource request
+# ----------------------------------------------------------------------------
+# Read by simplicity.runners.slurm.submit_simulations from the
+# SIMPLICITY_SLURM_MEM/SIMPLICITY_SLURM_TIME env vars (same pattern as
+# SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM) rather than a function
+# argument, so it never has to touch the run_seeded_simulations(...) interface
+# shared uniformly by the serial/multiprocessing/slurm runner modules.
+#
+# Defaults below are set from real sacct data for the isolated long-NSR
+# calibration grid (population_size=1000, final_time=1200): MaxRSS ranged
+# 0.29-0.45G across all 36 grid points, elapsed time up to ~88 min. 2G gives
+# real headroom over observed memory use (vs. the old blanket 8G every job
+# used to request regardless of actual need). Time limit is kept at the
+# existing 1-day default -- observed elapsed time has more headroom already,
+# and unlike memory there's no cost to leaving it generous.
+# =============================================================================
+DEFAULT_SLURM_MEM = "2G"
+DEFAULT_SLURM_TIME = "1-00:00:00"
+
+
+def add_slurm_resource_args(parser):
+    """Add --slurm-mem/--slurm-time to an argparse parser (shared wiring so
+    every stage script exposes the same two flags identically)."""
+    parser.add_argument('--slurm-mem', type=str, default=DEFAULT_SLURM_MEM,
+                        help=f"Per-task SLURM memory request (default: {DEFAULT_SLURM_MEM}).")
+    parser.add_argument('--slurm-time', type=str, default=DEFAULT_SLURM_TIME,
+                        help=f"Per-task SLURM time limit (default: {DEFAULT_SLURM_TIME}).")
+
+
+def set_slurm_resource_env(mem, time):
+    """Set the env vars simplicity.runners.slurm reads. Harmless no-op for
+    the serial/multiprocessing runners, which never read them."""
+    os.environ["SIMPLICITY_SLURM_MEM"] = mem
+    os.environ["SIMPLICITY_SLURM_TIME"] = time
