@@ -5,6 +5,28 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.2 — 2026-07-06 — pietro gerletti
+
+Two small follow-ups from the 2.4.1 SLURM resource work.
+
+* simplicity/runners/slurm.py's polling loop no longer prints "release up to
+  N seeded simulations" -- it fired on every poll cycle once jobs started
+  turning over, spamming both the live terminal and (previously, only
+  filtered from) the saved pipeline log. Removed at the source instead of
+  just filtering it downstream; the periodic status line already conveys
+  progress. Dropped the now-dead matching pattern from the pipeline
+  orchestrator's log-noise filter.
+* SIMPLICITY_SLURM_MEM/SIMPLICITY_SLURM_TIME's baseline default (2G/1 day)
+  now lives in simplicity/dir_manager.py, alongside every other
+  simplicity-wide env var default (SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_*,
+  QT_QPA_PLATFORM), instead of a second hardcoded copy in
+  impact_long_shedders_config.py -- one literal source for the value.
+  simplicity/runners/slurm.py and add_slurm_resource_args both just read the
+  env var now (no inline fallback), matching how
+  SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM is already read.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.1 — 2026-07-06 — pietro gerletti
 
 Configurable SLURM resources (found real numbers from sacct data on a

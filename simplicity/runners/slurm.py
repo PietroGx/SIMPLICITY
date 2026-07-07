@@ -107,10 +107,12 @@ def submit_simulations(experiment_name: str,
     # script from a --slurm-mem/--slurm-time CLI flag) rather than a function
     # argument, so this doesn't touch the run_seeded_simulations(experiment_name,
     # run_seeded_simulation) interface shared uniformly by serial/multiprocessing/
-    # slurm -- same pattern already used for SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM.
-    # Defaults below match every job ever submitted before this became configurable.
-    max_runtime = os.environ.get("SIMPLICITY_SLURM_TIME", "1-00:00:00")
-    mem_request = os.environ.get("SIMPLICITY_SLURM_MEM", "8G")
+    # slurm -- same pattern as SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM.
+    # Baseline default is set once in dir_manager (imported above); a hard
+    # subscript (not .get) matches how that other env var is read, and relies
+    # on dir_manager always having run first to set it.
+    max_runtime = os.environ["SIMPLICITY_SLURM_TIME"]
+    mem_request = os.environ["SIMPLICITY_SLURM_MEM"]
 
     # submit the job
     slurm_process = subprocess.run((args:=[
@@ -237,10 +239,11 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
             print(status); last_printed = time.time()
         last_status = status
         
-        # release simluations
+        # release simluations (silently -- this can fire every poll cycle
+        # once jobs start turning over, and the periodic status line above
+        # already conveys progress without repeating this on every release)
         n = min(status.left - status.pending, SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM - status.pending - status.running)
         if n:
-            print(f"release up to {n} seeded simulations"); last_printed = time.time()
             release_simulations(experiment_name, n)
             
         # sleep
