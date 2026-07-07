@@ -7,8 +7,8 @@ import numpy as np
 import simplicity.settings_manager as sm
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    LONG_NSR_EXP_NAME, CAL1_ISOLATED_FIXED_PARAMS, unique_long_taus, read_nsr_ranges,
-    add_slurm_resource_args, set_slurm_resource_env,
+    LONG_NSR_EXP_NAME, CAL1_ISOLATED_FIXED_PARAMS, unique_long_taus, derive_r_long,
+    read_nsr_ranges, add_slurm_resource_args, set_slurm_resource_env,
 )
 from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
@@ -17,11 +17,22 @@ def user_set_experiment_settings(seeds, ranges):
     sp = sm.read_standard_parameters_values()
 
     def make_settings():
-        varying_params = {
-            'nucleotide_substitution_rate': np.geomspace(
-                ranges['min'], ranges['max'], ranges['steps']).tolist(),
-            'tau_3_long': unique_long_taus(sp),  # corrected: D - (tau_1+tau_2+tau_4)
-        }
+        nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
+        # One group per tau_3_long value (corrected: D - (tau_1+tau_2+tau_4)),
+        # each sweeping the same NSR grid. R_long is derived from tau_3_long
+        # via derive_r_long -- the same formula every production scenario
+        # uses -- rather than a single fixed value shared by every group, so
+        # this isolated calibration runs at the R_long each tau_3_long will
+        # actually see downstream in cal_2/exp.
+        scenario_groups = [
+            {
+                'nucleotide_substitution_rate': nsr_values,
+                'tau_3_long': tau,
+                'R_long': derive_r_long(tau),
+            }
+            for tau in unique_long_taus(sp)
+        ]
+        varying_params = {'_scenario_groups': scenario_groups}
 
         return (varying_params, CAL1_ISOLATED_FIXED_PARAMS.copy(), seeds)
 
@@ -30,7 +41,7 @@ def user_set_experiment_settings(seeds, ranges):
 
 def run_isolated_calibration(exp_num, runner, seeds, target_osr_long):
     print("\n=========================================================")
-    print(" PHASE 1: ISOLATED LONG-SHEDDER CALIBRATION (R_long=1.5, 100% LS)")
+    print(" PHASE 1: ISOLATED LONG-SHEDDER CALIBRATION (R_long = tau_3_long/7, 100% LS)")
     print("=========================================================\n")
 
     exp_name = LONG_NSR_EXP_NAME

@@ -18,6 +18,15 @@ Working list of blockers, active refactors, features, and technical debt.
       the one using the broken `from experiments.experiment_script_runner
       import ...`; fixed to the sibling-import form already used by cal_1 and
       the exp runner.
+- [x] **cal_1 R_long inconsistency** — fixed: cal_1's isolated calibration
+      was fixing `R_long=1.5` for every `tau_3_long` in its sweep, while
+      production derives `R_long = tau_3_long / 7.0`
+      (`derive_scenario_params`). Most tau groups were calibrated at the
+      wrong R_long. Fixed via a shared `derive_r_long(tau_3_long)` helper and
+      a per-tau `_scenario_groups` submission in cal_1.py (same mechanism
+      cal_2 already uses). **Recalibration required**: any experiment run
+      before this fix used the wrong R_long for cal_1's grid and must be
+      redone under a fresh `--exp-num`.
 
 ------------------------------------------------------------------------
 
