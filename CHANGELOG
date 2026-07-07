@@ -5,6 +5,43 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.3 — 2026-07-07 — pietro gerletti
+
+Visibility into what a SLURM-run simulation is actually doing internally,
+without a live terminal attached to it.
+
+* simplicity/extrande.py: ProgressReporter optionally writes a small
+  throttled JSON snapshot ({"time", "final_time", "infected"}) to
+  "<seeded_simulation_parameters_path>.progress" -- same "<path>.xyz"
+  convention as the existing .started/.completed/.failed signal files.
+  Written at most once every 120s (update() fires on every extrande event,
+  potentially thousands/sec; writing every call would hammer the
+  filesystem), atomically (write to .tmp, then os.replace), and wrapped in
+  try/except OSError so progress reporting can never break a real run.
+  progress_file_path threads through extrande_factory/extrande_core_loop ->
+  simplicity/simulation.py's Simplicity.__init__/run() ->
+  simplicity/runners/unit_run.py (which derives it from
+  seeded_simulation_parameters_path). Harmless no-op for
+  serial/multiprocessing runs (nobody reads the file there); only the SLURM
+  monitor consumes it. This avoids threading a "which runner" flag through
+  the core simulation engine, which would have touched the shared
+  run_seeded_simulations(...) interface.
+* simplicity/runners/slurm.py: run_seeded_simulations' polling loop gained a
+  separate hourly timer (LONG_RUNNING_REPORT_INTERVAL_S) that calls the new
+  report_long_running_simulations(experiment_name), printing the internal
+  state (time/final_time, infected count) of any simulation whose .started
+  signal is more than an hour old (LONG_RUNNING_THRESHOLD_S) with no
+  .completed/.failed yet -- read from its .progress snapshot. This is
+  separate from, and doesn't touch, the existing ~17s SimulationsStatus
+  printout.
+* Verified locally (no SLURM access from here): synthetic .started/.progress
+  files confirming a stale+running sim gets reported with the right
+  time/infected values, a recently-started sim is correctly skipped, and a
+  completed-but-stale sim is correctly skipped; ProgressReporter's snapshot
+  write/read round-trip confirmed directly.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.2 — 2026-07-06 — pietro gerletti
 
 Two small follow-ups from the 2.4.1 SLURM resource work.

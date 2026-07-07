@@ -27,11 +27,12 @@ import simplicity.output_manager         as om
 import simplicity.plots_manager          as pm
 
 class Simplicity:
-    def __init__(self, parameters, output_directory, sim_id):
+    def __init__(self, parameters, output_directory, sim_id, progress_file_path=None):
         self.parameters       = parameters
         self.output_directory = output_directory
         self.population       = pop.create_population(parameters)
         self.sim_id  = sim_id
+        self.progress_file_path = progress_file_path
        
     def run(self):
         assert not hasattr(self, "simulation_output"), "cannot run simulation twice"
@@ -42,9 +43,10 @@ class Simplicity:
         rng2 = randomgen(seeds_generator.integers(0,10000)) # for rejection sampling of reactions
         
         # use factory to assign simulation algorithm
-        self.extrande = e.extrande_factory(self.parameters["phenotype_model"], 
+        self.extrande = e.extrande_factory(self.parameters["phenotype_model"],
                                            self.parameters, self.sim_id,
-                                           rng1, rng2)
+                                           rng1, rng2,
+                                           progress_file_path=self.progress_file_path)
         
         # run simulation
         self.simulation_output = self.extrande(self.population)

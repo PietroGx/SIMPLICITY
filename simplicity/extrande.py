@@ -21,6 +21,8 @@ Created on Fri Mar 28 13:31:54 2025
 """
 import time
 import math
+import os
+import json
 import numpy as np
 import simplicity.population_model as SIDR
 import simplicity.evolution.mutations as evo
@@ -30,18 +32,34 @@ import simplicity.phenotype.update as pheno
 import simplicity.tuning.diagnosis_rate as dr
 from tqdm import tqdm
 
+# How often (wall-clock seconds) ProgressReporter writes its progress
+# snapshot file, if given one. Throttled well below the update() call rate
+# (called on every extrande event, possibly thousands/sec) to avoid hammering
+# the filesystem; still far more frequent than anything currently reads it
+# (the SLURM monitor checks hourly).
+PROGRESS_SNAPSHOT_INTERVAL_S = 120
+
 class ProgressReporter:
-    def __init__(self, total_time, simulation_id):
+    def __init__(self, total_time, simulation_id, progress_file_path=None):
         self.total_time = total_time
         self.current_time = 0
         self.step_size = 0
-        
+        self.infected = 0
+
         self.leap_counter = 0
         self.reactions_counter = 0
         self.thinning_counter = 0
         self.reaction_id = None
 
         self.start_wall = time.time()
+
+        # Optional: periodically write {time, final_time, infected} to this
+        # path (same ".xyz next to the seeded params file" convention as the
+        # .started/.completed/.failed signals) so an external monitor -- e.g.
+        # simplicity.runners.slurm's poll loop -- can report a running
+        # simulation's internal state without needing a live terminal.
+        self.progress_file_path = progress_file_path
+        self.last_progress_write = 0.0
 
         self.pbar = tqdm(
                     total=total_time,
@@ -51,6 +69,20 @@ class ProgressReporter:
                     position=1,
                     leave=False
                     )
+
+    def _write_progress_snapshot(self):
+        snapshot = {
+            "time": self.current_time,
+            "final_time": self.total_time,
+            "infected": self.infected,
+        }
+        tmp_path = self.progress_file_path + ".tmp"
+        try:
+            with open(tmp_path, "w") as f:
+                json.dump(snapshot, f)
+            os.replace(tmp_path, self.progress_file_path)  # atomic on POSIX
+        except OSError:
+            pass  # advisory-only; never let progress reporting break a run
 
     def update(self, population, delta_t, reaction_id=None, event_type=None):
         self.step_size = delta_t
@@ -86,6 +118,12 @@ class ProgressReporter:
             "CPU(s)": f"{cpu_time:.1f}",
             "Time left": f"{(cpu_time / self.current_time * (self.total_time - self.current_time)):.0f}s"
         })
+
+        if self.progress_file_path is not None:
+            now = time.time()
+            if now - self.last_progress_write >= PROGRESS_SNAPSHOT_INTERVAL_S:
+                self._write_progress_snapshot()
+                self.last_progress_write = now
 
     def close(self):
         self.pbar.close()
@@ -224,7 +262,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     "reaction_step": reaction_step,
     }
 
-def extrande_core_loop(parameters, population, helpers, sim_id):
+def extrande_core_loop(parameters, population, helpers, sim_id, progress_file_path=None):
     """
     Core extrande loop.
     """
@@ -233,8 +271,9 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
     final_time = parameters['final_time']
     start_time = time.time()
     t_day = 0
-    
-    reporter = ProgressReporter(total_time=final_time, simulation_id=sim_id)
+
+    reporter = ProgressReporter(total_time=final_time, simulation_id=sim_id,
+                                progress_file_path=progress_file_path)
     
     min_update_threshold = 0.5  # minimum dt for intra-host update (12h step)
     dt_accumulated = 0  # initialize accumulator
@@ -308,10 +347,11 @@ def extrande_core_loop(parameters, population, helpers, sim_id):
 
     return population
 
-def extrande_factory(phenotype_model, parameters, sim_id, rng1, rng2):
-    
+def extrande_factory(phenotype_model, parameters, sim_id, rng1, rng2, progress_file_path=None):
+
     def extrande_generic(population):
         helpers = get_helpers(phenotype_model, parameters, rng1, rng2)
-        return extrande_core_loop(parameters, population, helpers, sim_id)
+        return extrande_core_loop(parameters, population, helpers, sim_id,
+                                  progress_file_path=progress_file_path)
 
     return extrande_generic
