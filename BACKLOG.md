@@ -19,14 +19,20 @@ Working list of blockers, active refactors, features, and technical debt.
       import ...`; fixed to the sibling-import form already used by cal_1 and
       the exp runner.
 - [x] **cal_1 R_long inconsistency** — fixed: cal_1's isolated calibration
-      was fixing `R_long=1.5` for every `tau_3_long` in its sweep, while
-      production derives `R_long = tau_3_long / 7.0`
+      was feeding the same raw `R_long=1.5` (a weekly per-long-shedder
+      infection rate) directly into every `tau_3_long` grid point as the
+      final R_long, unscaled by duration, while production derives
+      `R_long = R_long_per_week * tau_3_long / 7.0`
       (`derive_scenario_params`). Most tau groups were calibrated at the
-      wrong R_long. Fixed via a shared `derive_r_long(tau_3_long)` helper and
-      a per-tau `_scenario_groups` submission in cal_1.py (same mechanism
-      cal_2 already uses). **Recalibration required**: any experiment run
-      before this fix used the wrong R_long for cal_1's grid and must be
-      redone under a fresh `--exp-num`.
+      wrong R_long. Fixed via a shared
+      `derive_r_long(R_long_per_week, tau_3_long)` helper and a per-tau
+      `_scenario_groups` submission in cal_1.py (same mechanism cal_2
+      already uses) -- each context scales its own weekly baseline
+      (`CAL1_ISOLATED_FIXED_PARAMS["R_long"]`=1.5 for cal_1, `sp["R_long"]`
+      for cal_2/exp) by that point's own `tau_3_long/7`.
+      **Recalibration required**: any experiment run before this fix used
+      the wrong R_long for cal_1's grid and must be redone under a fresh
+      `--exp-num`.
 
 ------------------------------------------------------------------------
 

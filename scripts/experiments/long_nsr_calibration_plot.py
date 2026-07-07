@@ -45,7 +45,7 @@ import simplicity.tuning.evolutionary_rate as er
 # resolves in both cases.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from impact_long_shedders_config import (
-    SCENARIOS, TAU_ROUND, DEFAULT_COLORS, derive_scenario_params,
+    SCENARIOS, TAU_ROUND, DEFAULT_COLORS, derive_tau_3_long,
 )
 
 
@@ -56,8 +56,7 @@ def _tau_labels_and_colors(sp):
     for scenario in SCENARIOS:
         if scenario["long_shedders_ratio"] <= 0.0:
             continue
-        frozen = derive_scenario_params(scenario, sp)
-        tau = round(frozen["tau_3_long"], TAU_ROUND)
+        tau = round(derive_tau_3_long(scenario, sp), TAU_ROUND)
         if tau not in labels:
             labels[tau] = scenario["name"]
             colors[tau] = next(color_cycle, "black")
