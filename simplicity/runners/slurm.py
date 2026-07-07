@@ -44,9 +44,18 @@ Kown bugs:
    (removing or archiving the experiment folder) is highly recommanded before retrying.
 
 """
-import typing, os, pathlib, subprocess, platform
+import typing, os, json, pathlib, subprocess, platform
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
+
+# How often (seconds) run_seeded_simulations' polling loop reports the
+# internal state (time/final_time/infected) of simulations that have been
+# running for a while -- separate from the ~17s SimulationsStatus printout,
+# since this is meant as an occasional deeper look, not a repeated ping.
+LONG_RUNNING_REPORT_INTERVAL_S = 3600
+# How long a simulation must have been running (since its .started signal)
+# before it's included in that report.
+LONG_RUNNING_THRESHOLD_S = 3600
 
 class SimulationsStatus(typing.NamedTuple):
     total    : int
@@ -176,6 +185,48 @@ def poll_simulations_status(experiment_name):
         failed   = failed,
     )
 
+def report_long_running_simulations(experiment_name, threshold_seconds=LONG_RUNNING_THRESHOLD_S):
+    """Print the internal state (time/final_time/infected) of every seeded
+    simulation that has been running for more than threshold_seconds.
+
+    State is read from the periodic progress snapshot
+    simplicity.extrande.ProgressReporter writes next to the seeded params
+    file (same "<seeded_simulation_parameters_path>.xyz" convention as the
+    .started/.completed/.failed signals below), so this works without a live
+    terminal attached to the actual simulation process.
+    """
+    import time
+    seeded_simulation_parameters = sm.get_seeded_simulation_parameters_paths(experiment_name)
+    now = time.time()
+    for seeded_simulation_parameters_path in seeded_simulation_parameters:
+        signal_started_path   = seeded_simulation_parameters_path + ".started"
+        signal_completed_path = seeded_simulation_parameters_path + ".completed"
+        signal_failed_path    = seeded_simulation_parameters_path + ".failed"
+        started_path = pathlib.Path(signal_started_path)
+        if not started_path.exists():
+            continue
+        if pathlib.Path(signal_completed_path).exists() or pathlib.Path(signal_failed_path).exists():
+            continue
+        elapsed = now - started_path.stat().st_mtime
+        if elapsed < threshold_seconds:
+            continue
+
+        name = os.path.basename(seeded_simulation_parameters_path)
+        progress_path = pathlib.Path(seeded_simulation_parameters_path + ".progress")
+        if not progress_path.exists():
+            print(f"[long-running] {name}: running {elapsed/3600:.1f}h, no progress snapshot yet")
+            continue
+        try:
+            with open(progress_path) as f:
+                snapshot = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            print(f"[long-running] {name}: running {elapsed/3600:.1f}h, progress snapshot unreadable")
+            continue
+        print(f"[long-running] {name}: running {elapsed/3600:.1f}h, "
+              f"time={snapshot.get('time')}/{snapshot.get('final_time')}, "
+              f"infected={snapshot.get('infected')}")
+
+
 def release_simulations(experiment_name, n: int):
     # get the seeded simulation parameters files paths
     seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
@@ -233,19 +284,26 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
     
     # loop until no simulation left to release
     last_status  = None
+    last_long_running_report = time.time()
     while (status := poll_simulations_status(experiment_name)).left > 0:
         # print if status changed or after 17 seconds
         if last_status != status or (time.time() - last_printed) > 17.:
             print(status); last_printed = time.time()
         last_status = status
-        
+
         # release simluations (silently -- this can fire every poll cycle
         # once jobs start turning over, and the periodic status line above
         # already conveys progress without repeating this on every release)
         n = min(status.left - status.pending, SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM - status.pending - status.running)
         if n:
             release_simulations(experiment_name, n)
-            
+
+        # once an hour, report the internal state of any simulation that's
+        # been running for more than an hour (time/final_time, infected count)
+        if (time.time() - last_long_running_report) >= LONG_RUNNING_REPORT_INTERVAL_S:
+            report_long_running_simulations(experiment_name)
+            last_long_running_report = time.time()
+
         # sleep
         time.sleep(7.)
 

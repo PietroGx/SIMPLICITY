@@ -37,9 +37,15 @@ def run_seeded_simulation(seeded_simulation_parameters_path: str,
     
     # </settings and output managers>
 
-    ## <simplicity core>        
+    ## <simplicity core>
     import simplicity.simulation       as sim
-    simulation = sim.Simplicity       (parameters, output_directory, sim_id)
+    # Same "<seeded params path>.xyz" convention as the .started/.completed/
+    # .failed signal files touched by simplicity.runners.slurm's job(), so an
+    # external monitor can find a running simulation's progress snapshot from
+    # the same path it already uses to find its status signals.
+    progress_file_path = seeded_simulation_parameters_path + ".progress"
+    simulation = sim.Simplicity       (parameters, output_directory, sim_id,
+                                       progress_file_path=progress_file_path)
     simulation.run()
-    ## </simplicity core>        
+    ## </simplicity core>
     

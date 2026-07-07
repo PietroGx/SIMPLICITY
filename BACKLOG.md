@@ -91,6 +91,21 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 
 ------------------------------------------------------------------------
 
+## Monitor visibility
+
+- [x] SLURM monitor had no visibility into a running simulation's internal
+      state (only completed/running/failed counts) — fixed: `extrande.py`'s
+      `ProgressReporter` optionally writes a throttled JSON snapshot
+      (`time`/`final_time`/`infected`) to
+      `<seeded_simulation_parameters_path>.progress` (same signal-file
+      convention as `.started`/`.completed`/`.failed`), threaded through
+      `simulation.py` and `unit_run.py`. `simplicity/runners/slurm.py`'s
+      polling loop gained a separate hourly timer that reports the internal
+      state of any simulation running longer than an hour, reading that
+      snapshot — independent of the existing ~17s `SimulationsStatus` line.
+
+------------------------------------------------------------------------
+
 ## Technical Debt
 
 - [x] Memory and runtime requests to slurm are hardcoded in the runner —
