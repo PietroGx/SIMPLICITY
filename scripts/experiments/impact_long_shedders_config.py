@@ -14,7 +14,10 @@
 # ----------------------------------------------------------------------------
 # Single source of truth for the scenario definitions and fixed parameters
 # shared by impact_long_shedders_cal_1.py, impact_long_shedders_cal_2.py and
-# impact_long_shedders_exp.py.
+# impact_long_shedders_exp.py. Sections below are ordered the same way the
+# pipeline itself runs: shared/foundational definitions first, then Stage 1
+# (cal_1), Stage 2 (cal_2), Stage 3 (exp), then cross-cutting infrastructure
+# (NSR ranges file, SLURM resources) used across stages.
 #
 # NSR sweep ranges are NOT hardcoded here: they live in a user-editable JSON
 # file under Data/00_Reference_parameters/, since they get retuned between
@@ -29,7 +32,7 @@ import json
 import simplicity.dir_manager as dm
 
 # =============================================================================
-# SCENARIOS
+# SHARED / FOUNDATIONAL -- used by every stage
 # =============================================================================
 # One entry per scenario. `inf_duration_long` is the raw clinical long-shedding
 # duration (days); tau_3_long is DERIVED from it (see derive_scenario_params)
@@ -51,39 +54,19 @@ TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
 LONG_NSR_EXP_NAME = "impact_long_shedders_calibration_lng_nsr"
 STD_NSR_SWEEP_NAME = "impact_long_shedders_calibration_std_nsr"
 
-# Shared color palette for the calibration-fit plots (long-NSR per tau group,
-# standard-NSR per scenario), keyed by scenario name so both plots look
-# consistent with each other.
-DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
-
-# Fixed experiment overrides shared by cal_2 and exp (mirrors the population
-# context of the impact experiment). Single source of truth -- previously
-# duplicated verbatim in both scripts.
-USER_FIXED_PARAMS = {
-    "population_size": 1000,
-    "infected_individuals_at_start": 100,
-    "R": 1.05,
-    "final_time": 1095,
-    "IH_virus_emergence_rate": 0.1,
-}
-
-# cal_1's isolated-calibration context: a 100% long-shedder population, used
-# ONLY to calibrate the long-shedder NSR in isolation -- deliberately
-# different from USER_FIXED_PARAMS (the mixed production population), not a
-# duplicate of it. Still belongs in one place rather than inline in cal_1.py.
-CAL1_ISOLATED_FIXED_PARAMS = {
-    "long_shedders_ratio": 1.0,
-    "R": 1.0,
-    "R_long": 1.5,
-    "infected_individuals_at_start": 100,
-    "final_time": 1200,
-    "sequence_long_shedders": True,
-}
-
 
 def phase_offset(sp):
     """Sum of the non-long-shedding infection phases (tau_1+tau_2+tau_4)."""
     return sp["tau_1"] + sp["tau_2"] + sp["tau_4"]
+
+
+def derive_r_long(tau_3_long):
+    """R_long as a function of the (corrected) long-shedding duration. Single
+    source of truth for this formula -- used both to freeze each scenario's
+    R_long (derive_scenario_params, below) and to drive cal_1's isolated
+    per-tau_3_long calibration groups, so the isolated calibration never runs
+    a tau_3_long/R_long combination that production won't actually use."""
+    return tau_3_long / 7.0
 
 
 def derive_scenario_params(scenario, sp):
@@ -108,12 +91,11 @@ def derive_scenario_params(scenario, sp):
         }
 
     tau_3_long = float(scenario["inf_duration_long"]) - phase_offset(sp)
-    R_long = tau_3_long / 7.0
     return {
         "scenario_name": name,
         "long_shedders_ratio": float(ratio),
         "tau_3_long": tau_3_long,
-        "R_long": R_long,
+        "R_long": derive_r_long(tau_3_long),
         "sequence_long_shedders": True,
         "is_long": True,
     }
@@ -130,18 +112,76 @@ def unique_long_taus(sp):
 
 
 # =============================================================================
-# NSR SWEEP RANGES -- user-editable reference file
+# STAGE 1 (cal_1) -- isolated long-shedder NSR calibration
+# =============================================================================
+# cal_1's isolated-calibration context: a 100% long-shedder population, used
+# ONLY to calibrate the long-shedder NSR in isolation -- deliberately
+# different from USER_FIXED_PARAMS (the mixed production population), not a
+# duplicate of it. Still belongs in one place rather than inline in cal_1.py.
+#
+# R_long is NOT listed here: cal_1 sweeps tau_3_long across
+# unique_long_taus(sp), and R_long must track each tau_3_long value via
+# derive_r_long (the same formula every production scenario uses) --
+# otherwise this isolated calibration would run at a different R_long than
+# the tau_3_long value will actually see downstream in cal_2/exp, which would
+# invalidate the calibrated NSR. cal_1.py derives R_long per tau_3_long group
+# via the '_scenario_groups' mechanism (same one cal_2 uses for its own
+# per-scenario grid).
+CAL1_ISOLATED_FIXED_PARAMS = {
+    "long_shedders_ratio": 1.0,
+    "R": 1.0,
+    "infected_individuals_at_start": 100,
+    "final_time": 720,
+    "sequence_long_shedders": True,
+}
+
+
+# =============================================================================
+# STAGE 2 (cal_2) -- standard NSR calibrated in-context (mixed population)
+# =============================================================================
+# Fixed experiment overrides shared by cal_2 and exp (mirrors the population
+# context of the impact experiment). Single source of truth -- previously
+# duplicated verbatim in both scripts.
+USER_FIXED_PARAMS = {
+    "population_size": 1000,
+    "infected_individuals_at_start": 100,
+    "R": 1.05,
+    "final_time": 1095,
+    "IH_virus_emergence_rate": 0.1,
+}
+
+# Shared color palette for the calibration-fit plots (long-NSR per tau group,
+# standard-NSR per scenario), keyed by scenario name so both plots look
+# consistent with each other.
+DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+
+
+# =============================================================================
+# STAGE 3 (exp) -- production runs
+# =============================================================================
+# exp reuses USER_FIXED_PARAMS (Stage 2, above) as-is: the production
+# population context must match the one cal_2 calibrated the standard NSR
+# against. Nothing new is defined for this stage.
+
+
+# =============================================================================
+# NSR SWEEP RANGES -- user-editable reference file (drives Stage 1 & Stage 2
+# grids)
 # =============================================================================
 NSR_RANGES_FILENAME = "impact_long_shedders_nsr_ranges.json"
 
+# Single source for the grid resolution shared by every sweep below, so
+# tuning it doesn't mean touching (and keeping in sync) six separate literals.
+_DEFAULT_NSR_STEPS = 10
+
 DEFAULT_NSR_RANGES = {
-    "cal1_long_nsr": {"min": 0.0001, "max": 0.002, "steps": 6},
+    "cal1_long_nsr": {"min": 0.0005, "max": 0.05, "steps": _DEFAULT_NSR_STEPS},
     "cal2_standard_nsr": {
-        "control":   {"min": 3e-05, "max": 5e-04, "steps": 6},
-        "SOT":       {"min": 1e-05, "max": 1e-04, "steps": 6},
-        "HIV_low":   {"min": 1e-05, "max": 1e-04, "steps": 6},
-        "HIV_high":  {"min": 1e-05, "max": 1e-04, "steps": 6},
-        "edge_case": {"min": 1e-05, "max": 1e-04, "steps": 6},
+        "control":   {"min": 3e-05, "max": 5e-04, "steps": _DEFAULT_NSR_STEPS},
+        "SOT":       {"min": 1e-05, "max": 1e-04, "steps": _DEFAULT_NSR_STEPS},
+        "HIV_low":   {"min": 1e-05, "max": 1e-04, "steps": _DEFAULT_NSR_STEPS},
+        "HIV_high":  {"min": 1e-05, "max": 1e-04, "steps": _DEFAULT_NSR_STEPS},
+        "edge_case": {"min": 1e-05, "max": 1e-04, "steps": _DEFAULT_NSR_STEPS},
     },
 }
 
@@ -174,7 +214,7 @@ def read_nsr_ranges():
 
 
 # =============================================================================
-# SLURM per-task resource request
+# SLURM per-task resource request -- shared by every stage + the orchestrator
 # ----------------------------------------------------------------------------
 # Read by simplicity.runners.slurm.submit_simulations from the
 # SIMPLICITY_SLURM_MEM/SIMPLICITY_SLURM_TIME env vars (same pattern as

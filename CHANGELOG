@@ -5,6 +5,44 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.4 — 2026-07-07 — pietro gerletti
+
+Fixed a real R_long inconsistency in cal_1's isolated calibration, plus two
+config cleanups.
+
+* cal_1's isolated long-shedder calibration was fixing R_long=1.5 for every
+  tau_3_long value in its sweep, while every production scenario derives
+  R_long = tau_3_long / 7.0 (impact_long_shedders_config.derive_scenario_params).
+  Since cal_1's grid spans multiple tau_3_long values (one per unique
+  production scenario duration), most of them were being calibrated at the
+  wrong R_long -- invalidating the calibrated NSR for anything other than
+  whichever tau happened to land near tau=10.5 (1.5*7). Fixed by extracting
+  the formula into impact_long_shedders_config.derive_r_long(tau_3_long),
+  used by both derive_scenario_params and a new per-tau '_scenario_groups'
+  submission in cal_1.py (same mechanism cal_2 already uses for its
+  per-scenario grid) -- R_long is now correctly correlated with tau_3_long
+  in every group. CAL1_ISOLATED_FIXED_PARAMS no longer lists R_long at all
+  (it's derived per group, not a single constant). cal_1's isolated context
+  final_time also lowered 1200 -> 720.
+* impact_long_shedders_config.py reorganized so its sections follow pipeline
+  order (shared/foundational definitions, then Stage 1/cal_1, Stage 2/cal_2,
+  Stage 3/exp, then cross-cutting NSR-ranges/SLURM-resource infrastructure) --
+  previously Stage 2's USER_FIXED_PARAMS was defined before Stage 1's
+  CAL1_ISOLATED_FIXED_PARAMS, out of order with how the pipeline actually
+  runs.
+* DEFAULT_NSR_RANGES' six identical `"steps": 6` literals collapsed into one
+  `_DEFAULT_NSR_STEPS` constant (now 10) referenced by every sweep, so tuning
+  grid resolution doesn't mean touching six literals in sync. Mirrored into
+  the committed Data/00_Reference_parameters/impact_long_shedders_nsr_ranges.json
+  reference file (steps 6->10; cal1_long_nsr range widened to 0.0005-0.05).
+* Verified locally: hand-built the fake standard-parameters dict
+  generate_experiment_settings needs, confirmed cal_1's new
+  '_scenario_groups' submission produces the expected tau-count x steps grid
+  points with each point's R_long exactly matching derive_r_long(tau_3_long)
+  for its group -- not a single shared constant.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.3 — 2026-07-07 — pietro gerletti
 
 Visibility into what a SLURM-run simulation is actually doing internally,
