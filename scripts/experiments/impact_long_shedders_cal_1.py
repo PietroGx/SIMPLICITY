@@ -42,8 +42,10 @@ def user_set_experiment_settings(seeds, ranges):
 
 
 def run_isolated_calibration(exp_num, runner, seeds, target_osr_long):
+    r_long_per_week = CAL1_ISOLATED_FIXED_PARAMS["R_long"]
     print("\n=========================================================")
-    print(" PHASE 1: ISOLATED LONG-SHEDDER CALIBRATION (R_long = tau_3_long/7, 100% LS)")
+    print(f" PHASE 1: ISOLATED LONG-SHEDDER CALIBRATION "
+         f"(R_long = {r_long_per_week} * tau_3_long/7, 100% LS)")
     print("=========================================================\n")
 
     exp_name = LONG_NSR_EXP_NAME
