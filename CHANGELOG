@@ -5,6 +5,34 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.5 — 2026-07-07 — pietro gerletti
+
+Follow-up to 2.4.4: R_long is a weekly rate, and must be normalized by
+duration for every tau_3_long group, not just cal_1's.
+
+* derive_r_long(tau_3_long) -> derive_r_long(R_long_per_week, tau_3_long) =
+  R_long_per_week * tau_3_long / 7.0. R depends on how long someone stays
+  infectious, so R_long is modeled as a baseline weekly infection rate for a
+  long shedder, scaled by the number of weeks (tau_3_long/7) they actually
+  shed for -- not the base (standard) reproduction number R. Each context
+  supplies its own weekly baseline: cal_1.py's per-tau _scenario_groups use
+  CAL1_ISOLATED_FIXED_PARAMS["R_long"] (1.5, restored -- this isolated
+  context's own rate, deliberately different from production's);
+  derive_scenario_params uses sp["R_long"] (the standard-parameters default
+  rate) for every long-shedder scenario. Previously (2.4.4) the formula
+  implicitly assumed a weekly rate of 1 for every scenario/tau -- this
+  restores the actual configured rate as the multiplier.
+* Split derive_tau_3_long(scenario, sp) out of derive_scenario_params so
+  callers that only need the tau value (unique_long_taus,
+  long_nsr_calibration_plot._tau_labels_and_colors) don't need to touch
+  R_long at all.
+* Verified locally: cal_1's grid now uses R_long = 1.5 * tau/7 for every
+  group (its own isolated weekly rate), while derive_scenario_params uses
+  R_long = sp["R_long"] * tau/7 (production's rate) -- confirmed these
+  differ and each context uses its own correct baseline.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.4 — 2026-07-07 — pietro gerletti
 
 Fixed a real R_long inconsistency in cal_1's isolated calibration, plus two

@@ -60,13 +60,29 @@ def phase_offset(sp):
     return sp["tau_1"] + sp["tau_2"] + sp["tau_4"]
 
 
-def derive_r_long(tau_3_long):
-    """R_long as a function of the (corrected) long-shedding duration. Single
-    source of truth for this formula -- used both to freeze each scenario's
-    R_long (derive_scenario_params, below) and to drive cal_1's isolated
+def derive_r_long(R_long_per_week, tau_3_long):
+    """Total long-shedder reproduction number over the whole (corrected)
+    long-shedding duration, given the model's baseline weekly infection rate
+    for a long shedder (R_long_per_week -- e.g. sp['R_long'] for production,
+    CAL1_ISOLATED_FIXED_PARAMS['R_long'] for cal_1's isolated context).
+    R depends on how long someone stays infectious, so R_long_per_week is
+    normalized to a per-week rate and scaled by the number of weeks
+    (tau_3_long/7) the long shedder actually sheds for. Single source of
+    truth for this formula -- used both to freeze each scenario's R_long
+    (derive_scenario_params, below) and to drive cal_1's isolated
     per-tau_3_long calibration groups, so the isolated calibration never runs
     a tau_3_long/R_long combination that production won't actually use."""
-    return tau_3_long / 7.0
+    return R_long_per_week * tau_3_long / 7.0
+
+
+def derive_tau_3_long(scenario, sp):
+    """Corrected long-shedding duration: inf_duration_long - (tau_1+tau_2+tau_4)
+    for a long-shedder scenario, or sp's own tau_3_long default for control.
+    Split out of derive_scenario_params so unique_long_taus doesn't need an R
+    value it has no use for."""
+    if scenario["long_shedders_ratio"] == 0.0:
+        return float(sp["tau_3_long"])
+    return float(scenario["inf_duration_long"]) - phase_offset(sp)
 
 
 def derive_scenario_params(scenario, sp):
@@ -78,24 +94,24 @@ def derive_scenario_params(scenario, sp):
     """
     name = scenario["name"]
     ratio = scenario["long_shedders_ratio"]
+    tau_3_long = derive_tau_3_long(scenario, sp)
 
     if ratio == 0.0:
         # Control: no long shedders. Use standard defaults; long NSR unused.
         return {
             "scenario_name": name,
             "long_shedders_ratio": 0.0,
-            "tau_3_long": float(sp["tau_3_long"]),
+            "tau_3_long": tau_3_long,
             "R_long": float(sp["R_long"]),
             "sequence_long_shedders": False,
             "is_long": False,
         }
 
-    tau_3_long = float(scenario["inf_duration_long"]) - phase_offset(sp)
     return {
         "scenario_name": name,
         "long_shedders_ratio": float(ratio),
         "tau_3_long": tau_3_long,
-        "R_long": derive_r_long(tau_3_long),
+        "R_long": derive_r_long(sp["R_long"], tau_3_long),
         "sequence_long_shedders": True,
         "is_long": True,
     }
@@ -104,7 +120,7 @@ def derive_scenario_params(scenario, sp):
 def unique_long_taus(sp):
     """Sorted unique corrected tau_3_long values across long-shedder scenarios."""
     taus = {
-        round(derive_scenario_params(scenario, sp)["tau_3_long"], TAU_ROUND)
+        round(derive_tau_3_long(scenario, sp), TAU_ROUND)
         for scenario in SCENARIOS
         if scenario["long_shedders_ratio"] > 0.0
     }
@@ -119,17 +135,21 @@ def unique_long_taus(sp):
 # different from USER_FIXED_PARAMS (the mixed production population), not a
 # duplicate of it. Still belongs in one place rather than inline in cal_1.py.
 #
-# R_long is NOT listed here: cal_1 sweeps tau_3_long across
-# unique_long_taus(sp), and R_long must track each tau_3_long value via
-# derive_r_long (the same formula every production scenario uses) --
-# otherwise this isolated calibration would run at a different R_long than
-# the tau_3_long value will actually see downstream in cal_2/exp, which would
-# invalidate the calibrated NSR. cal_1.py derives R_long per tau_3_long group
-# via the '_scenario_groups' mechanism (same one cal_2 uses for its own
-# per-scenario grid).
+# "R_long" here is this isolated context's OWN baseline weekly long-shedder
+# infection rate (deliberately different from sp['R_long'], the production
+# default) -- NOT the final per-simulation R_long. cal_1 sweeps tau_3_long
+# across unique_long_taus(sp), and the actual R_long fed to each grid point
+# must scale with its own tau_3_long via derive_r_long(R_long_per_week=
+# CAL1_ISOLATED_FIXED_PARAMS['R_long'], tau) -- the same formula every
+# production scenario uses -- otherwise every point would run at the same
+# raw weekly rate regardless of duration, which would invalidate the
+# calibrated NSR for every tau except by coincidence. cal_1.py derives this
+# per tau_3_long group via the '_scenario_groups' mechanism (same one cal_2
+# uses for its own per-scenario grid), overriding this dict's own "R_long".
 CAL1_ISOLATED_FIXED_PARAMS = {
     "long_shedders_ratio": 1.0,
     "R": 1.0,
+    "R_long": 1.5,
     "infected_individuals_at_start": 100,
     "final_time": 720,
     "sequence_long_shedders": True,

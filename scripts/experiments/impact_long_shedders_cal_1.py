@@ -19,16 +19,18 @@ def user_set_experiment_settings(seeds, ranges):
     def make_settings():
         nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
         # One group per tau_3_long value (corrected: D - (tau_1+tau_2+tau_4)),
-        # each sweeping the same NSR grid. R_long is derived from tau_3_long
-        # via derive_r_long -- the same formula every production scenario
-        # uses -- rather than a single fixed value shared by every group, so
-        # this isolated calibration runs at the R_long each tau_3_long will
-        # actually see downstream in cal_2/exp.
+        # each sweeping the same NSR grid. The actual R_long fed to each
+        # point is derived from this isolated context's own weekly rate
+        # (CAL1_ISOLATED_FIXED_PARAMS['R_long']) scaled by that point's own
+        # tau_3_long via derive_r_long -- the same formula every production
+        # scenario uses -- rather than a single fixed value shared by every
+        # group regardless of duration.
+        isolated_r_long_per_week = CAL1_ISOLATED_FIXED_PARAMS["R_long"]
         scenario_groups = [
             {
                 'nucleotide_substitution_rate': nsr_values,
                 'tau_3_long': tau,
-                'R_long': derive_r_long(tau),
+                'R_long': derive_r_long(isolated_r_long_per_week, tau),
             }
             for tau in unique_long_taus(sp)
         ]
