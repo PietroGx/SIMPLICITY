@@ -51,9 +51,9 @@ import simplicity.tuning.evolutionary_rate as er
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    SCENARIOS, TAU_ROUND, USER_FIXED_PARAMS, DEFAULT_COLORS,
-    LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME, derive_scenario_params, read_nsr_ranges,
-    add_slurm_resource_args, set_slurm_resource_env,
+    TAU_ROUND, DEFAULT_COLORS, LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME,
+    lookup_long_nsr, build_cal2_scenario_groups, build_cal2_settings,
+    read_nsr_ranges, add_slurm_resource_args, set_slurm_resource_env,
 )
 
 # =============================================================================
@@ -131,53 +131,13 @@ def compute_long_nsr_per_tau(long_calib_exp, target_osr_long,
     return long_nsr_by_tau
 
 
-def lookup_long_nsr(long_nsr_by_tau, tau_3_long):
-    """Exact (rounded) match lookup. Raises on miss -- never silently guesses."""
-    key = round(float(tau_3_long), TAU_ROUND)
-    if key not in long_nsr_by_tau:
-        raise KeyError(
-            f"No calibrated long NSR for tau_3_long={key}. "
-            f"Available keys: {sorted(long_nsr_by_tau.keys())}. "
-            f"Check that the scenario tau matches the calibration experiment.")
-    return long_nsr_by_tau[key]
-
-
 # =============================================================================
 # STAGE 2 -- standard NSR calibrated in-context (mixed population)
+# ----------------------------------------------------------------------------
+# Scenario-group construction (build_cal2_scenario_groups/build_cal2_settings)
+# lives in impact_long_shedders_config.py; this script only reads back what
+# it submitted.
 # =============================================================================
-def build_scenario_groups(nsr_ranges, long_nsr_by_tau, sp):
-    """
-    One group dict per scenario: its own nucleotide_substitution_rate sweep
-    (list -> the group's local varying axis) plus its fixed tau_3_long/
-    long_shedders_ratio/R_long/sequence_long_shedders/long-NSR overrides.
-    """
-    scenario_groups = []
-    scenarios_frozen = []
-
-    for scenario in SCENARIOS:
-        frozen = derive_scenario_params(scenario, sp)
-        scenarios_frozen.append(frozen)
-
-        name = frozen["scenario_name"]
-        r = nsr_ranges[name]
-        nsr_list = np.logspace(np.log10(r['min']), np.log10(r['max']), r['steps']).tolist()
-
-        group = {
-            "long_shedders_ratio": frozen["long_shedders_ratio"],
-            "tau_3_long": frozen["tau_3_long"],
-            "R_long": frozen["R_long"],
-            "sequence_long_shedders": frozen["sequence_long_shedders"],
-            "nucleotide_substitution_rate": [float(x) for x in nsr_list],
-        }
-        if frozen["is_long"]:
-            group["nucleotide_substitution_rate_long"] = lookup_long_nsr(
-                long_nsr_by_tau, frozen["tau_3_long"])
-
-        scenario_groups.append(group)
-
-    return scenario_groups, scenarios_frozen
-
-
 def compute_standard_nsr_per_scenario(numbered, scenarios_frozen, target_osr_std,
                                       model_type='exp', min_seq=30, min_len=100):
     """
@@ -319,7 +279,6 @@ def main():
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
 
-    sp = sm.read_standard_parameters_values()
     nsr_ranges = read_nsr_ranges()['cal2_standard_nsr']
 
     # This pipeline always runs cal_1 -> cal_2 sequentially under the same
@@ -335,11 +294,8 @@ def main():
         model_type=args.model, min_seq=args.min_seq, min_len=args.min_len)
 
     # --- Build one group per scenario and submit ONE combined experiment ---
-    scenario_groups, scenarios_frozen = build_scenario_groups(nsr_ranges, long_nsr_by_tau, sp)
-
-    def settings_func():
-        varying_params = {'_scenario_groups': scenario_groups}
-        return (varying_params, USER_FIXED_PARAMS.copy(), args.seeds)
+    scenario_groups, scenarios_frozen = build_cal2_scenario_groups(nsr_ranges, long_nsr_by_tau)
+    settings_func = build_cal2_settings(scenario_groups, args.seeds)
 
     run_experiment_script(args.runner, args.exp_num, settings_func, STD_NSR_SWEEP_NAME)
     numbered = f"{STD_NSR_SWEEP_NAME}_#{args.exp_num}"
