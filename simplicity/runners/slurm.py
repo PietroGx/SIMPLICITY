@@ -103,17 +103,24 @@ def submit_simulations(experiment_name: str,
     # output_file = "/dev/null"
     # error_file  = "/dev/null"
         
-    max_runtime = "1-00:00:00"  # 1 day max runtime
-    
+    # Per-task resource request. Configurable via env var (set by the calling
+    # script from a --slurm-mem/--slurm-time CLI flag) rather than a function
+    # argument, so this doesn't touch the run_seeded_simulations(experiment_name,
+    # run_seeded_simulation) interface shared uniformly by serial/multiprocessing/
+    # slurm -- same pattern already used for SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM.
+    # Defaults below match every job ever submitted before this became configurable.
+    max_runtime = os.environ.get("SIMPLICITY_SLURM_TIME", "1-00:00:00")
+    mem_request = os.environ.get("SIMPLICITY_SLURM_MEM", "8G")
+
     # submit the job
     slurm_process = subprocess.run((args:=[
         # calls sbatch
         "sbatch" + get_platform_executable_extension(),
-        # to create the job array on hold 
-        f"--array={batch_start}-{batch_end}", 
+        # to create the job array on hold
+        f"--array={batch_start}-{batch_end}",
         "--hold",
         f"--time={max_runtime}",
-        "--mem=8G",
+        f"--mem={mem_request}",
         # with a name (used later for lookup)
         f"--job-name={experiment_name}",
         f"--output={output_file}",  # Specify the output file path

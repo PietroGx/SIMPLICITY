@@ -31,7 +31,9 @@ import argparse
 import pandas as pd
 
 from experiment_script_runner import run_experiment_script
-from impact_long_shedders_config import USER_FIXED_PARAMS
+from impact_long_shedders_config import (
+    USER_FIXED_PARAMS, add_slurm_resource_args, set_slurm_resource_env,
+)
 
 EXP_NAME = "impact_long_shedders"
 
@@ -141,7 +143,10 @@ def main():
                         choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
     parser.add_argument('--only', type=str, default=None,
                         help="Optional: run only this scenario_name.")
+    add_slurm_resource_args(parser)
     args = parser.parse_args()
+
+    set_slurm_resource_env(args.slurm_mem, args.slurm_time)
 
     table_path = default_table_path(args.exp_num)
     df = load_calibration_table(table_path)

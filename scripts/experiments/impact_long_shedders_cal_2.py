@@ -53,6 +53,7 @@ from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
     SCENARIOS, TAU_ROUND, USER_FIXED_PARAMS, DEFAULT_COLORS,
     LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME, derive_scenario_params, read_nsr_ranges,
+    add_slurm_resource_args, set_slurm_resource_env,
 )
 
 # =============================================================================
@@ -313,7 +314,10 @@ def main():
                         help="Min sequences to keep a seed.")
     parser.add_argument('--min-len', type=int, default=100,
                         help="Min simulation length (days) to keep a seed.")
+    add_slurm_resource_args(parser)
     args = parser.parse_args()
+
+    set_slurm_resource_env(args.slurm_mem, args.slurm_time)
 
     sp = sm.read_standard_parameters_values()
     nsr_ranges = read_nsr_ranges()['cal2_standard_nsr']
