@@ -44,13 +44,19 @@ def run_experiment_script(runner:str,
     print('##########################################')
     print('')
     try:
-        run_experiment(f'{experiment_name}_#{experiment_number}', 
-                       user_set_experiment_settings,             
+        run_experiment(f'{experiment_name}_#{experiment_number}',
+                       user_set_experiment_settings,
                        simplicity_runner  = runner_module,
                        archive_experiment = False)
     except Exception as e:
+        # Re-raise instead of swallowing: a caller several stages downstream
+        # (e.g. a calibration fit, or the next pipeline stage) would otherwise
+        # proceed against data that was never actually produced -- silently
+        # printing "COMPLETED" regardless of whether anything ran -- and fail
+        # later with a confusing, unrelated-looking error instead of this one.
         print(f'The simulation failed to run: {e}')
-        
+        raise
+
     print('')
     print(f'{experiment_name} #{experiment_number} -- COMPLETED.')
     print('##########################################')

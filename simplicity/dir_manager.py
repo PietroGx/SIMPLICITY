@@ -35,12 +35,18 @@ _data_dir = DEFAULT_DATA_DIR
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(10)
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(500)
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
-# Per-task SLURM resource request defaults (2G/1 day, from real sacct data on
-# the isolated long-NSR calibration grid -- see impact_long_shedders_config).
+# Per-task SLURM resource request defaults (2G/2 days). Memory is from real
+# sacct data on the isolated long-NSR calibration grid -- see
+# impact_long_shedders_config. Time was bumped from 1 day after that same
+# grid showed some high-R_long tau groups (e.g. edge_case) still running
+# past the old 1-day walltime and getting killed mid-simulation (see
+# simplicity.runners.slurm.reconcile_terminated_tasks, which now detects and
+# signals that case regardless, but avoiding the kill in the first place is
+# still better when a day's headroom is cheap to give).
 # CLI scripts that expose --slurm-mem/--slurm-time overwrite these with the
 # user's chosen value before submitting; this is just the baseline.
 os.environ["SIMPLICITY_SLURM_MEM"] = "2G"
-os.environ["SIMPLICITY_SLURM_TIME"] = "1-00:00:00"
+os.environ["SIMPLICITY_SLURM_TIME"] = "2-00:00:00"
 
 def set_data_dir(path):
     """Set the data directory path."""

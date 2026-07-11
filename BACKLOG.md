@@ -112,8 +112,41 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 
 ## Bug Fixes
 
-- [ ] Slurm runner gets stuck on abrupt job terminations (e.g. OOM or OOT): the
-      job is not reported as failed and the runner does not submit a new job.
+- [x] **Slurm runner gets stuck on abrupt job terminations (e.g. OOM or OOT)**
+      — fixed: root-caused via a real HPC run (`impact_long_shedders_calibration_lng_nsr_#1`,
+      `edge_case` tau group) using the new `[long-running]` monitor report
+      itself, which showed a task's progress snapshot frozen unchanged for
+      30+ hours. A Slurm walltime/memory kill terminates job()'s process
+      directly, so its `except` block never runs and `.completed`/`.failed`
+      never gets touched — the task stays "started" forever,
+      `poll_simulations_status`'s `left` count never reaches 0 for it, and
+      the polling loop could only exit via the unrelated, previously
+      silently-swallowed `release_simulations` "no held task" exception (see
+      below). Fixed with `reconcile_terminated_tasks` (new): periodically
+      (`RECONCILE_INTERVAL_S`, 15 min) cross-checks `.started`-but-unresolved
+      tasks against `sacct` (which retains terminal-state history after a
+      job leaves `squeue`, unlike `squeue` itself) via the job-ID mapping
+      files `job()` already wrote but nothing previously read, and touches
+      `.failed` on Slurm's behalf for any task Slurm reports as
+      `TIMEOUT`/`OUT_OF_MEMORY`/`CANCELLED`/etc.
+- [x] **`release_simulations` false "no held task" exception, silently
+      swallowed by the pipeline** — fixed as two related bugs found analyzing
+      the same HPC run: (1) once every task has been released at least once,
+      zombie/stuck tasks (see above) inflate `status.left` without inflating
+      `status.pending`, so the polling loop keeps computing `n > 0` and
+      calling `release_simulations` long after there's nothing left to
+      release — its own on-disk scan correctly finds nothing, but it still
+      unconditionally queried `squeue` and raised once the (finished/aged-out)
+      array job no longer appeared there. Fixed: `release_simulations`
+      returns immediately when its own scan finds nothing to release, before
+      ever touching `squeue`. (2) `experiment_script_runner.run_experiment_script`
+      caught *any* exception from a stage (this one included) and printed
+      "COMPLETED" regardless, so real failures — this one, and separately a
+      genuine `sbatch: Unable to contact slurm controller` outage observed in
+      the same run — were invisible until an unrelated downstream stage
+      crashed with a confusing secondary error several steps later. Fixed:
+      it now re-raises after printing, aborting the pipeline immediately at
+      the actual point of failure.
 
 ------------------------------------------------------------------------
 
