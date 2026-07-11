@@ -373,15 +373,19 @@ def read_nsr_ranges():
 # argument, so it never has to touch the run_seeded_simulations(...) interface
 # shared uniformly by the serial/multiprocessing/slurm runner modules.
 #
-# The baseline default (2G/1 day) is set exactly once, in
+# The baseline default (2G/2 days) is set exactly once, in
 # simplicity.dir_manager, alongside every other simplicity-wide env var --
 # not redefined here, so there's a single literal source for it. 2G was set
 # from real sacct data on the isolated long-NSR calibration grid
 # (population_size=1000, final_time=1200): MaxRSS ranged 0.29-0.45G across
 # all 36 grid points -- real headroom over that, well below the old blanket
-# 8G every job used to request regardless of actual need. Time limit stays
-# at 1 day: observed elapsed time (up to ~88 min) has even more headroom
-# already, and unlike memory there's no cost to leaving it generous.
+# 8G every job used to request regardless of actual need. Time limit was
+# bumped from 1 day to 2: some high-R_long tau groups (e.g. edge_case, whose
+# derived R_long via CAL1_R_LONG_WEEKLY_RATE runs well past 1 day of
+# wall-clock time to reach final_time) were getting killed by the walltime
+# mid-simulation -- see simplicity.runners.slurm.reconcile_terminated_tasks,
+# which now detects and signals that case regardless, but giving cheap extra
+# headroom avoids the kill (and the wasted compute) in the first place.
 # =============================================================================
 def add_slurm_resource_args(parser):
     """Add --slurm-mem/--slurm-time to an argparse parser (shared wiring so

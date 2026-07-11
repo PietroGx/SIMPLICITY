@@ -43,6 +43,17 @@ Kown bugs:
    In this case, manually cleaning Slurm (hint: squeue) and the Data directory
    (removing or archiving the experiment folder) is highly recommanded before retrying.
 
+3. A task killed directly by Slurm (walltime/--time or memory/--mem limit)
+   never gets a chance to run job()'s except block and touch .failed itself
+   -- the process is just terminated. Left unresolved, poll_simulations_status
+   would count that task as permanently "left" and run_seeded_simulations'
+   polling loop would never see status.left reach 0. Handled by
+   reconcile_terminated_tasks, called periodically (RECONCILE_INTERVAL_S)
+   from run_seeded_simulations: it cross-checks .started-but-unresolved tasks
+   against `sacct` (which retains terminal-state history after a job leaves
+   squeue) and touches .failed on Slurm's behalf for any task Slurm reports
+   as TIMEOUT/OUT_OF_MEMORY/CANCELLED/etc.
+
 """
 import typing, os, json, pathlib, subprocess, platform
 import simplicity.dir_manager as dm
@@ -56,6 +67,24 @@ LONG_RUNNING_REPORT_INTERVAL_S = 3600
 # How long a simulation must have been running (since its .started signal)
 # before it's included in that report.
 LONG_RUNNING_THRESHOLD_S = 3600
+
+# How often (seconds) run_seeded_simulations' polling loop reconciles
+# .started-but-unresolved tasks against Slurm's own accounting (sacct). This
+# is what unblocks a run stuck on an externally-killed task (see
+# reconcile_terminated_tasks below) -- unlike the purely-informational
+# LONG_RUNNING_REPORT above, so it runs on its own, shorter timer.
+RECONCILE_INTERVAL_S = 900
+
+# sacct job states that mean "Slurm itself terminated this task" -- i.e. the
+# task's own process never got a chance to touch .completed/.failed (job()'s
+# except block only runs on a catchable Python exception, not a SIGTERM/
+# SIGKILL from Slurm hitting --time/--mem). RUNNING/PENDING/COMPLETING are
+# deliberately excluded (still in flight); COMPLETED is excluded too (job()
+# should have already touched .completed itself in that case).
+SLURM_TERMINAL_FAILURE_STATES = {
+    "TIMEOUT", "OUT_OF_MEMORY", "FAILED", "NODE_FAIL", "CANCELLED",
+    "DEADLINE", "PREEMPTED", "BOOT_FAIL",
+}
 
 class SimulationsStatus(typing.NamedTuple):
     total    : int
@@ -227,6 +256,112 @@ def report_long_running_simulations(experiment_name, threshold_seconds=LONG_RUNN
               f"infected={snapshot.get('infected')}")
 
 
+def _build_slurm_id_map_index(experiment_name):
+    """Reverse-index job()'s slurm_id_map_dir CSV files (job()-written, never
+    previously read): {seeded_simulation_parameters_path: (job_id, task_id)}.
+    Filenames are "{experiment_name}_{job_id}_{task_id}.csv"; content is the
+    seeded_simulation_parameters_path itself."""
+    index = {}
+    map_dir = pathlib.Path(dm.get_slurm_id_map_dir(experiment_name))
+    prefix = f"{experiment_name}_"
+    for map_file in map_dir.glob(f"{prefix}*.csv"):
+        # "{experiment_name}_{job_id}_{task_id}" -> split off the prefix, then
+        # the remaining "{job_id}_{task_id}" splits on the last underscore.
+        stem = map_file.stem[len(prefix):]
+        job_id, _, task_id = stem.rpartition("_")
+        if not job_id:
+            continue
+        try:
+            path = map_file.read_text().strip()
+        except OSError:
+            continue
+        if path:
+            index[path] = (job_id, task_id)
+    return index
+
+
+def reconcile_terminated_tasks(experiment_name):
+    """
+    Find every seeded simulation with a .started signal but no .completed/
+    .failed, and check Slurm's own accounting (sacct) for whether Slurm
+    itself already killed that task (TIMEOUT/OUT_OF_MEMORY/CANCELLED/...).
+
+    This exists because job()'s try/except (simplicity.runners.slurm.job,
+    above) can only touch .failed on a catchable Python exception -- a Slurm
+    walltime or memory kill terminates the process directly, so job() never
+    gets to run its except block, and that task would otherwise stay
+    "started" forever. poll_simulations_status's `left` count then never
+    reaches 0 for it, and run_seeded_simulations' polling loop can only exit
+    through the unrelated (and previously silently-swallowed) "no held task"
+    exception in release_simulations -- see the module Kown bugs note. Unlike
+    a live task's own job() process, sacct retains terminal-state history
+    after a job leaves squeue, so it's the only reliable place to check this
+    from outside the (now-dead) task's own process.
+
+    Any task confirmed terminated by Slurm gets .failed touched on its
+    behalf, with a note explaining it was an externally-detected kill (not a
+    Python-level failure) -- this is what actually unblocks the polling loop.
+    """
+    seeded_simulation_parameters = sm.get_seeded_simulation_parameters_paths(experiment_name)
+    stuck_paths = []
+    for seeded_simulation_parameters_path in seeded_simulation_parameters:
+        signal_started_path   = seeded_simulation_parameters_path + ".started"
+        signal_completed_path = seeded_simulation_parameters_path + ".completed"
+        signal_failed_path    = seeded_simulation_parameters_path + ".failed"
+        if not pathlib.Path(signal_started_path).exists():
+            continue
+        if pathlib.Path(signal_completed_path).exists() or pathlib.Path(signal_failed_path).exists():
+            continue
+        stuck_paths.append(seeded_simulation_parameters_path)
+
+    if not stuck_paths:
+        return
+
+    id_index = _build_slurm_id_map_index(experiment_name)
+
+    # Group stuck paths by Slurm array job id, so each distinct job id is
+    # queried via sacct exactly once (normally there's only one, but nothing
+    # here assumes that).
+    by_job_id = {}
+    unmapped = []
+    for path in stuck_paths:
+        ids = id_index.get(path)
+        if ids is None:
+            # job() hasn't written its map file yet (narrow window right
+            # after .started, before the map file write) -- not stuck, just
+            # not checkable yet. Skip silently; it'll be found on a later pass.
+            unmapped.append(path)
+            continue
+        job_id, task_id = ids
+        by_job_id.setdefault(job_id, {})[f"{job_id}_{task_id}"] = path
+
+    for job_id, task_id_to_path in by_job_id.items():
+        sacct_process = subprocess.run([
+            "sacct" + get_platform_executable_extension(),
+                "-j", job_id, "--format=JobID,State", "--noheader", "--parsable2", "-X",
+        ], stdout=subprocess.PIPE)
+        if sacct_process.returncode != 0:
+            # sacct itself unreachable/erroring -- try again on the next
+            # reconcile pass rather than guessing at these tasks' state now.
+            continue
+
+        for line in sacct_process.stdout.decode().splitlines():
+            if "|" not in line:
+                continue
+            sacct_job_id, state = line.split("|", maxsplit=1)
+            sacct_job_id = sacct_job_id.strip()
+            path = task_id_to_path.get(sacct_job_id)
+            if path is None:
+                continue
+            # sacct states can carry a suffix, e.g. "CANCELLED by 12345".
+            state = state.strip().split()[0] if state.strip() else state.strip()
+            if state in SLURM_TERMINAL_FAILURE_STATES:
+                pathlib.Path(path + ".failed").touch()
+                name = os.path.basename(path)
+                print(f"[reconciled] {name}: Slurm reports {state} -- "
+                     f"marking .failed (task never signaled itself)")
+
+
 def release_simulations(experiment_name, n: int):
     # get the seeded simulation parameters files paths
     seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
@@ -240,7 +375,20 @@ def release_simulations(experiment_name, n: int):
             i_th_seeds[i_th_seed] = seeded_simulation_parameters_path
         if len(i_th_seeds) >= n:
             break
-        
+
+    if not i_th_seeds:
+        # Nothing actually needs releasing right now. This happens once
+        # every task has already been released at least once, while `n` (the
+        # caller's estimate of remaining capacity) can still come out > 0
+        # because status.left also counts tasks stuck on an externally-killed
+        # Slurm task that hasn't been reconciled yet (see
+        # reconcile_terminated_tasks) -- those inflate `left` without
+        # inflating `pending`. Querying squeue here would be pointless (nothing
+        # to release) and, once the whole array job has aged out of squeue's
+        # listing, would incorrectly raise "no held task" for a totally benign
+        # state. Just return; the reconciler is what actually clears this up.
+        return
+
     # slurm find array job id from job name
     slurm_process = subprocess.run([
         "squeue" + get_platform_executable_extension(),
@@ -285,6 +433,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
     # loop until no simulation left to release
     last_status  = None
     last_long_running_report = time.time()
+    last_reconcile = time.time()
     while (status := poll_simulations_status(experiment_name)).left > 0:
         # print if status changed or after 17 seconds
         if last_status != status or (time.time() - last_printed) > 17.:
@@ -297,6 +446,14 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
         n = min(status.left - status.pending, SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM - status.pending - status.running)
         if n:
             release_simulations(experiment_name, n)
+
+        # periodically reconcile .started-but-unresolved tasks against
+        # Slurm's own accounting -- this is what unblocks a run stuck on a
+        # task Slurm killed externally (walltime/OOM) without ever getting a
+        # chance to touch .completed/.failed itself.
+        if (time.time() - last_reconcile) >= RECONCILE_INTERVAL_S:
+            reconcile_terminated_tasks(experiment_name)
+            last_reconcile = time.time()
 
         # once an hour, report the internal state of any simulation that's
         # been running for more than an hour (time/final_time, infected count)

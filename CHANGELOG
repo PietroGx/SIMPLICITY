@@ -5,6 +5,61 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.7 — 2026-07-09 — pietro gerletti
+
+Root-caused and fixed why `impact_long_shedders_calibration_lng_nsr_#1`
+never actually completed cleanly across two separate HPC runs, both
+reported as "COMPLETED" regardless.
+
+* Diagnosed using the 2.4.3 monitor feature itself: the `[long-running]`
+  report showed a task's progress snapshot frozen at the exact same value
+  for 30+ consecutive hourly checks -- the process was dead, but nothing
+  had signaled it.
+* simplicity/runners/slurm.py: a Slurm walltime/memory kill terminates
+  job()'s process directly, so its except block never runs and
+  .completed/.failed never gets touched -- that task stays "started"
+  forever and poll_simulations_status's `left` count can never reach 0 for
+  it. New reconcile_terminated_tasks(experiment_name), called periodically
+  (RECONCILE_INTERVAL_S, 15 min) from run_seeded_simulations: cross-checks
+  .started-but-unresolved tasks against `sacct` (retains terminal-state
+  history after a job leaves squeue, unlike squeue itself) via the
+  job-ID-mapping files job() already wrote but nothing previously read, and
+  touches .failed on Slurm's behalf for any task Slurm reports as
+  TIMEOUT/OUT_OF_MEMORY/CANCELLED/etc.
+* Those stuck tasks were also the reason release_simulations' "no held
+  task" exception ever fired: they inflate status.left without inflating
+  status.pending, so the polling loop kept computing n>0 and calling
+  release_simulations long after everything had already been released once
+  -- its own on-disk scan correctly found nothing to release, but it still
+  unconditionally queried squeue and raised once the finished/aged-out
+  array job no longer appeared there. Fixed: release_simulations now
+  returns immediately when its own scan finds nothing to release.
+* scripts/experiments/experiment_script_runner.py: run_experiment_script
+  caught any exception from a stage and printed "COMPLETED" regardless --
+  both of the above, and separately a genuine `sbatch: Unable to contact
+  slurm controller` outage observed in the same HPC run, were invisible
+  until an unrelated downstream stage crashed with a confusing secondary
+  error several steps later. Now re-raises after printing, aborting the
+  pipeline immediately at the actual point of failure.
+* Verified locally (no SLURM access from here): synthetic .started signals
+  + job-ID-mapping files + a stubbed `sacct` response confirming
+  reconcile_terminated_tasks marks exactly the TIMEOUT task's .failed and
+  leaves a RUNNING/already-.completed task untouched; confirmed
+  release_simulations never touches squeue when its scan finds nothing to
+  release (and still releases normally when there's real work to do);
+  confirmed run_experiment_script now propagates a stubbed failure instead
+  of swallowing it.
+* `--exp-num 1`'s existing data (both the 10-seed and 25-seed attempts) is
+  unusable -- neither actually completed; rerun from a clean experiment
+  directory once these fixes are in place.
+* SIMPLICITY_SLURM_TIME's baseline default bumped 1 day -> 2 days
+  (simplicity/dir_manager.py): the same high-R_long tau groups above were
+  getting killed by the walltime mid-simulation; reconcile_terminated_tasks
+  now handles that gracefully regardless, but giving cheap extra headroom
+  avoids the kill (and the wasted compute) in the first place.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.6 — 2026-07-07 — pietro gerletti
 
 Config/pipeline separation: config.py builds parameter settings, the three
