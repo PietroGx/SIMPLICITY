@@ -156,7 +156,7 @@ def unique_long_taus(sp):
 # section above) -- deliberately different from sp['R_long'] (production's
 # default). NOT itself a simulation parameter: only ever fed through
 # derive_r_long, below, to get the actual per-tau_3_long-group R_long.
-CAL1_R_LONG_WEEKLY_RATE = 1.5
+CAL1_R_LONG_WEEKLY_RATE = 1.1
 
 CAL1_ISOLATED_FIXED_PARAMS = {
     "long_shedders_ratio": 1.0,
