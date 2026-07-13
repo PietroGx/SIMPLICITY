@@ -86,6 +86,18 @@ SLURM_TERMINAL_FAILURE_STATES = {
     "DEADLINE", "PREEMPTED", "BOOT_FAIL",
 }
 
+# Launch-failure retry/reconciliation -- distinct from reconcile_terminated_tasks
+# above: applies to tasks that never reached job() at all (Slurm failed to
+# launch them on their assigned node and auto-requeued them into a held
+# state, e.g. squeue reason "(launch failed requeued held)"). Checked more
+# often than the OOT/OOM reconciliation since a re-release is cheap and the
+# whole point is prompt recovery from what's usually a transient node issue.
+LAUNCH_FAILURE_RECONCILE_INTERVAL_S = 120
+LAUNCH_FAILURE_MAX_RETRIES = 3
+# Substring match against squeue's free-text Reason column (case-insensitive)
+# -- Slurm doesn't expose this as a stable enum the way job State is.
+LAUNCH_FAILURE_REASON_MARKERS = ("launch failed",)
+
 class SimulationsStatus(typing.NamedTuple):
     total    : int
     submitted: int
@@ -362,6 +374,91 @@ def reconcile_terminated_tasks(experiment_name):
                      f"marking .failed (task never signaled itself)")
 
 
+def reconcile_launch_failures(experiment_name):
+    """
+    Detect tasks Slurm auto-requeued into a held state after failing to
+    launch them (e.g. squeue reason "(launch failed requeued held)") --
+    distinct from reconcile_terminated_tasks above: these tasks never
+    reached job() at all (no .started signal), so there's no job-ID mapping
+    file to look them up by either (job() only writes that after .started).
+    Array task IDs map directly (1-based) to
+    sm.get_seeded_simulation_parameters_paths' order instead -- the same
+    mapping submit_simulations/job() already rely on.
+
+    Re-releases each affected task up to LAUNCH_FAILURE_MAX_RETRIES times
+    (tracked via an on-disk retry counter, same "<path>.xyz" signal
+    convention as everything else here); past that, marks it .failed so the
+    polling loop stops waiting on it indefinitely.
+    """
+    seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
+
+    # Candidates: already released once (Slurm tried to launch it) but never
+    # started.
+    candidates = {}  # 1-based array task id -> path
+    for i_th_seed, path in enumerate(seeded_simulation_parameters_paths):
+        if (pathlib.Path(path + ".released").exists()
+                and not pathlib.Path(path + ".started").exists()):
+            candidates[i_th_seed + 1] = path
+
+    if not candidates:
+        return
+
+    squeue_process = subprocess.run([
+        "squeue" + get_platform_executable_extension(),
+            "--name", experiment_name,
+            "--Format=ArrayJobID,ArrayTaskID,Reason", "--noheader",
+    ], stdout=subprocess.PIPE)
+    if squeue_process.returncode != 0:
+        # squeue itself unreachable/erroring -- try again on the next pass.
+        return
+
+    to_release = {}  # "{job_id}_{task_id}" -> (path, current retry count)
+    for line in squeue_process.stdout.decode().splitlines():
+        parts = line.split(None, 2)
+        if len(parts) < 3:
+            continue
+        job_id, task_id_str, reason = parts
+        try:
+            task_id = int(task_id_str)
+        except ValueError:
+            continue
+        path = candidates.get(task_id)
+        if path is None:
+            continue
+        if not any(marker in reason.lower() for marker in LAUNCH_FAILURE_REASON_MARKERS):
+            continue
+
+        retry_path = pathlib.Path(path + ".launch_retries")
+        retries = int(retry_path.read_text()) if retry_path.exists() else 0
+        name = os.path.basename(path)
+
+        if retries >= LAUNCH_FAILURE_MAX_RETRIES:
+            pathlib.Path(path + ".failed").touch()
+            print(f"[reconciled] {name}: launch failed {retries} times "
+                 f"(Slurm reason: {reason.strip()}) -- giving up, marking .failed")
+            continue
+
+        to_release[f"{job_id}_{task_id}"] = (path, retries)
+
+    if not to_release:
+        return
+
+    job_list = ",".join(to_release.keys())
+    scontrol_process = subprocess.run([
+        "scontrol" + get_platform_executable_extension(),
+            "release", job_list
+    ])
+    if scontrol_process.returncode != 0:
+        print(f"[reconciled] scontrol release failed for launch-failed tasks: {job_list}")
+        return
+
+    for path, retries in to_release.values():
+        pathlib.Path(path + ".launch_retries").write_text(str(retries + 1))
+        name = os.path.basename(path)
+        print(f"[reconciled] {name}: launch failed, re-released "
+             f"(attempt {retries + 1}/{LAUNCH_FAILURE_MAX_RETRIES})")
+
+
 def release_simulations(experiment_name, n: int):
     # get the seeded simulation parameters files paths
     seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
@@ -434,6 +531,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
     last_status  = None
     last_long_running_report = time.time()
     last_reconcile = time.time()
+    last_launch_failure_reconcile = time.time()
     while (status := poll_simulations_status(experiment_name)).left > 0:
         # print if status changed or after 17 seconds
         if last_status != status or (time.time() - last_printed) > 17.:
@@ -454,6 +552,13 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
         if (time.time() - last_reconcile) >= RECONCILE_INTERVAL_S:
             reconcile_terminated_tasks(experiment_name)
             last_reconcile = time.time()
+
+        # periodically reconcile tasks Slurm auto-requeued into a held state
+        # after a launch failure -- these never reach .started at all, so
+        # reconcile_terminated_tasks above never sees them.
+        if (time.time() - last_launch_failure_reconcile) >= LAUNCH_FAILURE_RECONCILE_INTERVAL_S:
+            reconcile_launch_failures(experiment_name)
+            last_launch_failure_reconcile = time.time()
 
         # once an hour, report the internal state of any simulation that's
         # been running for more than an hour (time/final_time, infected count)
