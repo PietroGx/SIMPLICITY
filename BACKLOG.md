@@ -147,6 +147,22 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
       crashed with a confusing secondary error several steps later. Fixed:
       it now re-raises after printing, aborting the pipeline immediately at
       the actual point of failure.
+- [ ] **Tasks that fail to launch (Slurm auto-requeues them held, e.g.
+      squeue reason "launch failed requeued held") are never detected or
+      resolved.** Observed live on `--exp-num 2`: 4 array tasks stuck `PD`
+      with that reason. Distinct from the OOT/OOM case above --
+      `reconcile_terminated_tasks` only looks at tasks that reached `job()`
+      (have a `.started` signal); these never did, so there's no job-ID
+      mapping file either (that's written by `job()` itself, after
+      `.started`). Needs its own detection path: periodically check
+      `.submitted`+`.released`-but-never-`.started` tasks against
+      `squeue`/`sacct` for a stuck/held launch-failure state (array task ID
+      maps directly, 1-based, to `sm.get_seeded_simulation_parameters_paths`'
+      order -- same mapping `submit_simulations`/`job()` already rely on, no
+      job-ID file needed for this case), then either re-`scontrol release`
+      a bounded number of times or mark `.failed` so the polling loop
+      doesn't wait on it forever. Worked around manually for `--exp-num 2`
+      by releasing/failing the specific stuck task IDs by hand.
 
 ------------------------------------------------------------------------
 
