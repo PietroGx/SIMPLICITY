@@ -5,6 +5,39 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.8 — 2026-07-09 — pietro gerletti
+
+Follow-up to 2.4.7: also recover from Slurm launch failures, not just
+OOT/OOM kills.
+
+* Observed live on `--exp-num 2`: 4 array tasks stuck `PD` with squeue
+  reason "(launch failed requeued held)" -- Slurm failed to launch them on
+  their assigned node and auto-requeued them into a held state. Distinct
+  from the OOT/OOM case fixed in 2.4.7: these tasks never reach job() at
+  all, so there's no `.started` signal for reconcile_terminated_tasks to
+  key off, and no job-ID mapping file either (job() only writes that after
+  .started).
+* New reconcile_launch_failures(experiment_name) in simplicity/runners/slurm.py,
+  called every 2 minutes (LAUNCH_FAILURE_RECONCILE_INTERVAL_S) from
+  run_seeded_simulations -- shorter than the 15-min OOT/OOM reconciler since
+  a re-release is cheap and prompt recovery matters for what's usually a
+  transient node issue. Finds .released-but-never-.started tasks, maps
+  array task ID directly (1-based) to
+  sm.get_seeded_simulation_parameters_paths' order (the same mapping
+  submit_simulations/job() already rely on), matches squeue's free-text
+  Reason column against "launch failed", and either re-scontrol-releases it
+  (tracked via an on-disk .launch_retries counter, up to
+  LAUNCH_FAILURE_MAX_RETRIES=3 attempts) or marks .failed once retries are
+  exhausted.
+* Verified locally: synthetic .released-without-.started tasks + a stubbed
+  squeue response confirming an under-limit task gets re-released with its
+  retry count incremented, an at-limit task gets marked .failed instead of
+  re-released again, a task with an unrelated pending reason is left
+  untouched, and an already-started task is never even considered a
+  candidate (no subprocess call at all in that case).
+
+------------------------------------------------------------------------
+
 ## Version 2.4.7 — 2026-07-09 — pietro gerletti
 
 Root-caused and fixed why `impact_long_shedders_calibration_lng_nsr_#1`
