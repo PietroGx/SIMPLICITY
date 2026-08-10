@@ -326,7 +326,7 @@ NSR_RANGES_FILENAME = "impact_long_shedders_nsr_ranges.json"
 _DEFAULT_NSR_STEPS = 10
 
 DEFAULT_NSR_RANGES = {
-    "cal1_long_nsr": {"min": 0.0005, "max": 0.05, "steps": _DEFAULT_NSR_STEPS},
+    "cal1_long_nsr": {"min": 0.0005, "max": 0.005, "steps": _DEFAULT_NSR_STEPS},
     "cal2_standard_nsr": {
         "control":   {"min": 3e-05, "max": 5e-04, "steps": _DEFAULT_NSR_STEPS},
         "SOT":       {"min": 1e-05, "max": 1e-04, "steps": _DEFAULT_NSR_STEPS},

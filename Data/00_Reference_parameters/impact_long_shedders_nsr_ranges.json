@@ -1,7 +1,7 @@
 {
     "cal1_long_nsr": {
         "min": 0.0005,
-        "max": 0.05,
+        "max": 0.005,
         "steps": 10
     },
     "cal2_standard_nsr": {

@@ -5,6 +5,54 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.10 — 2026-08-10 — pietro gerletti
+
+Reviewing run #2/#3's calibration-fit plots (`Long-Shedder OSR Calibration`,
+`Standard NSR Calibration`) surfaced a real correctness bug behind the
+`impact_long_shedders_calibration_std_nsr_#2` scatter looking wrong: its
+x-axis was auto-scaled out to `1e12` because HIV_low's calibrated standard
+NSR came out as ~1.5e12 -- a physically meaningless value that was then
+written straight into `impact_long_shedders_HIV_low_#2`'s production
+parameters and run to completion without anyone (or anything) noticing.
+Same root cause as 2.4.7's `edge_case` OverflowError crash
+(`inverse_exp_regressor`'s `(OSR/A)**(1/B)` becoming numerically unstable
+for a poorly-conditioned exponential fit) -- it just didn't happen to
+overflow that time, so it silently proceeded instead of crashing.
+
+* simplicity/tuning/evolutionary_rate.py: new `NSR_SANITY_MAX = 1.0`,
+  enforced inside `compute_calibrated_parameter` -- the single funnel every
+  model type (lin/log/exp/tan) already goes through. Catches both failure
+  shapes as the same clear `ValueError` (model type, target OSR, and fit
+  params included): a finite-but-nonphysical blowup (the actual HIV_low
+  case) is rejected outright; a raw `OverflowError` (2.4.7's edge_case
+  crash shape) is now also caught and re-raised with the same message
+  instead of leaking `(34, 'Numerical result out of range')`. Both of
+  impact_long_shedders_cal_2.py's production-path calls (Stage 1 long-NSR-
+  per-tau, Stage 2 std-NSR-per-scenario -- the two that feed the frozen
+  calibration table impact_long_shedders_exp.py reads) are unguarded by any
+  try/except, so this propagates straight up, exits non-zero, and the
+  pipeline's run_stage aborts immediately with a clear
+  `[FAILED] stage exited ...` instead of silently running production on
+  garbage.
+* Data/00_Reference_parameters/impact_long_shedders_nsr_ranges.json +
+  impact_long_shedders_config.DEFAULT_NSR_RANGES: `cal1_long_nsr` max
+  narrowed from 0.05 to 0.005. Both run #2 and run #3's calibration-fit
+  plots show the target-OSR crossing sitting at NSR~0.0011-0.0015
+  regardless of seed count (5 vs. 20); everything above ~0.01 was just
+  steep extrapolation past the crossing, so the grid's 10 steps now resolve
+  the region that actually matters instead of spending half of them 10-50x
+  past it.
+* simplicity/dir_manager.py: `SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM`
+  500 -> 200.
+* Verified locally (project conda env, synthetic lmfit fit results, no
+  cluster needed): a normal well-conditioned fit still returns its NSR
+  unaffected; a finite-blowup fit (reproducing the ~1.5e12 HIV_low shape)
+  and an overflow fit (reproducing the 2.4.7 edge_case shape) both now
+  raise the same clear ValueError instead of returning garbage or leaking a
+  raw OverflowError.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.9 — 2026-08-10 — pietro gerletti
 
 Diagnosed why `impact_long_shedders_pipeline_#3` never finished (comparing
