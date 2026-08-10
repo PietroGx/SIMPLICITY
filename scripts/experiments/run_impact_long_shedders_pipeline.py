@@ -21,6 +21,11 @@
 #   3. impact_long_shedders_exp.py    (production runs, one per scenario)
 #   4. submit_sanity_plot.sh          (one SLURM job per long-shedder
 #      scenario)
+#   5. Once every sanity-plot job has left Slurm's queue, the pipeline log,
+#      both calibration-fit plots, and every sanity plot are bundled into
+#      one zip at Data/pipeline_artifacts/impact_long_shedders_#{exp_num}_
+#      artifacts.zip -- a single place to review a run's outputs instead of
+#      hunting across per-experiment 05_Plots folders.
 #
 # Every stage keeps its own independently-runnable CLI; this script is a
 # thin sequencer that aborts immediately if any stage fails. All stage
@@ -40,6 +45,8 @@
 import os
 import re
 import sys
+import time
+import zipfile
 import argparse
 import subprocess
 from datetime import datetime
@@ -56,6 +63,9 @@ _NOISE_PATTERNS = [
     re.compile(r'^SimulationsStatus\('),
     re.compile(r'^submitted \d+ seeded simulations$'),
 ]
+
+_SBATCH_JOB_ID_RE = re.compile(r'Submitted batch job (\d+)')
+SANITY_PLOT_POLL_INTERVAL_S = 15
 
 
 def _is_slurm_monitor_noise(line):
@@ -124,6 +134,65 @@ def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh):
     return submitted
 
 
+def wait_for_sanity_plots(submitted, log_fh, poll_interval=SANITY_PLOT_POLL_INTERVAL_S):
+    """Block until every submitted sanity-plot job has left Slurm's queue,
+    so the plots actually exist on disk before archiving."""
+    job_ids = {}
+    for scenario, sbatch_out in submitted:
+        m = _SBATCH_JOB_ID_RE.search(sbatch_out)
+        if m:
+            job_ids[m.group(1)] = scenario
+
+    if not job_ids:
+        return
+
+    _log(log_fh, f"\nWaiting for {len(job_ids)} sanity plot job(s) to finish: "
+                f"{', '.join(job_ids)}")
+    while job_ids:
+        result = subprocess.run(
+            ["squeue", "-h", "-j", ",".join(job_ids), "-o", "%i"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        still_queued = set(result.stdout.split())
+        for jid in list(job_ids):
+            if jid not in still_queued:
+                _log(log_fh, f"  [done] sanity plot job {jid} ({job_ids.pop(jid)})")
+        if job_ids:
+            time.sleep(poll_interval)
+
+
+def artifacts_archive_path(exp_num):
+    return os.path.join(
+        "Data", "pipeline_artifacts", f"impact_long_shedders_#{exp_num}_artifacts.zip")
+
+
+def write_artifacts_archive(archive_path, exp_num, log_file, submitted):
+    """Bundle this run's log, both calibration-fit plots, and every
+    per-scenario sanity plot into one zip -- a single place to check a
+    run's outputs instead of hunting across per-experiment 05_Plots
+    folders. Missing files (e.g. a sanity plot that itself failed) are
+    skipped with a warning rather than aborting the archive."""
+    os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+
+    candidates = [log_file]
+    candidates.append(os.path.join(
+        "Data", f"{LONG_NSR_EXP_NAME}_#{exp_num}", "05_Plots",
+        f"{LONG_NSR_EXP_NAME}_#{exp_num}_long_nsr_calibration_fit.png"))
+    candidates.append(os.path.join(
+        "Data", f"{STD_NSR_SWEEP_NAME}_#{exp_num}", "05_Plots",
+        f"{STD_NSR_SWEEP_NAME}_#{exp_num}_std_nsr_calibration_fit.png"))
+    for scenario, _ in submitted:
+        exp_name = f"impact_long_shedders_{scenario}_#{exp_num}"
+        candidates.append(os.path.join(
+            "Data", exp_name, "05_Plots", f"{exp_name}_global_vs_intrahost.png"))
+
+    with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in candidates:
+            if os.path.isfile(path):
+                zf.write(path, arcname=os.path.basename(path))
+            else:
+                print(f"  [skip] artifact not found: {path}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run the full impact_long_shedders pipeline: cal_1 -> "
@@ -188,10 +257,12 @@ def main():
 
         submitted = submit_sanity_plots(
             args.exp_num, args.target_osr_std, args.target_osr_long, log_fh)
+        wait_for_sanity_plots(submitted, log_fh)
 
         table_path = os.path.join(
             "Data", f"impact_long_shedders_calibration_setup_data_#{args.exp_num}",
             "nsr_calibration_table.csv")
+        archive_path = artifacts_archive_path(args.exp_num)
         summary_lines = [
             "\n===== Pipeline summary =====",
             f"Frozen calibration table : {table_path}",
@@ -203,9 +274,16 @@ def main():
         for scenario, sbatch_out in submitted:
             summary_lines.append(f"  - {scenario}: {sbatch_out}")
         summary_lines.append(f"Full log: {log_file}")
+        summary_lines.append(f"Artifacts archive (log + calibration + sanity plots): "
+                            f"{archive_path}")
 
         for line in summary_lines:
             _log(log_fh, line)
+
+        # Archived last, after every summary line above is on disk, so the
+        # log copy bundled inside the zip is complete (including this run's
+        # own archive path) rather than missing its own tail.
+        write_artifacts_archive(archive_path, args.exp_num, log_file, submitted)
 
 
 if __name__ == "__main__":
