@@ -5,6 +5,41 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.9 — 2026-08-10 — pietro gerletti
+
+Diagnosed why `impact_long_shedders_pipeline_#3` never finished (comparing
+its log against a completed run, `#2`): the local driver process was
+silently disconnected mid-Phase-1, stranding an in-progress Slurm array job
+with no cal_2/exp/sanity-plot dispatch to follow it -- no traceback, no
+FAILED line, the log just stops mid-poll. Not a pipeline logic bug, but it
+exposed that a completed run's outputs were scattered across several
+per-experiment `05_Plots` folders with no single place to check them while
+testing. Added a final archiving step to close that gap.
+
+* run_impact_long_shedders_pipeline.py: new
+  wait_for_sanity_plots(submitted, log_fh), polling `squeue` (same idiom
+  simplicity/runners/slurm.py already uses) until every sanity-plot job
+  dispatched via submit_sanity_plot.sh has left the queue -- those jobs run
+  async via sbatch and don't exist on disk yet when submit_sanity_plots()
+  returns.
+* New write_artifacts_archive(...): bundles the pipeline log, both
+  calibration-fit plots (`*_long_nsr_calibration_fit.png`,
+  `*_std_nsr_calibration_fit.png`), and every per-scenario sanity plot
+  (`*_global_vs_intrahost.png`) into
+  `Data/pipeline_artifacts/impact_long_shedders_#{exp_num}_artifacts.zip`.
+  A missing file (e.g. a sanity-plot job that itself failed) is skipped
+  with a `[skip]` warning instead of aborting the archive. Archived last,
+  after the summary lines (including the archive's own path) are written
+  to the log, so the log copy bundled inside the zip is complete rather
+  than missing its own tail.
+* Verified locally (project conda env, no cluster needed): mocked `squeue`
+  responses confirm the poll loop waits across multiple checks per job and
+  exits once all have left the queue; a deliberately-missing sanity plot is
+  skipped with a warning rather than crashing the archive step; and the
+  zipped log includes its own final summary line.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.8 — 2026-07-09 — pietro gerletti
 
 Follow-up to 2.4.7: also recover from Slurm launch failures, not just
