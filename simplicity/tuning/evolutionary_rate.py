@@ -21,11 +21,14 @@ the functions to plot E (model nucleotide substitution rate) vs u (observed subs
 or vs any other simulation parameter.
 '''
 
-import sklearn.linear_model 
+import sklearn.linear_model
 import numpy as np
 import lmfit
 import simplicity.output_manager as om
 # from tqdm import tqdm
+
+# Upper bound on NSR.
+NSR_SANITY_MAX = 1.0
 
 def tempest_regression(sequencing_data_df):
     '''
@@ -289,4 +292,21 @@ def compute_calibrated_parameter(model_type, fit_result, target_osr):
     # fit_result.params is an lmfit Parameters object; values accessed via key lookups or .valuesdict()
     params_dict = fit_result.params.valuesdict()
 
-    return dispatch_map[model_type](target_osr, params_dict)
+    try:
+        nsr = dispatch_map[model_type](target_osr, params_dict)
+    except OverflowError as e:
+        raise ValueError(
+            f"Calibrated NSR overflowed ({e}) -- exceeds NSR_SANITY_MAX="
+            f"{NSR_SANITY_MAX} (model_type={model_type!r}, "
+            f"target_osr={target_osr!r}, fit params={params_dict!r}). "
+            "Refusing to return it."
+        ) from e
+
+    if nsr > NSR_SANITY_MAX:
+        raise ValueError(
+            f"Calibrated NSR {nsr!r} exceeds NSR_SANITY_MAX={NSR_SANITY_MAX} "
+            f"(model_type={model_type!r}, target_osr={target_osr!r}, "
+            f"fit params={params_dict!r}). Refusing to return it."
+        )
+
+    return nsr
