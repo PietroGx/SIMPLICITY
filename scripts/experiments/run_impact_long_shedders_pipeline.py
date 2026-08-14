@@ -19,11 +19,12 @@
 #   2. impact_long_shedders_cal_2.py  (in-context standard-NSR calibration,
 #      one combined SLURM submission for all scenarios -> frozen NSR table)
 #   3. impact_long_shedders_exp.py    (production runs, one per scenario)
-#   4. submit_sanity_plot.sh          (one SLURM job per long-shedder
-#      scenario)
-#   5. Once every sanity-plot job has left Slurm's queue, the pipeline log,
-#      both calibration-fit plots, and every sanity plot are bundled into
-#      one zip at Data/pipeline_artifacts/impact_long_shedders_#{exp_num}_
+#   4. submit_sanity_plot.sh          (ONE SLURM job producing a combined
+#      4x2 sanity grid -- one row per long-shedder scenario, shared x/y
+#      limits per column -- via plot_sot_sanity_regressions.py)
+#   5. Once the sanity-plot job has left Slurm's queue, the pipeline log,
+#      both calibration-fit plots, and the combined sanity grid are bundled
+#      into one zip at Data/pipeline_artifacts/impact_long_shedders_#{exp_num}_
 #      artifacts.zip -- a single place to review a run's outputs instead of
 #      hunting across per-experiment 05_Plots folders.
 #
@@ -50,8 +51,6 @@ import zipfile
 import argparse
 import subprocess
 from datetime import datetime
-
-import pandas as pd
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
@@ -104,34 +103,26 @@ def run_stage(cmd, log_fh):
 
 
 def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh):
-    table_path = os.path.join(
-        "Data", f"impact_long_shedders_calibration_setup_data_#{exp_num}",
-        "nsr_calibration_table.csv")
-    df = pd.read_csv(table_path)
-
+    """Dispatch the ONE combined sanity-plot job (4x2 grid, one row per
+    long-shedder scenario, shared axis limits per column -- see
+    plot_sot_sanity_regressions.py). Returns a single-entry list so callers
+    that iterate over `submitted` (wait_for_sanity_plots, the summary print)
+    don't need special-casing versus the old one-job-per-scenario shape."""
     sanity_sh = os.path.join(SCRIPT_DIR, "submit_sanity_plot.sh")
-    submitted = []
+    cmd = ["sbatch", sanity_sh, str(exp_num), str(target_osr_std), str(target_osr_long)]
+    header = f"\n$ {' '.join(cmd)}"
+    print(header)
+    log_fh.write(header + "\n")
 
-    for _, row in df.iterrows():
-        if float(row["long_shedders_ratio"]) <= 0.0:
-            continue  # control has no long-shedder data to plot
-        scenario = row["scenario_name"]
-        cmd = ["sbatch", sanity_sh, str(exp_num), scenario,
-              str(target_osr_std), str(target_osr_long)]
-        header = f"\n$ {' '.join(cmd)}"
-        print(header)
-        log_fh.write(header + "\n")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    for stream in (result.stdout, result.stderr):
+        if stream:
+            print(stream, end="")
+            log_fh.write(stream)
+    if result.returncode != 0:
+        raise SystemExit("[FAILED] sbatch submission for combined sanity plot")
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        for stream in (result.stdout, result.stderr):
-            if stream:
-                print(stream, end="")
-                log_fh.write(stream)
-        if result.returncode != 0:
-            raise SystemExit(f"[FAILED] sbatch submission for scenario {scenario}")
-        submitted.append((scenario, result.stdout.strip()))
-
-    return submitted
+    return [("combined", result.stdout.strip())]
 
 
 def wait_for_sanity_plots(submitted, log_fh, poll_interval=SANITY_PLOT_POLL_INTERVAL_S):
@@ -165,25 +156,27 @@ def artifacts_archive_path(exp_num):
         "Data", "pipeline_artifacts", f"impact_long_shedders_#{exp_num}_artifacts.zip")
 
 
-def write_artifacts_archive(archive_path, exp_num, log_file, submitted):
-    """Bundle this run's log, both calibration-fit plots, and every
-    per-scenario sanity plot into one zip -- a single place to check a
-    run's outputs instead of hunting across per-experiment 05_Plots
-    folders. Missing files (e.g. a sanity plot that itself failed) are
-    skipped with a warning rather than aborting the archive."""
+def write_artifacts_archive(archive_path, exp_num, log_file):
+    """Bundle this run's log, both calibration-fit plots, and the combined
+    sanity-plot grid into one zip -- a single place to check a run's
+    outputs instead of hunting across per-experiment 05_Plots folders.
+    A missing file (e.g. the sanity plot job itself failed) is skipped
+    with a warning rather than aborting the archive."""
     os.makedirs(os.path.dirname(archive_path), exist_ok=True)
 
-    candidates = [log_file]
-    candidates.append(os.path.join(
-        "Data", f"{LONG_NSR_EXP_NAME}_#{exp_num}", "05_Plots",
-        f"{LONG_NSR_EXP_NAME}_#{exp_num}_long_nsr_calibration_fit.png"))
-    candidates.append(os.path.join(
-        "Data", f"{STD_NSR_SWEEP_NAME}_#{exp_num}", "05_Plots",
-        f"{STD_NSR_SWEEP_NAME}_#{exp_num}_std_nsr_calibration_fit.png"))
-    for scenario, _ in submitted:
-        exp_name = f"impact_long_shedders_{scenario}_#{exp_num}"
-        candidates.append(os.path.join(
-            "Data", exp_name, "05_Plots", f"{exp_name}_global_vs_intrahost.png"))
+    sanity_exp_name = f"impact_long_shedders_sanity_#{exp_num}"
+    candidates = [
+        log_file,
+        os.path.join(
+            "Data", f"{LONG_NSR_EXP_NAME}_#{exp_num}", "05_Plots",
+            f"{LONG_NSR_EXP_NAME}_#{exp_num}_long_nsr_calibration_fit.png"),
+        os.path.join(
+            "Data", f"{STD_NSR_SWEEP_NAME}_#{exp_num}", "05_Plots",
+            f"{STD_NSR_SWEEP_NAME}_#{exp_num}_std_nsr_calibration_fit.png"),
+        os.path.join(
+            "Data", sanity_exp_name, "05_Plots",
+            f"{sanity_exp_name}_all_scenarios_global_vs_intrahost.png"),
+    ]
 
     with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in candidates:
@@ -203,9 +196,9 @@ def main():
                         choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
     parser.add_argument('--target-osr-std', type=float, default=0.0013)
     parser.add_argument('--target-osr-long', type=float, default=0.00205)
-    parser.add_argument('--cal-seeds', type=int, default=25,
+    parser.add_argument('--cal-seeds', type=int, default=50,
                         help="Seeds per grid point, cal_1 and cal_2.")
-    parser.add_argument('--exp-seeds', type=int, default=25,
+    parser.add_argument('--exp-seeds', type=int, default=50,
                         help="Seeds per scenario, final production stage.")
     parser.add_argument('--skip-cal1', action='store_true',
                         help=f"Reuse an already-computed {LONG_NSR_EXP_NAME}_#{{exp_num}} "
@@ -283,7 +276,7 @@ def main():
         # Archived last, after every summary line above is on disk, so the
         # log copy bundled inside the zip is complete (including this run's
         # own archive path) rather than missing its own tail.
-        write_artifacts_archive(archive_path, args.exp_num, log_file, submitted)
+        write_artifacts_archive(archive_path, args.exp_num, log_file)
 
 
 if __name__ == "__main__":

@@ -45,7 +45,7 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 # still better when a day's headroom is cheap to give).
 # CLI scripts that expose --slurm-mem/--slurm-time overwrite these with the
 # user's chosen value before submitting; this is just the baseline.
-os.environ["SIMPLICITY_SLURM_MEM"] = "2G"
+os.environ["SIMPLICITY_SLURM_MEM"] = "3G"
 os.environ["SIMPLICITY_SLURM_TIME"] = "2-00:00:00"
 
 def set_data_dir(path):

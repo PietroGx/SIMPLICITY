@@ -236,6 +236,7 @@ def compute_standard_nsr_per_scenario(numbered, scenarios_frozen, target_osr_std
 
     plt.axhline(target_osr_std, color='black', linestyle='--', linewidth=1.5,
               label='Target OSR')
+    plt.xscale('log')
     plt.title('Standard NSR Calibration by Scenario (in-context, mixed population)')
     plt.xlabel('Input Nucleotide Substitution Rate (NSR)')
     plt.ylabel('Observed Substitution Rate (OSR, standard individuals)')
