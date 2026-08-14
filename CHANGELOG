@@ -5,6 +5,73 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.11 — 2026-08-14 — pietro gerletti
+
+Follow-up to 2.4.10: reviewing run #1's calibration-fit and sanity plots
+(the first real run with the archiving feature) surfaced a plotting bug in
+`impact_long_shedders_calibration_std_nsr_#1_std_nsr_calibration_fit.png`
+and prompted a broader look at `plot_sot_sanity_regressions.py`'s design
+and filtering, plus a round of population/resource parameter tuning.
+
+* Parameter tuning: `SIMPLICITY_SLURM_MEM` 2G -> 3G
+  (`simplicity/dir_manager.py`); `infected_individuals_at_start` 100 -> 50
+  in both `CAL1_ISOLATED_FIXED_PARAMS` and `USER_FIXED_PARAMS`
+  (`impact_long_shedders_config.py`), R values unchanged; standard seed
+  count defaults 25 -> 50 (`impact_long_shedders_cal_1.py --seeds`,
+  pipeline's `--cal-seeds`/`--exp-seeds`).
+* `impact_long_shedders_cal_2.py`'s Stage 2 plot: added `plt.xscale('log')`.
+  `control` (no long shedders) sweeps a 5x wider NSR range than the other
+  four scenarios by design (mixed populations need a lower own-NSR to hit
+  the same target OSR, since standard individuals sit downstream of
+  long-shedder-injected diversity) -- on a shared linear axis that crushed
+  the other four into an illegible sliver. `plot_calibration_step_1.py`
+  already used log-x for the same kind of plot; this brings cal_2's
+  combined plot in line with that precedent.
+* NSR ranges narrowed further: `cal2_standard_nsr` unified to the same
+  `{min: 1e-05, max: 3e-04, steps: 10}` for all 5 scenarios (previously
+  control alone used a 5x wider max); `cal1_long_nsr` narrowed
+  `0.0005-0.005` -> `0.0005-0.002` (both the live JSON and
+  `impact_long_shedders_config.DEFAULT_NSR_RANGES`).
+* `plot_sot_sanity_regressions.py`, three changes:
+  - Both loaders now apply the same `min_len=100`/`min_seq=30` gate
+    `cal_2.py`'s own calibration fits use (previously unfiltered), so this
+    sanity check validates the same population of seeds calibration was
+    actually fit on instead of pooling in short/sparse seeds it excluded.
+  - Left panel redesigned: standard individuals' global clock (target +
+    fit + scatter) plus a black "mixed" line fit on ALL individuals pooled
+    together (what unstratified surveillance data would show) on the
+    primary axis; long-shedder intra-host clock (target + fit, no scatter)
+    overlaid on a secondary y-axis with its own target, single combined
+    legend. Right panel (intra-host detail) unchanged.
+  - Restructured from 4 separate per-scenario PNGs into ONE combined 4x2
+    grid (`--scenarios`, one row per long-shedder scenario, default
+    SOT/HIV_low/HIV_high/edge_case) with every axis in the grid -- left
+    primary, left secondary/twin, and the whole right column -- sharing
+    one unified y-limit, and x-limits shared per column, so scenarios are
+    directly visually comparable on one figure.
+* Cascading pipeline changes to match the single combined plot:
+  `submit_sanity_plot.sh` now submits ONE job instead of one per scenario
+  (dropped the `<scenario>` arg; `--time` bumped 30min -> 2h since one job
+  now does sequentially what 4 parallel jobs used to split).
+  `run_impact_long_shedders_pipeline.py`'s `submit_sanity_plots` no longer
+  reads the calibration table to loop over scenarios (dropped the now-
+  unused `pandas` import entirely); `write_artifacts_archive` now expects
+  the single combined `..._sanity_#{exp_num}_all_scenarios_global_vs_
+  intrahost.png` instead of one per scenario.
+* Verified locally (project conda env, no cluster needed): built synthetic
+  experiment-output trees matching the real file schema (`final_time.csv`,
+  `sequencing_data_regression.csv`, `individuals_data.csv`,
+  `phylogenetic_data.csv` with correct sparse `(position, base)` genome
+  tuples) and ran the real plotting script end-to-end -- confirmed the
+  min_len/min_seq filter correctly excludes a deliberately-short seed from
+  every fit, the twin-axis/merged-legend left panel renders correctly, and
+  the 4-scenario combined grid renders with one true shared y-scale across
+  all 8 axes. Separately mocked `squeue` responses to confirm the
+  pipeline's single-job dispatch/wait/archive flow still works end-to-end
+  post-refactor.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.10 — 2026-08-10 — pietro gerletti
 
 Reviewing run #2/#3's calibration-fit plots (`Long-Shedder OSR Calibration`,

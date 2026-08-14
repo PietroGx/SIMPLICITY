@@ -161,7 +161,7 @@ CAL1_R_LONG_WEEKLY_RATE = 1.1
 CAL1_ISOLATED_FIXED_PARAMS = {
     "long_shedders_ratio": 1.0,
     "R": 1.0,
-    "infected_individuals_at_start": 100,
+    "infected_individuals_at_start": 50,
     "final_time": 720,
     "sequence_long_shedders": True,
     # R_long deliberately absent: build_cal1_settings derives it per
@@ -203,7 +203,7 @@ def build_cal1_settings(seeds, ranges):
 # duplicated verbatim in both scripts.
 USER_FIXED_PARAMS = {
     "population_size": 1000,
-    "infected_individuals_at_start": 100,
+    "infected_individuals_at_start": 50,
     "R": 1.05,
     "final_time": 1095,
     "IH_virus_emergence_rate": 0.1,
@@ -326,13 +326,13 @@ NSR_RANGES_FILENAME = "impact_long_shedders_nsr_ranges.json"
 _DEFAULT_NSR_STEPS = 10
 
 DEFAULT_NSR_RANGES = {
-    "cal1_long_nsr": {"min": 0.0005, "max": 0.005, "steps": _DEFAULT_NSR_STEPS},
+    "cal1_long_nsr": {"min": 0.0005, "max": 0.002, "steps": _DEFAULT_NSR_STEPS},
     "cal2_standard_nsr": {
-        "control":   {"min": 3e-05, "max": 5e-04, "steps": _DEFAULT_NSR_STEPS},
-        "SOT":       {"min": 1e-05, "max": 1e-04, "steps": _DEFAULT_NSR_STEPS},
-        "HIV_low":   {"min": 1e-05, "max": 1e-04, "steps": _DEFAULT_NSR_STEPS},
-        "HIV_high":  {"min": 1e-05, "max": 1e-04, "steps": _DEFAULT_NSR_STEPS},
-        "edge_case": {"min": 1e-05, "max": 1e-04, "steps": _DEFAULT_NSR_STEPS},
+        "control":   {"min": 1e-05, "max": 3e-04, "steps": _DEFAULT_NSR_STEPS},
+        "SOT":       {"min": 1e-05, "max": 3e-04, "steps": _DEFAULT_NSR_STEPS},
+        "HIV_low":   {"min": 1e-05, "max": 3e-04, "steps": _DEFAULT_NSR_STEPS},
+        "HIV_high":  {"min": 1e-05, "max": 3e-04, "steps": _DEFAULT_NSR_STEPS},
+        "edge_case": {"min": 1e-05, "max": 3e-04, "steps": _DEFAULT_NSR_STEPS},
     },
 }
 

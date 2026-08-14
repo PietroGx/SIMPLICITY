@@ -53,7 +53,7 @@ def main():
                         help="Experiment number.")
     parser.add_argument('--runner', type=str,
                         choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
-    parser.add_argument('--seeds', type=int, default=25,
+    parser.add_argument('--seeds', type=int, default=50,
                         help="Seeds per grid point.")
     parser.add_argument('--target-osr-long', type=float, default=0.00205,
                         help="Target long OSR, used only for the diagnostic "
