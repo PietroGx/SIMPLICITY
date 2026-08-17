@@ -142,9 +142,10 @@ def unique_long_taus(sp):
 # =============================================================================
 CAL1_ISOLATED_FIXED_PARAMS = {
     "long_shedders_ratio": 1.0,
-    "R": 1.1,
-    "infected_individuals_at_start": 50,
-    "final_time": 720,
+    "R": 1.0,
+    "population_size": 5000,
+    "infected_individuals_at_start": 10,
+    "final_time": 365,
     "sequence_long_shedders": True,
     # R_long deliberately absent: build_cal1_settings derives it per
     # tau_3_long group via sm.compute_r_long(R, ..., tau, multiplier).

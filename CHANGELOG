@@ -5,6 +5,31 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.14 — 2026-08-17 — pietro gerletti
+
+Run #3 failed: cal_1's isolated ("100% LS") calibration context now
+converts essentially every new infection to a long shedder (correct,
+per 2.4.12's recruitment-probability fix), and at R_long=5-34 that
+burns through a 1000-person population's susceptible pool in well under
+100 days -- confirmed locally (SOT tau group, mildest R_long=5.03, hit
+"No susceptibles left" at t=50.4 days), so every one of 1500 seeded
+simulations failed the fit's `final_time >= 100` filter and the
+calibration produced zero usable data points.
+
+* `CAL1_ISOLATED_FIXED_PARAMS` (`impact_long_shedders_config.py`): `R`
+  1.1 -> 1.0; `infected_individuals_at_start` 50 -> 10; `final_time`
+  720 -> 365; added `population_size: 5000` (previously unset, silently
+  defaulting to `standard_values.json`'s 1000). Meant to slow the
+  isolated context's epidemic enough to sustain a usable observation
+  window before susceptible depletion.
+* `impact_long_shedders_cal_1.py --R` and the pipeline's `--r-cal1`
+  defaults follow automatically (both read
+  `CAL1_ISOLATED_FIXED_PARAMS['R']`).
+* Not yet empirically re-verified against the new depletion timing --
+  to be confirmed on the next real HPC run.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.13 — 2026-08-17 — pietro gerletti
 
 Follow-up to 2.4.12: after running the pipeline with only `--exp-num` set,
