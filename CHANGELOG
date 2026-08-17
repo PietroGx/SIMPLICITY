@@ -5,6 +5,27 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.13 — 2026-08-17 — pietro gerletti
+
+Follow-up to 2.4.12: after running the pipeline with only `--exp-num` set,
+only cal_1's dispatch message showed its R -- no stage printed its full
+parameter set before submitting, so confirming what actually got submitted
+meant digging into config.py or the generated JSON files.
+
+* New shared `print_fixed_params(fixed_params, label=...)` helper in
+  `impact_long_shedders_config.py`.
+* `impact_long_shedders_cal_1.py`: now prints the full fixed-params dict,
+  seed count, and per-`tau_3_long`-group `R_long`/NSR grid range before
+  dispatching.
+* `impact_long_shedders_cal_2.py`: same, before Stage 2's submission --
+  fixed-params dict, seed count, and per-scenario ratio/tau/`R_long`/NSR
+  grid range.
+* `impact_long_shedders_exp.py`: prints the shared fixed params once up
+  front (R excluded -- already shown correctly per scenario from the
+  frozen table); per-scenario dispatch block unchanged.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.12 — 2026-08-17 — pietro gerletti
 
 Two correctness fixes surfaced by inspecting run #2's calibration/sanity

@@ -22,6 +22,7 @@ from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
     LONG_NSR_EXP_NAME, CAL1_ISOLATED_FIXED_PARAMS, build_cal1_settings,
     read_nsr_ranges, add_slurm_resource_args, set_slurm_resource_env,
+    print_fixed_params,
 )
 from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
@@ -36,7 +37,16 @@ def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R, multipl
     ranges = read_nsr_ranges()['cal1_long_nsr']
     settings_func = build_cal1_settings(seeds, ranges, R=R, multiplier=multiplier)
 
-    print(f"Dispatching grid experiment: {exp_name}_#{exp_num} to {runner}...")
+    varying_params, fixed_params, n_seeds = settings_func()
+    print_fixed_params(fixed_params)
+    print(f"Seeds per grid point: {n_seeds}")
+    print("Per tau_3_long group:")
+    for g in varying_params['_scenario_groups']:
+        nsr_vals = g['nucleotide_substitution_rate']
+        print(f"  tau_3_long={g['tau_3_long']:7.2f}  R_long={g['R_long']:7.4f}  "
+             f"NSR grid: {len(nsr_vals)} pts [{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
+
+    print(f"\nDispatching grid experiment: {exp_name}_#{exp_num} to {runner}...")
     run_experiment_script(runner, exp_num, settings_func, exp_name)
     print("\n[Success] Calibration sweep submitted via native runner.")
 

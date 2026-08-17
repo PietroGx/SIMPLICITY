@@ -32,7 +32,8 @@ import pandas as pd
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    build_exp_scenario_settings, add_slurm_resource_args, set_slurm_resource_env,
+    USER_FIXED_PARAMS, build_exp_scenario_settings, add_slurm_resource_args,
+    set_slurm_resource_env, print_fixed_params,
 )
 
 EXP_NAME = "impact_long_shedders"
@@ -121,6 +122,8 @@ def main():
                 f"Scenario '{args.only}' not found in the calibration table.")
 
     print(f"\n[Runner] Dispatching {len(df)} scenario(s) from {table_path}")
+    shared_params = {k: v for k, v in USER_FIXED_PARAMS.items() if k != "R"}
+    print_fixed_params(shared_params, label="Shared parameters (R shown per scenario below)")
 
     for _, row in df.iterrows():
         dispatch_scenario(row, args.exp_num, args.runner, args.seeds)
