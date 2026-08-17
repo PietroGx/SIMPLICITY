@@ -43,12 +43,15 @@ import simplicity.settings_manager as sm
 # duration (days); the model parameter tau_3_long is DERIVED from it (see
 # derive_tau_3_long) as tau_3_long = inf_duration_long - (tau_1+tau_2+tau_4).
 # `control` has no long side, so inf_duration_long is unused (None).
+# `beta_multiplier` scales that scenario's long-shedder daily transmission
+# rate relative to standard individuals (1.0 = same daily rate, only
+# duration differs -- see derive_scenario_params / sm.compute_r_long).
 SCENARIOS = [
-    {"name": "control",   "inf_duration_long": None,  "long_shedders_ratio": 0.00},
-    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.01},
-    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.01},
-    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.12},
-    {"name": "edge_case", "inf_duration_long": 365.0, "long_shedders_ratio": 0.01},
+    {"name": "control",   "inf_duration_long": None,  "long_shedders_ratio": 0.00, "beta_multiplier": 1.0},
+    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.01, "beta_multiplier": 1.0},
+    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.01, "beta_multiplier": 1.0},
+    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.12, "beta_multiplier": 1.0},
+    {"name": "edge_case", "inf_duration_long": 365.0, "long_shedders_ratio": 0.01, "beta_multiplier": 1.0},
 ]
 
 TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
@@ -63,19 +66,11 @@ STD_NSR_SWEEP_NAME = "impact_long_shedders_calibration_std_nsr"
 # =============================================================================
 # SHARED MATH -- tau_3_long / R_long derivation
 # ----------------------------------------------------------------------------
-# R_long is a MODEL PARAMETER: simplicity/extrande.py's get_helpers divides
-# it by a long shedder's whole infectious period to get a per-day
-# transmission rate (beta_long = R_long / (tau_2+tau_3_long)) -- the standard
-# beta = R/infectious_duration relationship. Because infectious duration
-# varies a lot between scenarios, R_long is never a single constant: it is a
-# fixed WEEKLY infection rate scaled by the number of weeks
-# (tau_3_long / 7) that group's long shedders actually shed for, so beta_long
-# stays roughly constant across scenarios while total R_long grows with
-# duration.
-#
-# "Weekly rate" and "R_long" are deliberately different names below -- a
-# weekly rate is only ever an INPUT to derive_r_long, never itself the value
-# assigned to a simulation's "R_long" parameter.
+# R_long comes from simplicity.settings_manager.compute_r_long: long
+# shedders transmit at the same daily rate as standard individuals
+# (beta_long == beta_standard * beta_multiplier), just for longer. See that
+# function's docstring for the formula; single source of truth, shared with
+# core.
 # =============================================================================
 def phase_offset(sp):
     """Sum of the non-long-shedding infection phases (tau_1+tau_2+tau_4)."""
@@ -90,21 +85,12 @@ def derive_tau_3_long(scenario, sp):
     return float(scenario["inf_duration_long"]) - phase_offset(sp)
 
 
-def derive_r_long(r_long_weekly_rate, tau_3_long):
-    """The actual R_long model parameter for a tau_3_long-day long-shedding
-    duration, given a fixed weekly infection rate. See the module docstring
-    above for why this scaling exists. Single source of truth for this
-    formula -- used both to freeze each production scenario's R_long
-    (derive_scenario_params, below) and to drive cal_1's isolated
-    per-tau_3_long calibration groups (build_cal1_settings, further down)."""
-    return r_long_weekly_rate * tau_3_long / 7.0
-
-
-def derive_scenario_params(scenario, sp):
+def derive_scenario_params(scenario, sp, R):
     """
     Derive the frozen long-side parameters for one production scenario.
-    Uses sp['R_long'] as the weekly-rate baseline (simplicity's own default
-    long-shedder infection rate).
+    R is this experiment's own standard-population R (e.g.
+    USER_FIXED_PARAMS['R']) -- NOT sp['R'], simplicity's generic default,
+    which this pipeline never actually runs with.
 
     Returns a dict with: scenario_name, long_shedders_ratio, tau_3_long,
     R_long, sequence_long_shedders, is_long.
@@ -112,15 +98,17 @@ def derive_scenario_params(scenario, sp):
     name = scenario["name"]
     ratio = scenario["long_shedders_ratio"]
     tau_3_long = derive_tau_3_long(scenario, sp)
+    r_long = sm.compute_r_long(R, sp["tau_2"], sp["tau_3"], tau_3_long,
+                                scenario["beta_multiplier"])
 
     if ratio == 0.0:
         # Control: no long shedders, so R_long is never actually used by the
-        # simulation -- keep sp's raw default rather than deriving anything.
+        # simulation -- still derive it consistently rather than a stray default.
         return {
             "scenario_name": name,
             "long_shedders_ratio": 0.0,
             "tau_3_long": tau_3_long,
-            "R_long": float(sp["R_long"]),
+            "R_long": r_long,
             "sequence_long_shedders": False,
             "is_long": False,
         }
@@ -129,7 +117,7 @@ def derive_scenario_params(scenario, sp):
         "scenario_name": name,
         "long_shedders_ratio": float(ratio),
         "tau_3_long": tau_3_long,
-        "R_long": derive_r_long(sp["R_long"], tau_3_long),
+        "R_long": r_long,
         "sequence_long_shedders": True,
         "is_long": True,
     }
@@ -152,32 +140,29 @@ def unique_long_taus(sp):
 # in isolation -- deliberately different from USER_FIXED_PARAMS (Stage 2/3's
 # mixed production population), not a duplicate of it.
 # =============================================================================
-# This isolated context's OWN weekly R_long rate (see the "SHARED MATH"
-# section above) -- deliberately different from sp['R_long'] (production's
-# default). NOT itself a simulation parameter: only ever fed through
-# derive_r_long, below, to get the actual per-tau_3_long-group R_long.
-CAL1_R_LONG_WEEKLY_RATE = 1.1
-
 CAL1_ISOLATED_FIXED_PARAMS = {
     "long_shedders_ratio": 1.0,
-    "R": 1.0,
+    "R": 1.1,
     "infected_individuals_at_start": 50,
     "final_time": 720,
     "sequence_long_shedders": True,
     # R_long deliberately absent: build_cal1_settings derives it per
-    # tau_3_long group via derive_r_long(CAL1_R_LONG_WEEKLY_RATE, tau).
+    # tau_3_long group via sm.compute_r_long(R, ..., tau, multiplier).
 }
 
 
-def build_cal1_settings(seeds, ranges):
+def build_cal1_settings(seeds, ranges, R=None, multiplier=1.0):
     """
     Returns a zero-arg make_settings callable ready for run_experiment_script:
     one group per tau_3_long value (see unique_long_taus), each sweeping the
     same NSR grid, with R_long correctly scaled to that group's own duration
     (rather than a single fixed value shared by every group regardless of
-    duration).
+    duration). R defaults to CAL1_ISOLATED_FIXED_PARAMS['R'] if not given.
     """
     sp = sm.read_standard_parameters_values()
+    fixed_params = CAL1_ISOLATED_FIXED_PARAMS.copy()
+    if R is not None:
+        fixed_params["R"] = R
 
     def make_settings():
         nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
@@ -185,12 +170,13 @@ def build_cal1_settings(seeds, ranges):
             {
                 'nucleotide_substitution_rate': nsr_values,
                 'tau_3_long': tau,
-                'R_long': derive_r_long(CAL1_R_LONG_WEEKLY_RATE, tau),
+                'R_long': sm.compute_r_long(
+                    fixed_params["R"], sp["tau_2"], sp["tau_3"], tau, multiplier),
             }
             for tau in unique_long_taus(sp)
         ]
         varying_params = {'_scenario_groups': scenario_groups}
-        return (varying_params, CAL1_ISOLATED_FIXED_PARAMS.copy(), seeds)
+        return (varying_params, fixed_params, seeds)
 
     return make_settings
 
@@ -204,7 +190,7 @@ def build_cal1_settings(seeds, ranges):
 USER_FIXED_PARAMS = {
     "population_size": 1000,
     "infected_individuals_at_start": 50,
-    "R": 1.05,
+    "R": 1.03,
     "final_time": 1095,
     "IH_virus_emergence_rate": 0.1,
 }
@@ -226,7 +212,7 @@ def lookup_long_nsr(long_nsr_by_tau, tau_3_long):
     return long_nsr_by_tau[key]
 
 
-def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_tau):
+def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_tau, R, multiplier=None):
     """
     One group dict per scenario: its own nucleotide_substitution_rate sweep
     (list -> that group's local varying axis) plus its fixed tau_3_long/
@@ -234,7 +220,8 @@ def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_tau):
 
     long_nsr_by_tau is Stage 1's calibration-fit result (computed by cal_2.py
     from already-run simulation output, not parameter setup -- passed in
-    rather than recomputed here).
+    rather than recomputed here). multiplier, if given, overrides every
+    scenario's own beta_multiplier (SCENARIOS) uniformly.
 
     Returns (scenario_groups, scenarios_frozen).
     """
@@ -243,7 +230,9 @@ def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_tau):
     scenarios_frozen = []
 
     for scenario in SCENARIOS:
-        frozen = derive_scenario_params(scenario, sp)
+        if multiplier is not None:
+            scenario = {**scenario, "beta_multiplier": multiplier}
+        frozen = derive_scenario_params(scenario, sp, R)
         scenarios_frozen.append(frozen)
 
         name = frozen["scenario_name"]
@@ -266,12 +255,20 @@ def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_tau):
     return scenario_groups, scenarios_frozen
 
 
-def build_cal2_settings(scenario_groups, seeds):
+def build_cal2_settings(scenario_groups, seeds, R=None):
     """Zero-arg make_settings callable ready for run_experiment_script,
-    submitting every scenario's sweep as ONE combined experiment."""
+    submitting every scenario's sweep as ONE combined experiment. R
+    defaults to USER_FIXED_PARAMS['R'] if not given -- pass the SAME R used
+    to build scenario_groups (build_cal2_scenario_groups) so the frozen
+    R_long values stay consistent with what standard individuals actually
+    run with."""
+    fixed_params = USER_FIXED_PARAMS.copy()
+    if R is not None:
+        fixed_params["R"] = R
+
     def make_settings():
         varying_params = {'_scenario_groups': scenario_groups}
-        return (varying_params, USER_FIXED_PARAMS.copy(), seeds)
+        return (varying_params, fixed_params, seeds)
     return make_settings
 
 
@@ -292,6 +289,7 @@ def build_exp_scenario_settings(row, n_seeds):
 
     fixed = USER_FIXED_PARAMS.copy()
     fixed.update({
+        "R": float(row["R"]),
         "long_shedders_ratio": float(row["long_shedders_ratio"]),
         "tau_3_long": float(row["tau_3_long"]),
         "R_long": float(row["R_long"]),
@@ -380,9 +378,9 @@ def read_nsr_ranges():
 # (population_size=1000, final_time=1200): MaxRSS ranged 0.29-0.45G across
 # all 36 grid points -- real headroom over that, well below the old blanket
 # 8G every job used to request regardless of actual need. Time limit was
-# bumped from 1 day to 2: some high-R_long tau groups (e.g. edge_case, whose
-# derived R_long via CAL1_R_LONG_WEEKLY_RATE runs well past 1 day of
-# wall-clock time to reach final_time) were getting killed by the walltime
+# bumped from 1 day to 2: some high-R_long tau groups (e.g. edge_case) run
+# well past 1 day of wall-clock time to reach final_time and were getting
+# killed by the walltime
 # mid-simulation -- see simplicity.runners.slurm.reconcile_terminated_tasks,
 # which now detects and signals that case regardless, but giving cheap extra
 # headroom avoids the kill (and the wasted compute) in the first place.

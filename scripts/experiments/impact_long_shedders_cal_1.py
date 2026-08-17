@@ -20,21 +20,21 @@ import argparse
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    LONG_NSR_EXP_NAME, CAL1_R_LONG_WEEKLY_RATE, build_cal1_settings,
+    LONG_NSR_EXP_NAME, CAL1_ISOLATED_FIXED_PARAMS, build_cal1_settings,
     read_nsr_ranges, add_slurm_resource_args, set_slurm_resource_env,
 )
 from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
 
-def run_isolated_calibration(exp_num, runner, seeds, target_osr_long):
+def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R, multiplier):
     print("\n=========================================================")
     print(f" PHASE 1: ISOLATED LONG-SHEDDER CALIBRATION "
-         f"(R_long = {CAL1_R_LONG_WEEKLY_RATE} * tau_3_long/7, 100% LS)")
+         f"(beta_long == beta_standard * {multiplier}, R={R}, 100% LS)")
     print("=========================================================\n")
 
     exp_name = LONG_NSR_EXP_NAME
     ranges = read_nsr_ranges()['cal1_long_nsr']
-    settings_func = build_cal1_settings(seeds, ranges)
+    settings_func = build_cal1_settings(seeds, ranges, R=R, multiplier=multiplier)
 
     print(f"Dispatching grid experiment: {exp_name}_#{exp_num} to {runner}...")
     run_experiment_script(runner, exp_num, settings_func, exp_name)
@@ -58,11 +58,18 @@ def main():
     parser.add_argument('--target-osr-long', type=float, default=0.00205,
                         help="Target long OSR, used only for the diagnostic "
                             "calibration-fit plot (not for the grid itself).")
+    parser.add_argument('--R', type=float, default=CAL1_ISOLATED_FIXED_PARAMS['R'],
+                        help="Reference R for this isolated context's "
+                            f"beta_standard (default {CAL1_ISOLATED_FIXED_PARAMS['R']}).")
+    parser.add_argument('--beta-multiplier-long', type=float, default=1.0,
+                        help="Long-shedder daily-rate multiplier relative to "
+                            "beta_standard (1.0 = same daily rate).")
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
-    run_isolated_calibration(args.exp_num, args.runner, args.seeds, args.target_osr_long)
+    run_isolated_calibration(args.exp_num, args.runner, args.seeds, args.target_osr_long,
+                             args.R, args.beta_multiplier_long)
 
 
 if __name__ == "__main__":

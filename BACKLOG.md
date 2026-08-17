@@ -167,6 +167,46 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
       on-disk `.launch_retries` counter, up to `LAUNCH_FAILURE_MAX_RETRIES`
       = 3 attempts) or marks `.failed` once retries are exhausted.
 
+- [x] **R_long had no single source of truth, and didn't actually hold
+      beta_long == beta_standard** — fixed: `sp['R_long']=1` (a "weekly rate"
+      proxy in `standard_values.json`) and `CAL1_R_LONG_WEEKLY_RATE` (a
+      second, separate weekly-rate constant in
+      `impact_long_shedders_config.py`) were each fed through
+      `derive_r_long(rate, tau) = rate * tau / 7.0` -- neither was tied to
+      the R the standard population actually runs with, so beta_long ended
+      up ~1.4-1.5x beta_standard instead of matching it. New
+      `simplicity.settings_manager.compute_r_long(R, tau_2, tau_3,
+      tau_3_long, multiplier=1.0)` is the single shared formula:
+      `R_long = R * multiplier * (tau_2+tau_3_long) / (tau_2+tau_3)`, so
+      beta_long == beta_standard * multiplier exactly. `multiplier` is a new
+      per-scenario field on `SCENARIOS` (`beta_multiplier`, defaults 1.0 --
+      a deliberate knob for making long shedders more/less infectious per
+      day than standard individuals, replacing the old *accidental* gap).
+      `R_long` is no longer a stored default anywhere: removed from
+      `standard_values.json` and `write_standard_parameters_values()`;
+      `read_settings_and_write_simulation_parameters` now computes it via
+      `compute_r_long` whenever an experiment doesn't explicitly override
+      it. This required also fixing `check_parameters_names`, which
+      validated parameter names against `standard_values.json`'s keys (so
+      removing `R_long` from there would have broken every experiment that
+      explicitly sets it) -- now validates against `parameter_specs.json`
+      instead, correctly decoupling "valid parameter name" from "has a
+      static default". **Recalibration required**: any experiment run
+      before this fix used the old, uncorrected R_long.
+- [x] **`infect_long_shedder` recruitment probability decoupled from
+      `long_shedders_ratio`** — fixed: `population_model.py:139-146`'s
+      per-new-infection recruitment check used a hardcoded `0.01` literal
+      instead of `long_shedders_ratio`, so every scenario recruited long
+      shedders at the same fixed 1% rate regardless of its configured
+      ratio -- coincided for `edge_case` (ratio=0.01) but made `HIV_high`'s
+      12% cap largely aspirational. Now
+      `population.rng4.uniform() < population.long_shedders_ratio`.
+      Verified empirically (20k draws): recruitment rate now tracks ratio
+      for both 0.01 and 0.12. Side effect: `CAL1_ISOLATED_FIXED_PARAMS`'s
+      `long_shedders_ratio=1.0` ("100% LS" isolated context) now actually
+      behaves as advertised, instead of still drawing at 1% per infection.
+      **Recalibration required.**
+
 ------------------------------------------------------------------------
 
 ## Monitor visibility

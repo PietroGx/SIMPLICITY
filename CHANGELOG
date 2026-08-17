@@ -5,6 +5,52 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.12 — 2026-08-17 — pietro gerletti
+
+Two correctness fixes surfaced by inspecting run #2's calibration/sanity
+plots and the resulting HIV_high/edge_case dynamics, plus CLI exposure of
+the parameters they touch.
+
+* **R_long now has a single source of truth and actually matches its
+  intent.** `sp['R_long']`/`CAL1_R_LONG_WEEKLY_RATE` were two disconnected
+  "weekly rate" proxies, neither tied to the R the standard population
+  actually ran with -- beta_long ended up ~1.4-1.5x beta_standard by
+  accident. New `simplicity.settings_manager.compute_r_long(R, tau_2,
+  tau_3, tau_3_long, multiplier=1.0)` is the shared formula:
+  `R_long = R * multiplier * (tau_2+tau_3_long) / (tau_2+tau_3)`, so
+  beta_long == beta_standard * multiplier exactly. `multiplier` is a new
+  per-scenario `beta_multiplier` field on `SCENARIOS` (defaults 1.0 for
+  all five). `R_long` is no longer a stored default anywhere -- removed
+  from `standard_values.json`/`write_standard_parameters_values()`;
+  `read_settings_and_write_simulation_parameters` computes it via
+  `compute_r_long` whenever an experiment doesn't override it explicitly.
+  This required fixing `check_parameters_names`, which validated
+  parameter names against `standard_values.json`'s keys (so dropping
+  `R_long` from there would have broken every explicit override) -- it now
+  validates against `parameter_specs.json` instead, correctly decoupling
+  "valid parameter name" from "has a static default".
+* **`infect_long_shedder` recruitment probability now tracks
+  `long_shedders_ratio`** (`population_model.py`) instead of a hardcoded
+  1% literal -- every scenario used to recruit long shedders at the same
+  fixed rate regardless of its configured ratio, making e.g. `HIV_high`'s
+  12% cap largely aspirational. Side effect: `CAL1_ISOLATED_FIXED_PARAMS`'s
+  `long_shedders_ratio=1.0` ("100% LS" isolated context) now actually
+  behaves as advertised.
+* R is now CLI-configurable per stage instead of a hardcoded constant:
+  `impact_long_shedders_cal_1.py --R` (default 1.1, was
+  `CAL1_ISOLATED_FIXED_PARAMS['R']=1.0`), `impact_long_shedders_cal_2.py
+  --R` (default 1.03, was `USER_FIXED_PARAMS['R']=1.05`) -- both also gain
+  `--beta-multiplier-long`, applied uniformly across every scenario. The
+  pipeline orchestrator exposes the same as `--r-cal1`/`--r-cal2`/
+  `--beta-multiplier-long`. Production (`exp.py`) now reads R from the
+  frozen `nsr_calibration_table.csv` (new `R` column, written by cal_2)
+  instead of the raw `USER_FIXED_PARAMS` default, so it always matches
+  whatever R cal_2 actually calibrated against, even under a CLI override.
+* Recalibration required: any experiment run before this fix used the old,
+  uncorrected R_long and recruitment probability.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.11 — 2026-08-14 — pietro gerletti
 
 Follow-up to 2.4.10: reviewing run #1's calibration-fit and sanity plots

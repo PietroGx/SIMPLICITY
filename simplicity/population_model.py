@@ -140,8 +140,8 @@ def infect_long_shedder(population, new_infected_index):
     
     if (population.time > min_time and 
         population.infected > min_infected_n and
-        population.long_shedders < max_long_shedders and 
-        population.rng4.uniform() < 0.01
+        population.long_shedders < max_long_shedders and
+        population.rng4.uniform() < population.long_shedders_ratio
                       ):
         population.long_shedder_i.add(new_infected_index)
         population.long_shedders += 1
