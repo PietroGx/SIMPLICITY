@@ -339,6 +339,14 @@ def get_nsr_ranges_file_path():
     return os.path.join(dm.get_reference_parameters_dir(), NSR_RANGES_FILENAME)
 
 
+def print_fixed_params(fixed_params, label="Fixed parameters"):
+    """Single shared format for echoing a stage's fixed_params dict to the
+    console/log before it's submitted."""
+    print(f"{label}:")
+    for k, v in fixed_params.items():
+        print(f"  {k}: {v}")
+
+
 def write_default_nsr_ranges():
     path = get_nsr_ranges_file_path()
     with open(path, "w") as f:

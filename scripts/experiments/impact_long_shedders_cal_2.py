@@ -54,7 +54,7 @@ from impact_long_shedders_config import (
     TAU_ROUND, DEFAULT_COLORS, LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME,
     USER_FIXED_PARAMS, lookup_long_nsr, build_cal2_scenario_groups,
     build_cal2_settings, read_nsr_ranges, add_slurm_resource_args,
-    set_slurm_resource_env,
+    set_slurm_resource_env, print_fixed_params,
 )
 
 # =============================================================================
@@ -306,6 +306,18 @@ def main():
     scenario_groups, scenarios_frozen = build_cal2_scenario_groups(
         nsr_ranges, long_nsr_by_tau, args.R, args.beta_multiplier_long)
     settings_func = build_cal2_settings(scenario_groups, args.seeds, args.R)
+
+    print(f"\n[Stage 2] Submitting standard-NSR sweep "
+         f"(beta_long == beta_standard * {args.beta_multiplier_long}, R={args.R})")
+    _, fixed_params, n_seeds = settings_func()
+    print_fixed_params(fixed_params)
+    print(f"Seeds per grid point: {n_seeds}")
+    print("Per scenario:")
+    for g, frozen in zip(scenario_groups, scenarios_frozen):
+        nsr_vals = g['nucleotide_substitution_rate']
+        print(f"  {frozen['scenario_name']:10s} ratio={frozen['long_shedders_ratio']:.3f}  "
+             f"tau_3_long={frozen['tau_3_long']:7.2f}  R_long={frozen['R_long']:7.4f}  "
+             f"NSR grid: {len(nsr_vals)} pts [{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
 
     run_experiment_script(args.runner, args.exp_num, settings_func, STD_NSR_SWEEP_NAME)
     numbered = f"{STD_NSR_SWEEP_NAME}_#{args.exp_num}"
