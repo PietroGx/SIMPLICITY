@@ -55,7 +55,8 @@ from datetime import datetime
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from impact_long_shedders_config import (
-    LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME, add_slurm_resource_args,
+    LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME, CAL1_ISOLATED_FIXED_PARAMS,
+    USER_FIXED_PARAMS, add_slurm_resource_args,
 )
 
 _NOISE_PATTERNS = [
@@ -203,6 +204,17 @@ def main():
     parser.add_argument('--skip-cal1', action='store_true',
                         help=f"Reuse an already-computed {LONG_NSR_EXP_NAME}_#{{exp_num}} "
                             "instead of rerunning Stage 1.")
+    parser.add_argument('--r-cal1', type=float, default=CAL1_ISOLATED_FIXED_PARAMS['R'],
+                        help="R for cal_1's isolated context "
+                            f"(default {CAL1_ISOLATED_FIXED_PARAMS['R']}).")
+    parser.add_argument('--r-cal2', type=float, default=USER_FIXED_PARAMS['R'],
+                        help="R for cal_2 and production "
+                            f"(default {USER_FIXED_PARAMS['R']}).")
+    parser.add_argument('--beta-multiplier-long', type=float, default=1.0,
+                        help="Long-shedder daily-rate multiplier relative to "
+                            "standard individuals, applied uniformly across "
+                            "cal_1 and every cal_2/production scenario "
+                            "(1.0 = same daily rate, only duration differs).")
     parser.add_argument('--log-file', type=str, default=None,
                         help="Defaults to "
                             "Data/pipeline_logs/impact_long_shedders_pipeline_#{exp_num}.log")
@@ -232,6 +244,8 @@ def main():
                       "--runner", args.runner,
                       "--seeds", str(args.cal_seeds),
                       "--target-osr-long", str(args.target_osr_long),
+                      "--R", str(args.r_cal1),
+                      "--beta-multiplier-long", str(args.beta_multiplier_long),
                       *slurm_res_args], log_fh)
 
         run_stage([py, cal2_path,
@@ -240,6 +254,8 @@ def main():
                   "--target-osr-std", str(args.target_osr_std),
                   "--target-osr-long", str(args.target_osr_long),
                   "--seeds", str(args.cal_seeds),
+                  "--R", str(args.r_cal2),
+                  "--beta-multiplier-long", str(args.beta_multiplier_long),
                   *slurm_res_args], log_fh)
 
         run_stage([py, exp_path,

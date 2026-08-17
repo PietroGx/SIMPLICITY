@@ -52,8 +52,9 @@ import simplicity.tuning.evolutionary_rate as er
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
     TAU_ROUND, DEFAULT_COLORS, LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME,
-    lookup_long_nsr, build_cal2_scenario_groups, build_cal2_settings,
-    read_nsr_ranges, add_slurm_resource_args, set_slurm_resource_env,
+    USER_FIXED_PARAMS, lookup_long_nsr, build_cal2_scenario_groups,
+    build_cal2_settings, read_nsr_ranges, add_slurm_resource_args,
+    set_slurm_resource_env,
 )
 
 # =============================================================================
@@ -269,6 +270,13 @@ def main():
                         help="Experiment number (shared with cal_1 and exp).")
     parser.add_argument('--runner', type=str,
                         choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
+    parser.add_argument('--R', type=float, default=USER_FIXED_PARAMS['R'],
+                        help="Standard-population R for this stage and exp "
+                            f"(default {USER_FIXED_PARAMS['R']}).")
+    parser.add_argument('--beta-multiplier-long', type=float, default=1.0,
+                        help="Long-shedder daily-rate multiplier relative to "
+                            "standard individuals, applied to every scenario "
+                            "(1.0 = same daily rate, only duration differs).")
     parser.add_argument('--model', type=str, default='exp',
                         choices=['lin', 'log', 'exp', 'tan'], help="Fit model.")
     parser.add_argument('--min-seq', type=int, default=30,
@@ -295,8 +303,9 @@ def main():
         model_type=args.model, min_seq=args.min_seq, min_len=args.min_len)
 
     # --- Build one group per scenario and submit ONE combined experiment ---
-    scenario_groups, scenarios_frozen = build_cal2_scenario_groups(nsr_ranges, long_nsr_by_tau)
-    settings_func = build_cal2_settings(scenario_groups, args.seeds)
+    scenario_groups, scenarios_frozen = build_cal2_scenario_groups(
+        nsr_ranges, long_nsr_by_tau, args.R, args.beta_multiplier_long)
+    settings_func = build_cal2_settings(scenario_groups, args.seeds, args.R)
 
     run_experiment_script(args.runner, args.exp_num, settings_func, STD_NSR_SWEEP_NAME)
     numbered = f"{STD_NSR_SWEEP_NAME}_#{args.exp_num}"
@@ -316,6 +325,7 @@ def main():
             "scenario_name": name,
             "tau_3_long": frozen["tau_3_long"],
             "long_shedders_ratio": frozen["long_shedders_ratio"],
+            "R": args.R,
             "R_long": frozen["R_long"],
             "nucleotide_substitution_rate_long": long_nsr,
             "nucleotide_substitution_rate": std_nsr_by_scenario[name],
@@ -326,7 +336,7 @@ def main():
         })
 
     table_path = os.path.join(setup_dir, "nsr_calibration_table.csv")
-    cols = ["scenario_name", "tau_3_long", "long_shedders_ratio", "R_long",
+    cols = ["scenario_name", "tau_3_long", "long_shedders_ratio", "R", "R_long",
             "nucleotide_substitution_rate_long", "nucleotide_substitution_rate",
             "target_osr_std", "target_osr_long", "model_type", "long_calib_source"]
     pd.DataFrame(rows)[cols].to_csv(table_path, index=False)
