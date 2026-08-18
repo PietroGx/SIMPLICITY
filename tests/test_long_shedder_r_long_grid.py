@@ -17,22 +17,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # ============================================================================
-# HPC test: isolated long-shedder NSR calibration over a grid of
-# R_long x infected_individuals_at_start values, for a single tau_3_long
-# (borrowed from one of impact_long_shedders' 5 production scenarios), at
-# final_time = 3 years. Not part of the impact_long_shedders pipeline itself
-# -- a standalone exploratory tool to visually compare calibration curves
-# across R_long/starting-cohort-size before picking defaults for
-# scripts/experiments/impact_long_shedders_config.py.
+# HPC test: isolated long-shedder NSR calibration across EVERY long-shedder
+# production scenario (by unique tau_3_long -- HIV_low/HIV_high share a
+# duration in this isolated 100%-long-shedder context, so are tested once
+# and reported together, not duplicated) x R_long in {1.0, 1.3}, sampled at
+# only 3 NSR anchor points (min/mid/max of NSR_RANGES['cal1_long_nsr']) --
+# this is a bracketing check (does the sampled range reach target OSR?), not
+# a full curve-shape scan. final_time = 3 years. infected_individuals_at_start
+# is fixed (not swept). Not part of the impact_long_shedders pipeline itself
+# -- a standalone exploratory tool.
 #
-# Reuses NSR_RANGES['cal1_long_nsr'] from impact_long_shedders_config as the
-# NSR sweep range (same range the real pipeline uses), and
-# CAL1_ISOLATED_FIXED_PARAMS['R'] as the standard-population reference R.
-# population_size is fixed (not swept).
+# Reuses NSR_RANGES['cal1_long_nsr'] and CAL1_ISOLATED_FIXED_PARAMS['R'] from
+# impact_long_shedders_config rather than duplicating them.
+#
+# Writes a plain-text recap (Data/tests/test_cal_1_out_#{test_n}.txt) with
+# per-cell fit stats AND raw per-NSR-node mean OSR (so bracketing can be
+# checked directly, without trusting a fit that may only have 3 points to
+# work with), plus the combined grid figure, both zipped into a single file
+# at Data/{experiment_name}_artifacts.zip.
 # ============================================================================
 
 import os
 import sys
+import zipfile
 import argparse
 import numpy as np
 import pandas as pd
@@ -52,13 +59,13 @@ import simplicity.tuning.evolutionary_rate as er
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 '..', 'scripts', 'experiments'))
 from impact_long_shedders_config import (
-    SCENARIOS, derive_tau_3_long, CAL1_ISOLATED_FIXED_PARAMS, NSR_RANGES,
+    SCENARIOS, TAU_ROUND, derive_tau_3_long, CAL1_ISOLATED_FIXED_PARAMS, NSR_RANGES,
 )
 
-EXP_NAME = "long_shedder_r_long_grid_test"
+EXP_NAME = "long_shedder_scenario_r_long_test"
 
-R_LONG_VALUES = [1.0, 1.5, 2.0, 4.0]
-INFECTED_START_VALUES = [10, 50, 100]
+R_LONG_VALUES = [1.0, 1.3]
+INFECTED_START = 10           # fixed -- not swept
 POPULATION_SIZE = 1000        # fixed -- not swept
 FINAL_TIME = 365 * 3          # 3 years
 TARGET_OSR_LONG = 0.00205     # reference line only (same default as cal_1)
@@ -70,30 +77,37 @@ RUNNERS = {
 }
 
 
-def build_settings(tau_3_long, n_seeds):
-    """One scenario group per (R_long, infected_individuals_at_start) cell,
-    each sweeping the SAME nucleotide_substitution_rate grid (reusing
-    impact_long_shedders_config.NSR_RANGES['cal1_long_nsr']). tau_3_long is
-    shared across every cell -- only R_long and the starting cohort size
-    vary between groups."""
-    ranges = NSR_RANGES['cal1_long_nsr']
-    nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
+def unique_tau_labels(sp):
+    """{rounded tau_3_long: 'SOT' / 'HIV_low/HIV_high' / 'edge_case'} across
+    every long-shedder scenario, deduplicated by tau (HIV_low and HIV_high
+    share a duration, hence a label, in this isolated context)."""
+    labels = {}
+    for s in SCENARIOS:
+        if s["long_shedders_ratio"] <= 0.0:
+            continue
+        tau = round(derive_tau_3_long(s, sp), TAU_ROUND)
+        labels.setdefault(tau, []).append(s["name"])
+    return {tau: "/".join(names) for tau, names in labels.items()}
 
+
+def build_settings(nsr_values, tau_labels, n_seeds):
+    """One scenario group per (tau_3_long, R_long) cell, each sweeping the
+    same 3-point NSR grid."""
     scenario_groups = [
         {
-            'nucleotide_substitution_rate': nsr_values,
+            'nucleotide_substitution_rate': list(nsr_values),
+            'tau_3_long': tau,
             'R_long': r_long,
-            'infected_individuals_at_start': infected_start,
         }
+        for tau in tau_labels
         for r_long in R_LONG_VALUES
-        for infected_start in INFECTED_START_VALUES
     ]
 
     fixed_params = {
         'long_shedders_ratio': 1.0,
         'R': CAL1_ISOLATED_FIXED_PARAMS['R'],
         'population_size': POPULATION_SIZE,
-        'tau_3_long': tau_3_long,
+        'infected_individuals_at_start': INFECTED_START,
         'final_time': FINAL_TIME,
         'sequence_long_shedders': True,
     }
@@ -104,14 +118,15 @@ def build_settings(tau_3_long, n_seeds):
     return make_settings
 
 
-def analyze_and_plot(numbered, tau_3_long, min_seq=30, min_len=100, model_type='exp'):
-    """Extracts per-seed OSR for every (R_long, infected_start, NSR) point,
-    outlier-filters per grid point, fits a regressor per (R_long,
-    infected_start) cell, and saves ONE combined figure: R_long as rows
-    (ascending), starting-infected count as columns (ascending), shared x/y
-    axes so every cell is directly comparable at a glance.
+def analyze_and_report(numbered, nsr_values, tau_labels, test_n,
+                       min_seq=30, min_len=100, model_type='exp'):
+    """Extracts per-seed OSR for every (tau_3_long, R_long, NSR) point,
+    outlier-filters per grid point, fits a regressor per (tau, R_long) cell,
+    saves ONE combined grid figure (scenario rows x R_long columns, shared
+    axes), writes a plain-text recap with fit stats AND raw per-NSR-node
+    mean OSR, and zips the recap + figure into one file in Data/.
     """
-    print(f"--- Analyzing R_long/starting-infected grid: {numbered} ---")
+    print(f"--- Analyzing scenario/R_long grid: {numbered} ---")
 
     simulation_output_dirs = dm.get_simulation_output_dirs(numbered)
 
@@ -119,9 +134,8 @@ def analyze_and_plot(numbered, tau_3_long, min_seq=30, min_len=100, model_type='
     for sod in simulation_output_dirs:
         nsr_val = sm.get_parameter_value_from_simulation_output_dir(
             sod, 'nucleotide_substitution_rate')
+        tau_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'tau_3_long')
         r_long_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'R_long')
-        infected_start_val = sm.get_parameter_value_from_simulation_output_dir(
-            sod, 'infected_individuals_at_start')
 
         seeded_dirs = dm.get_seeded_simulation_output_dirs(sod)
         sod_rows = []
@@ -134,8 +148,8 @@ def analyze_and_plot(numbered, tau_3_long, min_seq=30, min_len=100, model_type='
                 if final_time >= min_len and len(seq_data) >= min_seq:
                     osr_val = er.tempest_regression(seq_data).coef_[0]
                     sod_rows.append({
+                        'tau_3_long': tau_val,
                         'R_long': r_long_val,
-                        'infected_individuals_at_start': infected_start_val,
                         'nucleotide_substitution_rate': nsr_val,
                         'observed_substitution_rate': osr_val,
                     })
@@ -149,39 +163,64 @@ def analyze_and_plot(numbered, tau_3_long, min_seq=30, min_len=100, model_type='
             sod_df['n_seeds_total'] = len(seeded_dirs)
             all_rows.append(sod_df)
 
-    if not all_rows:
-        raise RuntimeError(
-            f"No valid data found in {numbered}. "
-            f"Check if simulations finished and lengths/seqs meet minimums.")
+    master_df = pd.concat(all_rows, ignore_index=True) if all_rows else pd.DataFrame()
+    clean_df = (master_df[master_df['is_outlier'] == 0]
+               if not master_df.empty else master_df)
 
-    master_df = pd.concat(all_rows, ignore_index=True)
-    clean_df = master_df[master_df['is_outlier'] == 0]
-
-    n_rows, n_cols = len(R_LONG_VALUES), len(INFECTED_START_VALUES)
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.5 * n_cols, 3.5 * n_rows),
+    taus = sorted(tau_labels.keys())
+    n_rows, n_cols = len(taus), len(R_LONG_VALUES)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 3.5 * n_rows),
                              sharex=True, sharey=True)
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
 
-    print(f"\n--- Fit results (tau_3_long={tau_3_long:.2f}) ---")
-    for i, r_long in enumerate(R_LONG_VALUES):
-        for j, infected_start in enumerate(INFECTED_START_VALUES):
+    recap = []
+    recap.append(f"=== Long-shedder scenario/R_long calibration test: {numbered} ===")
+    recap.append(f"NSR anchor points (3): {nsr_values}")
+    recap.append(f"R_long values: {R_LONG_VALUES}")
+    recap.append("Scenarios (by unique tau_3_long): " +
+                 ", ".join(f"{lbl} (tau_3_long={tau:.2f})" for tau, lbl in tau_labels.items()))
+    recap.append(f"population_size={POPULATION_SIZE} (fixed), "
+                 f"infected_individuals_at_start={INFECTED_START} (fixed), "
+                 f"final_time={FINAL_TIME} (3 years)")
+    recap.append(f"Target OSR = {TARGET_OSR_LONG}")
+    recap.append("")
+
+    for i, tau in enumerate(taus):
+        label = tau_labels[tau]
+        for j, r_long in enumerate(R_LONG_VALUES):
             ax = axes[i, j]
-            cell_df = clean_df[(clean_df['R_long'] == r_long) &
-                               (clean_df['infected_individuals_at_start'] == infected_start)]
+            cell_label = f"{label} (tau={tau:.2f}), R_long={r_long}"
+            recap.append(f"--- {cell_label} ---")
 
-            label = f"R_long={r_long}, start={infected_start}"
+            cell_df = (clean_df[(clean_df['tau_3_long'].round(TAU_ROUND) == tau) &
+                                (clean_df['R_long'] == r_long)]
+                      if not clean_df.empty else clean_df)
+
             if cell_df.empty:
                 ax.text(0.5, 0.5, "no valid data", ha='center', va='center',
                        transform=ax.transAxes)
-                print(f"{label:30s}: no valid data")
+                recap.append("  no valid data")
+                print(f"{cell_label:40s}: no valid data")
             else:
                 ax.scatter(cell_df['nucleotide_substitution_rate'],
                           cell_df['observed_substitution_rate'],
-                          alpha=0.2, s=10, color='tab:blue')
+                          alpha=0.3, s=15, color='tab:blue')
+
+                for nsr in nsr_values:
+                    sub = cell_df[np.isclose(cell_df['nucleotide_substitution_rate'], nsr)]
+                    if not sub.empty:
+                        recap.append(f"  NSR={nsr:.6f} -> mean OSR="
+                                    f"{sub['observed_substitution_rate'].mean():.6f} "
+                                    f"(n={len(sub)})")
+                    else:
+                        recap.append(f"  NSR={nsr:.6f} -> no valid points")
+
                 try:
                     fit_result = er.fit_observed_substitution_rate_regressor(
                         numbered, cell_df, model_type=model_type,
                         parameter_name='nucleotide_substitution_rate',
-                        experiment_group=label)
+                        experiment_group=cell_label)
                     x_vals = np.linspace(cell_df['nucleotide_substitution_rate'].min(),
                                         cell_df['nucleotide_substitution_rate'].max(), 100)
                     y_vals = fit_result.eval(x=x_vals)
@@ -189,76 +228,95 @@ def analyze_and_plot(numbered, tau_3_long, min_seq=30, min_len=100, model_type='
                     r2 = fit_result.rsquared
                     n_pts = len(cell_df)
                     mean_ft = cell_df['mean_final_time'].iloc[0]
+                    fit_params = {name: p.value for name, p in fit_result.params.items()}
                     ax.text(0.03, 0.97, f"R2={r2:.3f}\nn={n_pts}\nmean t={mean_ft:.0f}d",
                            transform=ax.transAxes, va='top', fontsize=8,
                            bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
-                    print(f"{label:30s}: R2={r2:.4f}  n_points={n_pts}  "
+                    recap.append(f"  fit: {fit_params}  R2={r2:.4f}  n={n_pts}  "
+                                f"mean_final_time={mean_ft:.1f}")
+                    print(f"{cell_label:40s}: R2={r2:.4f}  n={n_pts}  "
                          f"mean_final_time={mean_ft:.1f}")
                 except Exception as e:
                     ax.text(0.5, 0.5, "fit failed", ha='center', va='center',
                            transform=ax.transAxes)
-                    print(f"{label:30s}: fit failed ({e})")
+                    recap.append(f"  fit failed: {e}")
+                    print(f"{cell_label:40s}: fit failed ({e})")
 
             ax.axhline(TARGET_OSR_LONG, color='black', linestyle='--',
                       linewidth=1, alpha=0.6)
             if i == 0:
-                ax.set_title(f"start={infected_start}")
+                ax.set_title(f"R_long={r_long}")
             if j == 0:
-                ax.set_ylabel(f"R_long={r_long}\nOSR")
+                ax.set_ylabel(f"{label}\ntau={tau:.1f}\nOSR")
             if i == n_rows - 1:
                 ax.set_xlabel("NSR")
+            recap.append("")
 
-    fig.suptitle(f"Long-shedder isolated calibration grid "
-                f"({numbered}, tau_3_long={tau_3_long:.2f})")
+    fig.suptitle(f"Long-shedder scenario/R_long calibration grid ({numbered})")
     plt.tight_layout()
 
     plot_path = os.path.join(dm.get_experiment_plots_dir(numbered),
-                             f"{numbered}_r_long_grid.png")
+                             f"{numbered}_scenario_r_long_grid.png")
     plt.savefig(plot_path, dpi=200)
     plt.close()
     print(f"\nGrid plot saved to: {plot_path}")
-    return plot_path
+
+    recap_dir = os.path.join(dm.get_data_dir(), "tests")
+    os.makedirs(recap_dir, exist_ok=True)
+    recap_path = os.path.join(recap_dir, f"test_cal_1_out_#{test_n}.txt")
+    with open(recap_path, "w") as f:
+        f.write("\n".join(recap))
+    print(f"Recap written to: {recap_path}")
+
+    zip_path = os.path.join(dm.get_data_dir(), f"{numbered}_artifacts.zip")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.write(recap_path, arcname=os.path.basename(recap_path))
+        zf.write(plot_path, arcname=os.path.basename(plot_path))
+    print(f"Artifacts zipped to: {zip_path}")
+
+    return recap_path, plot_path, zip_path
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="HPC test: sweep the isolated long-shedder NSR calibration "
-                    "over a grid of R_long x starting-infected-count values, "
-                    "for a single tau_3_long (borrowed from one of the 5 "
-                    "production scenarios), at final_time=3 years. Produces "
-                    "one combined figure to visually compare calibration "
-                    "curves across the grid.")
+                    "across every long-shedder production scenario (by unique "
+                    "tau_3_long) x R_long in {1.0, 1.3}, at 3 NSR anchor points "
+                    "(min/mid/max), final_time=3 years, infected_individuals_"
+                    "at_start fixed. Writes a recap file + combined figure, "
+                    "zipped together into Data/.")
     parser.add_argument('test_n', type=int,
                         help="Test number (numbers this test's experiment).")
     parser.add_argument('--runner', type=str, default='slurm',
                         choices=['serial', 'multiprocessing', 'slurm'])
     parser.add_argument('--n-seeds', type=int, default=10,
-                        help="Seeds per (R_long, start, NSR) grid point (default 10).")
-    parser.add_argument('--scenario', type=str, default='edge_case',
-                        choices=[s['name'] for s in SCENARIOS],
-                        help="Which of the 5 production scenarios' tau_3_long "
-                            "to use (default 'edge_case' -- the longest-"
-                            "duration, hardest-to-calibrate scenario).")
+                        help="Seeds per (tau, R_long, NSR) grid point (default 10).")
     args = parser.parse_args()
 
     sp = sm.read_standard_parameters_values()
-    scenario = next(s for s in SCENARIOS if s['name'] == args.scenario)
-    tau_3_long = derive_tau_3_long(scenario, sp)
+    tau_labels = unique_tau_labels(sp)
+
+    ranges = NSR_RANGES['cal1_long_nsr']
+    nsr_min, nsr_max = ranges['min'], ranges['max']
+    nsr_mid = float(np.sqrt(nsr_min * nsr_max))
+    nsr_values = [nsr_min, nsr_mid, nsr_max]
 
     experiment_name = f"{EXP_NAME}_#{args.test_n}"
     print("\n=========================================================")
-    print(f" R_long / starting-infected grid test #{args.test_n}")
-    print(f" scenario={args.scenario}  tau_3_long={tau_3_long:.2f}")
+    print(f" Scenario / R_long calibration test #{args.test_n}")
+    print(f" scenarios (by tau): {tau_labels}")
     print(f" R_long values: {R_LONG_VALUES}")
-    print(f" starting-infected values: {INFECTED_START_VALUES}")
-    print(f" population_size={POPULATION_SIZE} (fixed)  final_time={FINAL_TIME} (3 years)")
+    print(f" NSR anchor points: {nsr_values}")
+    print(f" population_size={POPULATION_SIZE} (fixed)  "
+         f"infected_individuals_at_start={INFECTED_START} (fixed)  "
+         f"final_time={FINAL_TIME} (3 years)")
     print("=========================================================\n")
 
-    settings_func = build_settings(tau_3_long, args.n_seeds)
+    settings_func = build_settings(nsr_values, tau_labels, args.n_seeds)
     run_experiment(experiment_name, settings_func,
                    simplicity_runner=RUNNERS[args.runner], archive_experiment=False)
 
-    analyze_and_plot(experiment_name, tau_3_long)
+    analyze_and_report(experiment_name, nsr_values, tau_labels, args.test_n)
 
 
 if __name__ == "__main__":
