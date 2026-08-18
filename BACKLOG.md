@@ -107,25 +107,36 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 - [ ] Figure 3 Panel C: verify the per-seed pairwise-Hamming cap (200 sampled
       pairs) in the consistency check is generous enough once real genome
       counts per seed are known; tune if not.
-- [ ] **cal_1's isolated calibration: edge_case sequencing shortfall vs.
-      SOT depletion, sharing one parameter** — edge_case
-      (`tau_3_long=350.23`) reaches the full 365-day `final_time` but only
-      accumulates 3-8 sequenced diagnoses per seed (needs `min_seq=30`) --
-      `tau_3_long` is almost as long as `final_time`, so individuals barely
-      complete a full cycle. Raising `R_long` doesn't help (confirmed).
-      Raising `CAL1_ISOLATED_FIXED_PARAMS['infected_individuals_at_start']`
-      (10->60) does (3-8 -> 20-39 seqs), but at 60 it also pushes SOT
-      (`R_long=1.3`) into early depletion (most seeds end via "No
-      susceptibles left" well before 365 days) -- a single shared parameter
-      with competing pressures across scenarios. Needs either an
-      intermediate value that satisfies both (untested), or a per-scenario
-      starting-cohort size (would need a new SCENARIOS field, out of
-      tonight's tuning scope). `tests/test_long_shedder_r_long_grid.py`
-      (new) can help explore this systematically on the HPC. Also open:
-      SOT/HIV_low's calibration fits are currently poor (R² near 0 / weak)
-      at only 5 diagnostic seeds/NSR-point -- not yet determined whether
-      that's a genuine `NSR_RANGES['cal1_long_nsr']` mismatch or just
-      statistical noise from the small diagnostic seed count.
+- [x] **cal_1's isolated calibration: edge_case sequencing shortfall vs.
+      SOT depletion, sharing one parameter** — fixed, via `tests/
+      test_long_shedder_r_long_grid.py` (new standalone HPC diagnostic
+      tool) rather than more local tuning. Root cause of the sequencing
+      shortfall turned out to be `CAL1_ISOLATED_FIXED_PARAMS['final_time']`
+      itself (365) -- edge_case's `tau_3_long=350.23` is almost as long as
+      that window, so individuals barely complete a cycle regardless of
+      `R_long` or starting-cohort size. HPC test #1 confirmed the shortfall
+      disappears at `final_time=1095` (3 years) even at the default
+      `infected_individuals_at_start=10` -- the `infected_individuals_at_start`
+      tuning (10->30->40->60) from the same night was chasing an artifact
+      of testing at the wrong duration, not a real fix; reverted back to 10.
+      Separately, HPC test #2 (all 3 scenarios x R_long in {1.0,1.3}, narrow
+      `NSR_RANGES['cal1_long_nsr']`=0.0005-0.002) found the SOT/HIV weak-fit
+      question was real, not diagnostic-seed noise: observed OSR never got
+      within 3.6-14x of `target_osr_long`=0.00205 anywhere in that range
+      (R²=0.002-0.24 everywhere). HPC test #3 (same grid, NSR=0.001-0.1)
+      confirmed a much wider range fixes it: R²=0.54-0.92 across all 6
+      cells, SOT/HIV fully bracketed, edge_case only slightly short (needs
+      NSR≈0.11-0.13 vs sampled max 0.1, small well-constrained
+      extrapolation). Also fixed a bug test #2 surfaced: the
+      `"HIV_low/HIV_high"` combined-scenario label contained a `/`, read as
+      a directory separator by `fit_observed_substitution_rate_regressor`'s
+      file-saving, breaking the fit for both HIV cells -- now joined with
+      `+`. Final values adopted for the next real pipeline run (exp #1):
+      `R_long=1.1` uniformly across all 4 long-shedder scenarios (not the
+      1.0/1.3 split from local-only tuning), `NSR_RANGES['cal1_long_nsr']`
+      widened to 0.01-0.5, `final_time=1095` (3 years), seeds=20 for every
+      stage. **Recalibration required** (as always when R_long/NSR
+      ranges/final_time change).
 
 ------------------------------------------------------------------------
 
