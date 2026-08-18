@@ -21,14 +21,17 @@
 # production scenario (by unique tau_3_long -- HIV_low/HIV_high share a
 # duration in this isolated 100%-long-shedder context, so are tested once
 # and reported together, not duplicated) x R_long in {1.0, 1.3}, sampled at
-# only 3 NSR anchor points (min/mid/max of NSR_RANGES['cal1_long_nsr']) --
-# this is a bracketing check (does the sampled range reach target OSR?), not
-# a full curve-shape scan. final_time = 3 years. infected_individuals_at_start
-# is fixed (not swept). Not part of the impact_long_shedders pipeline itself
-# -- a standalone exploratory tool.
+# only 3 NSR anchor points (min/mid/max, standard 0.001-0.1, overridable via
+# --nsr-min/--nsr-max) -- this is a bracketing check (does the sampled range
+# reach target OSR?), not a full curve-shape scan. final_time = 3 years.
+# infected_individuals_at_start is fixed (not swept). Not part of the
+# impact_long_shedders pipeline itself -- a standalone exploratory tool, and
+# deliberately decoupled from NSR_RANGES['cal1_long_nsr'] in
+# impact_long_shedders_config.py (exploring here never changes that shared
+# production value).
 #
-# Reuses NSR_RANGES['cal1_long_nsr'] and CAL1_ISOLATED_FIXED_PARAMS['R'] from
-# impact_long_shedders_config rather than duplicating them.
+# Reuses CAL1_ISOLATED_FIXED_PARAMS['R'] from impact_long_shedders_config
+# rather than duplicating it.
 #
 # Writes a plain-text recap (Data/tests/test_cal_1_out_#{test_n}.txt) with
 # per-cell fit stats AND raw per-NSR-node mean OSR (so bracketing can be
@@ -59,7 +62,7 @@ import simplicity.tuning.evolutionary_rate as er
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 '..', 'scripts', 'experiments'))
 from impact_long_shedders_config import (
-    SCENARIOS, TAU_ROUND, derive_tau_3_long, CAL1_ISOLATED_FIXED_PARAMS, NSR_RANGES,
+    SCENARIOS, TAU_ROUND, derive_tau_3_long, CAL1_ISOLATED_FIXED_PARAMS,
 )
 
 EXP_NAME = "long_shedder_scenario_r_long_test"
@@ -70,6 +73,14 @@ POPULATION_SIZE = 1000        # fixed -- not swept
 FINAL_TIME = 365 * 3          # 3 years
 TARGET_OSR_LONG = 0.00205     # reference line only (same default as cal_1)
 
+# Standard NSR bracket for this test -- 0.0005-0.002 (NSR_RANGES['cal1_long_nsr']
+# in impact_long_shedders_config.py) turned out to sit on a near-flat part of
+# the OSR-vs-NSR curve (test #2: OSR never got within 3.6-14x of the target
+# across every scenario/R_long combo). 0.001-0.1 is the next range to probe;
+# override via --nsr-min/--nsr-max for anything else.
+DEFAULT_NSR_MIN = 0.001
+DEFAULT_NSR_MAX = 0.1
+
 RUNNERS = {
     'serial': simplicity.runners.serial,
     'multiprocessing': simplicity.runners.multiprocessing,
@@ -78,16 +89,19 @@ RUNNERS = {
 
 
 def unique_tau_labels(sp):
-    """{rounded tau_3_long: 'SOT' / 'HIV_low/HIV_high' / 'edge_case'} across
+    """{rounded tau_3_long: 'SOT' / 'HIV_low+HIV_high' / 'edge_case'} across
     every long-shedder scenario, deduplicated by tau (HIV_low and HIV_high
-    share a duration, hence a label, in this isolated context)."""
+    share a duration, hence a label, in this isolated context). '+' not '/'
+    -- this label is also used as fit_observed_substitution_rate_regressor's
+    experiment_group, which becomes part of a saved-results file path, and
+    '/' would be read as a directory separator there."""
     labels = {}
     for s in SCENARIOS:
         if s["long_shedders_ratio"] <= 0.0:
             continue
         tau = round(derive_tau_3_long(s, sp), TAU_ROUND)
         labels.setdefault(tau, []).append(s["name"])
-    return {tau: "/".join(names) for tau, names in labels.items()}
+    return {tau: "+".join(names) for tau, names in labels.items()}
 
 
 def build_settings(nsr_values, tau_labels, n_seeds):
@@ -291,13 +305,19 @@ def main():
                         choices=['serial', 'multiprocessing', 'slurm'])
     parser.add_argument('--n-seeds', type=int, default=10,
                         help="Seeds per (tau, R_long, NSR) grid point (default 10).")
+    parser.add_argument('--nsr-min', type=float, default=DEFAULT_NSR_MIN,
+                        help=f"Min NSR anchor point (default {DEFAULT_NSR_MIN}). "
+                            "Deliberately decoupled from NSR_RANGES['cal1_long_nsr'] "
+                            "in impact_long_shedders_config.py -- exploring here "
+                            "never changes that shared production value.")
+    parser.add_argument('--nsr-max', type=float, default=DEFAULT_NSR_MAX,
+                        help=f"Max NSR anchor point (default {DEFAULT_NSR_MAX}).")
     args = parser.parse_args()
 
     sp = sm.read_standard_parameters_values()
     tau_labels = unique_tau_labels(sp)
 
-    ranges = NSR_RANGES['cal1_long_nsr']
-    nsr_min, nsr_max = ranges['min'], ranges['max']
+    nsr_min, nsr_max = args.nsr_min, args.nsr_max
     nsr_mid = float(np.sqrt(nsr_min * nsr_max))
     nsr_values = [nsr_min, nsr_mid, nsr_max]
 
