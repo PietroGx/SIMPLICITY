@@ -7,9 +7,8 @@ Figure_*.png
 structure.txt
 
 # Data/ holds simulation outputs and machine-local reference parameter files
-# (standard_values.json, parameter_specs.json, ...) -- keep those ignored,
-# but track the hand-edited NSR sweep ranges as versioned config.
+# (standard_values.json, parameter_specs.json, ...) -- all machine-local,
+# none versioned. Pipeline-specific config (e.g. impact_long_shedders'
+# SCENARIOS/NSR_RANGES) lives in scripts/experiments/impact_long_shedders_config.py
+# instead, as plain code -- not a Data/ reference file.
 Data/*
-!Data/00_Reference_parameters/
-Data/00_Reference_parameters/*
-!Data/00_Reference_parameters/impact_long_shedders_nsr_ranges.json

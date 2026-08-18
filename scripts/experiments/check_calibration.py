@@ -11,7 +11,7 @@
 import sys
 import argparse
 
-from experiments.long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
+from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
 
 def main():

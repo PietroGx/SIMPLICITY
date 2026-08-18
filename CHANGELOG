@@ -5,6 +5,96 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.16 — 2026-08-18 — pietro gerletti
+
+Local testing/tuning of cal_1's isolated long-shedder context under the new
+directly-specified R_long design (2.4.15), plus a new standalone HPC
+exploration tool.
+
+* `CAL1_ISOLATED_FIXED_PARAMS['population_size']` 5000 -> 1000 (the 5000
+  bump from 2.4.14 was overkill once R_long stopped being formula-derived).
+* `SCENARIOS['R_long']`: SOT and HIV_low/HIV_high raised 1.0 -> 1.3 --
+  confirmed via 30 local multiprocessing simulations (10 seeds each) that
+  1.0 leaves a ~1-in-3 chance of stochastic extinction before 365 days
+  (expected near-critical behavior, not a bug), while 1.3 survives 10/10
+  for both groups. edge_case stays at 1.0 (already 10/10 at that value).
+* Running the real `cal_1.py` end-to-end at these values (150 local sims,
+  0 failures) surfaced a *second*, distinct problem beyond survival:
+  edge_case's simulations reach the full 365 days but only accumulate
+  3-8 sequenced diagnoses each (vs `min_seq=30`) -- tau_3_long=350.23 is
+  almost as long as final_time=365, so individuals barely complete a full
+  infectious cycle within the window. Confirmed raising R_long does NOT
+  fix this (transmission rate isn't the bottleneck); raising
+  `infected_individuals_at_start` (more parallel starting cohorts) helps
+  substantially (3-8 -> 20-39 seqs at 60) but at 60 it also pushes SOT into
+  early depletion (most seeds now end via "No susceptibles left" well
+  before 365 days) -- a genuine three-way tension between edge_case's
+  sequencing needs, SOT's survival, and a single shared parameter. Not yet
+  resolved -- `infected_individuals_at_start` stays at its prior value (10)
+  pending further tuning; edge_case's calibration fit is still unusable as
+  of this commit. SOT and HIV_low's fits are also currently poor (R² near
+  0 / weak) at only 5 diagnostic seeds/NSR-point -- not yet determined
+  whether that's genuine NSR-range mismatch or just statistical noise from
+  the small diagnostic seed count.
+* New `tests/test_long_shedder_r_long_grid.py`: standalone HPC tool (not
+  part of the impact_long_shedders pipeline) that sweeps the isolated
+  long-shedder NSR calibration over a grid of R_long (1/1.5/2/4) x
+  starting-infected-count (10/50/100), for one tau_3_long borrowed from a
+  chosen production scenario (`--scenario`, default edge_case), at
+  final_time=3 years. Produces one combined figure (R_long x starting-count
+  grid, shared axes, R²/mean-final-time annotated per cell) to visually
+  compare calibration curves before picking real defaults. Reuses
+  `NSR_RANGES['cal1_long_nsr']` and `CAL1_ISOLATED_FIXED_PARAMS['R']` from
+  `impact_long_shedders_config.py` rather than duplicating them.
+
+------------------------------------------------------------------------
+
+## Version 2.4.15 — 2026-08-17 — pietro gerletti
+
+Run #4 still failed (only the mildest tau group produced usable data, with
+a garbage R²=0.033 fit) -- root cause traced to the beta-matching R_long
+design itself (2.4.12): holding beta_long == beta_standard necessarily
+makes total R_long grow with duration, giving cal_1's isolated 100%-LS
+context an effective R of 4.6-31 that burns through any population size.
+Redesigned R_long, reverted the core changes that design required, and
+used the occasion to tidy `scripts/`.
+
+* **R_long is now directly specified per scenario, not derived from
+  anything.** Decided to hold *total* R_long constant across durations
+  instead of the *daily* rate -- and to make it a plain value rather than
+  a formula at all. `SCENARIOS` (`impact_long_shedders_config.py`) gained
+  an `R_long` field per entry (replacing `beta_multiplier`), defaulting to
+  `1.0` for SOT/HIV_low/HIV_high/edge_case.
+* **Reverted `simplicity/settings_manager.py` to its pre-2.4.12 shape**:
+  removed `compute_r_long` entirely; `R_long` is a plain flat default in
+  `standard_values.json` again (same pattern as `long_shedders_ratio`);
+  `check_parameters_names` validates against `standard_values.json` again;
+  no special-casing left in `read_settings_and_write_simulation_parameters`.
+* Two scenarios can now share a duration but have different R_long
+  (HIV_low/HIV_high) -- cal_1's grid
+  (`unique_long_tau_r_long_pairs`), `long_nsr_calibration_plot.py`,
+  `cal_2.py::compute_long_nsr_per_tau`, and `lookup_long_nsr` all now
+  group/key by the `(tau_3_long, R_long)` pair instead of tau alone.
+* `--beta-multiplier-long` removed from cal_1/cal_2/the pipeline
+  orchestrator (no multiplier-on-R concept left); `--R`/`--r-cal1`/
+  `--r-cal2` stay (still real, CLI-useful, just unrelated to R_long now).
+* **Removed the NSR-ranges JSON reference file** the same way: NSR ranges
+  were the "one exception" `impact_long_shedders_config.py`'s own docstring
+  called out to its "this is the only file to touch" principle. Both NSR
+  ranges and R_long are now plain code in that one file, no external
+  `Data/` reference file, no exceptions left. Deleted
+  `impact_long_shedders_nsr_ranges.json` and its `.gitignore` carve-out.
+* **Tidied `scripts/`**: moved `check_calibration.py` and
+  `plot_sot_sanity_regressions.py` into `scripts/experiments/` (both are
+  impact_long_shedders-specific); left generic tools in `scripts/`.
+  Deleted `scripts/plot_calibration_step_1.py` -- dead code referencing a
+  script/naming convention (`calibrate_impact_long_shedders.py`,
+  `imp_ls_cal_{scenario}_#{exp_num}`) that no longer exists anywhere in
+  the repo, superseded by the current cal_1/cal_2/exp pipeline.
+* Recalibration required.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.14 — 2026-08-17 — pietro gerletti
 
 Run #3 failed: cal_1's isolated ("100% LS") calibration context now
