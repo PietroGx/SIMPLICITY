@@ -5,6 +5,35 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.19 — 2026-08-18 — pietro gerletti
+
+Applying the values HPC test #3 validated to the real pipeline, ready for a
+fresh run starting back at `--exp-num 1`.
+
+* `SCENARIOS['R_long']`: unified to `1.1` for all 4 long-shedder scenarios
+  (SOT/HIV_low/HIV_high/edge_case), replacing the 1.0/1.3 split from
+  local-only tuning -- both values bracketed target OSR reasonably in test
+  #3, no reason to keep them different.
+* `NSR_RANGES['cal1_long_nsr']`: `0.0005-0.002` -> `0.01-0.5` -- the old
+  range never got within 3.6-14x of `target_osr_long`=0.00205 anywhere
+  (test #2); the new one brackets it cleanly for SOT/HIV and nearly so for
+  edge_case (test #3, R²=0.54-0.92 across the board, up from 0.002-0.24).
+* `CAL1_ISOLATED_FIXED_PARAMS['final_time']`: `365` -> `1095` (3 years) --
+  matches what these R_long/NSR values were actually validated against on
+  the HPC. Also reverted `infected_individuals_at_start` back to `10`
+  (from an uncommitted, never-fully-validated `40`) -- the sequencing
+  shortfall that motivated raising it turned out to be a `final_time`
+  problem, not a starting-cohort-size problem (see BACKLOG.md).
+* Seeds: default `20` for every stage (`cal_1.py --seeds`, `cal_2.py
+  --seeds`, `exp.py --seeds`, pipeline orchestrator `--cal-seeds`/
+  `--exp-seeds`) -- was `50` (cal_1/orchestrator) or required-with-no-
+  default (`cal_2.py`/`exp.py`).
+* `BACKLOG.md`'s "edge_case sequencing shortfall vs. SOT depletion" item
+  marked resolved, with the full root-cause chain (final_time, not
+  R_long/infected_individuals_at_start) and test #1-3 findings recorded.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.18 — 2026-08-18 — pietro gerletti
 
 Follow-up to test #2's results (uploaded from the HPC): confirmed, across

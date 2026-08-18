@@ -45,10 +45,10 @@ import simplicity.settings_manager as sm
 # unique_long_tau_r_long_pairs).
 SCENARIOS = [
     {"name": "control",   "inf_duration_long": None,  "long_shedders_ratio": 0.00, "R_long": None},
-    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.01, "R_long": 1.3},
-    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.01, "R_long": 1.3},
-    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.12, "R_long": 1.3},
-    {"name": "edge_case", "inf_duration_long": 365.0, "long_shedders_ratio": 0.01, "R_long": 1.0},
+    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.01, "R_long": 1.1},
+    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.01, "R_long": 1.1},
+    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.12, "R_long": 1.1},
+    {"name": "edge_case", "inf_duration_long": 365.0, "long_shedders_ratio": 0.01, "R_long": 1.1},
 ]
 
 TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
@@ -137,7 +137,7 @@ CAL1_ISOLATED_FIXED_PARAMS = {
     "R": 1.0,
     "population_size": 1000,
     "infected_individuals_at_start": 10,
-    "final_time": 365,
+    "final_time": 365 * 3,  # 3 years -- matches what R_long/NSR_RANGES were validated against
     "sequence_long_shedders": True,
     # R_long deliberately absent: build_cal1_settings sets it per
     # (tau_3_long, R_long) pair straight from SCENARIOS.
@@ -313,7 +313,7 @@ def build_exp_scenario_settings(row, n_seeds):
 _NSR_STEPS = 10
 
 NSR_RANGES = {
-    "cal1_long_nsr": {"min": 0.0005, "max": 0.002, "steps": _NSR_STEPS},
+    "cal1_long_nsr": {"min": 0.01, "max": 0.5, "steps": _NSR_STEPS},
     "cal2_standard_nsr": {
         "control":   {"min": 1e-05, "max": 3e-04, "steps": _NSR_STEPS},
         "SOT":       {"min": 1e-05, "max": 3e-04, "steps": _NSR_STEPS},

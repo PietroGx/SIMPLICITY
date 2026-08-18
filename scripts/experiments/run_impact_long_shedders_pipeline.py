@@ -197,9 +197,9 @@ def main():
                         choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
     parser.add_argument('--target-osr-std', type=float, default=0.0013)
     parser.add_argument('--target-osr-long', type=float, default=0.00205)
-    parser.add_argument('--cal-seeds', type=int, default=50,
+    parser.add_argument('--cal-seeds', type=int, default=20,
                         help="Seeds per grid point, cal_1 and cal_2.")
-    parser.add_argument('--exp-seeds', type=int, default=50,
+    parser.add_argument('--exp-seeds', type=int, default=20,
                         help="Seeds per scenario, final production stage.")
     parser.add_argument('--skip-cal1', action='store_true',
                         help=f"Reuse an already-computed {LONG_NSR_EXP_NAME}_#{{exp_num}} "
