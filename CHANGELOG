@@ -5,6 +5,38 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.18 — 2026-08-18 — pietro gerletti
+
+Follow-up to test #2's results (uploaded from the HPC): confirmed, across
+all 3 scenarios x both R_long values, that NSR_RANGES['cal1_long_nsr']
+(0.0005-0.002) sits on a near-flat part of the OSR-vs-NSR curve -- observed
+OSR only moved 0-37% for a 4x change in NSR, nowhere close to bracketing
+target_osr_long=0.00205 (worst case edge_case: ~11-14x below target even at
+max sampled NSR).
+
+* Fixed a real bug test #2 surfaced: the `"HIV_low/HIV_high"` combined-
+  scenario label (used both for display and as
+  `fit_observed_substitution_rate_regressor`'s `experiment_group`, which
+  becomes part of a saved-results file path) contained a `/`, so it was
+  read as a directory separator and the fit-results save failed for both
+  HIV_low+HIV_high cells ("Cannot save file into a non-existent
+  directory"). Now joined with `+` instead. The raw per-NSR-point OSR data
+  for those cells was unaffected (captured earlier in the pipeline) --
+  only the fit itself and its plot line were missing.
+* `--nsr-min`/`--nsr-max` are now real CLI flags (previously the range came
+  straight from `NSR_RANGES['cal1_long_nsr']`, so probing a different
+  range meant either editing that shared production value or passing an
+  override with no visible default). New standard default: **0.001-0.1**
+  (10-50x higher than the old range) -- the next bracket to probe, based
+  on test #2's finding that OSR barely responds within 0.0005-0.002.
+  Exploring here never touches `NSR_RANGES['cal1_long_nsr']` itself.
+  `python tests/test_long_shedder_r_long_grid.py <test_n>` now runs this
+  new default range with no extra flags needed; same 180 simulations
+  (3 scenarios x 2 R_long x 3 NSR points x default 10 seeds) regardless of
+  which range is selected.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.17 — 2026-08-18 — pietro gerletti
 
 Reworked `tests/test_long_shedder_r_long_grid.py` based on the first HPC
