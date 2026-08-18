@@ -19,8 +19,8 @@
 # Used by impact_long_shedders_cal_1.py right after its long-NSR calibration
 # grid finishes (saved into that experiment's own 05_Plots folder, so it can
 # be reviewed at the end of a pipeline run and used to retune
-# cal1_long_nsr in the NSR-ranges reference file), and by
-# scripts/check_calibration.py as a standalone manual-rerun tool.
+# cal1_long_nsr in impact_long_shedders_config.py), and by
+# check_calibration.py as a standalone manual-rerun tool.
 # ============================================================================
 
 import os
@@ -36,45 +36,45 @@ import simplicity.settings_manager as sm
 import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
 
-# This module is imported both as a plain sibling (from
-# impact_long_shedders_cal_1.py, run directly from this directory) and as a
-# dotted submodule (experiments.long_nsr_calibration_plot, from
-# scripts/check_calibration.py, run directly from the parent directory) --
-# those two entry points put different directories on sys.path[0]. Ensure
-# this file's own directory is always importable so the sibling import below
-# resolves in both cases.
+# Imported as a plain sibling by both impact_long_shedders_cal_1.py and
+# check_calibration.py (both live in this same directory). Ensure this
+# file's own directory is on sys.path regardless of the caller's cwd, so the
+# sibling import below always resolves.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from impact_long_shedders_config import (
     SCENARIOS, TAU_ROUND, DEFAULT_COLORS, derive_tau_3_long,
 )
 
 
-def _tau_labels_and_colors(sp):
-    """Map each corrected tau_3_long value back to its scenario name/color."""
+def _tau_r_long_labels_and_colors(sp):
+    """Map each (tau_3_long, R_long) pair back to its scenario name/color."""
     labels, colors = {}, {}
     color_cycle = iter(DEFAULT_COLORS)
     for scenario in SCENARIOS:
         if scenario["long_shedders_ratio"] <= 0.0:
             continue
-        tau = round(derive_tau_3_long(scenario, sp), TAU_ROUND)
-        if tau not in labels:
-            labels[tau] = scenario["name"]
-            colors[tau] = next(color_cycle, "black")
+        key = (round(derive_tau_3_long(scenario, sp), TAU_ROUND),
+               round(float(scenario["R_long"]), TAU_ROUND))
+        if key not in labels:
+            labels[key] = scenario["name"]
+            colors[key] = next(color_cycle, "black")
     return labels, colors
 
 
 def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
                                       model_type='exp', min_seq=30, min_len=100):
     """
-    Extracts per-seed OSR for every (tau_3_long, NSR) grid point of
+    Extracts per-seed OSR for every (tau_3_long, R_long, NSR) grid point of
     `experiment_name`, outlier-filters per grid point, fits a regressor per
-    tau_3_long group, inverts at `target_osr_long`, and saves a multi-curve
-    calibration figure into the experiment's 05_Plots folder.
+    (tau_3_long, R_long) group -- two scenarios can share a duration but
+    have different R_long, so grouping by tau alone would conflate them --
+    inverts at `target_osr_long`, and saves a multi-curve calibration
+    figure into the experiment's 05_Plots folder.
 
-    Returns {tau_3_long: calibrated_nsr}.
+    Returns {(tau_3_long, R_long): calibrated_nsr}.
     """
     sp = sm.read_standard_parameters_values()
-    labels, colors = _tau_labels_and_colors(sp)
+    labels, colors = _tau_r_long_labels_and_colors(sp)
 
     print(f"--- Analyzing long-shedder NSR calibration: {experiment_name} ---")
 
@@ -84,6 +84,7 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
     for sod in simulation_output_dirs:
         nsr_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'nucleotide_substitution_rate')
         tau_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'tau_3_long')
+        r_long_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'R_long')
 
         seeded_dirs = dm.get_seeded_simulation_output_dirs(sod)
         sod_rows = []
@@ -95,6 +96,7 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
                     osr_val = er.tempest_regression(seq_data).coef_[0]
                     sod_rows.append({
                         'tau_3_long': tau_val,
+                        'R_long': r_long_val,
                         'nucleotide_substitution_rate': nsr_val,
                         'observed_substitution_rate': osr_val,
                     })
@@ -115,16 +117,17 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
     clean_df = master_df[master_df['is_outlier'] == 0]
 
     plt.figure(figsize=(10, 6))
-    tau_groups = sorted(clean_df['tau_3_long'].unique())
+    clean_df['_group_key'] = list(zip(clean_df['tau_3_long'], clean_df['R_long']))
+    tau_r_long_groups = sorted(clean_df['_group_key'].unique())
     results = {}
 
     print(f"\n--- Calibration results (target long OSR = {target_osr_long}) ---")
 
-    for tau in tau_groups:
-        group_df = clean_df[clean_df['tau_3_long'] == tau]
-        key = round(float(tau), TAU_ROUND)
+    for tau, r_long in tau_r_long_groups:
+        group_df = clean_df[clean_df['_group_key'] == (tau, r_long)]
+        key = (round(float(tau), TAU_ROUND), round(float(r_long), TAU_ROUND))
         color = colors.get(key, 'black')
-        label = labels.get(key, f'tau={tau}')
+        label = labels.get(key, f'tau={tau},R_long={r_long}')
 
         plt.scatter(group_df['nucleotide_substitution_rate'],
                    group_df['observed_substitution_rate'],
@@ -140,7 +143,7 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
 
         try:
             calibrated_nsr = er.compute_calibrated_parameter(model_type, fit_result, target_osr_long)
-            results[tau] = float(calibrated_nsr)
+            results[key] = float(calibrated_nsr)
             print(f"{label:<17}: NSR = {calibrated_nsr:.6f}")
         except Exception as e:
             print(f"{label:<17}: Could not compute calibration ({e})")

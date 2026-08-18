@@ -107,6 +107,25 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 - [ ] Figure 3 Panel C: verify the per-seed pairwise-Hamming cap (200 sampled
       pairs) in the consistency check is generous enough once real genome
       counts per seed are known; tune if not.
+- [ ] **cal_1's isolated calibration: edge_case sequencing shortfall vs.
+      SOT depletion, sharing one parameter** — edge_case
+      (`tau_3_long=350.23`) reaches the full 365-day `final_time` but only
+      accumulates 3-8 sequenced diagnoses per seed (needs `min_seq=30`) --
+      `tau_3_long` is almost as long as `final_time`, so individuals barely
+      complete a full cycle. Raising `R_long` doesn't help (confirmed).
+      Raising `CAL1_ISOLATED_FIXED_PARAMS['infected_individuals_at_start']`
+      (10->60) does (3-8 -> 20-39 seqs), but at 60 it also pushes SOT
+      (`R_long=1.3`) into early depletion (most seeds end via "No
+      susceptibles left" well before 365 days) -- a single shared parameter
+      with competing pressures across scenarios. Needs either an
+      intermediate value that satisfies both (untested), or a per-scenario
+      starting-cohort size (would need a new SCENARIOS field, out of
+      tonight's tuning scope). `tests/test_long_shedder_r_long_grid.py`
+      (new) can help explore this systematically on the HPC. Also open:
+      SOT/HIV_low's calibration fits are currently poor (R² near 0 / weak)
+      at only 5 diagnostic seeds/NSR-point -- not yet determined whether
+      that's a genuine `NSR_RANGES['cal1_long_nsr']` mismatch or just
+      statistical noise from the small diagnostic seed count.
 
 ------------------------------------------------------------------------
 
@@ -193,6 +212,41 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
       instead, correctly decoupling "valid parameter name" from "has a
       static default". **Recalibration required**: any experiment run
       before this fix used the old, uncorrected R_long.
+      **Superseded same day** — see the entry below: this beta-matching
+      design (`R_long` derived from `R`) turned out to make the isolated
+      cal_1 context deplete its population before producing usable data
+      (run #3/#4), and was replaced with directly-specified per-scenario
+      `R_long` values instead of any formula.
+- [x] **R_long redesigned again: directly-specified per scenario, no
+      formula at all** — after 2.4.14's population/duration bump for cal_1
+      still wasn't enough (run #4: only the mildest tau group produced any
+      data, with a garbage R²=0.033 fit), traced the root cause to the
+      *beta-matching* design itself: holding beta_long == beta_standard
+      necessarily makes R_long (total secondary infections) grow with
+      duration, so cal_1's 100%-long-shedder isolated population had an
+      effective R of 4.6-31 and burned through any population size fast.
+      Decided to hold total R_long constant instead (same lifetime
+      secondary infections regardless of duration, daily rate drops for
+      longer-shedding scenarios) -- and to make it a plain, directly-set
+      value per scenario rather than derived from R by any formula at all.
+      `SCENARIOS` gained an `R_long` field per entry (replacing
+      `beta_multiplier`), defaulting to `1.0` for all four long-shedder
+      scenarios. `simplicity.settings_manager.compute_r_long` removed
+      entirely (reverted to the pre-2.4.12 shape): `R_long` is a plain
+      flat default in `standard_values.json` again (like
+      `long_shedders_ratio`), `check_parameters_names` reverted to
+      validating against `standard_values.json`, no special-casing left in
+      `read_settings_and_write_simulation_parameters`. Consequence: two
+      scenarios can now share a duration but have different R_long
+      (HIV_low/HIV_high), so cal_1's grid (`unique_long_tau_r_long_pairs`),
+      `long_nsr_calibration_plot.py`, `cal_2.py::compute_long_nsr_per_tau`,
+      and `lookup_long_nsr` all group/key by the `(tau_3_long, R_long)`
+      pair instead of tau alone. Also removed NSR_RANGES' JSON reference
+      file (`impact_long_shedders_nsr_ranges.json`) the same way -- both
+      NSR ranges and R_long are now plain code in
+      `impact_long_shedders_config.py`, no external Data/ file, matching
+      that file's own "this is the only file to touch" principle with no
+      exceptions left. **Recalibration required.**
 - [x] **`infect_long_shedder` recruitment probability decoupled from
       `long_shedders_ratio`** — fixed: `population_model.py:139-146`'s
       per-new-infection recruitment check used a hardcoded `0.01` literal
@@ -226,6 +280,18 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 
 ## Technical Debt
 
+- [x] `scripts/` mixed impact_long_shedders-specific files with generic
+      utilities — fixed: moved `check_calibration.py` and
+      `plot_sot_sanity_regressions.py` into `scripts/experiments/` (both are
+      only meaningful to this pipeline); left generic tools
+      (`archive_experiment.py`, `check_completed_simulations.py`,
+      `fit_OSR.py`, `generate_user_set_parameters_file.py`,
+      `get_NSR_for_model_from_OSR.py`, `nextstrain.py`, the `.sh` scripts) in
+      `scripts/`. Deleted `scripts/plot_calibration_step_1.py`: its own
+      header referenced `calibrate_impact_long_shedders.py`
+      (`imp_ls_cal_{scenario}_#{exp_num}`), a script/naming convention that
+      no longer exists anywhere in the repo (superseded by the cal_1/cal_2/
+      exp pipeline) — genuinely dead code, nothing else referenced it.
 - [x] Memory and runtime requests to slurm are hardcoded in the runner —
       fixed: `simplicity/runners/slurm.py` now reads `SIMPLICITY_SLURM_MEM`/
       `SIMPLICITY_SLURM_TIME` env vars (same pattern already used for

@@ -36,7 +36,7 @@ mkdir -p "$LOG_DIR"
 echo "Sanity plot: exp_num=$EXP_NUM (all long-shedder scenarios, combined grid)"
 date
 
-python scripts/plot_sot_sanity_regressions.py \
+python scripts/experiments/plot_sot_sanity_regressions.py \
     --exp-num "$EXP_NUM" \
     --target-osr-std "$TARGET_OSR_STD" \
     --target-osr-long "$TARGET_OSR_LONG" \

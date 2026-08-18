@@ -39,12 +39,6 @@ def get_parameter_specs_file_path():
     parameter_specs_file_path = os.path.join(dm.get_reference_parameters_dir(), "parameter_specs.json")
     return parameter_specs_file_path
 
-def compute_r_long(R, tau_2, tau_3, tau_3_long, multiplier=1.0):
-    """R_long giving beta_long == beta_standard * multiplier. Not a static
-    default (see write_standard_parameters_values) -- always derived."""
-    beta_standard = R / (tau_2 + tau_3)
-    return beta_standard * multiplier * (tau_2 + tau_3_long)
-
 def write_standard_parameters_values():
     filename= get_standard_parameters_values_file_path()
     standard_values = {
@@ -57,7 +51,7 @@ def write_standard_parameters_values():
         "tau_3_long": 133.5,
         "tau_4": 8,
         "R": 1.1,
-        # R_long has no static default -- derived via compute_r_long (above).
+        "R_long": 1,
         "diagnosis_rate_standard": 0.1, # in percentage, will be converted to kds in model
         "diagnosis_rate_long"    : 0.1, # in percentage, will be converted to kdl in model
         "IH_virus_emergence_rate": 0,      # k_v in theoretical model equations
@@ -152,9 +146,9 @@ def get_n_seeds_file_path(experiment_name):
                         f'{experiment_name}_n_seeds.json')
 
 def check_parameters_names(parameters_dic):
-    PARAMETER_SPECS = read_parameter_specs()
+    STANDARD_VALUES = read_standard_parameters_values()
     for key in parameters_dic.keys():
-        if key not in PARAMETER_SPECS.keys():
+        if key not in STANDARD_VALUES.keys():
             raise ValueError(f'Parameter {key} is not a valid parameter')
 
 def read_experiment_settings(experiment_name):
@@ -366,11 +360,6 @@ def read_settings_and_write_simulation_parameters(experiment_name):
             key: value for key, value in experiment_settings.items()
             if key in STANDARD_VALUES and value != STANDARD_VALUES[key]
         }
-        # R_long has no standard-values entry to compare against (always
-        # derived), so surface it in the filename whenever an experiment
-        # sets it explicitly instead of dropping it from modified_params.
-        if 'R_long' in experiment_settings:
-            modified_params['R_long'] = experiment_settings['R_long']
         # Fallback: if all params match standard, name it by index
         if not modified_params:
             file_name = 'standard_values.json'
@@ -383,9 +372,6 @@ def read_settings_and_write_simulation_parameters(experiment_name):
 
         # Merge the standard values with the current experiment settings
         settings = {**STANDARD_VALUES, **experiment_settings}
-        if 'R_long' not in settings:
-            settings['R_long'] = compute_r_long(
-                settings['R'], settings['tau_2'], settings['tau_3'], settings['tau_3_long'])
 
         # Write the simulation parameters to a JSON file
         write_simulation_parameters(simulation_parameters_file_path, 

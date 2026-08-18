@@ -20,22 +20,22 @@ import argparse
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    LONG_NSR_EXP_NAME, CAL1_ISOLATED_FIXED_PARAMS, build_cal1_settings,
-    read_nsr_ranges, add_slurm_resource_args, set_slurm_resource_env,
+    LONG_NSR_EXP_NAME, CAL1_ISOLATED_FIXED_PARAMS, NSR_RANGES,
+    build_cal1_settings, add_slurm_resource_args, set_slurm_resource_env,
     print_fixed_params,
 )
 from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
 
-def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R, multiplier):
+def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R):
     print("\n=========================================================")
     print(f" PHASE 1: ISOLATED LONG-SHEDDER CALIBRATION "
-         f"(beta_long == beta_standard * {multiplier}, R={R}, 100% LS)")
+         f"(R={R}, R_long per SCENARIOS, 100% LS)")
     print("=========================================================\n")
 
     exp_name = LONG_NSR_EXP_NAME
-    ranges = read_nsr_ranges()['cal1_long_nsr']
-    settings_func = build_cal1_settings(seeds, ranges, R=R, multiplier=multiplier)
+    ranges = NSR_RANGES['cal1_long_nsr']
+    settings_func = build_cal1_settings(seeds, ranges, R=R)
 
     varying_params, fixed_params, n_seeds = settings_func()
     print_fixed_params(fixed_params)
@@ -70,16 +70,14 @@ def main():
                             "calibration-fit plot (not for the grid itself).")
     parser.add_argument('--R', type=float, default=CAL1_ISOLATED_FIXED_PARAMS['R'],
                         help="Reference R for this isolated context's "
-                            f"beta_standard (default {CAL1_ISOLATED_FIXED_PARAMS['R']}).")
-    parser.add_argument('--beta-multiplier-long', type=float, default=1.0,
-                        help="Long-shedder daily-rate multiplier relative to "
-                            "beta_standard (1.0 = same daily rate).")
+                            f"standard individuals (default {CAL1_ISOLATED_FIXED_PARAMS['R']}); "
+                            "unrelated to R_long, which is set per scenario in "
+                            "impact_long_shedders_config.SCENARIOS.")
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
-    run_isolated_calibration(args.exp_num, args.runner, args.seeds, args.target_osr_long,
-                             args.R, args.beta_multiplier_long)
+    run_isolated_calibration(args.exp_num, args.runner, args.seeds, args.target_osr_long, args.R)
 
 
 if __name__ == "__main__":

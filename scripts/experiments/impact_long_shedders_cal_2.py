@@ -52,8 +52,8 @@ import simplicity.tuning.evolutionary_rate as er
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
     TAU_ROUND, DEFAULT_COLORS, LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME,
-    USER_FIXED_PARAMS, lookup_long_nsr, build_cal2_scenario_groups,
-    build_cal2_settings, read_nsr_ranges, add_slurm_resource_args,
+    USER_FIXED_PARAMS, NSR_RANGES, lookup_long_nsr, build_cal2_scenario_groups,
+    build_cal2_settings, add_slurm_resource_args,
     set_slurm_resource_env, print_fixed_params,
 )
 
@@ -70,10 +70,14 @@ def compute_long_nsr_per_tau(long_calib_exp, target_osr_long,
                              model_type='exp', min_seq=30, min_len=100):
     """
     Replicates the per-group extraction from check_calibration.py:
-    extract per-seed OSR grouped by tau_3_long, outlier-filter per grid point,
-    fit an 'exp' regressor per group, invert at target_osr_long.
+    extract per-seed OSR grouped by (tau_3_long, R_long), outlier-filter per
+    grid point, fit an 'exp' regressor per group, invert at target_osr_long.
+    Grouped by the PAIR, not tau alone, since two scenarios can share a
+    duration (HIV_low/HIV_high) but have different R_long -- cal_1's
+    isolated context can't disambiguate them by long_shedders_ratio like
+    Stage 2 does (it's uniformly 1.0 there).
 
-    Returns {round(tau_3_long, TAU_ROUND): calibrated_long_nsr}.
+    Returns {(round(tau_3_long, TAU_ROUND), round(R_long, TAU_ROUND)): calibrated_long_nsr}.
     """
     print(f"\n[Stage 1] Long-shedder NSR calibration from: {long_calib_exp}")
     print(f"          target long OSR = {target_osr_long}")
@@ -86,6 +90,8 @@ def compute_long_nsr_per_tau(long_calib_exp, target_osr_long,
             sod, 'nucleotide_substitution_rate')
         tau_val = sm.get_parameter_value_from_simulation_output_dir(
             sod, 'tau_3_long')
+        r_long_val = sm.get_parameter_value_from_simulation_output_dir(
+            sod, 'R_long')
 
         seeded_dirs = dm.get_seeded_simulation_output_dirs(sod)
         sod_rows = []
@@ -97,6 +103,7 @@ def compute_long_nsr_per_tau(long_calib_exp, target_osr_long,
                     osr_val = er.tempest_regression(seq_data).coef_[0]
                     sod_rows.append({
                         'tau_3_long': tau_val,
+                        'R_long': r_long_val,
                         'nucleotide_substitution_rate': nsr_val,
                         'observed_substitution_rate': osr_val,
                     })
@@ -114,20 +121,22 @@ def compute_long_nsr_per_tau(long_calib_exp, target_osr_long,
 
     master_df = pd.concat(all_rows, ignore_index=True)
     clean_df = master_df[master_df['is_outlier'] == 0]
+    clean_df['_group_key'] = list(zip(clean_df['tau_3_long'], clean_df['R_long']))
 
     long_nsr_by_tau = {}
-    for tau in sorted(clean_df['tau_3_long'].unique()):
-        group_df = clean_df[clean_df['tau_3_long'] == tau]
+    for tau, r_long in sorted(clean_df['_group_key'].unique()):
+        group_df = clean_df[clean_df['_group_key'] == (tau, r_long)]
         fit_result = er.fit_observed_substitution_rate_regressor(
             long_calib_exp,
             group_df,
             model_type=model_type,
             parameter_name='nucleotide_substitution_rate',
-            experiment_group=f"tau_{tau}",
+            experiment_group=f"tau_{tau}_Rlong_{r_long}",
         )
         nsr = er.compute_calibrated_parameter(model_type, fit_result, target_osr_long)
-        long_nsr_by_tau[round(float(tau), TAU_ROUND)] = float(nsr)
-        print(f"          tau_3_long={tau}: long NSR = {nsr:.8f}")
+        key = (round(float(tau), TAU_ROUND), round(float(r_long), TAU_ROUND))
+        long_nsr_by_tau[key] = float(nsr)
+        print(f"          tau_3_long={tau}, R_long={r_long}: long NSR = {nsr:.8f}")
 
     return long_nsr_by_tau
 
@@ -272,11 +281,9 @@ def main():
                         choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
     parser.add_argument('--R', type=float, default=USER_FIXED_PARAMS['R'],
                         help="Standard-population R for this stage and exp "
-                            f"(default {USER_FIXED_PARAMS['R']}).")
-    parser.add_argument('--beta-multiplier-long', type=float, default=1.0,
-                        help="Long-shedder daily-rate multiplier relative to "
-                            "standard individuals, applied to every scenario "
-                            "(1.0 = same daily rate, only duration differs).")
+                            f"(default {USER_FIXED_PARAMS['R']}); unrelated to "
+                            "R_long, which is set per scenario in "
+                            "impact_long_shedders_config.SCENARIOS.")
     parser.add_argument('--model', type=str, default='exp',
                         choices=['lin', 'log', 'exp', 'tan'], help="Fit model.")
     parser.add_argument('--min-seq', type=int, default=30,
@@ -288,7 +295,7 @@ def main():
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
 
-    nsr_ranges = read_nsr_ranges()['cal2_standard_nsr']
+    nsr_ranges = NSR_RANGES['cal2_standard_nsr']
 
     # This pipeline always runs cal_1 -> cal_2 sequentially under the same
     # exp_num, so the long calibration to read from is fixed, not passed in.
@@ -304,11 +311,11 @@ def main():
 
     # --- Build one group per scenario and submit ONE combined experiment ---
     scenario_groups, scenarios_frozen = build_cal2_scenario_groups(
-        nsr_ranges, long_nsr_by_tau, args.R, args.beta_multiplier_long)
+        nsr_ranges, long_nsr_by_tau)
     settings_func = build_cal2_settings(scenario_groups, args.seeds, args.R)
 
-    print(f"\n[Stage 2] Submitting standard-NSR sweep "
-         f"(beta_long == beta_standard * {args.beta_multiplier_long}, R={args.R})")
+    print(f"\n[Stage 2] Submitting standard-NSR sweep (R={args.R}, "
+         f"R_long per SCENARIOS)")
     _, fixed_params, n_seeds = settings_func()
     print_fixed_params(fixed_params)
     print(f"Seeds per grid point: {n_seeds}")
@@ -331,7 +338,7 @@ def main():
     rows = []
     for frozen in scenarios_frozen:
         name = frozen["scenario_name"]
-        long_nsr = (lookup_long_nsr(long_nsr_by_tau, frozen["tau_3_long"])
+        long_nsr = (lookup_long_nsr(long_nsr_by_tau, frozen["tau_3_long"], frozen["R_long"])
                    if frozen["is_long"] else None)
         rows.append({
             "scenario_name": name,

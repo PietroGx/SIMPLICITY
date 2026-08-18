@@ -37,10 +37,10 @@
 # simulations" ping was removed at the source (slurm.py no longer prints it
 # at all -- it fired on every poll cycle once jobs started turning over).
 #
-# NSR sweep ranges are NOT arguments here -- they live in the user-editable
-# Data/00_Reference_parameters/impact_long_shedders_nsr_ranges.json (see
-# impact_long_shedders_config.read_nsr_ranges), reviewed/tuned between runs
-# using the calibration-fit and sanity plots this pipeline produces.
+# NSR sweep ranges (and per-scenario R_long) are NOT arguments here -- they
+# live in impact_long_shedders_config.py (NSR_RANGES / SCENARIOS), reviewed/
+# tuned between runs using the calibration-fit and sanity plots this
+# pipeline produces.
 # ============================================================================
 
 import os
@@ -209,12 +209,9 @@ def main():
                             f"(default {CAL1_ISOLATED_FIXED_PARAMS['R']}).")
     parser.add_argument('--r-cal2', type=float, default=USER_FIXED_PARAMS['R'],
                         help="R for cal_2 and production "
-                            f"(default {USER_FIXED_PARAMS['R']}).")
-    parser.add_argument('--beta-multiplier-long', type=float, default=1.0,
-                        help="Long-shedder daily-rate multiplier relative to "
-                            "standard individuals, applied uniformly across "
-                            "cal_1 and every cal_2/production scenario "
-                            "(1.0 = same daily rate, only duration differs).")
+                            f"(default {USER_FIXED_PARAMS['R']}); unrelated to "
+                            "R_long, which is set per scenario in "
+                            "impact_long_shedders_config.SCENARIOS.")
     parser.add_argument('--log-file', type=str, default=None,
                         help="Defaults to "
                             "Data/pipeline_logs/impact_long_shedders_pipeline_#{exp_num}.log")
@@ -245,7 +242,6 @@ def main():
                       "--seeds", str(args.cal_seeds),
                       "--target-osr-long", str(args.target_osr_long),
                       "--R", str(args.r_cal1),
-                      "--beta-multiplier-long", str(args.beta_multiplier_long),
                       *slurm_res_args], log_fh)
 
         run_stage([py, cal2_path,
@@ -255,7 +251,6 @@ def main():
                   "--target-osr-long", str(args.target_osr_long),
                   "--seeds", str(args.cal_seeds),
                   "--R", str(args.r_cal2),
-                  "--beta-multiplier-long", str(args.beta_multiplier_long),
                   *slurm_res_args], log_fh)
 
         run_stage([py, exp_path,
