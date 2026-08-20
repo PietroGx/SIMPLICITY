@@ -5,6 +5,41 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.20 — 2026-08-20 — pietro gerletti
+
+Real pipeline run #1 (2.4.19's values) got past Stage 1 cleanly -- cal_1's
+fit worked exactly as validated (SOT NSR=0.086, HIV_low/high NSR=0.062,
+edge_case NSR=0.117, all inside the widened 0.01-0.5 range) -- but Stage 2
+hit two new problems.
+
+* `simplicity/dir_manager.py`: `SIMPLICITY_SLURM_MEM` default `3G` -> `4G`.
+  Run #1 had 284 OOM failures across Stage 1+2 (~18% of ~1600 tasks,
+  `reconcile_terminated_tasks` correctly caught and marked them `.failed`
+  rather than hanging) -- likely the much wider `cal1_long_nsr` range
+  (long-shedder NSR now up to 0.5, was 0.002) means more accumulated
+  mutations per genome over the 3-year run, pushing memory past the old
+  default.
+* New `tests/test_long_shedder_std_nsr_grid.py`: Stage 2 counterpart to
+  `test_long_shedder_r_long_grid.py`. Run #1's Stage 2 aborted -- SOT's
+  standard-NSR fit came back essentially flat (R²=0.0003) within
+  `NSR_RANGES['cal2_standard_nsr']`'s OLD range (1e-5-3e-4), correctly
+  triggering the `NSR_SANITY_MAX` guard rather than returning garbage.
+  `control` (no long shedders) fit fine in that same run (0.00019, within
+  range) -- so this is specific to scenarios WITH long shedders: Stage 1's
+  now much higher calibrated long-NSR (0.06-0.12) injects far more
+  diversity into the mixed population than before, apparently swamping the
+  standard individuals' own signal within the old narrow range. Same class
+  of "range doesn't bracket target" problem as Stage 1, on the side that
+  was never re-checked. Uses Stage 1's real fitted long-NSR values from
+  run #1 as fixed per-scenario inputs (not re-derived); sweeps 3 NSR anchor
+  points (default 1e-5-0.05, decoupled from
+  `NSR_RANGES['cal2_standard_nsr']` the same way the Stage 1 test is
+  decoupled from `NSR_RANGES['cal1_long_nsr']`) across all 5 scenarios
+  (control included, as a sanity reference). Same recap-file + combined-
+  figure + zip output pattern as the Stage 1 test.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.19 — 2026-08-18 — pietro gerletti
 
 Applying the values HPC test #3 validated to the real pipeline, ready for a
