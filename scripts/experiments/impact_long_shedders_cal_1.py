@@ -20,22 +20,25 @@ import argparse
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    LONG_NSR_EXP_NAME, CAL1_ISOLATED_FIXED_PARAMS, NSR_RANGES,
+    LONG_NSR_EXP_NAME, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS, NSR_RANGES,
     build_cal1_settings, add_slurm_resource_args, set_slurm_resource_env,
     print_fixed_params,
 )
 from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
 
-def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R):
+def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R,
+                             ih_virus_emergence_rate):
     print("\n=========================================================")
     print(f" PHASE 1: ISOLATED LONG-SHEDDER CALIBRATION "
-         f"(R={R}, R_long per SCENARIOS, 100% LS)")
+         f"(R={R}, R_long per SCENARIOS, 100% LS, "
+         f"k_v={ih_virus_emergence_rate})")
     print("=========================================================\n")
 
     exp_name = LONG_NSR_EXP_NAME
     ranges = NSR_RANGES['cal1_long_nsr']
-    settings_func = build_cal1_settings(seeds, ranges, R=R)
+    settings_func = build_cal1_settings(
+        seeds, ranges, R=R, ih_virus_emergence_rate=ih_virus_emergence_rate)
 
     varying_params, fixed_params, n_seeds = settings_func()
     print_fixed_params(fixed_params)
@@ -44,6 +47,7 @@ def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R):
     for g in varying_params['_scenario_groups']:
         nsr_vals = g['nucleotide_substitution_rate']
         print(f"  tau_3_long={g['tau_3_long']:7.2f}  R_long={g['R_long']:7.4f}  "
+             f"final_time={g['final_time']:5d}  "
              f"NSR grid: {len(nsr_vals)} pts [{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
 
     print(f"\nDispatching grid experiment: {exp_name}_#{exp_num} to {runner}...")
@@ -73,11 +77,18 @@ def main():
                             f"standard individuals (default {CAL1_ISOLATED_FIXED_PARAMS['R']}); "
                             "unrelated to R_long, which is set per scenario in "
                             "impact_long_shedders_config.SCENARIOS.")
+    parser.add_argument('--ih-virus-emergence-rate', type=float,
+                        default=USER_FIXED_PARAMS['IH_virus_emergence_rate'],
+                        help="Intra-host lineage-duplication rate (k_v); "
+                            f"default {USER_FIXED_PARAMS['IH_virus_emergence_rate']}, "
+                            "matching cal_2/exp so Stage 1 is calibrated under "
+                            "the same k_v it will actually run with.")
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
-    run_isolated_calibration(args.exp_num, args.runner, args.seeds, args.target_osr_long, args.R)
+    run_isolated_calibration(args.exp_num, args.runner, args.seeds, args.target_osr_long, args.R,
+                             args.ih_virus_emergence_rate)
 
 
 if __name__ == "__main__":

@@ -33,6 +33,35 @@ Working list of blockers, active refactors, features, and technical debt.
       **Recalibration required**: any experiment run before this fix used
       the wrong R_long for cal_1's grid and must be redone under a fresh
       `--exp-num`.
+- [ ] **cal_1/cal_2 `IH_virus_emergence_rate` (k_v) mismatch — hypothesis
+      pending an A/B test** — real run #1's Stage 2 aborted via
+      `NSR_SANITY_MAX` because SOT's standard-NSR fit was garbage (R²≈0.0003).
+      `tests/test_long_shedder_std_nsr_grid.py` showed the target
+      `osr_std=0.0013` is unreachable for ANY long-shedder scenario across
+      the whole sampled NSR range (floor ≈0.03, 20-50x above target, even
+      near NSR≈0), ruling out "range too narrow." Traced to a structural
+      difference between the two stages: `USER_FIXED_PARAMS['IH_virus_emergence_rate']`
+      = 0.1 (used by cal_2/exp) vs `CAL1_ISOLATED_FIXED_PARAMS` never setting
+      it, silently defaulting to `standard_values.json`'s 0 (used by cal_1) --
+      the one parameter that differed between the context that calibrated
+      cleanly and the one that didn't. Mechanism not fully proven yet
+      (k_v drives `add_lineage`, duplicating intra-host lineages, which
+      plausibly inflates measured OSR), so fixed the inconsistency itself
+      (cal_1 now defaults its `IH_virus_emergence_rate` to
+      `USER_FIXED_PARAMS`'s value, overridable via `--ih-virus-emergence-rate`
+      on `cal_1.py`/the pipeline orchestrator) and built
+      `scripts/experiments/run_kv_ab_test.sh` to test it directly: two
+      full pipeline runs (`--exp-num 2`/`3`, `--cal-seeds 5 --exp-seeds 5`)
+      identical except `--ih-virus-emergence-rate 0` vs `0.1`. Also, while
+      touching cal_1: `CAL1_ISOLATED_FIXED_PARAMS['final_time']` is no
+      longer one uniform 1095 (3y) for every tau group -- now
+      `CAL1_FINAL_TIME_MULTIPLIER=3 * tau_3_long` per group (SOT≈145d,
+      HIV≈283d, edge_case≈1051d), since the uniform 3y window was only
+      validated as *necessary* for edge_case's long tau (see the entry
+      below) and was wasting compute on the shorter-tau scenarios that
+      never needed it. **Recalibration required**, and the A/B test's
+      result should confirm or rule out the k_v hypothesis before the next
+      real production run.
 
 ------------------------------------------------------------------------
 
