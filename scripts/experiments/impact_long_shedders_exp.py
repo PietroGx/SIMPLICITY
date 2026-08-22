@@ -45,7 +45,8 @@ TABLE_FILENAME = "nsr_calibration_table.csv"
 
 # Columns the frozen table must contain.
 REQUIRED_COLUMNS = [
-    "scenario_name", "tau_3_long", "long_shedders_ratio", "R", "R_long",
+    "scenario_name", "tau_3_long", "long_shedders_ratio", "R",
+    "IH_virus_emergence_rate", "R_long",
     "nucleotide_substitution_rate_long", "nucleotide_substitution_rate",
 ]
 
@@ -83,6 +84,7 @@ def dispatch_scenario(row, exp_num, runner, n_seeds):
     print(f"\n{'='*60}")
     print(f"[Dispatch] {EXP_NAME}_{name}")
     print(f"   R            : {float(row['R'])}")
+    print(f"   IH_virus_emergence_rate (k_v) : {float(row['IH_virus_emergence_rate'])}")
     print(f"   standard NSR : {float(row['nucleotide_substitution_rate']):.8f}")
     if float(row["long_shedders_ratio"]) > 0.0:
         print(f"   long NSR     : {float(row['nucleotide_substitution_rate_long']):.8f}")

@@ -5,6 +5,39 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.21 — 2026-08-22 — pietro gerletti
+
+Diagnosed the Stage 2 problem from 2.4.20 further: `tests/
+test_long_shedder_std_nsr_grid.py`'s NSR sweep (1e-5-0.05) showed every
+long-shedder-containing scenario (SOT, HIV_low, HIV_high, edge_case) sitting
+20-50x above `target_osr_std`=0.0013 across the ENTIRE range, including at
+NSR approx 0 -- ruling out "range too narrow" (no NSR value can help once
+the floor itself exceeds target) and pointing at something NSR-independent.
+Found a concrete structural difference between Stage 1 (which calibrated
+cleanly) and Stage 2 (which didn't): `USER_FIXED_PARAMS['IH_virus_emergence_rate']`
+(k_v, drives intra-host lineage duplication) = 0.1, but
+`CAL1_ISOLATED_FIXED_PARAMS` never sets it, silently defaulting to
+`standard_values.json`'s 0 -- the one parameter that actually differs
+between the context that worked and the one that didn't.
+
+* `IH_virus_emergence_rate` is now settable per pipeline run instead of a
+  hardcoded `USER_FIXED_PARAMS` constant: new `--ih-virus-emergence-rate`
+  on `cal_2.py` and the pipeline orchestrator (passed only to cal_2, not
+  exp.py). Recorded as a new column in the frozen `nsr_calibration_table.csv`
+  (same pattern as `R`) so `exp.py`'s production run always matches
+  whatever value cal_2 was actually calibrated under -- nothing to keep in
+  sync by hand between the two stages.
+* `NSR_RANGES['cal2_standard_nsr']`: `1e-5-3e-4` -> `1e-5-0.1` for all 5
+  scenarios, wide enough to cover both a `k_v=0` run (expected to land
+  closer to the old range) and a `k_v=0.1` run (floor already ~0.03-0.05)
+  under the same bracket, for direct comparability.
+* Plan: two full pipeline runs at 10 seeds/point, identical except
+  `--ih-virus-emergence-rate 0` vs `0.1`, to directly test whether turning
+  off intra-host lineage duplication in the mixed-population context
+  restores normal calibration behavior.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.20 — 2026-08-20 — pietro gerletti
 
 Real pipeline run #1 (2.4.19's values) got past Stage 1 cleanly -- cal_1's
