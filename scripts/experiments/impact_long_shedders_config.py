@@ -246,16 +246,20 @@ def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_group):
     return scenario_groups, scenarios_frozen
 
 
-def build_cal2_settings(scenario_groups, seeds, R=None):
+def build_cal2_settings(scenario_groups, seeds, R=None, ih_virus_emergence_rate=None):
     """Zero-arg make_settings callable ready for run_experiment_script,
     submitting every scenario's sweep as ONE combined experiment. R
     defaults to USER_FIXED_PARAMS['R'] if not given -- pass the SAME R used
     to build scenario_groups (build_cal2_scenario_groups) so the frozen
     R_long values stay consistent with what standard individuals actually
-    run with."""
+    run with. Same for ih_virus_emergence_rate -- whatever value is used
+    here must also be recorded in the frozen table (see cal_2.py's row
+    building) so exp.py's production run matches what was calibrated."""
     fixed_params = USER_FIXED_PARAMS.copy()
     if R is not None:
         fixed_params["R"] = R
+    if ih_virus_emergence_rate is not None:
+        fixed_params["IH_virus_emergence_rate"] = ih_virus_emergence_rate
 
     def make_settings():
         varying_params = {'_scenario_groups': scenario_groups}
@@ -281,6 +285,7 @@ def build_exp_scenario_settings(row, n_seeds):
     fixed = USER_FIXED_PARAMS.copy()
     fixed.update({
         "R": float(row["R"]),
+        "IH_virus_emergence_rate": float(row["IH_virus_emergence_rate"]),
         "long_shedders_ratio": float(row["long_shedders_ratio"]),
         "tau_3_long": float(row["tau_3_long"]),
         "R_long": float(row["R_long"]),
@@ -315,11 +320,11 @@ _NSR_STEPS = 10
 NSR_RANGES = {
     "cal1_long_nsr": {"min": 0.01, "max": 0.5, "steps": _NSR_STEPS},
     "cal2_standard_nsr": {
-        "control":   {"min": 1e-05, "max": 3e-04, "steps": _NSR_STEPS},
-        "SOT":       {"min": 1e-05, "max": 3e-04, "steps": _NSR_STEPS},
-        "HIV_low":   {"min": 1e-05, "max": 3e-04, "steps": _NSR_STEPS},
-        "HIV_high":  {"min": 1e-05, "max": 3e-04, "steps": _NSR_STEPS},
-        "edge_case": {"min": 1e-05, "max": 3e-04, "steps": _NSR_STEPS},
+        "control":   {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
+        "SOT":       {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
+        "HIV_low":   {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
+        "HIV_high":  {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
+        "edge_case": {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
     },
 }
 

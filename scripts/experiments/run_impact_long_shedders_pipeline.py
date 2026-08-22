@@ -212,6 +212,14 @@ def main():
                             f"(default {USER_FIXED_PARAMS['R']}); unrelated to "
                             "R_long, which is set per scenario in "
                             "impact_long_shedders_config.SCENARIOS.")
+    parser.add_argument('--ih-virus-emergence-rate', type=float,
+                        default=USER_FIXED_PARAMS['IH_virus_emergence_rate'],
+                        help="Intra-host lineage-duplication rate (k_v) for "
+                            "cal_2 and production (default "
+                            f"{USER_FIXED_PARAMS['IH_virus_emergence_rate']}). "
+                            "Passed only to cal_2 -- exp.py reads it back "
+                            "from the frozen table, so it can't drift out "
+                            "of sync between calibration and production.")
     parser.add_argument('--log-file', type=str, default=None,
                         help="Defaults to "
                             "Data/pipeline_logs/impact_long_shedders_pipeline_#{exp_num}.log")
@@ -251,6 +259,7 @@ def main():
                   "--target-osr-long", str(args.target_osr_long),
                   "--seeds", str(args.cal_seeds),
                   "--R", str(args.r_cal2),
+                  "--ih-virus-emergence-rate", str(args.ih_virus_emergence_rate),
                   *slurm_res_args], log_fh)
 
         run_stage([py, exp_path,

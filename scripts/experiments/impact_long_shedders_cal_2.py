@@ -284,6 +284,14 @@ def main():
                             f"(default {USER_FIXED_PARAMS['R']}); unrelated to "
                             "R_long, which is set per scenario in "
                             "impact_long_shedders_config.SCENARIOS.")
+    parser.add_argument('--ih-virus-emergence-rate', type=float,
+                        default=USER_FIXED_PARAMS['IH_virus_emergence_rate'],
+                        help="Intra-host lineage-duplication rate (k_v) for "
+                            "this stage and exp (default "
+                            f"{USER_FIXED_PARAMS['IH_virus_emergence_rate']}). "
+                            "Recorded in the frozen table so exp.py's "
+                            "production run automatically matches whatever "
+                            "value was calibrated under.")
     parser.add_argument('--model', type=str, default='exp',
                         choices=['lin', 'log', 'exp', 'tan'], help="Fit model.")
     parser.add_argument('--min-seq', type=int, default=30,
@@ -312,7 +320,8 @@ def main():
     # --- Build one group per scenario and submit ONE combined experiment ---
     scenario_groups, scenarios_frozen = build_cal2_scenario_groups(
         nsr_ranges, long_nsr_by_tau)
-    settings_func = build_cal2_settings(scenario_groups, args.seeds, args.R)
+    settings_func = build_cal2_settings(scenario_groups, args.seeds, args.R,
+                                        args.ih_virus_emergence_rate)
 
     print(f"\n[Stage 2] Submitting standard-NSR sweep (R={args.R}, "
          f"R_long per SCENARIOS)")
@@ -345,6 +354,7 @@ def main():
             "tau_3_long": frozen["tau_3_long"],
             "long_shedders_ratio": frozen["long_shedders_ratio"],
             "R": args.R,
+            "IH_virus_emergence_rate": args.ih_virus_emergence_rate,
             "R_long": frozen["R_long"],
             "nucleotide_substitution_rate_long": long_nsr,
             "nucleotide_substitution_rate": std_nsr_by_scenario[name],
@@ -355,7 +365,8 @@ def main():
         })
 
     table_path = os.path.join(setup_dir, "nsr_calibration_table.csv")
-    cols = ["scenario_name", "tau_3_long", "long_shedders_ratio", "R", "R_long",
+    cols = ["scenario_name", "tau_3_long", "long_shedders_ratio", "R",
+            "IH_virus_emergence_rate", "R_long",
             "nucleotide_substitution_rate_long", "nucleotide_substitution_rate",
             "target_osr_std", "target_osr_long", "model_type", "long_calib_source"]
     pd.DataFrame(rows)[cols].to_csv(table_path, index=False)
