@@ -5,6 +5,31 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.22 — 2026-08-22 — pietro gerletti
+
+Acted on 2.4.21's k_v/IH_virus_emergence_rate finding instead of just
+flagging it: cal_1 should be calibrated under the same k_v cal_2/exp
+actually run with, not silently default to 0.
+
+* `build_cal1_settings` (and `cal_1.py`'s new `--ih-virus-emergence-rate`
+  flag) now default `IH_virus_emergence_rate` to `USER_FIXED_PARAMS`'s value
+  (0.1) instead of leaving it unset; the pipeline orchestrator now passes
+  `--ih-virus-emergence-rate` to cal_1 as well as cal_2 (previously cal_2
+  only).
+* `CAL1_ISOLATED_FIXED_PARAMS['final_time']` is no longer a single 1095
+  (3y) applied to every tau group -- each `(tau_3_long, R_long)` group now
+  gets its own `final_time = CAL1_FINAL_TIME_MULTIPLIER(=3) * tau_3_long`
+  (SOT≈145d, HIV≈283d, edge_case≈1051d), cutting compute for the
+  shorter-tau scenarios that never needed a uniform 3y window.
+* New `scripts/experiments/run_kv_ab_test.sh`: launches two detached tmux
+  sessions (same activation pattern as `start_simplicity_session.sh`),
+  each running the full pipeline at `--cal-seeds 5 --exp-seeds 5` under a
+  distinct `--exp-num` (2, 3) and `--ih-virus-emergence-rate` (0, 0.1) --
+  a direct A/B test of the k_v hypothesis, superseding the manual 10-seed
+  run pair planned in 2.4.21.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.21 — 2026-08-22 — pietro gerletti
 
 Diagnosed the Stage 2 problem from 2.4.20 further: `tests/
