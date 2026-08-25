@@ -270,9 +270,7 @@ class Population:
        '''
        Fetch lineage genome from lineage name
        '''
-       genome = next((d['Genome'] for d in self.phylogenetic_data if d['Lineage_name'] == lineage_name))
-       # print(f'{lineage_name} Genome: ', genome)
-       return genome
+       return self._phylo_name_map[lineage_name]['Genome']
     # -------------------------------------------------------------------------
     #                               Updates
     # -------------------------------------------------------------------------

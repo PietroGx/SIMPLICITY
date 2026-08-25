@@ -5,6 +5,27 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.23 — 2026-08-25 — pietro gerletti
+
+Found while investigating the k_v A/B test's OOM kills: `Population.
+get_lineage_genome` did a linear scan over `self.phylogenetic_data`
+(`next(d['Genome'] for d in self.phylogenetic_data if ...)`) even though
+`self._phylo_name_map` already indexes the same rows by lineage name in
+O(1) and is kept correctly in sync on every append (`mutations.py:439`).
+Called twice per mutation event from inside the mutation loop itself
+(`mutations.py:214`, `mutations.py:425`), and `phylogenetic_data`'s length
+*is* the cumulative mutation count for the run -- so the total cost of
+just these lookups was O(mutations²), not O(mutations). Swapped the scan
+for the existing dict lookup; verified with `tests/test_local_runme.py`
+(long-shedder scenario, mutations + sequencing + phylogenetic-data output
+all exercised) -- output unchanged, ran clean.
+
+* `Population.get_lineage_genome`: `next(...)` linear scan -> O(1)
+  `self._phylo_name_map[lineage_name]['Genome']` lookup. No other code
+  changes required; `_phylo_name_map` was already correct.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.22 — 2026-08-22 — pietro gerletti
 
 Acted on 2.4.21's k_v/IH_virus_emergence_rate finding instead of just
