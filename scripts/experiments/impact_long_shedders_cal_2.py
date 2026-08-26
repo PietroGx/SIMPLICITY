@@ -56,6 +56,7 @@ from impact_long_shedders_config import (
     build_cal2_settings, add_slurm_resource_args,
     set_slurm_resource_env, print_fixed_params,
 )
+from long_nsr_calibration_plot import read_calibrated_long_nsr
 
 # =============================================================================
 # CONFIGURATION
@@ -64,81 +65,14 @@ EXP_NAME = "impact_long_shedders_calibration"
 
 
 # =============================================================================
-# STAGE 1 -- long-shedder NSR per tau_3_long group (from existing calibration)
+# STAGE 1 -- long-shedder NSR per tau_3_long group
+# ----------------------------------------------------------------------------
+# Not computed here: cal_1.py already fit it and persisted the result (see
+# long_nsr_calibration_plot.py's write_calibrated_long_nsr /
+# read_calibrated_long_nsr). This used to be a second, independent
+# re-derivation from raw simulation output -- see BACKLOG for how that let
+# it silently disagree with cal_1's own diagnostic fit.
 # =============================================================================
-def compute_long_nsr_per_tau(long_calib_exp, target_osr_long,
-                             model_type='exp', min_seq=30, min_len=100):
-    """
-    Replicates the per-group extraction from check_calibration.py:
-    extract per-seed OSR grouped by (tau_3_long, R_long), outlier-filter per
-    grid point, fit an 'exp' regressor per group, invert at target_osr_long.
-    Grouped by the PAIR, not tau alone, since two scenarios can share a
-    duration (HIV_low/HIV_high) but have different R_long -- cal_1's
-    isolated context can't disambiguate them by long_shedders_ratio like
-    Stage 2 does (it's uniformly 1.0 there).
-
-    Returns {(round(tau_3_long, TAU_ROUND), round(R_long, TAU_ROUND)): calibrated_long_nsr}.
-    """
-    print(f"\n[Stage 1] Long-shedder NSR calibration from: {long_calib_exp}")
-    print(f"          target long OSR = {target_osr_long}")
-
-    simulation_output_dirs = dm.get_simulation_output_dirs(long_calib_exp)
-
-    all_rows = []
-    for sod in simulation_output_dirs:
-        nsr_val = sm.get_parameter_value_from_simulation_output_dir(
-            sod, 'nucleotide_substitution_rate')
-        tau_val = sm.get_parameter_value_from_simulation_output_dir(
-            sod, 'tau_3_long')
-        r_long_val = sm.get_parameter_value_from_simulation_output_dir(
-            sod, 'R_long')
-
-        seeded_dirs = dm.get_seeded_simulation_output_dirs(sod)
-        sod_rows = []
-        for ssod in seeded_dirs:
-            try:
-                final_time = om.read_final_time(ssod)
-                seq_data = om.read_sequencing_data_regression(ssod)
-                if final_time >= min_len and len(seq_data) >= min_seq:
-                    osr_val = er.tempest_regression(seq_data).coef_[0]
-                    sod_rows.append({
-                        'tau_3_long': tau_val,
-                        'R_long': r_long_val,
-                        'nucleotide_substitution_rate': nsr_val,
-                        'observed_substitution_rate': osr_val,
-                    })
-            except Exception:
-                continue
-
-        if sod_rows:
-            sod_df = pd.DataFrame(sod_rows)
-            sod_df = om.detect_sod_outliers(sod_df)
-            all_rows.append(sod_df)
-
-    if not all_rows:
-        raise RuntimeError(
-            f"[Stage 1] No valid long-calibration data found in {long_calib_exp}.")
-
-    master_df = pd.concat(all_rows, ignore_index=True)
-    clean_df = master_df[master_df['is_outlier'] == 0]
-    clean_df['_group_key'] = list(zip(clean_df['tau_3_long'], clean_df['R_long']))
-
-    long_nsr_by_tau = {}
-    for tau, r_long in sorted(clean_df['_group_key'].unique()):
-        group_df = clean_df[clean_df['_group_key'] == (tau, r_long)]
-        fit_result = er.fit_observed_substitution_rate_regressor(
-            long_calib_exp,
-            group_df,
-            model_type=model_type,
-            parameter_name='nucleotide_substitution_rate',
-            experiment_group=f"tau_{tau}_Rlong_{r_long}",
-        )
-        nsr = er.compute_calibrated_parameter(model_type, fit_result, target_osr_long)
-        key = (round(float(tau), TAU_ROUND), round(float(r_long), TAU_ROUND))
-        long_nsr_by_tau[key] = float(nsr)
-        print(f"          tau_3_long={tau}, R_long={r_long}: long NSR = {nsr:.8f}")
-
-    return long_nsr_by_tau
 
 
 # =============================================================================
@@ -293,11 +227,19 @@ def main():
                             "production run automatically matches whatever "
                             "value was calibrated under.")
     parser.add_argument('--model', type=str, default='exp',
-                        choices=['lin', 'log', 'exp', 'tan'], help="Fit model.")
+                        choices=['lin', 'log', 'exp', 'tan'],
+                        help="Fit model for this stage's OWN standard-NSR "
+                            "fit. Does not affect the long-NSR value (read "
+                            "back from cal_1's already-computed calibration, "
+                            "see read_calibrated_long_nsr) -- to change that "
+                            "fit's model, rerun cal_1.py with a different "
+                            "--model.")
     parser.add_argument('--min-seq', type=int, default=30,
-                        help="Min sequences to keep a seed.")
+                        help="Min sequences to keep a seed, for this stage's "
+                            "own standard-NSR fit.")
     parser.add_argument('--min-len', type=int, default=100,
-                        help="Min simulation length (days) to keep a seed.")
+                        help="Min simulation length (days) to keep a seed, "
+                            "for this stage's own standard-NSR fit.")
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 
@@ -312,10 +254,8 @@ def main():
     setup_dir = f"Data/{EXP_NAME}_setup_data_#{args.exp_num}"
     os.makedirs(setup_dir, exist_ok=True)
 
-    # --- Stage 1: long NSR per tau group (once, reused across scenarios) ---
-    long_nsr_by_tau = compute_long_nsr_per_tau(
-        long_calib_exp, args.target_osr_long,
-        model_type=args.model, min_seq=args.min_seq, min_len=args.min_len)
+    # --- Stage 1: long NSR per tau group, already computed by cal_1.py ---
+    long_nsr_by_tau = read_calibrated_long_nsr(long_calib_exp, args.target_osr_long)
 
     # --- Build one group per scenario and submit ONE combined experiment ---
     scenario_groups, scenarios_frozen = build_cal2_scenario_groups(

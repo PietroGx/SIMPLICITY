@@ -28,7 +28,8 @@ from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
 
 def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R,
-                             ih_virus_emergence_rate):
+                             ih_virus_emergence_rate, model_type='exp',
+                             min_seq=30, min_len=100):
     print("\n=========================================================")
     print(f" PHASE 1: ISOLATED LONG-SHEDDER CALIBRATION "
          f"(R={R}, R_long per SCENARIOS, 100% LS, "
@@ -56,7 +57,9 @@ def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R,
 
     numbered = f"{exp_name}_#{exp_num}"
     print(f"\n[Plot] Fitting + plotting long-NSR calibration for {numbered}...")
-    plot_and_fit_long_nsr_calibration(numbered, target_osr_long)
+    plot_and_fit_long_nsr_calibration(numbered, target_osr_long,
+                                      model_type=model_type,
+                                      min_seq=min_seq, min_len=min_len)
 
 
 def main():
@@ -83,12 +86,29 @@ def main():
                             f"default {USER_FIXED_PARAMS['IH_virus_emergence_rate']}, "
                             "matching cal_2/exp so Stage 1 is calibrated under "
                             "the same k_v it will actually run with.")
+    parser.add_argument('--model', type=str, default='exp',
+                        choices=['lin', 'log', 'exp', 'tan'],
+                        help="Fit model for this stage's own diagnostic plot. "
+                            "Purely diagnostic -- cal_2.py recomputes the "
+                            "actual frozen-table long NSR independently with "
+                            "its own --model, which must be set to match if "
+                            "the two are meant to agree.")
+    parser.add_argument('--min-seq', type=int, default=30,
+                        help="Min sequences to keep a seed, for this stage's "
+                            "own diagnostic plot (same default cal_2.py uses "
+                            "for its independent recomputation).")
+    parser.add_argument('--min-len', type=int, default=100,
+                        help="Min simulation length (days) to keep a seed, "
+                            "for this stage's own diagnostic plot (same "
+                            "default cal_2.py uses for its independent "
+                            "recomputation).")
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
     run_isolated_calibration(args.exp_num, args.runner, args.seeds, args.target_osr_long, args.R,
-                             args.ih_virus_emergence_rate)
+                             args.ih_virus_emergence_rate, args.model,
+                             args.min_seq, args.min_len)
 
 
 if __name__ == "__main__":

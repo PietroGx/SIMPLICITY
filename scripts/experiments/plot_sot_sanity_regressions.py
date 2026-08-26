@@ -13,7 +13,7 @@
 # SOT sanity-check: standard vs long-shedder OSR, two clocks
 # ----------------------------------------------------------------------------
 # One combined figure, one ROW per long-shedder scenario (--scenarios, default
-# SOT/HIV_low/HIV_high/edge_case), 2 columns. Every row shares the same x/y
+# SOT/HIV_low/HIV_high), 2 columns. Every row shares the same x/y
 # limits per column, so scenarios are directly visually comparable.
 #
 # LEFT column (global clock, primary axis): standard individuals'
@@ -25,23 +25,23 @@
 #        read of both clocks.
 # RIGHT column (intra-host clock): long shedders only, full detail
 #        (scatter + fit). One point per intra-host lineage in each
-#        long-shedder's IH_lineages_trajectory:
+#        long-shedder's IH_lineages_trajectory -- extraction itself lives in
+#        simplicity.tuning.evolutionary_rate.extract_ih_regression_data,
+#        shared with long_nsr_calibration_plot.py's Stage 1 calibration fit
+#        so the two can never again disagree on what "intra-host clock"
+#        means:
 #          x = (ih_birth - t_infection) / 365.25            [years]
 #          y = hamming_iw(genome(lineage), genome(inherited))
-#              / len(dis.reference)                          [subs/site]
+#              / len(reference)                              [subs/site]
 #
 # Both loaders apply the same final_time/sequence-count gate (--min-len/
 # --min-seq, defaults 100/30) cal_2.py's own calibration fits use, so this
 # sanity check validates the same population of seeds calibration was
 # actually fit on rather than pooling in short/sparse seeds it excluded.
 #
-# CRITICAL: intra-host lineage names are unique ONLY within a seed folder.
-# Genome lookups are resolved strictly against the SAME ssod's phylogenetic
-# data; only the final numeric (x, y) points are pooled across seeds. Names
-# and genomes never cross the ssod boundary.
-#
-# No core files modified. ih_death is never used. Distance is computed only
-# via the codebase's dis.hamming_iw (never lineage-name parsing).
+# CRITICAL: intra-host lineage names are unique ONLY within a seed folder --
+# extract_ih_regression_data resolves genomes strictly within one ssod;
+# only the final numeric (x, y) points are pooled across seeds here.
 # ============================================================================
 
 import os
@@ -55,7 +55,6 @@ import matplotlib.pyplot as plt
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
-import simplicity.phenotype.distance as dis
 
 # Cohort styling (matches fig1 D/E colors).
 COHORT_STYLE = {
@@ -127,39 +126,17 @@ def load_regression_data(exp_name, scenario, exp_num, min_seq=30, min_len=100):
 # ---------------------------------------------------------------------------
 # INTRA-HOST-CLOCK DATA (right subplot) -- long shedders only
 # ---------------------------------------------------------------------------
-def parse_ih_trajectory(raw):
-    """
-    np-aware parse of IH_lineages_trajectory. Pre-fix data serializes values
-    as np.float64(...), which defeats ast.literal_eval; a locked-scope eval
-    with np available handles both old and fixed data. Returns {} on failure.
-    """
-    if isinstance(raw, dict):
-        return raw
-    if not isinstance(raw, str):
-        return {}
-    try:
-        return eval(raw, {"np": np, "__builtins__": {}})
-    except Exception:
-        return {}
-
-
-def build_phylo_genome_map(ssod):
-    """
-    {Lineage_name: Genome(list)} for ONE ssod. Lineage names are unique only
-    within a seed folder, so this map must never be shared across ssods.
-    """
-    ph = om.read_phylogenetic_data(ssod)
-    genome_map = {}
-    for _, r in ph.iterrows():
-        genome_map[str(r["Lineage_name"])] = r["Genome"]
-    return genome_map
-
-
+# Point extraction itself lives in simplicity.tuning.evolutionary_rate
+# (extract_ih_regression_data) -- shared with long_nsr_calibration_plot.py
+# so cal_1's calibration fit and this sanity check can never again disagree
+# on what "intra-host clock" means (see BACKLOG: they used to -- cal_1 fit
+# the population-pooled global-clock methodology by mistake).
 def load_intrahost_long_data(exp_name, scenario, exp_num, min_seq=30, min_len=100):
     """
-    Build (Sequencing_time, Distance_from_root, individual_type) points for
-    long shedders on the intra-host clock. Names/genomes are resolved strictly
-    within each ssod; only numeric points are pooled across seeds.
+    Concatenate genuine intra-host clock points (own founder genome, own-
+    infection-relative time -- see extract_ih_regression_data) across
+    every seed of this run. Lineage names/genomes are resolved strictly
+    within each ssod; only numeric points cross the ssod boundary.
 
     Applies the same final_time/sequence-count gate as load_regression_data
     (and cal_2.py's own calibration fits) per ssod, before extracting any
@@ -171,17 +148,9 @@ def load_intrahost_long_data(exp_name, scenario, exp_num, min_seq=30, min_len=10
         raise RuntimeError(
             f"No simulation output dirs for '{experiment_string}'.")
 
-    ref_len = len(dis.reference)
-    points = []            # only (x, y, type) floats cross the ssod boundary
-    n_skipped = 0
-
+    frames = []
     for sod in sods:
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
-            ind_path = os.path.join(ssod, "individuals_data.csv")
-            phylo_path = os.path.join(ssod, "phylogenetic_data.csv")
-            if not (os.path.isfile(ind_path) and os.path.isfile(phylo_path)):
-                continue
-
             try:
                 final_time = om.read_final_time(ssod)
                 seq_data = om.read_sequencing_data_regression(ssod)
@@ -190,62 +159,21 @@ def load_intrahost_long_data(exp_name, scenario, exp_num, min_seq=30, min_len=10
             if seq_data is None or final_time < min_len or len(seq_data) < min_seq:
                 continue
 
-            # Per-ssod genome map -- LOCAL SCOPE ONLY, never shared.
             try:
-                phylo_map = build_phylo_genome_map(ssod)
+                ih_points = er.extract_ih_regression_data(ssod)
             except Exception:
                 continue
+            if not ih_points.empty:
+                frames.append(ih_points)
 
-            # Raw read: IH_lineages_trajectory needs the np-aware parser, so we
-            # do not use the native reader (which would ast.literal_eval it).
-            try:
-                ind_df = pd.read_csv(ind_path, index_col=0)
-            except Exception:
-                continue
-            if "type" not in ind_df.columns:
-                continue
-            ind_df = ind_df[ind_df["type"] == "long_shedder"]
-            if ind_df.empty:
-                continue
-
-            for _, row in ind_df.iterrows():
-                inherited = str(row.get("inherited_lineage"))
-                t_inf = row.get("t_infection")
-                if inherited not in phylo_map or pd.isna(t_inf):
-                    n_skipped += 1
-                    continue
-                inh_genome = phylo_map[inherited]
-
-                traj = parse_ih_trajectory(row.get("IH_lineages_trajectory"))
-                if not isinstance(traj, dict):
-                    continue
-
-                for lineage, ev in traj.items():
-                    lin_name = str(lineage)
-                    if lin_name not in phylo_map:
-                        n_skipped += 1
-                        continue
-                    ih_birth = ev.get("ih_birth") if isinstance(ev, dict) else None
-                    if ih_birth is None:
-                        n_skipped += 1
-                        continue
-
-                    lin_genome = phylo_map[lin_name]
-                    y = dis.hamming_iw(lin_genome, inh_genome) / ref_len
-                    x = (float(ih_birth) - float(t_inf)) / 365.25
-                    points.append((x, y, "long_shedder"))
-
-    if not points:
+    if not frames:
         raise RuntimeError(
             f"No intra-host long-shedder points assembled for "
             f"'{experiment_string}'.")
 
-    if n_skipped:
-        print(f"[note] intra-host: skipped {n_skipped} record(s) "
-              f"(missing lineage/inherited/birth).")
-
-    return pd.DataFrame(
-        points, columns=["Sequencing_time", "Distance_from_root", "individual_type"])
+    combined = pd.concat(frames, ignore_index=True)
+    combined["individual_type"] = "long_shedder"
+    return combined
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +215,7 @@ def draw_target(ax, target, x_max, color, label):
             linewidth=1.0, alpha=0.6, zorder=1, label=label)
 
 
-DEFAULT_LONG_SCENARIOS = ["SOT", "HIV_low", "HIV_high", "edge_case"]
+DEFAULT_LONG_SCENARIOS = ["SOT", "HIV_low", "HIV_high"]
 
 
 # ---------------------------------------------------------------------------

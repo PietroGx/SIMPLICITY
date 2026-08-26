@@ -48,7 +48,17 @@ SCENARIOS = [
     {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.01, "R_long": 1.1},
     {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.01, "R_long": 1.1},
     {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.12, "R_long": 1.1},
-    {"name": "edge_case", "inf_duration_long": 365.0, "long_shedders_ratio": 0.01, "R_long": 1.1},
+    # edge_case (inf_duration_long=365.0) removed: at tau_3_long=350.23, both
+    # (a) raw-Hamming-distance saturation (expected substitutions/site by
+    # end of window reaches ~0.34, deep into multiple-hits territory) and
+    # (b) more transmission generations elapsing within cal_1's own isolated
+    # population (more time = more inherited-divergence layering) make its
+    # long-NSR calibration unreliable relative to the shorter-duration
+    # scenarios. Can be reinstated once cal_1's fit uses the same genuine
+    # intra-host methodology as plot_sot_sanity_regressions.py's
+    # load_intrahost_long_data (own founder genome, own-infection-relative
+    # time) instead of the population-pooled/absolute-time regression it
+    # uses today.
 ]
 
 TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
@@ -342,13 +352,12 @@ def build_exp_scenario_settings(row, n_seeds):
 _NSR_STEPS = 10
 
 NSR_RANGES = {
-    "cal1_long_nsr": {"min": 0.01, "max": 0.5, "steps": _NSR_STEPS},
+    "cal1_long_nsr": {"min": 0.01, "max": 0.1, "steps": _NSR_STEPS},
     "cal2_standard_nsr": {
         "control":   {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
         "SOT":       {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
         "HIV_low":   {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
         "HIV_high":  {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
-        "edge_case": {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
     },
 }
 
@@ -370,19 +379,24 @@ def print_fixed_params(fixed_params, label="Fixed parameters"):
 # argument, so it never has to touch the run_seeded_simulations(...) interface
 # shared uniformly by the serial/multiprocessing/slurm runner modules.
 #
-# The baseline default (2G/2 days) is set exactly once, in
-# simplicity.dir_manager, alongside every other simplicity-wide env var --
-# not redefined here, so there's a single literal source for it. 2G was set
-# from real sacct data on the isolated long-NSR calibration grid
-# (population_size=1000, final_time=1200): MaxRSS ranged 0.29-0.45G across
-# all 36 grid points -- real headroom over that, well below the old blanket
-# 8G every job used to request regardless of actual need. Time limit was
-# bumped from 1 day to 2: some high-R_long tau groups (e.g. edge_case) run
-# well past 1 day of wall-clock time to reach final_time and were getting
-# killed by the walltime
-# mid-simulation -- see simplicity.runners.slurm.reconcile_terminated_tasks,
-# which now detects and signals that case regardless, but giving cheap extra
-# headroom avoids the kill (and the wasted compute) in the first place.
+# The baseline default is set exactly once, in simplicity.dir_manager,
+# alongside every other simplicity-wide env var -- not redefined here, so
+# there's a single literal source for it. Originally 2G, based on real sacct
+# data on the isolated long-NSR calibration grid (population_size=1000,
+# final_time=1200): MaxRSS ranged 0.29-0.45G across all 36 grid points --
+# real headroom over that, well below the old blanket 8G every job used to
+# request regardless of actual need. Raised to 4G after real run #1's much
+# wider NSR sweep (see BACKLOG) produced 284 OOM-killed tasks (~18% of the
+# run) at 3G -- higher NSR means more cumulative mutation events, which
+# means more memory (see the get_lineage_genome/phylogenetic_data growth
+# analysis, same BACKLOG entry) -- 2G was tuned for a much narrower range
+# and stopped being enough once the range widened. Time limit was bumped
+# from 1 day to 2: some high-duration tau groups run well past 1 day of
+# wall-clock time to reach final_time and were getting killed by the
+# walltime mid-simulation -- see simplicity.runners.slurm.
+# reconcile_terminated_tasks, which now detects and signals that case
+# regardless, but giving cheap extra headroom avoids the kill (and the
+# wasted compute) in the first place.
 # =============================================================================
 def add_slurm_resource_args(parser):
     """Add --slurm-mem/--slurm-time to an argparse parser (shared wiring so

@@ -5,6 +5,59 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.24 — 2026-08-26 — pietro gerletti
+
+The k_v A/B test (2.4.22) didn't confirm the k_v hypothesis: control/SOT
+calibrated near-identically under k_v=0 vs 0.1, and HIV_low actually fit
+*worse* at k_v=0. What tracked the failure cleanly in both arms was
+`tau_3_long`, independent of k_v -- pointed at the measurement, not the
+mechanism. Traced Stage 1's calibration fit
+(`long_nsr_calibration_plot.py`) to using the same population-pooled,
+global-reference, absolute-time regression as the "global clock" (just
+filtered to long-shedder rows) -- not a genuine intra-host measurement,
+unlike `plot_sot_sanity_regressions.py`'s `load_intrahost_long_data`,
+which already resolved each host's own founder genome and own-infection-
+relative time correctly.
+
+* New `simplicity.tuning.evolutionary_rate.extract_ih_regression_data`:
+  the shared, correct intra-host point extraction (own founder genome via
+  `inherited_lineage`, time since own infection via `ih_birth -
+  t_infection`, full `IH_lineages_trajectory`) -- consolidates what used
+  to be two implementations (`plot_sot_sanity_regressions.py`'s own copy,
+  now deleted, ~90 lines) into one.
+* `long_nsr_calibration_plot.py`'s Stage 1 fit now fits each seed's
+  genuine intra-host clock via this function, instead of the population-
+  pooled regression. **This alone wasn't enough**: `impact_long_shedders_
+  cal_2.py` had its own *separate* re-derivation of the same Stage 1
+  value (`compute_long_nsr_per_tau`, reading the same raw simulation
+  output independently) -- the one that actually reached
+  `nsr_calibration_table.csv` -- still on the old method. Fixed there too,
+  then eliminated the duplication at the root: `plot_and_fit_long_nsr_
+  calibration` now persists its result (`write_calibrated_long_nsr`, in
+  the experiment's `Fit_results/`), and cal_2.py reads it back
+  (`read_calibrated_long_nsr`) instead of recomputing -- one
+  implementation, one computation, and cal_2 now raises loudly if its own
+  `--target-osr-long` doesn't match what the file was actually calibrated
+  against.
+* `edge_case` scenario removed from `SCENARIOS` (commented out, not
+  deleted): at `tau_3_long=350.23`, raw-Hamming-distance saturation
+  (~0.34 expected substitutions/site by end of window) and more
+  transmission generations elapsing within cal_1's own isolated
+  population both made its long-NSR calibration unreliable relative to
+  SOT/HIV_low/HIV_high. `NSR_RANGES['cal1_long_nsr']['max']`: 0.5 -> 0.1.
+* `Population.detect_sod_outliers`: IQR statistical-outlier pass now
+  gated behind `use_iqr=False` (off by default; hard floor unchanged) --
+  at the seed counts calibration sweeps actually run with (5-20), a
+  Tukey fence over 3-5 points was too easily thrown off by the same
+  single bad seed it was meant to catch.
+* Minor: fixed a stale SLURM-mem comment (said 2G, actual default is 4G
+  since 2.4.23's OOM fix), three stale "4x2 sanity grid" references (now
+  3x2 after the edge_case removal), and a plot-legend label that silently
+  collapsed the shared HIV_low/HIV_high tau=94.23 group to just
+  "HIV_low" -- now "HIV_low+HIV_high".
+
+------------------------------------------------------------------------
+
 ## Version 2.4.23 — 2026-08-25 — pietro gerletti
 
 Found while investigating the k_v A/B test's OOM kills: `Population.

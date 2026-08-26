@@ -505,17 +505,25 @@ def create_combined_sequencing_df(source,
         print('')
         return None
 
-def detect_sod_outliers(sod_df, threshold=1.5, hard_floor=1e-9):
+def detect_sod_outliers(sod_df, threshold=1.5, hard_floor=1e-9, use_iqr=False):
     """
-    Identifies outliers using a Hard Floor for failures AND IQR for statistical deviants.
+    Identifies outliers using a Hard Floor for failures, optionally plus IQR
+    for statistical deviants. The IQR pass is disabled by default (use_iqr=
+    False) -- with the small seed counts calibration sweeps typically run
+    with (5-20), a Tukey fence over 3-5 points is too easily thrown off by
+    the same single bad seed it's meant to catch; pass use_iqr=True at a
+    specific call site to opt back in.
     """
     sod_df['is_outlier'] = 0
-    
+
     # -----------------------------------------------------------
     # HARD FLOOR
     # Any rate below 1e-9 is physically impossible/noise -> Outlier
     # -----------------------------------------------------------
     sod_df.loc[sod_df['observed_substitution_rate'] < hard_floor, 'is_outlier'] = 1
+
+    if not use_iqr:
+        return sod_df
 
     # IQR CHECK
     valid_df = sod_df[sod_df['is_outlier'] == 0]
