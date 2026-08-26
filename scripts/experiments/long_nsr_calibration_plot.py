@@ -17,10 +17,19 @@
 # target long OSR, plus a multi-curve calibration figure.
 #
 # Used by impact_long_shedders_cal_1.py right after its long-NSR calibration
-# grid finishes (saved into that experiment's own 05_Plots folder, so it can
-# be reviewed at the end of a pipeline run and used to retune
+# grid finishes (plot saved into that experiment's own 05_Plots folder, so it
+# can be reviewed at the end of a pipeline run and used to retune
 # cal1_long_nsr in impact_long_shedders_config.py), and by
 # check_calibration.py as a standalone manual-rerun tool.
+#
+# The computed {(tau_3_long, R_long): calibrated_nsr} result is ALSO
+# persisted to a small CSV (write_calibrated_long_nsr, in the experiment's
+# Fit_results dir) -- the single source of truth impact_long_shedders_cal_2.py
+# reads back (read_calibrated_long_nsr) instead of independently re-deriving
+# the same fit from raw simulation output a second time. Re-running this
+# module against a past experiment (e.g. via check_calibration.py with a new
+# --target-osr) overwrites that file too, so cal_2's next run picks up the
+# new calibration -- not a side-effect-free plot refresh anymore.
 # ============================================================================
 
 import os
@@ -47,18 +56,84 @@ from impact_long_shedders_config import (
 
 
 def _tau_r_long_labels_and_colors(sp):
-    """Map each (tau_3_long, R_long) pair back to its scenario name/color."""
-    labels, colors = {}, {}
-    color_cycle = iter(DEFAULT_COLORS)
+    """Map each (tau_3_long, R_long) pair back to a label and color. When
+    multiple scenarios share a (tau, R_long) pair (e.g. HIV_low/HIV_high --
+    same duration and R_long, only ratio differs, which Stage 1's isolated
+    context doesn't use), the label combines every scenario name sharing it,
+    joined with '+' -- not '/', which write_fit_results_csv's file-saving
+    reads as a directory separator."""
+    names_by_key = {}
     for scenario in SCENARIOS:
         if scenario["long_shedders_ratio"] <= 0.0:
             continue
         key = (round(derive_tau_3_long(scenario, sp), TAU_ROUND),
                round(float(scenario["R_long"]), TAU_ROUND))
-        if key not in labels:
-            labels[key] = scenario["name"]
-            colors[key] = next(color_cycle, "black")
+        names_by_key.setdefault(key, []).append(scenario["name"])
+
+    labels, colors = {}, {}
+    color_cycle = iter(DEFAULT_COLORS)
+    for key, names in names_by_key.items():
+        labels[key] = "+".join(names)
+        colors[key] = next(color_cycle, "black")
     return labels, colors
+
+
+def _calibrated_long_nsr_path(experiment_name):
+    return os.path.join(dm.get_experiment_fit_result_dir(experiment_name),
+                        f'{experiment_name}_calibrated_long_nsr.csv')
+
+
+def write_calibrated_long_nsr(experiment_name, results, target_osr_long, model_type):
+    """Persist Stage 1's calibrated long NSR per (tau_3_long, R_long) group
+    to a small CSV -- the single computed result, so cal_2.py can read it
+    straight back instead of independently re-extracting/re-fitting from
+    raw simulation output a second time (two implementations of the same
+    fit is exactly what let cal_1's and cal_2's methodology drift apart
+    before; see BACKLOG)."""
+    rows = [
+        {'tau_3_long': tau, 'R_long': r_long,
+         'nucleotide_substitution_rate_long': nsr,
+         'target_osr_long': target_osr_long, 'model_type': model_type}
+        for (tau, r_long), nsr in results.items()
+    ]
+    path = _calibrated_long_nsr_path(experiment_name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    pd.DataFrame(rows).to_csv(path, index=False)
+    print(f"Saved calibrated long NSR per group to: {path}")
+
+
+def read_calibrated_long_nsr(experiment_name, target_osr_long):
+    """Read back Stage 1's calibrated long NSR per (tau_3_long, R_long)
+    group, written by write_calibrated_long_nsr. Raises rather than
+    silently guessing if the file is missing (cal_1 never ran under this
+    exp_num) or if target_osr_long doesn't match what the file was
+    actually calibrated against -- a caller wanting a different target
+    must re-run cal_1.py with it, not just pass a different flag here and
+    reuse a stale calibration.
+
+    Returns {(tau_3_long, R_long): calibrated_nsr}.
+    """
+    path = _calibrated_long_nsr_path(experiment_name)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"No calibrated long NSR file at {path}. Run "
+            f"impact_long_shedders_cal_1.py for this exp_num first.")
+
+    df = pd.read_csv(path)
+    mismatched = df[df['target_osr_long'] != target_osr_long]
+    if not mismatched.empty:
+        raise ValueError(
+            f"{path} was calibrated against target_osr_long="
+            f"{mismatched['target_osr_long'].iloc[0]}, but this run requested "
+            f"target_osr_long={target_osr_long}. Re-run cal_1.py with "
+            f"--target-osr-long {target_osr_long} first, or pass the matching "
+            f"target here.")
+
+    return {
+        (round(float(row['tau_3_long']), TAU_ROUND),
+         round(float(row['R_long']), TAU_ROUND)): float(row['nucleotide_substitution_rate_long'])
+        for _, row in df.iterrows()
+    }
 
 
 def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
@@ -92,8 +167,19 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
             try:
                 final_time = om.read_final_time(ssod)
                 seq_data = om.read_sequencing_data_regression(ssod)
+                # Same final_time/sequence-count gate as everywhere else that
+                # fits an OSR regressor -- decides whether this seed ran long
+                # enough / sequenced enough to trust at all. What actually
+                # gets fit below is NOT seq_data (population-pooled, global-
+                # reference, absolute-time -- see evolutionary_rate.py's
+                # extract_ih_regression_data docstring): cal_1 is meant to
+                # calibrate against each long shedder's OWN intra-host clock,
+                # not the population root-to-tip rate.
                 if final_time >= min_len and len(seq_data) >= min_seq:
-                    osr_val = er.tempest_regression(seq_data).coef_[0]
+                    ih_points = er.extract_ih_regression_data(ssod)
+                    if ih_points.empty:
+                        continue
+                    osr_val = er.tempest_regression(ih_points).coef_[0]
                     sod_rows.append({
                         'tau_3_long': tau_val,
                         'R_long': r_long_val,
@@ -170,6 +256,8 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
     plt.savefig(plot_path, dpi=300)
     plt.close()
     print(f"\nCalibration plot saved to: {plot_path}")
+
+    write_calibrated_long_nsr(experiment_name, results, target_osr_long, model_type)
 
     return results
 

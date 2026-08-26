@@ -33,35 +33,49 @@ Working list of blockers, active refactors, features, and technical debt.
       **Recalibration required**: any experiment run before this fix used
       the wrong R_long for cal_1's grid and must be redone under a fresh
       `--exp-num`.
-- [ ] **cal_1/cal_2 `IH_virus_emergence_rate` (k_v) mismatch — hypothesis
-      pending an A/B test** — real run #1's Stage 2 aborted via
-      `NSR_SANITY_MAX` because SOT's standard-NSR fit was garbage (R²≈0.0003).
-      `tests/test_long_shedder_std_nsr_grid.py` showed the target
-      `osr_std=0.0013` is unreachable for ANY long-shedder scenario across
-      the whole sampled NSR range (floor ≈0.03, 20-50x above target, even
-      near NSR≈0), ruling out "range too narrow." Traced to a structural
-      difference between the two stages: `USER_FIXED_PARAMS['IH_virus_emergence_rate']`
-      = 0.1 (used by cal_2/exp) vs `CAL1_ISOLATED_FIXED_PARAMS` never setting
-      it, silently defaulting to `standard_values.json`'s 0 (used by cal_1) --
-      the one parameter that differed between the context that calibrated
-      cleanly and the one that didn't. Mechanism not fully proven yet
-      (k_v drives `add_lineage`, duplicating intra-host lineages, which
-      plausibly inflates measured OSR), so fixed the inconsistency itself
-      (cal_1 now defaults its `IH_virus_emergence_rate` to
-      `USER_FIXED_PARAMS`'s value, overridable via `--ih-virus-emergence-rate`
-      on `cal_1.py`/the pipeline orchestrator) and built
-      `scripts/experiments/run_kv_ab_test.sh` to test it directly: two
-      full pipeline runs (`--exp-num 2`/`3`, `--cal-seeds 5 --exp-seeds 5`)
-      identical except `--ih-virus-emergence-rate 0` vs `0.1`. Also, while
-      touching cal_1: `CAL1_ISOLATED_FIXED_PARAMS['final_time']` is no
-      longer one uniform 1095 (3y) for every tau group -- now
-      `CAL1_FINAL_TIME_MULTIPLIER=3 * tau_3_long` per group (SOT≈145d,
-      HIV≈283d, edge_case≈1051d), since the uniform 3y window was only
-      validated as *necessary* for edge_case's long tau (see the entry
-      below) and was wasting compute on the shorter-tau scenarios that
-      never needed it. **Recalibration required**, and the A/B test's
-      result should confirm or rule out the k_v hypothesis before the next
-      real production run.
+- [x] **cal_1/cal_2 `IH_virus_emergence_rate` (k_v) mismatch — hypothesis
+      tested and ruled out; real cause found and fixed** — real run #1's
+      Stage 2 aborted via `NSR_SANITY_MAX` because SOT's standard-NSR fit
+      was garbage (R²≈0.0003). Initially traced to a structural difference
+      between the two stages (`USER_FIXED_PARAMS['IH_virus_emergence_rate']`
+      = 0.1 used by cal_2/exp vs `CAL1_ISOLATED_FIXED_PARAMS` silently
+      defaulting to 0) and fixed as a consistency issue regardless
+      (`--ih-virus-emergence-rate` now threads through cal_1 too), but the
+      dedicated A/B test (`scripts/experiments/run_kv_ab_test.sh`, exp #2
+      k_v=0 vs exp #3 k_v=0.1) did NOT confirm k_v as the mechanism:
+      control/SOT calibrated near-identically in both arms, and HIV_low
+      actually fit *worse* at k_v=0 -- the opposite of what the hypothesis
+      predicted. What tracked cleanly with the failure, in both arms, was
+      `tau_3_long`, independent of k_v.
+      **Real cause**: Stage 1's calibration fit (`long_nsr_calibration_
+      plot.py`) was fitting the population-pooled, global-reference,
+      absolute-time regression (same shape as the "global clock", just
+      row-filtered to long shedders) instead of a genuine intra-host clock
+      -- unlike `plot_sot_sanity_regressions.py`'s already-correct
+      `load_intrahost_long_data`, which resolves each host's own founder
+      genome and own-infection-relative time. Fixed via a new shared
+      `simplicity.tuning.evolutionary_rate.extract_ih_regression_data`
+      (own founder genome via `inherited_lineage`, time since own
+      infection via `ih_birth - t_infection`), used by both cal_1's
+      diagnostic fit and (critically) `impact_long_shedders_cal_2.py`'s
+      *separate* re-derivation of the same value, which actually reaches
+      `nsr_calibration_table.csv` and had NOT been caught by the first
+      pass. Root architecture fixed too: cal_1 now persists its fit result
+      (`write_calibrated_long_nsr`) and cal_2 reads it back
+      (`read_calibrated_long_nsr`, raising if `--target-osr-long` doesn't
+      match) instead of independently recomputing -- one implementation,
+      not two kept in sync by hand.
+      Also: `edge_case` scenario removed (raw-Hamming saturation at its
+      long duration, ~0.34 expected substitutions/site, made its Stage 1
+      calibration unreliable regardless of methodology) --
+      `NSR_RANGES['cal1_long_nsr']['max']` 0.5 -> 0.1. `detect_sod_outliers`'
+      IQR pass now off by default (`use_iqr=False`; hard floor unchanged)
+      -- too easily thrown off by the single bad seed it was meant to
+      catch, at typical 5-20 seed counts. `CAL1_ISOLATED_FIXED_PARAMS[
+      'final_time']` scales per group (`CAL1_FINAL_TIME_MULTIPLIER=3 *
+      tau_3_long`: SOT≈145d, HIV≈283d) instead of one uniform 3y.
+      **Recalibration required**: run the full pipeline under a fresh
+      `--exp-num` (next real production run, exp #4).
 
 ------------------------------------------------------------------------
 

@@ -20,8 +20,9 @@
 #      one combined SLURM submission for all scenarios -> frozen NSR table)
 #   3. impact_long_shedders_exp.py    (production runs, one per scenario)
 #   4. submit_sanity_plot.sh          (ONE SLURM job producing a combined
-#      4x2 sanity grid -- one row per long-shedder scenario, shared x/y
-#      limits per column -- via plot_sot_sanity_regressions.py)
+#      sanity grid -- one row per long-shedder scenario (see
+#      DEFAULT_LONG_SCENARIOS in plot_sot_sanity_regressions.py), shared
+#      x/y limits per column -- via plot_sot_sanity_regressions.py)
 #   5. Once the sanity-plot job has left Slurm's queue, the pipeline log,
 #      both calibration-fit plots, and the combined sanity grid are bundled
 #      into one zip at Data/pipeline_artifacts/impact_long_shedders_#{exp_num}_
@@ -104,7 +105,7 @@ def run_stage(cmd, log_fh):
 
 
 def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh):
-    """Dispatch the ONE combined sanity-plot job (4x2 grid, one row per
+    """Dispatch the ONE combined sanity-plot job (grid with one row per
     long-shedder scenario, shared axis limits per column -- see
     plot_sot_sanity_regressions.py). Returns a single-entry list so callers
     that iterate over `submitted` (wait_for_sanity_plots, the summary print)

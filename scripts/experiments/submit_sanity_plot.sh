@@ -7,7 +7,7 @@
 #SBATCH --qos=standard
 
 # ============================================================================
-# submit_sanity_plot.sh -- ONE SLURM job producing the combined 4x2 sanity
+# submit_sanity_plot.sh -- ONE SLURM job producing the combined sanity
 # grid (one row per long-shedder scenario) via plot_sot_sanity_regressions.py
 # (heavy per-lineage hamming_iw cost belongs on SLURM, not inline after
 # impact_long_shedders_exp.py). Previously one job per scenario in parallel;

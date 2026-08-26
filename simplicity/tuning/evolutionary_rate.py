@@ -21,14 +21,86 @@ the functions to plot E (model nucleotide substitution rate) vs u (observed subs
 or vs any other simulation parameter.
 '''
 
+import os
 import sklearn.linear_model
 import numpy as np
+import pandas as pd
 import lmfit
 import simplicity.output_manager as om
+import simplicity.phenotype.distance as dis
 # from tqdm import tqdm
 
 # Upper bound on NSR.
 NSR_SANITY_MAX = 1.0
+
+_INTRAHOST_COLUMNS = ["Sequencing_time", "Distance_from_root"]
+
+
+def extract_ih_regression_data(ssod):
+    """
+    Genuine intra-host clock points for one seeded simulation output dir
+    (ssod): one point per lineage in every long shedder's own
+    IH_lineages_trajectory, measured against THAT HOST'S OWN founder/
+    inherited genome and time since THAT HOST'S OWN infection -- not the
+    global reference genome or absolute simulation time (the population-
+    pooled root-to-tip setup tempest_regression is normally fed, e.g. via
+    read_sequencing_data_regression, conflates within-host accumulation
+    with divergence inherited through transmission chains and with when
+    during the run a host happened to get infected).
+
+        x = (ih_birth - t_infection) / 365.25                    [years]
+        y = hamming_iw(genome(lineage), genome(inherited_lineage))
+            / len(dis.reference)                                  [subs/site]
+
+    Returns a DataFrame with columns ['Sequencing_time', 'Distance_from_root']
+    (named to match tempest_regression's expected input, even though what
+    they hold here is host-relative, not root/absolute-time) -- empty if
+    ssod has no long shedders or the required files/fields are missing.
+    Lineage names are unique only within one ssod; this never mixes data
+    across ssods -- only call it once per ssod and concatenate the results.
+    """
+    ind_path = os.path.join(ssod, "individuals_data.csv")
+    phylo_path = os.path.join(ssod, "phylogenetic_data.csv")
+    if not (os.path.isfile(ind_path) and os.path.isfile(phylo_path)):
+        return pd.DataFrame(columns=_INTRAHOST_COLUMNS)
+
+    ind_df = om.read_individuals_data(ssod)
+    if "type" not in ind_df.columns:
+        return pd.DataFrame(columns=_INTRAHOST_COLUMNS)
+    ind_df = ind_df[ind_df["type"] == "long_shedder"]
+    if ind_df.empty:
+        return pd.DataFrame(columns=_INTRAHOST_COLUMNS)
+
+    phylo_df = om.read_phylogenetic_data(ssod)
+    genome_map = dict(zip(phylo_df["Lineage_name"].astype(str), phylo_df["Genome"]))
+    ref_len = len(dis.reference)
+
+    points = []
+    for _, row in ind_df.iterrows():
+        inherited = str(row.get("inherited_lineage"))
+        t_inf = row.get("t_infection")
+        if inherited not in genome_map or pd.isna(t_inf):
+            continue
+        inh_genome = genome_map[inherited]
+
+        traj = row.get("IH_lineages_trajectory")
+        if not isinstance(traj, dict):
+            continue
+
+        for lineage, ev in traj.items():
+            lin_name = str(lineage)
+            if lin_name not in genome_map:
+                continue
+            ih_birth = ev.get("ih_birth") if isinstance(ev, dict) else None
+            if ih_birth is None:
+                continue
+            lin_genome = genome_map[lin_name]
+            y = dis.hamming_iw(lin_genome, inh_genome) / ref_len
+            x = (float(ih_birth) - float(t_inf)) / 365.25
+            points.append((x, y))
+
+    return pd.DataFrame(points, columns=_INTRAHOST_COLUMNS)
+
 
 def tempest_regression(sequencing_data_df):
     '''
