@@ -39,9 +39,7 @@ def get_parameter_specs_file_path():
     parameter_specs_file_path = os.path.join(dm.get_reference_parameters_dir(), "parameter_specs.json")
     return parameter_specs_file_path
 
-def write_standard_parameters_values():
-    filename= get_standard_parameters_values_file_path()
-    standard_values = {
+_STANDARD_VALUES_DEFAULTS = {
         "population_size": 1000,
         'long_shedders_ratio': 0,
         "infected_individuals_at_start": 10,
@@ -62,8 +60,14 @@ def write_standard_parameters_values():
         "phenotype_model": 'immune_waning',  # or 'linear'
         "sequencing_rate": 0.05,
         "sequence_long_shedders": False,
+        "start_ls": False,
         "seed": None
     }
+
+
+def write_standard_parameters_values():
+    filename= get_standard_parameters_values_file_path()
+    standard_values = copy.deepcopy(_STANDARD_VALUES_DEFAULTS)
     with open(filename, "w") as file:
         json.dump(standard_values, file, indent=4)
     print(f"Standard values written to {filename}")
@@ -90,7 +94,8 @@ def write_parameter_specs():
         "max_runtime":                   {"type": "int", "min": 0},
         "phenotype_model":               {"type": "str"},
         "sequencing_rate":               {"type": "float", "min": 0, "max": 1},
-        "sequence_long_shedders":        {"type": "bool"}
+        "sequence_long_shedders":        {"type": "bool"},
+        "start_ls":                      {"type": "bool"}
         }
 
     with open(filename, "w") as file:
@@ -101,11 +106,16 @@ def read_standard_parameters_values():
     filename= get_standard_parameters_values_file_path()
     try:
         with open(filename, "r") as file:
-            return json.load(file)
+            from_file = json.load(file)
     except FileNotFoundError:
         print(f"Error: {filename} not found. Writing default standard values.")
         write_standard_parameters_values()
-        return read_standard_parameters_values()
+        with open(filename, "r") as file:
+            from_file = json.load(file)
+
+    # Code defaults under the file, so a parameter added after this file was
+    # written still resolves instead of raising KeyError downstream.
+    return {**_STANDARD_VALUES_DEFAULTS, **from_file}
 
 def read_parameter_specs():
     filename= get_parameter_specs_file_path()
@@ -264,6 +274,7 @@ def write_simulation_parameters(file_path,
                                 phenotype_model,
                                 sequencing_rate,
                                 sequence_long_shedders,
+                                start_ls,
                                 seed
                                 ):
     settings = {
@@ -288,6 +299,7 @@ def write_simulation_parameters(file_path,
         "phenotype_model": phenotype_model,
         "sequencing_rate": sequencing_rate,
         "sequence_long_shedders":sequence_long_shedders,
+        "start_ls": start_ls,
         "seed": seed
     }
     
@@ -395,6 +407,7 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                     settings["phenotype_model"],
                                     settings["sequencing_rate"],
                                     settings["sequence_long_shedders"],
+                                    settings["start_ls"],
                                     settings["seed"]
                                     )
 

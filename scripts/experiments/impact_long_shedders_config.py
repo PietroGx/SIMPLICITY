@@ -148,33 +148,19 @@ CAL1_ISOLATED_FIXED_PARAMS = {
     "population_size": 1000,
     "infected_individuals_at_start": 10,
     "sequence_long_shedders": True,
-    # final_time deliberately absent: build_cal1_settings sets it per group
-    # as CAL1_FINAL_TIME_MULTIPLIER * tau_3_long -- a fixed 3 years for
-    # every group regardless of duration (validated for edge_case,
-    # tau_3_long=350.23, final_time/tau=~3.1) wastes a lot of compute on
-    # short-duration groups (SOT, tau_3_long=48.23, would only need
-    # final_time=~145 to hit the same ratio) that have no trouble
-    # accumulating enough sequenced diagnoses well before 3 years.
-    # R_long also absent: build_cal1_settings sets it per (tau_3_long,
-    # R_long) pair straight from SCENARIOS.
+    "start_ls": True,
+    "final_time": 365,
+    # R_long absent: build_cal1_settings sets it per (tau_3_long, R_long)
+    # pair straight from SCENARIOS.
 }
-
-# Only validated directly for edge_case (tau_3_long=350.23, at final_time=
-# 1095 -> ratio 3.1). SOT/HIV's own ratio at final_time=1095 was much
-# higher (~23x, ~12x) and worked comfortably, but that's not proof 3x is
-# enough for THEM specifically -- shorter tau means faster turnover so it
-# likely still is, but watch cal_1's own data-availability numbers (not
-# just Stage 2) in the next runs to confirm rather than assume.
-CAL1_FINAL_TIME_MULTIPLIER = 3
 
 
 def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
     """
     Returns a zero-arg make_settings callable ready for run_experiment_script:
     one group per (tau_3_long, R_long) pair (see unique_long_tau_r_long_pairs),
-    each sweeping the same NSR grid, with its own final_time =
-    CAL1_FINAL_TIME_MULTIPLIER * tau_3_long (see CAL1_ISOLATED_FIXED_PARAMS'
-    comment). R defaults to CAL1_ISOLATED_FIXED_PARAMS['R'] if not given --
+    each sweeping the same NSR grid. R defaults to
+    CAL1_ISOLATED_FIXED_PARAMS['R'] if not given --
     governs standard individuals only, unrelated to R_long.
     ih_virus_emergence_rate (k_v) defaults to USER_FIXED_PARAMS'
     IH_virus_emergence_rate if not given, so Stage 1 is calibrated under the
@@ -194,10 +180,9 @@ def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
         nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
         scenario_groups = [
             {
-                'nucleotide_substitution_rate': nsr_values,
+                'nucleotide_substitution_rate_long': nsr_values,
                 'tau_3_long': tau,
                 'R_long': r_long,
-                'final_time': round(CAL1_FINAL_TIME_MULTIPLIER * tau),
             }
             for tau, r_long in unique_long_tau_r_long_pairs(sp)
         ]
@@ -220,6 +205,10 @@ USER_FIXED_PARAMS = {
     "final_time": 1095,
     "IH_virus_emergence_rate": 0.1,
 }
+
+# cal_2 calibrates over a shorter window than production runs on
+# (USER_FIXED_PARAMS['final_time']); build_cal2_settings applies it.
+CAL2_FINAL_TIME = 365
 
 # Shared color palette for the calibration-fit plots (long-NSR per tau group,
 # standard-NSR per scenario), keyed by scenario name so both plots look
@@ -290,6 +279,7 @@ def build_cal2_settings(scenario_groups, seeds, R=None, ih_virus_emergence_rate=
     here must also be recorded in the frozen table (see cal_2.py's row
     building) so exp.py's production run matches what was calibrated."""
     fixed_params = USER_FIXED_PARAMS.copy()
+    fixed_params["final_time"] = CAL2_FINAL_TIME
     if R is not None:
         fixed_params["R"] = R
     if ih_virus_emergence_rate is not None:
@@ -352,7 +342,7 @@ def build_exp_scenario_settings(row, n_seeds):
 _NSR_STEPS = 10
 
 NSR_RANGES = {
-    "cal1_long_nsr": {"min": 0.01, "max": 0.1, "steps": _NSR_STEPS},
+    "cal1_long_nsr": {"min": 1e-05, "max": 1e-02, "steps": _NSR_STEPS},
     "cal2_standard_nsr": {
         "control":   {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
         "SOT":       {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},

@@ -38,6 +38,7 @@ class Population:
                  NSR_long,
                  long_shedders_ratio=0,
                  sequence_long_shedders=False,
+                 start_ls=False,
                  reservoir=100000):
         
         # random number generator
@@ -48,6 +49,14 @@ class Population:
         
         self.size = size
         self.long_shedders_ratio = long_shedders_ratio
+        # Seed the initial infected cohort as long shedders (see
+        # _init_individuals). infect_long_shedder only fires on new
+        # transmissions, so without this the I_0 starting individuals are
+        # always standard -- and, since standard and long shedders mutate at
+        # different rates (mutations.py: rate_standard=NSR vs
+        # rate_long=NSR_long), a nominally 100%-long-shedder population
+        # still had a standard-rate founder cohort seeding every lineage.
+        self.start_ls = start_ls
         
         # compartments and population groups ---------------------------------
         
@@ -233,17 +242,22 @@ class Population:
                 self.reservoir_i.add(i)
             
         # set individuals infected at the beginning of the simulation
+        # Type of the starting cohort: sets both their intra-host model
+        # (tau_3 vs tau_3_long) and, via long_shedder_i, their mutation rate.
+        ind_type = 'long_shedder' if self.start_ls else 'standard'
+
         for i in range(I_0): # update data of individuals infected at the beginning of the simulation
-            
+
             dic[i]['parent']       = 'root'
             dic[i]['t_infection']  = 0
             dic[i]['t_infectious'] = None
             dic[i]['state_t']      = 0
+            dic[i]['type']         = ind_type
             # sample next jump time from exp dist.
             state_t = dic[i]['state_t']
-            rate = - self.host_model['standard'].A[state_t][state_t]
-            dic[i]['t_next_state'] = self.rng3.exponential(scale=1/rate) 
-            
+            rate = - self.host_model[ind_type].A[state_t][state_t]
+            dic[i]['t_next_state'] = self.rng3.exponential(scale=1/rate)
+
             dic[i]['state']                     = 'infected'
             dic[i]['IH_lineages']               = ['wt']
             dic[i]['IH_lineages_fitness_score'] = [1e-6]
@@ -252,8 +266,11 @@ class Population:
             dic[i]['inherited_lineage']         = 'wt'
             dic[i]['IH_lineages_trajectory']['wt'] = {'ih_birth':None,'ih_death':None}
             
-            self.susceptibles_i.remove(i)  
+            self.susceptibles_i.remove(i)
             self.infected_i.add(i)
+            if self.start_ls:
+                self.long_shedder_i.add(i)
+                self.long_shedders += 1
 
         # update lineage_frequency
         self.lineage_frequency.append({'Lineage_name'              :'wt',
@@ -521,6 +538,7 @@ def create_population(parameters):
     
     long_shedders_ratio = parameters['long_shedders_ratio']
     sequence_long_shedders = parameters['sequence_long_shedders']
+    start_ls = parameters['start_ls']
     
     NSR_long = parameters['nucleotide_substitution_rate_long']
     
@@ -542,7 +560,7 @@ def create_population(parameters):
     
     # create population
     pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5,rng6, NSR_long,
-                     long_shedders_ratio, sequence_long_shedders)
+                     long_shedders_ratio, sequence_long_shedders, start_ls)
     return pop
         
 

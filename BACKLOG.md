@@ -76,6 +76,33 @@ Working list of blockers, active refactors, features, and technical debt.
       tau_3_long`: SOT≈145d, HIV≈283d) instead of one uniform 3y.
       **Recalibration required**: run the full pipeline under a fresh
       `--exp-num` (next real production run, exp #4).
+- [x] **cal_1 swept the standard NSR in a 100%-long-shedder population** —
+      found by run #4, the first full run on the corrected intra-host
+      measurement. Stage 1's fit came out flat (R²=0.0013/0.0010; measured
+      intra-host OSR did not respond to the swept axis at all), so
+      inverting at target produced `NSR_long=0` and every production
+      scenario ran with long shedders that could not mutate.
+      Cause: `mutations.py` applies `rate_long = population.NSR_long` to
+      `long_shedder_i` and `rate_standard = NSR` to everyone else, but
+      `build_cal1_settings` swept `nucleotide_substitution_rate` while
+      `nucleotide_substitution_rate_long` stayed at its
+      `standard_values.json` default. The swept axis governed nobody.
+      The old population-pooled fit hid this because
+      `infect_long_shedder` only fires on new transmissions, so the
+      `infected_individuals_at_start` cohort was always standard; those
+      seeds did respond to the swept rate, and their divergence reached
+      the global-clock regression through inheritance, faking a
+      convincing R²=0.98 dose-response.
+      Fixed: cal_1 now sweeps `nucleotide_substitution_rate_long` (and
+      `long_nsr_calibration_plot.py` reads/fits/plots that parameter);
+      new `start_ls` parameter seeds the initial cohort as long shedders
+      (set `True` in `CAL1_ISOLATED_FIXED_PARAMS`) so the isolated
+      context is genuinely 100% long shedders from t=0;
+      `NSR_RANGES['cal1_long_nsr']` retargeted to 1e-5-1e-2 to bracket
+      `NSR_long`. Verified locally: seeds come out 10/10 long shedders
+      and intra-host OSR now responds (1e-5 -> 0.00124, 1e-3 -> 0.00257,
+      bracketing target 0.00205).
+      **Recalibration required**: fresh `--exp-num` (exp #5).
 
 ------------------------------------------------------------------------
 

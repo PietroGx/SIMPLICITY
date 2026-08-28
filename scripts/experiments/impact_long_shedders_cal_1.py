@@ -48,8 +48,7 @@ def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R,
     for g in varying_params['_scenario_groups']:
         nsr_vals = g['nucleotide_substitution_rate']
         print(f"  tau_3_long={g['tau_3_long']:7.2f}  R_long={g['R_long']:7.4f}  "
-             f"final_time={g['final_time']:5d}  "
-             f"NSR grid: {len(nsr_vals)} pts [{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
+             f"NSR_long grid: {len(nsr_vals)} pts [{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
 
     print(f"\nDispatching grid experiment: {exp_name}_#{exp_num} to {runner}...")
     run_experiment_script(runner, exp_num, settings_func, exp_name)
