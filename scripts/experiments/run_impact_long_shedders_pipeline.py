@@ -68,6 +68,11 @@ _NOISE_PATTERNS = [
 _SBATCH_JOB_ID_RE = re.compile(r'Submitted batch job (\d+)')
 SANITY_PLOT_POLL_INTERVAL_S = 15
 
+# Stage 2's own memory request, separate from the shared --slurm-mem the
+# other stages use: every OOM kill in run #1 (284) and run #4 (72) was
+# inside cal_2 and nowhere else.
+CAL2_SLURM_MEM = "5G"
+
 
 def _is_slurm_monitor_noise(line):
     stripped = line.strip()
@@ -227,6 +232,11 @@ def main():
                         help="Defaults to "
                             "Data/pipeline_logs/impact_long_shedders_pipeline_#{exp_num}.log")
     add_slurm_resource_args(parser)
+    parser.add_argument('--slurm-mem-cal2', type=str, default=CAL2_SLURM_MEM,
+                        help="Per-task SLURM memory for cal_2 ONLY (default "
+                            f"{CAL2_SLURM_MEM}); every OOM kill in runs #1 "
+                            "and #4 landed in that stage. cal_1 and exp use "
+                            "--slurm-mem.")
     args = parser.parse_args()
 
     log_file = args.log_file or os.path.join(
@@ -264,7 +274,10 @@ def main():
                   "--seeds", str(args.cal_seeds),
                   "--R", str(args.r_cal2),
                   "--ih-virus-emergence-rate", str(args.ih_virus_emergence_rate),
-                  *slurm_res_args], log_fh)
+                  # cal_2 gets its own (larger) memory request; see
+                  # CAL2_SLURM_MEM.
+                  "--slurm-mem", args.slurm_mem_cal2,
+                  "--slurm-time", args.slurm_time], log_fh)
 
         run_stage([py, exp_path,
                   "--exp-num", str(args.exp_num),

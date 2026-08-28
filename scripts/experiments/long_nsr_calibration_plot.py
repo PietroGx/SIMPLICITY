@@ -157,7 +157,8 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
 
     all_sod_results = []
     for sod in simulation_output_dirs:
-        nsr_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'nucleotide_substitution_rate')
+        nsr_val = sm.get_parameter_value_from_simulation_output_dir(
+            sod, 'nucleotide_substitution_rate_long')
         tau_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'tau_3_long')
         r_long_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'R_long')
 
@@ -183,7 +184,7 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
                     sod_rows.append({
                         'tau_3_long': tau_val,
                         'R_long': r_long_val,
-                        'nucleotide_substitution_rate': nsr_val,
+                        'nucleotide_substitution_rate_long': nsr_val,
                         'observed_substitution_rate': osr_val,
                     })
             except Exception:
@@ -215,7 +216,7 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
         color = colors.get(key, 'black')
         label = labels.get(key, f'tau={tau},R_long={r_long}')
 
-        plt.scatter(group_df['nucleotide_substitution_rate'],
+        plt.scatter(group_df['nucleotide_substitution_rate_long'],
                    group_df['observed_substitution_rate'],
                    color=color, alpha=0.15, s=10)
 
@@ -223,7 +224,7 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
             experiment_name,
             group_df,
             model_type=model_type,
-            parameter_name='nucleotide_substitution_rate',
+            parameter_name='nucleotide_substitution_rate_long',
             experiment_group=label,
         )
 
@@ -235,8 +236,8 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
             print(f"{label:<17}: Could not compute calibration ({e})")
             continue
 
-        x_vals = np.linspace(group_df['nucleotide_substitution_rate'].min(),
-                            group_df['nucleotide_substitution_rate'].max(), 100)
+        x_vals = np.linspace(group_df['nucleotide_substitution_rate_long'].min(),
+                            group_df['nucleotide_substitution_rate_long'].max(), 100)
         y_vals = fit_result.eval(x=x_vals)
         plt.plot(x_vals, y_vals, color=color, linewidth=2, label=f"{label} fit")
         plt.plot(calibrated_nsr, target_osr_long, marker='*', markersize=12,

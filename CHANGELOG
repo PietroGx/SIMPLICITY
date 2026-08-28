@@ -5,6 +5,73 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.25 — 2026-08-28 — pietro gerletti
+
+Run #4 (first full run on 2.4.24's corrected intra-host measurement)
+completed every stage but produced an invalid result: Stage 1's fit came
+out flat (R²=0.0013 SOT, 0.0010 HIV -- measured intra-host OSR did not
+move at all across the swept NSR), so inverting at target gave
+`NSR_long = 0.000000`, which propagated into the frozen table and into
+production. Every long-shedder scenario ran with long shedders having zero
+mutation rate. The corrected measurement did its job: it exposed a bug the
+old population-pooled one had been masking since the pipeline was written.
+
+* **cal_1 was sweeping a parameter that governed nobody.** `mutations.py`
+  splits the infected population into `long_shedder_i` evolving at
+  `NSR_long` and everyone else at `NSR`; cal_1 runs
+  `long_shedders_ratio=1.0` but swept `nucleotide_substitution_rate` --
+  the standard rate -- while `nucleotide_substitution_rate_long` sat
+  pinned at the `standard_values.json` default (8.759e-5) for every grid
+  point. `build_cal1_settings` now sweeps
+  `nucleotide_substitution_rate_long`, and `long_nsr_calibration_plot.py`
+  reads/fits/plots against that parameter throughout.
+  Why the old measurement hid it: `infect_long_shedder` only fires on new
+  transmissions, so the `infected_individuals_at_start` cohort was always
+  standard. Those seeds *did* respond to the swept rate, and the old
+  global-reference/absolute-time regression picked their divergence up
+  through inheritance -- rendering a convincing R²=0.98 dose-response out
+  of a contaminating signal.
+* New `start_ls` simulation parameter (default `False`, i.e. historical
+  behaviour): seeds the initial infected cohort as long shedders rather
+  than standard -- type, intra-host model (`tau_3_long`), and membership
+  in `long_shedder_i`, so they evolve at `NSR_long` like the rest of the
+  population. `CAL1_ISOLATED_FIXED_PARAMS` sets it `True`, making cal_1's
+  nominally-100%-long-shedder population actually 100% long shedders from
+  t=0 instead of carrying a standard-rate founder cohort.
+* `read_standard_parameters_values` now merges the code-level defaults
+  (`_STANDARD_VALUES_DEFAULTS`, hoisted out of
+  `write_standard_parameters_values`) *under* an existing
+  `standard_values.json`. The file still wins for every key it defines,
+  but a newly added parameter self-heals on machines whose reference file
+  predates it, instead of `KeyError`-ing -- `start_ls` would otherwise
+  have required manually deleting that file on every install.
+* `NSR_RANGES['cal1_long_nsr']`: 0.01-0.1 -> 1e-5-1e-2, now bracketing
+  `NSR_long`. Anchored on run #4, which (via the inert sweep) effectively
+  measured one point: at `NSR_long`=8.759e-5, intra-host OSR was ~0.00165
+  (SOT) / ~0.00098 (HIV) against target 0.00205, putting the calibrated
+  value near 1e-4. Verified locally post-fix: the sweep now produces real
+  dose-response (1e-5 -> 0.00124, 1e-3 -> 0.00257), bracketing target.
+* Simulated windows are now fixed per stage rather than derived:
+  `CAL1_ISOLATED_FIXED_PARAMS['final_time']` = 365 flat, replacing
+  2.4.24's per-group `CAL1_FINAL_TIME_MULTIPLIER * tau_3_long` (145/283
+  d), which is removed. New `CAL2_FINAL_TIME` = 365, applied by
+  `build_cal2_settings` -- cal_2 previously inherited production's 1095
+  from `USER_FIXED_PARAMS`, so calibration and production now run
+  deliberately different windows (exp keeps 1095).
+* `--slurm-mem-cal2` (default 5G) on the pipeline orchestrator: Stage 2
+  now requests memory independently of cal_1/exp. Every OOM kill in run
+  #1 (284) and run #4 (72) landed in that stage and nowhere else -- it
+  carries a full mixed population at near-critical R across a
+  standard-NSR sweep reaching 0.1, and memory tracks cumulative mutation
+  events.
+* Silver lining from run #4: with long-shedder evolution effectively off,
+  the global clock's inflation vanished (standard rates 0.0015-0.0021 vs
+  the 0.0013 target -- 1.2-1.6x, against 3-52x in run #2). An accidental
+  but clean confirmation that the inflation really is long-shedder-origin
+  divergence propagating through transmission chains.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.24 — 2026-08-26 — pietro gerletti
 
 The k_v A/B test (2.4.22) didn't confirm the k_v hypothesis: control/SOT
