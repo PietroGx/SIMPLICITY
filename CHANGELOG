@@ -5,6 +5,23 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.26 — 2026-08-28 — pietro gerletti
+
+Hotfix for 2.4.25: cal_1 aborted immediately on exp #5 with
+`KeyError: 'nucleotide_substitution_rate'`. Its per-group console echo
+still subscripted the old key after the sweep moved to
+`nucleotide_substitution_rate_long` -- the adjacent `final_time` reference
+in the same loop was updated, this one was not. Console-only, before any
+dispatch, so nothing ran against bad parameters.
+
+* `impact_long_shedders_cal_1.py`: the group printout reads
+  `g['nucleotide_substitution_rate_long']`. Swept the rest of the pipeline
+  for the same mistake -- every other subscript of the standard key
+  (cal_2's own sweep plot and printout, exp.py's frozen-table read) is
+  correct, since cal_2 genuinely does sweep the standard rate.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.25 — 2026-08-28 — pietro gerletti
 
 Run #4 (first full run on 2.4.24's corrected intra-host measurement)
