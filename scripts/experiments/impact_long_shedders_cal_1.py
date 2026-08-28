@@ -46,7 +46,7 @@ def run_isolated_calibration(exp_num, runner, seeds, target_osr_long, R,
     print(f"Seeds per grid point: {n_seeds}")
     print("Per tau_3_long group:")
     for g in varying_params['_scenario_groups']:
-        nsr_vals = g['nucleotide_substitution_rate']
+        nsr_vals = g['nucleotide_substitution_rate_long']
         print(f"  tau_3_long={g['tau_3_long']:7.2f}  R_long={g['R_long']:7.4f}  "
              f"NSR_long grid: {len(nsr_vals)} pts [{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
 
