@@ -20,11 +20,10 @@ def get_clinical_label(scenario):
     if scenario == "control": return "Control"
     if scenario == "SOT": return "SOT"
     if "HIV" in scenario: return "HIV"
-    if scenario == "edge_case": return "Edge Case"
     return scenario.replace("_", " ").title()
 
 def get_panel_a_data(exp_num=1, exp_name="impact_long_shedders"):
-    scenarios = ["control", "SOT", "HIV_low", "edge_case"]
+    scenarios = ["control", "SOT", "HIV_low"]
     df_list = []
     for scenario in scenarios:
         experiment_string = f"{exp_name}_{scenario}_#{exp_num}"
@@ -51,7 +50,7 @@ def get_panel_a_data(exp_num=1, exp_name="impact_long_shedders"):
     return pd.concat(df_list, ignore_index=True)
 
 def get_panel_b_data(exp_num=1, exp_name="impact_long_shedders"):
-    scenarios = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"]
+    scenarios = ["control", "SOT", "HIV_low", "HIV_high"]
     df_list = []
     control_exp_string = f"{exp_name}_control_#{exp_num}"
     try:
@@ -131,7 +130,7 @@ def get_panel_fg_data(exp_num=1, exp_name="impact_long_shedders"):
     except Exception: pass
 
     # Extract Panel G (Long Shedders)
-    scenarios = ["SOT", "HIV_low", "HIV_high", "edge_case"]
+    scenarios = ["SOT", "HIV_low", "HIV_high"]
     L = 4967 
 
     for scenario in scenarios:

@@ -10,7 +10,7 @@ import fig4_plots as plots
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
 from long_shedders_plots import add_global_pie_legend
 
-SCENARIOS = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"]
+SCENARIOS = ["control", "SOT", "HIV_low", "HIV_high"]
 
 
 def parse_arguments():
