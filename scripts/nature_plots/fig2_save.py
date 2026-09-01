@@ -27,8 +27,8 @@ def set_nature_rcparams():
 
 def build_figure_2(exp_num, target_seed, fmt):
     set_nature_rcparams()
-    scenarios = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"]
-    palette = {"control": "#333333", "SOT": "#56B4E9", "HIV_low": "#D55E00", "HIV_high": "#E69F00", "edge_case": "#CC79A7"}
+    scenarios = ["control", "SOT", "HIV_low", "HIV_high"]
+    palette = {"control": "#333333", "SOT": "#56B4E9", "HIV_low": "#D55E00", "HIV_high": "#E69F00"}
 
     # --- Phase A: Pre-calculation for strict alignments ---
     shared_violin_seeds = preproc.get_shared_valid_seeds(exp_num, scenarios)

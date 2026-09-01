@@ -86,21 +86,9 @@ def main():
                             "matching cal_2/exp so Stage 1 is calibrated under "
                             "the same k_v it will actually run with.")
     parser.add_argument('--model', type=str, default='exp',
-                        choices=['lin', 'log', 'exp', 'tan'],
-                        help="Fit model for this stage's own diagnostic plot. "
-                            "Purely diagnostic -- cal_2.py recomputes the "
-                            "actual frozen-table long NSR independently with "
-                            "its own --model, which must be set to match if "
-                            "the two are meant to agree.")
-    parser.add_argument('--min-seq', type=int, default=30,
-                        help="Min sequences to keep a seed, for this stage's "
-                            "own diagnostic plot (same default cal_2.py uses "
-                            "for its independent recomputation).")
-    parser.add_argument('--min-len', type=int, default=100,
-                        help="Min simulation length (days) to keep a seed, "
-                            "for this stage's own diagnostic plot (same "
-                            "default cal_2.py uses for its independent "
-                            "recomputation).")
+                        choices=['lin', 'log', 'exp', 'tan'])
+    parser.add_argument('--min-seq', type=int, default=30)
+    parser.add_argument('--min-len', type=int, default=100)
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 

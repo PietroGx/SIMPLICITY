@@ -91,7 +91,6 @@ LONG_NSR_BY_SCENARIO = {
     "SOT": 0.086046,
     "HIV_low": 0.062089,
     "HIV_high": 0.062089,
-    "edge_case": 0.116614,
 }
 
 RUNNERS = {
@@ -198,7 +197,7 @@ def analyze_and_report(numbered, nsr_values, sp, test_n, min_seq=30, min_len=100
         recap.append(f"--- {name} ---")
 
         # long_shedders_ratio alone is NOT unique across scenarios (SOT,
-        # HIV_low, edge_case all share ratio=0.01) -- match on the
+        # HIV_low both share ratio=0.01) -- match on the
         # (tau_3_long, ratio) pair together, same as elsewhere in this repo.
         key_tau = round(derive_tau_3_long(scenario, sp), TAU_ROUND)
         key_ratio = round(float(scenario["long_shedders_ratio"]), TAU_ROUND)

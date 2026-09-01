@@ -10,10 +10,10 @@ import fig3_plots as plots
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
 from long_shedders_plots import plot_fig4_pies, add_global_pie_legend
 
-SCENARIOS = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"]
+SCENARIOS = ["control", "SOT", "HIV_low", "HIV_high"]
 SCENARIO_PALETTE = {
     "control": "#333333", "SOT": "#56B4E9", "HIV_low": "#D55E00",
-    "HIV_high": "#E69F00", "edge_case": "#CC79A7",
+    "HIV_high": "#E69F00",
 }
 
 

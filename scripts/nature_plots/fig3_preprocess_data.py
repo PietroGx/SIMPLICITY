@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 from long_shedders_preprocess import get_clade_metrics, summarize_sod_pies
 
 EXP_NAME = "impact_long_shedders"
-SCENARIOS = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"]
+SCENARIOS = ["control", "SOT", "HIV_low", "HIV_high"]
 
 
 def _experiment_sod(exp_num, scenario, exp_name=EXP_NAME):

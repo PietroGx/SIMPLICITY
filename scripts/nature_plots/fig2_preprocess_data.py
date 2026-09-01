@@ -14,7 +14,6 @@ def get_clinical_label(scenario):
     if scenario == "SOT": return "SOT"
     if scenario == "HIV_low": return "HIV Low"
     if scenario == "HIV_high": return "HIV High"
-    if scenario == "edge_case": return "Edge Case"
     return scenario.replace("_", " ").title()
 
 def get_target_seed_dir(exp_num, scenario, target_seed, exp_name="impact_long_shedders"):
