@@ -130,22 +130,26 @@ def archive_experiment(experiment_name):
 # -----------------------------------------------------------------------------
 
 
-def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedders=False):
+def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedders=False,
+                            write_fasta=False):
     """
     Writes the simulated sequencing data to FASTA files and a regression CSV.
     
     Parameters:
     - simulation_output: The object containing simulation results.
     - output_path: Directory to save files.
-    - sequence_long_shedders (bool): If True, extracts and saves all lineages 
-      from long shedders (at end of infection/sim) to a separate FASTA 
-      and includes them in the regression CSV.
-    
+    - sequence_long_shedders (bool): If True, extracts and saves all lineages
+      from long shedders (at end of infection/sim) and includes them in the
+      regression CSV. Off for production: long shedders are then sampled only
+      on diagnosis, at the same rate as standard individuals.
+    - write_fasta (bool): opt-in, default False. Neither FASTA is read by any
+      code in this repo -- the CSVs carry everything downstream uses.
+
     Outputs:
-    1. sequencing_data.fasta: Random surveillance sequences 
-    2. sequencing_data_long.fasta: All lineages from long-shedders 
-    3. sequencing_data_regression.csv: Combined metrics for both groups.
-    4. sequencing_data.csv: Raw surveillance metadata 
+    1. sequencing_data_regression.csv: Combined metrics for both groups.
+    2. sequencing_data.csv: Raw surveillance metadata
+    3. sequencing_data.fasta / sequencing_data_long.fasta: only when
+       write_fasta is True.
     """
     
     # Ensure output directory exists
@@ -168,8 +172,8 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
         sequencing_data = simulation_output.sequencing_data
         
         if sequencing_data:
-            # Open standard FASTA
-            with open(fasta_file_path, 'w') as fasta_file:
+            fasta_file = open(fasta_file_path, 'w') if write_fasta else None
+            try:
                 for individual_sequencing_data in sequencing_data:
                     # Extract details
                     ind_index    = individual_sequencing_data['individual_index']
@@ -179,20 +183,22 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
                     sequence     = individual_sequencing_data['sequence']
                     ind_type     = individual_sequencing_data['individual_type']
                     
-                    # Write to FASTA
-                    sequences_id = f'>{ind_index}_{ih_lin_index}_time_{seq_time:.2f}_lin_{lin_name}'
-                    fasta_file.write(f"{sequences_id}\n")
-                    
-                    decoded_genome = decode_genome(sequence)
-                    genome_str = decoded_genome.replace("'", "")
-                    fasta_file.write(f"{genome_str}\n")      
-                    
+                    if fasta_file is not None:
+                        sequences_id = f'>{ind_index}_{ih_lin_index}_time_{seq_time:.2f}_lin_{lin_name}'
+                        fasta_file.write(f"{sequences_id}\n")
+                        decoded_genome = decode_genome(sequence)
+                        genome_str = decoded_genome.replace("'", "")
+                        fasta_file.write(f"{genome_str}\n")
+
                     # Add to Regression Dict
                     sequencing_data_regression_dic.append({
                         'Sequencing_time': round(seq_time / 365.25, 4), # Years
                         'Distance_from_root': dis.hamming(sequence) / len(dis.reference),
                         'individual_type': ind_type
                     })
+            finally:
+                if fasta_file is not None:
+                    fasta_file.close()
             
             # Save Sequencing Metadata CSV
             with open(data_file_path, mode='w', newline='') as file:
@@ -220,21 +226,26 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
                     else:
                         seq_time = simulation_output.time 
                     
-                    # 2. Iterate through ALL lineages
+                    # 2. Iterate through ALL lineages, one entry per DISTINCT
+                    #    genome -- IH_lineages is a multiset and duplicated
+                    #    slots carry identical genomes (see diagnosis()).
                     if not ind_data['IH_lineages']:
-                        continue 
-                        
+                        continue
+
+                    seen_genomes = set()
                     for lineage_name in ind_data['IH_lineages']:
-                        # Retrieve the genome sequence 
+                        # Retrieve the genome sequence
                         sequence_list = simulation_output.get_lineage_genome(lineage_name)
-                        
-                        # Prepare FASTA entry string
-                        header = f">{i}_long_shedder_time_{seq_time:.2f}_lin_{lineage_name}"
-                        decoded_genome = decode_genome(sequence_list)
-                        genome_str = decoded_genome.replace("'", "")
-                        
-                        # Store in buffer
-                        long_shedder_entries.append(f"{header}\n{genome_str}\n")
+                        genome_key = tuple(map(tuple, sequence_list))
+                        if genome_key in seen_genomes:
+                            continue
+                        seen_genomes.add(genome_key)
+
+                        if write_fasta:
+                            header = f">{i}_long_shedder_time_{seq_time:.2f}_lin_{lineage_name}"
+                            decoded_genome = decode_genome(sequence_list)
+                            genome_str = decoded_genome.replace("'", "")
+                            long_shedder_entries.append(f"{header}\n{genome_str}\n")
                         
                         # Add to Regression Dict 
                         sequencing_data_regression_dic.append({

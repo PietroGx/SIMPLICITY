@@ -23,7 +23,7 @@ def check_seeded_simulation_output(ssod):
     required_files = [
         'final_time.csv', 'fitness_trajectory.csv', 'individuals_data.csv',
         'lineage_frequency.csv', 'phylogenetic_data.csv', 'sequencing_data_regression.csv',
-        'sequencing_data.fasta', 'simulation_trajectory.csv',
+        'simulation_trajectory.csv',
     ]
     return all(check_output_file(ssod, f) for f in required_files)
 

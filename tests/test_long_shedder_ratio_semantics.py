@@ -19,37 +19,36 @@
 # ============================================================================
 # HPC test: what does `long_shedders_ratio` actually control?
 #
-# population_model.infect_long_shedder uses it for two different things at
-# once: a per-new-infection recruitment PROBABILITY, and a concurrent
-# PREVALENCE cap (max_long_shedders = population_size * ratio). Those only
-# coincide when long shedders clear at the same rate as standard
-# individuals, which is exactly what they do not do -- SOT lasts 63 days
-# and HIV 109, against ~22 for a standard infection. A recruitment
-# probability p should therefore settle at a prevalence well above p, so
-# `long_shedders_ratio=0.12` may not mean "12% of infected individuals are
-# long shedders". HIV_low vs HIV_high is a pure ratio contrast, so which
-# quantity the number denotes changes how that comparison reads.
+# long_shedders_ratio is the share of the POPULATION carrying the
+# long-shedder trait, fixed per individual at creation. Infection picks
+# recipients uniformly from the susceptible pool, so INCIDENCE should come
+# out at the nominal ratio. PREVALENCE among the infected should not: long
+# shedders last 63 days (SOT) or 109 (HIV) against ~22 for a standard
+# infection, so by Little's law they accumulate in the infected pool at
+#
+#     p * D_long / ( p * D_long + (1-p) * D_std )
+#
+# which is several times p. That inflation is a real model output, not a
+# defect -- more than x% of prevalent infections sit in x% of the
+# population precisely because those hosts stay infected longer.
 #
 # Measures, per production scenario, over the real production population
 # context (USER_FIXED_PARAMS + derive_scenario_params):
-#   incidence  -- share of non-founder infections recruited as long
-#                 shedders; this is what the probability sets, so it
-#                 should track the nominal ratio;
+#   incidence  -- share of non-founder infections landing on trait
+#                 carriers; should track the nominal ratio;
 #   prevalence -- time-weighted mean long_shedders/infected from the
-#                 trajectory; this is what "12% long shedders" reads as;
-#   cap        -- share of simulated time spent at the max_long_shedders
-#                 ceiling, i.e. how often the second role binds and
-#                 truncates the first.
+#                 trajectory; expected to exceed it, by the factor above.
 #
-# A large prevalence/nominal ratio, or a non-trivial cap share, means the
-# parameter is not doing what its name says. Both are reported per seed and
-# aggregated, with the nominal ratio drawn on the figure for reference.
+# The trait fraction of the population itself is exact by construction
+# (Population._init_individuals marks round(size*ratio) of the initial
+# cohort) and is not re-measured here: individuals_data.csv only ever
+# contains individuals who left the susceptible pool.
 #
 # Not part of the impact_long_shedders pipeline -- a standalone diagnostic,
 # and it writes nothing the pipeline reads.
 #
-# NSR: long-shedder recruitment is a coin flip in infect_long_shedder and
-# does not depend on the substitution rate, so this defaults to
+# NSR: the long-shedder trait is drawn at creation and does not depend on
+# the substitution rate, so this defaults to
 # standard_values.json's rate rather than a calibrated production one --
 # far cheaper (memory tracks cumulative mutation events) and it keeps the
 # test decoupled from any particular run's frozen table. The remaining
@@ -131,8 +130,8 @@ def build_settings(frozen_scenarios, n_seeds, nsr, nsr_long):
 
 
 def measure_seed(ssod, population_size, ratio):
-    """incidence / prevalence / cap-bound share for one seeded simulation,
-    or None if its output is unusable."""
+    """incidence / prevalence for one seeded simulation, or None if its
+    output is unusable."""
     try:
         traj = om.read_simulation_trajectory(ssod)
         ind = om.read_individuals_data(ssod)
@@ -142,9 +141,8 @@ def measure_seed(ssod, population_size, ratio):
     if traj.empty or ind.empty:
         return None
 
-    # Incidence: the founder cohort never passes through
-    # infect_long_shedder (it only fires on new transmissions), so counting
-    # it would dilute the recruitment probability we are trying to read.
+    # Incidence: founders are seeded directly rather than infected by
+    # anyone, so counting them would dilute the acquisition share we want.
     infected_ind = ind[ind["t_infection"].notna()]
     recruited = infected_ind[infected_ind["parent"].astype(str) != "root"]
     if recruited.empty:
@@ -165,15 +163,10 @@ def measure_seed(ssod, population_size, ratio):
     prevalence = float(np.average(long_shed[live] / infected[live], weights=weights))
     peak_prevalence = float((long_shed[live] / infected[live]).max())
 
-    # Cap: how much of that time sat at the max_long_shedders ceiling.
-    cap = population_size * ratio
-    cap_share = float(weights[long_shed[live] >= cap].sum() / weights.sum())
-
     return {
         "incidence": incidence,
         "prevalence": prevalence,
         "peak_prevalence": peak_prevalence,
-        "cap_share": cap_share,
         "n_recruited": len(recruited),
         "final_time": float(t[-1]),
     }
@@ -202,9 +195,9 @@ def analyze_and_report(numbered, frozen_scenarios, test_n, population_size):
 
     recap = [
         f"=== long_shedders_ratio semantics: {numbered} ===",
-        "incidence  = share of non-founder infections recruited as long shedders",
+        "incidence  = share of non-founder infections landing on trait carriers",
         "prevalence = time-weighted mean long_shedders/infected",
-        "cap_share  = share of time at max_long_shedders = population_size * ratio",
+        "expected prevalence = p*D_long / (p*D_long + (1-p)*D_std)",
         f"population_size={population_size}, final_time={FINAL_TIME}",
         "",
     ]
@@ -235,11 +228,9 @@ def analyze_and_report(numbered, frozen_scenarios, test_n, population_size):
         recap.append(f"  prevalence     = {prev:.4f}  ({prev / ratio:.2f}x nominal)"
                      f"  [per-seed sd {df['prevalence'].std():.4f}]")
         recap.append(f"  peak prevalence= {df['peak_prevalence'].mean():.4f}")
-        recap.append(f"  cap_share      = {df['cap_share'].mean():.4f}")
         recap.append("")
         print(f"{name:10s}: nominal={ratio:.3f}  incidence={inc:.4f}  "
-              f"prevalence={prev:.4f} ({prev / ratio:.2f}x)  "
-              f"cap_share={df['cap_share'].mean():.3f}")
+              f"prevalence={prev:.4f} ({prev / ratio:.2f}x)")
 
         for offset, col, color in ((-0.15, 'incidence', 'tab:blue'),
                                    (0.15, 'prevalence', 'tab:red')):

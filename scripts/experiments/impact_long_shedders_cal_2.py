@@ -293,6 +293,7 @@ def main():
             "scenario_name": name,
             "tau_3_long": frozen["tau_3_long"],
             "long_shedders_ratio": frozen["long_shedders_ratio"],
+            "susceptibility_long": frozen["susceptibility_long"],
             "R": args.R,
             "IH_virus_emergence_rate": args.ih_virus_emergence_rate,
             "R_long": frozen["R_long"],
@@ -305,7 +306,8 @@ def main():
         })
 
     table_path = os.path.join(setup_dir, "nsr_calibration_table.csv")
-    cols = ["scenario_name", "tau_3_long", "long_shedders_ratio", "R",
+    cols = ["scenario_name", "tau_3_long", "long_shedders_ratio",
+            "susceptibility_long", "R",
             "IH_virus_emergence_rate", "R_long",
             "nucleotide_substitution_rate_long", "nucleotide_substitution_rate",
             "target_osr_std", "target_osr_long", "model_type", "long_calib_source"]

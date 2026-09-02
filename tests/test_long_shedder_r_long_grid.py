@@ -35,8 +35,9 @@
 # produces confident numbers about a different quantity (see BACKLOG):
 #   - sweeps nucleotide_substitution_rate_long, the rate mutations.py applies
 #     to long_shedder_i -- the standard rate governs nobody at ratio 1.0;
-#   - takes fixed_params from CAL1_ISOLATED_FIXED_PARAMS (start_ls=True, so
-#     the starting cohort is long shedders too) rather than rebuilding them;
+#   - takes fixed_params from CAL1_ISOLATED_FIXED_PARAMS (ratio=1.0, so every
+#     individual carries the long-shedder trait from creation, founders
+#     included) rather than rebuilding them;
 #   - fits each seed's genuine intra-host clock via
 #     er.extract_ih_regression_data, not the population-pooled root-to-tip
 #     regression.

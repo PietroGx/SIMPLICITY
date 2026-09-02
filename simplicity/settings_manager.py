@@ -60,7 +60,8 @@ _STANDARD_VALUES_DEFAULTS = {
         "phenotype_model": 'immune_waning',  # or 'linear'
         "sequencing_rate": 0.05,
         "sequence_long_shedders": False,
-        "start_ls": False,
+        "susceptibility_long": 1.0,
+        "write_fasta": False,
         "seed": None
     }
 
@@ -95,7 +96,8 @@ def write_parameter_specs():
         "phenotype_model":               {"type": "str"},
         "sequencing_rate":               {"type": "float", "min": 0, "max": 1},
         "sequence_long_shedders":        {"type": "bool"},
-        "start_ls":                      {"type": "bool"}
+        "susceptibility_long":           {"type": "float", "min": 0},
+        "write_fasta":                   {"type": "bool"}
         }
 
     with open(filename, "w") as file:
@@ -274,7 +276,8 @@ def write_simulation_parameters(file_path,
                                 phenotype_model,
                                 sequencing_rate,
                                 sequence_long_shedders,
-                                start_ls,
+                                susceptibility_long,
+                                write_fasta,
                                 seed
                                 ):
     settings = {
@@ -299,7 +302,8 @@ def write_simulation_parameters(file_path,
         "phenotype_model": phenotype_model,
         "sequencing_rate": sequencing_rate,
         "sequence_long_shedders":sequence_long_shedders,
-        "start_ls": start_ls,
+        "susceptibility_long": susceptibility_long,
+        "write_fasta": write_fasta,
         "seed": seed
     }
     
@@ -407,7 +411,8 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                     settings["phenotype_model"],
                                     settings["sequencing_rate"],
                                     settings["sequence_long_shedders"],
-                                    settings["start_ls"],
+                                    settings["susceptibility_long"],
+                                    settings["write_fasta"],
                                     settings["seed"]
                                     )
 

@@ -45,7 +45,7 @@ TABLE_FILENAME = "nsr_calibration_table.csv"
 
 # Columns the frozen table must contain.
 REQUIRED_COLUMNS = [
-    "scenario_name", "tau_3_long", "long_shedders_ratio", "R",
+    "scenario_name", "tau_3_long", "long_shedders_ratio", "susceptibility_long", "R",
     "IH_virus_emergence_rate", "R_long",
     "nucleotide_substitution_rate_long", "nucleotide_substitution_rate",
 ]
