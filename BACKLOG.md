@@ -41,8 +41,16 @@ Working list of blockers, active refactors, features, and technical debt.
       count rather than diversity. This affected standard individuals too.
       Both sequencing paths now emit one row per distinct genome.
       **Recalibration required.**
-- [ ] **cal_2 keeps only ~12-15% of its seeds, and it is the `min_seq`
-      gate on STANDARD sequences** — unresolved. Standard individuals are
+- [x] **cal_2 keeps only ~12-15% of its seeds, and it is the `min_seq`
+      gate on STANDARD sequences** — fixed in v2.4.29 by sequencing every
+      diagnosed individual in cal_2 only (`CAL2_SEQUENCING_RATE = 1.0`);
+      production and cal_1 keep 0.05. Measured 4/1/3 standard sequences per
+      seed at 0.05 (gate passed 0/3) against 50/41/72 at 1.0 (3/3).
+      Unbiased: `rng6` drives nothing but the sequencing coin flip and
+      recorded sequences are never read back, so the OSR expectation is
+      unchanged and only its variance drops; it also removes the
+      survivorship bias whereby the gate admitted only seeds with unusually
+      large epidemics. Original diagnosis below. Standard individuals are
       sequenced only on diagnosis and only at `sequencing_rate`, giving
       ~0.007 sequences per host, so a seed needs thousands of standard
       infections to clear `min_seq=30`. This is what limited run #5's cal_2

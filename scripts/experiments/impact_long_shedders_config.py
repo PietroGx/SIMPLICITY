@@ -211,6 +211,18 @@ USER_FIXED_PARAMS = {
 # (USER_FIXED_PARAMS['final_time']); build_cal2_settings applies it.
 CAL2_FINAL_TIME = 365
 
+# cal_2 sequences every diagnosed individual; production keeps the realistic
+# rate from standard_values.json. Sequencing is pure observation -- rng6 is
+# used for nothing else and recorded sequences are never read back into the
+# simulation -- so this changes the PRECISION of the standard-clock estimate
+# and nothing else: same expectation, lower variance. At the default 0.05 a
+# standard host yields ~0.007 sequences, so a seed needed thousands of
+# standard infections to clear min_seq=30 and cal_2 kept only ~12-15% of its
+# seeds (run #5: 24/30/26/7 points per scenario). It also removes the
+# survivorship bias in that gate, which previously admitted only seeds with
+# unusually large epidemics.
+CAL2_SEQUENCING_RATE = 1.0
+
 # Shared color palette for the calibration-fit plots (long-NSR per tau group,
 # standard-NSR per scenario), keyed by scenario name so both plots look
 # consistent with each other.
@@ -282,6 +294,7 @@ def build_cal2_settings(scenario_groups, seeds, R=None, ih_virus_emergence_rate=
     building) so exp.py's production run matches what was calibrated."""
     fixed_params = USER_FIXED_PARAMS.copy()
     fixed_params["final_time"] = CAL2_FINAL_TIME
+    fixed_params["sequencing_rate"] = CAL2_SEQUENCING_RATE
     if R is not None:
         fixed_params["R"] = R
     if ih_virus_emergence_rate is not None:
