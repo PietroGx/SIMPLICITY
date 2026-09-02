@@ -5,6 +5,32 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.29 — 2026-09-02 — pietro gerletti
+
+cal_2 now sequences every diagnosed individual (`CAL2_SEQUENCING_RATE = 1.0`,
+applied in `build_cal2_settings` only). Production and cal_1 keep the
+realistic 0.05 from `standard_values.json`; `USER_FIXED_PARAMS` is untouched,
+so exp.py is unaffected.
+
+* Fixes the gate that limited cal_2 to ~12-15% of its seeds and fit
+  HIV_high on 7 points in run #5. At 0.05 a standard host yields ~0.007
+  sequences, so `min_seq=30` on STANDARD sequences needed thousands of
+  standard infections per seed. Measured back to back (pop 400, 150 d,
+  ratio 0.01, 3 seeds): 4/1/3 standard sequences per seed at 0.05, passing
+  the gate 0/3, against 50/41/72 at 1.0, passing 3/3.
+* Unbiased, not just bigger: sequencing is pure observation -- `rng6` is
+  used for nothing but this coin flip (`population_model.py:57`) and
+  recorded sequences are never read back into the simulation -- so the OSR
+  expectation is unchanged and only its variance drops. Random subsampling
+  of a through-origin regression is unbiased for the slope. It also removes
+  a survivorship bias: the old gate admitted only seeds whose epidemics were
+  large enough to accumulate 30 standard sequences.
+* Deliberately NOT a mismatch of the kind CAL2_FINAL_TIME is: the simulated
+  window changes what the global clock measures, whereas the sequencing rate
+  only changes how precisely it is observed.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.28 — 2026-09-02 — pietro gerletti
 
 `long_shedders_ratio` becomes what its name says -- the share of the
