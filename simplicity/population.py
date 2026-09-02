@@ -38,7 +38,8 @@ class Population:
                  NSR_long,
                  long_shedders_ratio=0,
                  sequence_long_shedders=False,
-                 start_ls=False,
+                 susceptibility_long=1.0,
+                 write_fasta=False,
                  reservoir=100000):
         
         # random number generator
@@ -48,16 +49,13 @@ class Population:
         self.rng6 = rng6 # for synthetic sequencing data
         
         self.size = size
+        # Share of the POPULATION that sheds long, fixed per individual at
+        # creation (see _init_individuals) -- not a per-infection draw.
         self.long_shedders_ratio = long_shedders_ratio
-        # Seed the initial infected cohort as long shedders (see
-        # _init_individuals). infect_long_shedder only fires on new
-        # transmissions, so without this the I_0 starting individuals are
-        # always standard -- and, since standard and long shedders mutate at
-        # different rates (mutations.py: rate_standard=NSR vs
-        # rate_long=NSR_long), a nominally 100%-long-shedder population
-        # still had a standard-rate founder cohort seeding every lineage.
-        self.start_ls = start_ls
-        
+        # Relative weight on who RECEIVES an infection; 1.0 = long shedders
+        # are infected in proportion to their share of the susceptible pool.
+        self.susceptibility_long = susceptibility_long
+
         # compartments and population groups ---------------------------------
         
         self.susceptibles = size - I_0 # number of susceptible individuals
@@ -119,6 +117,8 @@ class Population:
         
         # Phylogenetic tree data ----------------------------------------------
         self.sequence_long_shedders = sequence_long_shedders
+        # FASTA output is opt-in: nothing in the repo reads either fasta file
+        self.write_fasta = write_fasta
         self.phylogenetic_data = [{  'Time_emergence'  : 0,
                                      'Lineage_name'    : 'wt',
                                      'Lineage_parent'  : None,
@@ -203,18 +203,29 @@ class Population:
         '''
         
         dic = {}
+        # Long-shedder status is a host trait fixed here, not drawn at
+        # infection: long_shedders_ratio is the share of the POPULATION that
+        # sheds long, independent of infection status. Exact count over the
+        # initial `size`; i.i.d. over the reservoir, which tops up the
+        # susceptible pool on every diagnosis and would otherwise dilute it.
+        n_initial_long = int(round(size * self.long_shedders_ratio))
+        initial_long = set(self.rng3.choice(size, size=n_initial_long,
+                                            replace=False).tolist()) \
+                       if n_initial_long else set()
         # create an entry in the dictionary for each individual (0 to number of
         # total individuals in the population (reservoir))
         for i in range(self.reservoir):
-            
+            is_long = ((i in initial_long) if i < size
+                       else self.rng3.uniform() < self.long_shedders_ratio)
+
             dic[i] = {
                      't_infection' : None,
                      't_not_infected': None,
-                     
+
                      't_infectious': None,
                      't_not_infectious': None,
-                     
-                     'type'        : 'standard',
+
+                     'type'        : 'long_shedder' if is_long else 'standard',
                      'state_t'     : 0,
                      't_next_state': None,
                      'state'       : 'susceptible',
@@ -226,7 +237,8 @@ class Population:
                      'IH_lineages'   : [],
                      'IH_unique_lineages_number': 0, #1
                      'IH_lineages_number'    : 0,    #1
-                     'IH_lineages_max': self.rng3.integers(1,5),
+                     'IH_lineages_max': (self.rng3.integers(5,16) if is_long
+                                         else self.rng3.integers(1,5)),
                      'IH_lineages_fitness_score' : [], #1
                      'IH_lineages_trajectory': {}, # lineage name : [ih_time_start, ih_time_end]
                      'time_last_weight_event': 0, # time since infection or last mutation
@@ -241,18 +253,17 @@ class Population:
             else:
                 self.reservoir_i.add(i)
             
-        # set individuals infected at the beginning of the simulation
-        # Type of the starting cohort: sets both their intra-host model
-        # (tau_3 vs tau_3_long) and, via long_shedder_i, their mutation rate.
-        ind_type = 'long_shedder' if self.start_ls else 'standard'
-
+        # set individuals infected at the beginning of the simulation.
+        # The starting cohort already carries its own type from creation; that
+        # sets its intra-host model (tau_3 vs tau_3_long) and, via
+        # long_shedder_i, its mutation rate.
         for i in range(I_0): # update data of individuals infected at the beginning of the simulation
 
+            ind_type = dic[i]['type']
             dic[i]['parent']       = 'root'
             dic[i]['t_infection']  = 0
             dic[i]['t_infectious'] = None
             dic[i]['state_t']      = 0
-            dic[i]['type']         = ind_type
             # sample next jump time from exp dist.
             state_t = dic[i]['state_t']
             rate = - self.host_model[ind_type].A[state_t][state_t]
@@ -268,7 +279,7 @@ class Population:
             
             self.susceptibles_i.remove(i)
             self.infected_i.add(i)
-            if self.start_ls:
+            if ind_type == 'long_shedder':
                 self.long_shedder_i.add(i)
                 self.long_shedders += 1
 
@@ -538,7 +549,8 @@ def create_population(parameters):
     
     long_shedders_ratio = parameters['long_shedders_ratio']
     sequence_long_shedders = parameters['sequence_long_shedders']
-    start_ls = parameters['start_ls']
+    susceptibility_long = parameters['susceptibility_long']
+    write_fasta = parameters['write_fasta']
     
     NSR_long = parameters['nucleotide_substitution_rate_long']
     
@@ -560,7 +572,8 @@ def create_population(parameters):
     
     # create population
     pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5,rng6, NSR_long,
-                     long_shedders_ratio, sequence_long_shedders, start_ls)
+                     long_shedders_ratio, sequence_long_shedders,
+                     susceptibility_long, write_fasta)
     return pop
         
 

@@ -57,9 +57,21 @@ def diagnosis(population, from_long_shedder, seq_rate=0):
     if population.rng6.uniform(0, 1) < seq_rate:
         # store sequencing data
         # patient_id, time, genome, subst number, patient type, infection duration, ih lineage number
+        # One row per DISTINCT genome carried by the host. IH_lineages is a
+        # multiset: add_lineage duplicates an existing lineage into a new slot,
+        # and that copy stays byte-identical until it mutates, so emitting
+        # every slot records the same genome several times and weights the
+        # host by its lineage count instead of its actual diversity.
+        seen_genomes = set()
         i = 0
         for lineage_name in population.individuals[diagnosed_individual_i]['IH_lineages']:
             genome = population.get_lineage_genome(lineage_name)
+            # a genome is a position-sorted list of [position, base] pairs, so
+            # this is comparing actual sequence content, not lineage identity
+            genome_key = tuple(map(tuple, genome))
+            if genome_key in seen_genomes:
+                continue
+            seen_genomes.add(genome_key)
             population.sequencing_data.append({
                 'individual_index': diagnosed_individual_i,
                 'sequencing_time' : population.time,
@@ -132,27 +144,13 @@ def diagnosis(population, from_long_shedder, seq_rate=0):
     new_susceptible_index = population.reservoir_i.pop()
     population.susceptibles_i.add(new_susceptible_index)
 
-def infect_long_shedder(population, new_infected_index):
-    
-    min_time = 0
-    min_infected_n = 0
-    max_long_shedders = population.size * population.long_shedders_ratio
-    
-    if (population.time > min_time and 
-        population.infected > min_infected_n and
-        population.long_shedders < max_long_shedders and
-        population.rng4.uniform() < population.long_shedders_ratio
-                      ):
+def register_long_shedder(population, new_infected_index):
+    """Add a newly infected individual to long_shedder_i if its own type says
+    so. Nothing is drawn or assigned: type is the host's trait, fixed at
+    creation, and long_shedder_i holds only those currently infected."""
+    if population.individuals[new_infected_index]['type'] == 'long_shedder':
         population.long_shedder_i.add(new_infected_index)
         population.long_shedders += 1
-        
-        individual_type = 'long_shedder'
-        
-    
-    else:
-        individual_type = 'standard'
-        
-    return individual_type
 
 def infection(population, from_long_shedder=False):
     '''
@@ -179,9 +177,18 @@ def infection(population, from_long_shedder=False):
     parent = population.rng4.choice(infectious_i_list, p=weights)
         
     susceptibles_list = sorted(population.susceptibles_i)
-    
-    # select random patient to be infected
-    new_infected_index = population.rng4.choice(susceptibles_list)
+
+    # select random patient to be infected. Uniform unless long shedders are
+    # deliberately given a different acquisition rate -- the s == 1 branch stays
+    # a bare choice() because passing an explicit uniform p= consumes rng4
+    # differently and would change every seed's trajectory.
+    s = population.susceptibility_long
+    if s == 1.0:
+        new_infected_index = population.rng4.choice(susceptibles_list)
+    else:
+        w = np.array([s if population.individuals[i]['type'] == 'long_shedder'
+                      else 1.0 for i in susceptibles_list])
+        new_infected_index = population.rng4.choice(susceptibles_list, p=w / w.sum())
     population.exclude_i = {new_infected_index}
     new_inf = population.individuals[new_infected_index]
 
@@ -237,10 +244,9 @@ def infection(population, from_long_shedder=False):
         'individual_infected': new_infected_index
     })
     
-    # set the individual to be a long shedder if conditions apply
-    new_inf['type'] = infect_long_shedder(population, new_infected_index)
-    if new_inf['type']  == 'long_shedder':
-        new_inf['IH_lineages_max'] = population.rng3.integers(5,16)
+    # type and IH_lineages_max are the host's own, set at creation; this only
+    # registers the individual in long_shedder_i for the infection's duration
+    register_long_shedder(population, new_infected_index)
     
     # update susceptibles and infected 
     population.susceptibles -= 1

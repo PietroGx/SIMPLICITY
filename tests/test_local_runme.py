@@ -136,7 +136,6 @@ def test_experiment_output(experiment_name):
             check_output_file(seed_directory, 'lineage_frequency.csv')
             check_output_file(seed_directory, 'phylogenetic_data.csv')
             check_output_file(seed_directory, 'sequencing_data_regression.csv')
-            check_output_file(seed_directory, 'sequencing_data.fasta')
             check_output_file(seed_directory, 'simulation_trajectory.csv')
     print('')
     print(f'TEST {experiment_name} OUTPUT -- SUCCESS.')
@@ -217,7 +216,6 @@ def compare_experiment_outputs(experiment_name_1, experiment_name_2):
         'lineage_frequency.csv',
         'phylogenetic_data.csv',
         'sequencing_data_regression.csv',
-        'sequencing_data.fasta',  
         'simulation_trajectory.csv'
     ]
 

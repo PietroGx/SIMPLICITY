@@ -5,6 +5,87 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.28 — 2026-09-02 — pietro gerletti
+
+`long_shedders_ratio` becomes what its name says -- the share of the
+POPULATION that sheds long -- and the sequencing of long shedders stops
+being a separate, unsampled census. **Recalibration required**: fresh
+`--exp-num` (exp #6). NSR_RANGES retuned to one decade per stage.
+
+* **long-shedder status is now a host trait, fixed at creation.** It was
+  drawn per new infection in `infect_long_shedder`, so the parameter set an
+  incidence RATE; prevalence then came out 2.3-4.1x higher because long
+  shedders stay infected 3-5x longer (Little's law: measured 2.32/4.08/36.3%
+  against a duration-weighted prediction of 2.78/4.71/40.0%). The draw and
+  the separate `max_long_shedders = population_size * ratio` cap -- the same
+  number doing duty as both a probability and a concurrent-count ceiling --
+  are both gone. `Population._init_individuals` now marks exactly
+  `round(size * ratio)` of the initial cohort and draws i.i.d. across the
+  reservoir (the pool is open: every diagnosis pops a fresh individual in,
+  so marking only the initial cohort would dilute the fraction over a run).
+  No new field: `type` already held `standard`/`long_shedder` and was already
+  never reset after infection -- it was simply being assigned too late. Safe
+  because `individuals_data_to_df` drops `state == 'susceptible'` rows, so
+  never-infected carriers never reach any consumer that filters on `type`.
+  `infect_long_shedder` -> `register_long_shedder` (reads the trait, registers
+  in `long_shedder_i`, assigns nothing); `IH_lineages_max` moves to creation.
+  `start_ls` removed: at `ratio=1.0` every founder is a long shedder anyway,
+  which is all it ever did for cal_1. Verified: trait fraction exactly
+  10/1000, 120/1000, 1000/1000; incidence 0.0104/0.0090/0.1196 against
+  nominal 0.01/0.01/0.12, with prevalence still duration-inflated (a real
+  model output now, not an artifact).
+* **New `susceptibility_long`** (default 1.0, per-scenario in `SCENARIOS`):
+  relative weight on who RECEIVES an infection. At 1.0 the recipient draw is
+  the bare `rng4.choice` it always was, so behaviour is bit-identical --
+  passing an explicit uniform `p=` consumes rng4 differently and would move
+  every seed. A multiplier, not an absolute rate: an absolute rate has to be
+  kept consistent with R and the pool size, which is the mistake `R_long`
+  made twice (2.4.12, 2.4.13). Verified unbiased at 1.0 (0.0950 vs 0.1000,
+  n=5000, z=-1.18) and matching `f*s/(f*s+1-f)` at s=3.0 and s=0.2. Note
+  s != 1 drifts the population fraction to `x / (s(1-x)+x)`, so departures
+  from 1.0 are a deliberate sensitivity arm, not a free knob.
+* **Sequencing recorded one row per lineage SLOT, and 47% were duplicates.**
+  `IH_lineages` is a multiset -- `add_lineage` duplicates an existing lineage
+  into a new slot, and that copy stays byte-identical until it mutates -- so
+  a host sequenced once emitted the same genome several times and was
+  weighted by its lineage count rather than its diversity. One event produced
+  3 rows, all lineage `wt.2`, 1 distinct genome. Both sequencing paths now
+  emit one row per DISTINCT genome, keyed on sequence content (a
+  position-sorted list of `[position, base]`), not on lineage name. Verified:
+  0 duplicates. Consequence: the 3.67-vs-1.89 sequences-per-diagnosed-
+  individual gap between long shedders and standard was mostly duplicate
+  copies; the genuine `IH_lineages_max` difference remains and is now
+  measured honestly.
+* **`sequence_long_shedders` off for production.** It censused every recovered
+  long shedder, every lineage, with no diagnosis requirement and no
+  `seq_rate` gate -- alongside a ~0.5% sample of standard individuals. Long
+  shedders were 1.1% of hosts and 85% of sequences (SOT), 12% and 98%
+  (HIV_high); the census supplied 99-100% of long-shedder rows. Both cohorts
+  are now sampled only on diagnosis, at the same rate: `diagnosis_rate_long`
+  and `diagnosis_rate_standard` are both 0.1, and `k_dl`/`k_ds` are each
+  solved by `get_k_d_from_diagnosis_rate` for that same 10% lifetime
+  probability. Kept ON for `CAL1_ISOLATED_FIXED_PARAMS`: its population is
+  100% long shedders, so there is no standard cohort to be asymmetric with,
+  and its fit reads lineage trajectories rather than sequences. No gate
+  change was needed -- cal_2 already filtered to `standard` BEFORE its
+  `min_seq` count, so seq-long rows were never inflating it.
+* **New `write_fasta` parameter, default False.** Neither FASTA is read by
+  any code in the repo; the CSVs carry everything downstream uses.
+  `sequencing_data.fasta` was still listed as a required output by
+  `check_completed_simulations.py` and `test_local_runme.py`, which would
+  have reported every completed run as incomplete -- both now key on the
+  CSVs.
+* `NSR_RANGES` both stages -> 1e-4..1e-3 (see the note above the dict).
+* `tests/`: `test_nsr_range_finder.py` gained probe-scale
+  `--population-size`/`--infected-at-start`, SLURM resource args with a
+  5G stage-2 default (its first HPC run requested the 4G default and
+  returned 0.20 yield at every node), a per-node breakdown of WHY seeds were
+  dropped, the probe fit's R², and a guard for the empty-plot crash when a
+  group yields nothing. `test_long_shedder_ratio_semantics.py` drops the
+  cap measurement (no cap exists any more).
+
+------------------------------------------------------------------------
+
 ## Version 2.4.27 — 2026-09-01 — pietro gerletti
 
 Diagnostics only: no pipeline stage changes behaviour, and run #5's results

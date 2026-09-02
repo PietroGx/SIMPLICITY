@@ -6,6 +6,66 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Blockers (before next production rerun)
 
+- [x] **`long_shedders_ratio` was an incidence rate, not a population
+      share** — fixed in v2.4.28. Status was drawn per new infection in
+      `infect_long_shedder`, so the parameter set the FLOW of long-shedder
+      infections; prevalence is flow x residence time, and long shedders
+      stay infected 3-5x longer, so the realized share of infected
+      individuals came out 2.3-4.1x the nominal ratio (measured
+      2.32/4.08/36.3% against a duration-weighted prediction of
+      2.78/4.71/40.0%, i.e. 83-91% of prediction across all three
+      scenarios). `long_shedders_ratio=0.12` therefore produced a scenario
+      in which ~36% of infected individuals were long shedders, peaking at
+      58%. The same number was also serving as a concurrent-count cap
+      (`population_size * ratio`), which is why incidence read slightly
+      BELOW nominal. Now a host trait fixed at creation across all
+      reservoir records, reusing the existing `type` field.
+      **Note the inflation does not disappear and should not**: with x% of
+      the population carrying the trait, more than x% of prevalent
+      infections are in those hosts, because they stay infected longer.
+      That is now a genuine model output rather than a mis-specified
+      parameter. **Recalibration required** (exp #6).
+- [x] **Long shedders were censused, not sampled** — fixed in v2.4.28.
+      `sequence_long_shedders` sequenced every recovered long shedder, every
+      lineage, with no diagnosis requirement and no `sequencing_rate` gate,
+      alongside a ~0.5% sample of standard individuals: long shedders were
+      1.1% of hosts and 85% of sequences (SOT), 12% and 98% (HIV_high), with
+      the census supplying 99-100% of their rows. Both cohorts now sampled
+      only on diagnosis at the same rate. Kept on for cal_1 only (100%
+      long-shedder population, so no asymmetry possible, and its fit reads
+      lineage trajectories not sequences). **Recalibration required.**
+- [x] **47% of sequence rows were duplicate genomes** — fixed in v2.4.28.
+      `IH_lineages` is a multiset and a duplicated slot carries a
+      byte-identical genome until it mutates, so a host sequenced once
+      emitted the same sequence several times and was weighted by lineage
+      count rather than diversity. This affected standard individuals too.
+      Both sequencing paths now emit one row per distinct genome.
+      **Recalibration required.**
+- [ ] **cal_2 keeps only ~12-15% of its seeds, and it is the `min_seq`
+      gate on STANDARD sequences** — unresolved. Standard individuals are
+      sequenced only on diagnosis and only at `sequencing_rate`, giving
+      ~0.007 sequences per host, so a seed needs thousands of standard
+      infections to clear `min_seq=30`. This is what limited run #5's cal_2
+      (24/30/26/**7** points per scenario) and fit HIV_high on 7 points with
+      A uncertain to 22.7%. It also makes cal_2 unprobeable at any locally
+      runnable scale. Candidate fixes, none applied: raise
+      `sequencing_rate` for cal_2 only (observation-side, unbiased, does not
+      touch dynamics since `rng6` is dedicated and sequences are never read
+      back); raise `CAL2_FINAL_TIME` 365 -> 1095, which would also close the
+      calibration/production window gap below; or lower `min_seq`, which
+      just fits noisier regressions on the same thin data.
+- [ ] **cal_2 calibrates at 365 d while production runs 1095 d** —
+      unresolved, introduced in v2.4.25 and first exposed by run #5. Each
+      scenario's Stage 2 fit reproduces the 0.0013 target exactly at its
+      calibrated NSR *at 365 days*, but production then measured
+      0.00209/0.00196/0.00156 (1.61x/1.51x/1.20x). A root-to-tip regression
+      through the origin has a window-dependent slope whenever divergence
+      accumulates non-linearly, which inherited divergence through
+      transmission chains makes it do. Free test, no new simulations:
+      refit run #5's sanity data restricted to t <= 1 year; if the standard
+      slope drops to ~0.0013 the mismatch is confirmed and the fix is
+      `CAL2_FINAL_TIME = 1095`.
+
 - [x] **Temp tau hack in cal_2** — fixed: `tau_3_long` is now derived as
       `inf_duration_long - (tau_1 + tau_2 + tau_4)` (shared
       `impact_long_shedders_config.derive_scenario_params`). cal_1's long

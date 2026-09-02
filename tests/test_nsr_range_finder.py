@@ -99,6 +99,7 @@ from impact_long_shedders_config import (
     CAL2_FINAL_TIME, phase_offset, derive_scenario_params,
     unique_long_tau_r_long_pairs, build_cal1_settings,
     build_cal2_scenario_groups, build_cal2_settings,
+    add_slurm_resource_args, set_slurm_resource_env,
 )
 from long_nsr_calibration_plot import read_calibrated_long_nsr
 
@@ -110,6 +111,13 @@ DEFAULT_NSR_MAX = 1e-03
 DEFAULT_STEPS = 3
 DEFAULT_SEEDS = 10
 SATURATION_D = 0.1        # subs/site past which raw Hamming saturates
+
+# Stage 2's own memory request, separate from stage 1's, mirroring the
+# pipeline orchestrator's --slurm-mem-cal2: every OOM kill in production runs
+# #1 (284) and #4 (72) landed in cal_2 and nowhere else, and this tool's first
+# HPC run returned 0.20 yield at every stage-2 node while requesting only the
+# 4G default.
+STAGE2_SLURM_MEM = "5G"
 
 RUNNERS = {
     'serial': simplicity.runners.serial,
@@ -129,9 +137,12 @@ def scenario_pair(scenario_name, sp):
             round(frozen["R_long"], TAU_ROUND))
 
 
-def build_stage1(ranges, n_seeds, final_time, k_v, scenario_name, sp):
+def build_stage1(ranges, n_seeds, overrides, k_v, scenario_name, sp):
     """cal_1's own builder, subset to one scenario's (tau_3_long, R_long)
-    group -- a range probe does not need the whole grid."""
+    group, at probe scale. A probe only needs the SHAPE of the OSR-vs-NSR
+    curve, and the intra-host clock is measured within a single infection,
+    so a smaller population and shorter window cost accuracy in the mean
+    rather than biasing it."""
     varying, fixed, seeds = build_cal1_settings(
         n_seeds, ranges, R=CAL1_ISOLATED_FIXED_PARAMS['R'],
         ih_virus_emergence_rate=k_v)()
@@ -143,11 +154,11 @@ def build_stage1(ranges, n_seeds, final_time, k_v, scenario_name, sp):
     if not kept:
         raise SystemExit(f"no cal_1 group matches scenario '{scenario_name}' {want}")
 
-    fixed = dict(fixed, final_time=final_time)
+    fixed = dict(fixed, **overrides)
     return lambda: ({'_scenario_groups': kept}, fixed, seeds)
 
 
-def build_stage2(ranges, n_seeds, final_time, k_v, long_nsr_by_group,
+def build_stage2(ranges, n_seeds, overrides, k_v, long_nsr_by_group,
                  scenario_name):
     """cal_2's own builder, subset to one scenario's group."""
     nsr_ranges = {s["name"]: ranges for s in SCENARIOS}
@@ -161,7 +172,7 @@ def build_stage2(ranges, n_seeds, final_time, k_v, long_nsr_by_group,
 
     varying, fixed, seeds = build_cal2_settings(
         kept, n_seeds, USER_FIXED_PARAMS['R'], k_v)()
-    fixed = dict(fixed, final_time=final_time)
+    fixed = dict(fixed, **overrides)
     return lambda: (varying, fixed, seeds)
 
 
@@ -169,25 +180,46 @@ def build_stage2(ranges, n_seeds, final_time, k_v, long_nsr_by_group,
 # MEASUREMENT -- each stage measures its own clock
 # =============================================================================
 def measure_stage1(ssod, min_seq, min_len):
-    """Intra-host clock, as cal_1 fits it."""
-    final_time = om.read_final_time(ssod)
-    seq_data = om.read_sequencing_data_regression(ssod)
-    if final_time < min_len or len(seq_data) < min_seq:
-        return None
+    """Intra-host clock, as cal_1 fits it. Returns (osr, reason): osr is
+    None when the seed is unusable and `reason` names which gate rejected
+    it -- a bare skip cannot tell a crashed task from a short epidemic."""
+    try:
+        final_time = om.read_final_time(ssod)
+    except Exception:
+        return None, 'no output'
+    try:
+        seq_data = om.read_sequencing_data_regression(ssod)
+    except Exception:
+        return None, 'no sequences'
+    if final_time < min_len:
+        return None, 'short run'
+    if len(seq_data) < min_seq:
+        return None, 'too few sequences'
     ih_points = er.extract_ih_regression_data(ssod)
     if ih_points.empty:
-        return None
-    return float(er.tempest_regression(ih_points).coef_[0])
+        return None, 'no intra-host points'
+    return float(er.tempest_regression(ih_points).coef_[0]), 'ok'
 
 
 def measure_stage2(ssod, min_seq, min_len):
-    """Global clock over standard individuals only, as cal_2 fits it."""
-    final_time = om.read_final_time(ssod)
-    seq_data = om.read_sequencing_data_regression(ssod)
+    """Global clock over standard individuals only, as cal_2 fits it.
+    Returns (osr, reason) -- see measure_stage1. Long shedders are sequenced
+    repeatedly across a long infection, so they dominate the sequence pool
+    and 'too few STANDARD sequences' is the gate that usually bites."""
+    try:
+        final_time = om.read_final_time(ssod)
+    except Exception:
+        return None, 'no output'
+    try:
+        seq_data = om.read_sequencing_data_regression(ssod)
+    except Exception:
+        return None, 'no sequences'
     seq_data = seq_data[seq_data['individual_type'] == 'standard']
-    if final_time < min_len or len(seq_data) < min_seq:
-        return None
-    return float(er.tempest_regression(seq_data).coef_[0])
+    if final_time < min_len:
+        return None, 'short run'
+    if len(seq_data) < min_seq:
+        return None, 'too few standard sequences'
+    return float(er.tempest_regression(seq_data).coef_[0]), 'ok'
 
 
 def collect_points(numbered, stage, nsr_param, group_keys, min_seq, min_len):
@@ -203,16 +235,20 @@ def collect_points(numbered, stage, nsr_param, group_keys, min_seq, min_len):
             sod, k)), TAU_ROUND) for k in group_keys)
 
         seeded_dirs = dm.get_seeded_simulation_output_dirs(sod)
+        reasons = {}
         for ssod in seeded_dirs:
             try:
-                osr = measure(ssod, min_seq, min_len)
-            except Exception:
-                continue
+                osr, reason = measure(ssod, min_seq, min_len)
+            except Exception as exc:
+                osr, reason = None, f'error: {type(exc).__name__}'
             if osr is not None and np.isfinite(osr) and osr > 0:
                 points.append({'group_key': key, 'nsr': nsr_val,
                                'observed_substitution_rate': osr})
+            else:
+                reasons[reason] = reasons.get(reason, 0) + 1
         attempts.append({'group_key': key, 'nsr': nsr_val,
-                         'n_seeds': len(seeded_dirs)})
+                         'n_seeds': len(seeded_dirs),
+                         'reasons': reasons})
 
     return pd.DataFrame(points), pd.DataFrame(attempts)
 
@@ -236,6 +272,7 @@ def node_table(points_df, attempts_df, group_key):
                         if len(sub) else np.nan,
             'n_ok': len(sub),
             'n_seeds': int(a['n_seeds']),
+            'reasons': a.get('reasons') or {},
         })
     return pd.DataFrame(rows)
 
@@ -301,11 +338,13 @@ def calibrated_nsr_from_probe(numbered, group_points, nsr_param, target, rec,
             numbered, fit_df, model_type=model_type,
             parameter_name=nsr_param, experiment_group=label)
         nsr = float(er.compute_calibrated_parameter(model_type, fit, target))
+        r2 = getattr(fit, 'rsquared', float('nan'))
+        exps = ", ".join(f"{k}={v:.4g}" for k, v in fit.params.valuesdict().items())
         if np.isfinite(nsr) and nsr > 0:
             if lo_bound <= nsr <= hi_bound:
-                return nsr, f"fit+invert ({model_type})"
-            return nsr, (f"fit+invert ({model_type}), EXTRAPOLATED outside the "
-                         f"probed range [{lo_bound:g}, {hi_bound:g}]")
+                return nsr, f"fit+invert ({model_type}), R2={r2:.4f}, {exps}"
+            return nsr, (f"fit+invert ({model_type}), R2={r2:.4f}, {exps}, "
+                         f"EXTRAPOLATED outside [{lo_bound:g}, {hi_bound:g}]")
     except Exception as e:
         print(f"  [probe fit failed: {e}]")
 
@@ -328,6 +367,10 @@ def format_node_table(df):
         lines.append(f"    {r['nsr']:12.6g} {osr:>12s} "
                      f"{r['yield']:7.2f} {int(r['n_ok']):3d}/{int(r['n_seeds']):<3d} "
                      f"{d:>10s}{flag}")
+        dropped = r.get('reasons') or {}
+        if dropped:
+            why = ", ".join(f"{n} {k}" for k, n in sorted(dropped.items()))
+            lines.append(f"                 dropped: {why}")
     return lines
 
 
@@ -365,12 +408,18 @@ def run_stage(stage, args, sp, long_nsr_by_group=None):
                    else CAL2_FINAL_TIME))
 
     ranges = {'min': args.nsr_min, 'max': args.nsr_max, 'steps': args.steps}
+    overrides = {'final_time': final_time}
+    if args.population_size is not None:
+        overrides['population_size'] = args.population_size
+    if args.infected_at_start is not None:
+        overrides['infected_individuals_at_start'] = args.infected_at_start
+
     if stage == 1:
-        settings_func = build_stage1(ranges, args.n_seeds, final_time,
+        settings_func = build_stage1(ranges, args.n_seeds, overrides,
                                      args.ih_virus_emergence_rate,
                                      args.scenario, sp)
     else:
-        settings_func = build_stage2(ranges, args.n_seeds, final_time,
+        settings_func = build_stage2(ranges, args.n_seeds, overrides,
                                      args.ih_virus_emergence_rate,
                                      long_nsr_by_group, args.scenario)
 
@@ -387,6 +436,9 @@ def run_stage(stage, args, sp, long_nsr_by_group=None):
         print(f"   {k}: {v}")
     print("=========================================================\n")
 
+    set_slurm_resource_env(
+        args.slurm_mem if stage == 1 else args.slurm_mem_stage2,
+        args.slurm_time)
     run_experiment(numbered, settings_func,
                    simplicity_runner=RUNNERS[args.runner],
                    archive_experiment=False)
@@ -450,6 +502,8 @@ def run_stage(stage, args, sp, long_nsr_by_group=None):
         recap.append("")
 
         plot_df = rec['table'].dropna(subset=['mean_osr'])
+        if plot_df.empty:
+            continue          # nothing measurable; log axes reject empty data
         line, = ax.plot(plot_df['nsr'], plot_df['mean_osr'], marker='o',
                         linewidth=1.5, label=label)
         starved = plot_df[plot_df['yield'] < args.min_yield]
@@ -461,8 +515,13 @@ def run_stage(stage, args, sp, long_nsr_by_group=None):
 
     ax.axhline(target, color='black', linestyle='--', linewidth=1.5,
                label=f'target {target:g}')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
+    if ax.lines and any(len(l.get_xdata()) and l.get_label() != f'target {target:g}'
+                        for l in ax.lines):
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+    else:
+        ax.text(0.5, 0.5, 'no measurable OSR at any node',
+                ha='center', va='center', transform=ax.transAxes)
     ax.set_xlabel(nsr_param)
     ax.set_ylabel("mean observed substitution rate")
     ax.set_title(f"NSR range finder -- stage {stage} ({numbered})\n"
@@ -552,6 +611,12 @@ def main():
     parser.add_argument('--nsr-min', type=float, default=DEFAULT_NSR_MIN)
     parser.add_argument('--nsr-max', type=float, default=DEFAULT_NSR_MAX)
     parser.add_argument('--steps', type=int, default=DEFAULT_STEPS)
+    parser.add_argument('--population-size', type=int, default=None,
+                        help="Probe-scale population; default is the stage's "
+                            "own production value.")
+    parser.add_argument('--infected-at-start', type=int, default=None,
+                        help="Probe-scale initial infected; default is the "
+                            "stage's own production value.")
     parser.add_argument('--final-time', type=int, default=None,
                         help="Override both stages' window. Default: each "
                             f"stage's own (cal_1 "
@@ -576,6 +641,10 @@ def main():
     parser.add_argument('--min-yield', type=float, default=0.25,
                         help="Min share of seeds a node must keep to be "
                             "eligible for the recommended range.")
+    add_slurm_resource_args(parser)
+    parser.add_argument('--slurm-mem-stage2', type=str, default=STAGE2_SLURM_MEM,
+                        help="Per-task SLURM memory for stage 2 ONLY (default "
+                            f"{STAGE2_SLURM_MEM}); stage 1 uses --slurm-mem.")
     args = parser.parse_args()
 
     sp = sm.read_standard_parameters_values()

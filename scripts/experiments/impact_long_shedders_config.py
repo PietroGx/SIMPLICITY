@@ -44,10 +44,10 @@ import simplicity.settings_manager as sm
 # R_long) pair, not tau alone, to keep that possibility correct (see
 # unique_long_tau_r_long_pairs).
 SCENARIOS = [
-    {"name": "control",   "inf_duration_long": None,  "long_shedders_ratio": 0.00, "R_long": None},
-    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.01, "R_long": 1.1},
-    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.01, "R_long": 1.1},
-    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.12, "R_long": 1.1},
+    {"name": "control",   "inf_duration_long": None,  "long_shedders_ratio": 0.00, "R_long": None, "susceptibility_long": 1.0},
+    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.01, "R_long": 1.1,  "susceptibility_long": 1.0},
+    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.01, "R_long": 1.1,  "susceptibility_long": 1.0},
+    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.12, "R_long": 1.1,  "susceptibility_long": 1.0},
     # edge_case (inf_duration_long=365.0) removed: at tau_3_long=350.23, both
     # (a) raw-Hamming-distance saturation (expected substitutions/site by
     # end of window reaches ~0.34, deep into multiple-hits territory) and
@@ -106,6 +106,7 @@ def derive_scenario_params(scenario, sp):
         return {
             "scenario_name": name,
             "long_shedders_ratio": 0.0,
+            "susceptibility_long": float(scenario["susceptibility_long"]),
             "tau_3_long": tau_3_long,
             "R_long": 0.0,
             "sequence_long_shedders": False,
@@ -115,9 +116,10 @@ def derive_scenario_params(scenario, sp):
     return {
         "scenario_name": name,
         "long_shedders_ratio": float(ratio),
+        "susceptibility_long": float(scenario["susceptibility_long"]),
         "tau_3_long": tau_3_long,
         "R_long": float(scenario["R_long"]),
-        "sequence_long_shedders": True,
+        "sequence_long_shedders": False,
         "is_long": True,
     }
 
@@ -148,7 +150,6 @@ CAL1_ISOLATED_FIXED_PARAMS = {
     "population_size": 1000,
     "infected_individuals_at_start": 10,
     "sequence_long_shedders": True,
-    "start_ls": True,
     "final_time": 365,
     # R_long absent: build_cal1_settings sets it per (tau_3_long, R_long)
     # pair straight from SCENARIOS.
@@ -255,6 +256,7 @@ def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_group):
 
         group = {
             "long_shedders_ratio": frozen["long_shedders_ratio"],
+            "susceptibility_long": frozen["susceptibility_long"],
             "tau_3_long": frozen["tau_3_long"],
             "R_long": frozen["R_long"],
             "sequence_long_shedders": frozen["sequence_long_shedders"],
@@ -311,10 +313,15 @@ def build_exp_scenario_settings(row, n_seeds):
         "R": float(row["R"]),
         "IH_virus_emergence_rate": float(row["IH_virus_emergence_rate"]),
         "long_shedders_ratio": float(row["long_shedders_ratio"]),
+        "susceptibility_long": float(row["susceptibility_long"]),
         "tau_3_long": float(row["tau_3_long"]),
         "R_long": float(row["R_long"]),
         "nucleotide_substitution_rate": float(row["nucleotide_substitution_rate"]),
-        "sequence_long_shedders": (not is_control),
+        # Off in production: long shedders are sampled only on diagnosis,
+        # at the same rate as standard individuals (see cal_1, which keeps
+        # it on -- its population is 100% long shedders, so there is no
+        # standard cohort for it to be asymmetric with).
+        "sequence_long_shedders": False,
     })
 
     # Long NSR: set only when a long side exists. For control the table value
@@ -341,13 +348,21 @@ def build_exp_scenario_settings(row, n_seeds):
 # tuning it doesn't mean touching (and keeping in sync) six separate literals.
 _NSR_STEPS = 10
 
+# One decade each, retuned for exp #6.
+# cal1_long_nsr: local probes of the SOT group put the calibrated NSR_long at
+# 3.7e-4 (300/10/180d), 4.5e-4 (1000/10/365d) and 4.6e-4 (pre-trait-model),
+# against 5.5e-4 from run #5's ten-node three-decade fit -- all near this
+# range's log-centre, with 10/10 seed yield at every node.
+# cal2_standard_nsr: no local evidence -- stage 2 could not be probed locally
+# (standard sequences are too sparse to clear min_seq at any runnable scale),
+# so it starts on the same decade and gets retuned from exp #6's own fit.
 NSR_RANGES = {
-    "cal1_long_nsr": {"min": 1e-05, "max": 1e-02, "steps": _NSR_STEPS},
+    "cal1_long_nsr": {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
     "cal2_standard_nsr": {
-        "control":   {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
-        "SOT":       {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
-        "HIV_low":   {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
-        "HIV_high":  {"min": 1e-05, "max": 1e-01, "steps": _NSR_STEPS},
+        "control":   {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
+        "SOT":       {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
+        "HIV_low":   {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
+        "HIV_high":  {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
     },
 }
 
