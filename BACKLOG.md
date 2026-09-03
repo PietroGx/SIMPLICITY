@@ -62,8 +62,37 @@ Working list of blockers, active refactors, features, and technical debt.
       back); raise `CAL2_FINAL_TIME` 365 -> 1095, which would also close the
       calibration/production window gap below; or lower `min_seq`, which
       just fits noisier regressions on the same thin data.
+- [ ] **HIV_high's standard clock cannot reach `target_osr_std`** — the
+      open design question, now with numbers from run #6. Its entire
+      measured cal_2 curve sat ABOVE the 0.0013 target (0.00184 at the
+      lowest sampled NSR of 1e-4), so the fit extrapolated to 8.34e-6 to
+      find a crossing that is not in the data; production at that value
+      measured 0.00175, i.e. a 12x cut in the standard NSR moved the clock
+      ~5%. The standard-individual clock in HIV_high is driven by divergence
+      inherited from long shedders through transmission chains, not by the
+      standard rate, so no NSR reaches the target and no sweep range fixes
+      it. Two options, unchosen: accept the elevated clock as the effect
+      being studied and leave calibration alone for long-shedder scenarios,
+      or meet `target_osr_std` only against transmission chains that never
+      passed through a long shedder. exp #7 widens cal_2 to 1e-6 to confirm
+      the curve never crosses.
+- [ ] **`compute_calibrated_parameter` will invert outside the swept range**
+      — unresolved. `NSR_SANITY_MAX` catches absurdly large values and
+      nothing catches anything else: run #6 returned 1.546e-3 from a sweep
+      capped at 1e-3, and 8.34e-6 from a sweep floored at 1e-4, both without
+      comment, and both went into production. It should at minimum flag a
+      calibration that lies outside the data it was fit on. Same class as
+      the missing floor that let run #4's `NSR_long = 0` through. Not added
+      before exp #7 deliberately -- a hard guard would abort on HIV_high,
+      and that run is meant to produce the data for the decision above.
 - [ ] **cal_2 calibrates at 365 d while production runs 1095 d** —
-      unresolved, introduced in v2.4.25 and first exposed by run #5. Each
+      **downgraded after run #6**, which left `CAL2_FINAL_TIME` unchanged yet
+      lost run #5's systematic one-directional overshoot: 1.61x/1.51x/1.20x
+      became 0.82x/0.98x/1.35x, scattering both ways. A window effect should
+      have persisted, so the systematic component in #5 was more likely the
+      duplicate sequences and seq-long asymmetry fixed in 2.4.28. Not ruled
+      out; the free t <= 1 year refit of the sanity data still settles it.
+      Original entry: introduced in v2.4.25 and first exposed by run #5. Each
       scenario's Stage 2 fit reproduces the 0.0013 target exactly at its
       calibrated NSR *at 365 days*, but production then measured
       0.00209/0.00196/0.00156 (1.61x/1.51x/1.20x). A root-to-tip regression

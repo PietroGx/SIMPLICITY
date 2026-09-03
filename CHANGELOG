@@ -5,6 +5,83 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.30 — 2026-09-03 — pietro gerletti
+
+NSR sweeps widened for exp #7 after run #6. Ranges only -- no model change,
+so #6's production output stays interpretable; #7 recalibrates.
+
+What run #6 established, and it was two clean results and one clear failure:
+
+* **The v2.4.29 sequencing-rate fix worked completely.** Every fit in both
+  stages used 200/200 points -- 100% seed yield across all four scenarios,
+  against 24/30/26/**7** in run #5. Zero OOM kills (284 -> 72 -> 4 -> 0).
+* **The v2.4.28 sequencing symmetry is visible in the output.** "Mixed (all
+  individuals)" now tracks "Standard" almost exactly (0.00106/0.00106,
+  0.00128/0.00127), where it used to be 85-98% long-shedder rows.
+* **One decade is too narrow.** R² fell to 0.39-0.85 (four decades gave 0.99
+  in run #5), B = 0.14-0.42, and two of six calibrations inverted OUTSIDE
+  their swept range: cal_1 HIV to 1.546e-3 above the 1e-3 ceiling, and cal_2
+  HIV_high to 8.34e-6, twelve times below the 1e-4 floor. The extrapolated
+  calibrations are exactly the ones production then missed on -- both HIV
+  scenarios overshot the long target (121%, 117%) while SOT, calibrated
+  interior, landed at 91%.
+
+* `NSR_RANGES['cal1_long_nsr']` 1e-4..1e-3 -> **1e-4..1e-2**; both run #6
+  answers (5.05e-4, 1.546e-3) now sit at 0.35 and 0.59 of the log range.
+* `NSR_RANGES['cal2_standard_nsr']` 1e-4..1e-3 -> **1e-6..1e-3** for every
+  scenario. control/SOT/HIV_low calibrated to 1.7e-4/1.7e-4/1.1e-4, all
+  pressed against the old floor; they now sit at 0.75/0.74/0.68. The extra
+  reach downward is deliberate: it settles whether HIV_high's curve ever
+  crosses the target (see below).
+* **Seeds per grid point 20 -> 30** everywhere: the orchestrator's
+  `--cal-seeds`/`--exp-seeds`, the three stage scripts' own `--seeds`, and
+  the `tests/` probe tools, which had drifted to 10. Run #6's fits used 200
+  points (10 nodes x 20 seeds) at 100% yield; 30 seeds gives 300, which
+  matters more than usual now that the sweeps span two and three decades and
+  the per-node OSR mean is what the inversion rests on. Cost: 300 tasks per
+  calibration stage, 30 per production scenario.
+* **The pipeline log now carries a simulation-health report after every
+  stage** -- `check_completed_simulations.py` run per experiment (cal_1,
+  cal_2, then one per production scenario) via a new
+  `report_simulation_health`. It gives, per grid point, how many seeds
+  produced complete output and an extinction/saturation autopsy of anything
+  that ended before its theoretical `final_time`, with the seed numbers. This
+  is the data that had to be reconstructed after the fact to explain run #5's
+  cal_2 yield; it now lands in the log while the run happens. Reporting only:
+  a failure is captured into the log and never aborts the pipeline (verified
+  against a non-existent experiment).
+* **`check_completed_simulations.py` counted completed simulations as
+  invalid.** `required_files` included a sequencing output, which is written
+  conditionally -- `sequencing_data_regression.csv` only when the seed
+  produced at least one sequence, the FASTAs only when `write_fasta` is on --
+  so any seed that legitimately sequenced nobody was reported invalid.
+  Demonstrated: three completed seeds reported as "Valid simulations: 0/4",
+  and correctly as 3/4 after the fix. Pre-existing (the list previously named
+  `sequencing_data.fasta`, written under the same kind of condition) and
+  carried over unchanged in 2.4.28. The list is now only files a completed
+  run always writes.
+
+**Not fixed, and not a range problem.** In HIV_high the standard-individual
+clock is effectively decoupled from the standard substitution rate: run #6's
+entire measured curve sat above the 0.0013 target (0.00184 at the lowest
+sampled NSR), and production at the extrapolated 8.34e-6 measured 0.00175 --
+a 12x cut in NSR moved the clock ~5%. The clock there is driven by divergence
+inherited from long shedders through transmission chains, not by the standard
+rate, so no NSR reaches the target. This is the open `target_osr_std` question
+in BACKLOG, now with numbers. Widening cal_2 to 1e-6 is to confirm the curve
+never crosses, not to find a crossing.
+
+**Correction to an earlier hypothesis.** The cal_2 365 d vs production 1095 d
+window mismatch was recorded as the leading explanation for run #5's
+overshoot. `CAL2_FINAL_TIME` is unchanged in #6, yet the systematic
+one-directional overshoot (1.61x/1.51x/1.20x) is gone -- #6 scatters both
+ways (0.82x/0.98x/1.35x). A window effect should have persisted. The
+systematic component in #5 was more likely the duplicate sequences and the
+seq-long asymmetry, both fixed in 2.4.28. The window hypothesis is
+downgraded, not ruled out; the t <= 1 year refit still settles it.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.29 — 2026-09-02 — pietro gerletti
 
 cal_2 now sequences every diagnosed individual (`CAL2_SEQUENCING_RATE = 1.0`,

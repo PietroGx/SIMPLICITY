@@ -281,7 +281,7 @@ def main():
                         help="Test number (numbers this test's experiment).")
     parser.add_argument('--runner', type=str, default='slurm',
                         choices=['serial', 'multiprocessing', 'slurm'])
-    parser.add_argument('--n-seeds', type=int, default=20)
+    parser.add_argument('--n-seeds', type=int, default=30)
     parser.add_argument('--nsr', type=float, default=DEFAULT_NSR)
     parser.add_argument('--nsr-long', type=float, default=DEFAULT_NSR)
     args = parser.parse_args()

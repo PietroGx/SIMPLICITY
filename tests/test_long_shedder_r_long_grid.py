@@ -328,8 +328,9 @@ def main():
                         help="Test number (numbers this test's experiment).")
     parser.add_argument('--runner', type=str, default='slurm',
                         choices=['serial', 'multiprocessing', 'slurm'])
-    parser.add_argument('--n-seeds', type=int, default=10,
-                        help="Seeds per (tau, R_long, NSR) grid point (default 10).")
+    parser.add_argument('--n-seeds', type=int, default=30,
+                        help="Seeds per (tau, R_long, NSR) grid point (default 30, "
+                            "matching the pipeline).")
     parser.add_argument('--nsr-min', type=float, default=DEFAULT_NSR_MIN,
                         help=f"Min NSR anchor point (default {DEFAULT_NSR_MIN}). "
                             "Deliberately decoupled from NSR_RANGES['cal1_long_nsr'] "
