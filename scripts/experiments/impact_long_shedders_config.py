@@ -361,21 +361,30 @@ def build_exp_scenario_settings(row, n_seeds):
 # tuning it doesn't mean touching (and keeping in sync) six separate literals.
 _NSR_STEPS = 10
 
-# One decade each, retuned for exp #6.
-# cal1_long_nsr: local probes of the SOT group put the calibrated NSR_long at
-# 3.7e-4 (300/10/180d), 4.5e-4 (1000/10/365d) and 4.6e-4 (pre-trait-model),
-# against 5.5e-4 from run #5's ten-node three-decade fit -- all near this
-# range's log-centre, with 10/10 seed yield at every node.
-# cal2_standard_nsr: no local evidence -- stage 2 could not be probed locally
-# (standard sequences are too sparse to clear min_seq at any runnable scale),
-# so it starts on the same decade and gets retuned from exp #6's own fit.
+# Widened for exp #7 after run #6 showed one decade is too narrow: R2 fell to
+# 0.39-0.85 (four decades gave 0.99 in run #5) and two of six calibrations
+# inverted OUTSIDE their swept range.
+#
+# cal1_long_nsr 1e-4..1e-2: run #6 put SOT at 5.05e-4 and HIV at 1.55e-3, the
+# latter above the old 1e-3 ceiling -- an extrapolation, and both HIV
+# scenarios then overshot the long target (121%, 117%) while SOT, calibrated
+# interior, landed at 91%. Two decades puts both answers well inside.
+#
+# cal2_standard_nsr 1e-6..1e-3: control/SOT/HIV_low calibrated to 1.7e-4,
+# 1.7e-4 and 1.1e-4, all near the old 1e-4 floor, so the range is extended
+# downward. It also reaches far enough down to settle HIV_high, whose whole
+# measured curve sat ABOVE the 0.0013 target in run #6 (0.00184 at the lowest
+# sampled NSR; production at the extrapolated 8.34e-6 measured 0.00175, so a
+# 12x cut in NSR moved the clock ~5%). Sampling to 1e-6 shows definitively
+# whether that curve ever crosses the target, which is what the decision about
+# target_osr_std in long-shedder scenarios needs.
 NSR_RANGES = {
-    "cal1_long_nsr": {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
+    "cal1_long_nsr": {"min": 1e-04, "max": 1e-02, "steps": _NSR_STEPS},
     "cal2_standard_nsr": {
-        "control":   {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
-        "SOT":       {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
-        "HIV_low":   {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
-        "HIV_high":  {"min": 1e-04, "max": 1e-03, "steps": _NSR_STEPS},
+        "control":   {"min": 1e-06, "max": 1e-03, "steps": _NSR_STEPS},
+        "SOT":       {"min": 1e-06, "max": 1e-03, "steps": _NSR_STEPS},
+        "HIV_low":   {"min": 1e-06, "max": 1e-03, "steps": _NSR_STEPS},
+        "HIV_high":  {"min": 1e-06, "max": 1e-03, "steps": _NSR_STEPS},
     },
 }
 

@@ -109,7 +109,7 @@ DEFAULT_SCENARIO = "SOT"
 DEFAULT_NSR_MIN = 1e-04
 DEFAULT_NSR_MAX = 1e-03
 DEFAULT_STEPS = 3
-DEFAULT_SEEDS = 10
+DEFAULT_SEEDS = 30
 SATURATION_D = 0.1        # subs/site past which raw Hamming saturates
 
 # Stage 2's own memory request, separate from stage 1's, mirroring the

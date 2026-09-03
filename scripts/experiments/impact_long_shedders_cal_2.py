@@ -207,7 +207,7 @@ def main():
                         help="Target OSR for standard individuals (default 0.0013).")
     parser.add_argument('--target-osr-long', type=float, required=True,
                         help="Target OSR for long shedders.")
-    parser.add_argument('--seeds', type=int, default=20,
+    parser.add_argument('--seeds', type=int, default=30,
                         help="Seeds per NSR point in the standard sweep.")
     parser.add_argument('--exp-num', type=int, required=True,
                         help="Experiment number (shared with cal_1 and exp).")

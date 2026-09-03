@@ -57,8 +57,15 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from impact_long_shedders_config import (
     LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME, CAL1_ISOLATED_FIXED_PARAMS,
-    USER_FIXED_PARAMS, add_slurm_resource_args,
+    USER_FIXED_PARAMS, SCENARIOS, add_slurm_resource_args,
 )
+
+# scripts/check_completed_simulations.py -- per-grid-point completeness and an
+# extinction/saturation autopsy of anything that ended early. Run after each
+# stage so the log says WHY a stage produced thin data, instead of leaving a
+# low fit-point count to be explained after the fact.
+CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
+PROD_EXP_NAME = "impact_long_shedders"
 
 _NOISE_PATTERNS = [
     re.compile(r'^SimulationsStatus\('),
@@ -107,6 +114,27 @@ def run_stage(cmd, log_fh):
 
     if proc.returncode != 0:
         raise SystemExit(f"[FAILED] stage exited {proc.returncode}: {' '.join(cmd)}")
+
+
+def report_simulation_health(exp_names, log_fh, label):
+    """Append check_completed_simulations.py's report for each experiment.
+    Reporting only -- a failure here is logged and never aborts the run,
+    since the simulations it describes have already completed."""
+    _log(log_fh, f"\n===== simulation health: {label} =====")
+    for name in exp_names:
+        cmd = [sys.executable, CHECK_SCRIPT, name]
+        _log(log_fh, f"\n$ {' '.join(cmd)}")
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+        except Exception as exc:
+            _log(log_fh, f"  [skip] health report failed to run: {exc}")
+            continue
+        for stream in (result.stdout, result.stderr):
+            for line in stream.splitlines():
+                _log(log_fh, line)
+        if result.returncode != 0:
+            _log(log_fh, f"  [skip] health report exited {result.returncode} "
+                        f"for {name}")
 
 
 def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh):
@@ -203,9 +231,9 @@ def main():
                         choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
     parser.add_argument('--target-osr-std', type=float, default=0.0013)
     parser.add_argument('--target-osr-long', type=float, default=0.00205)
-    parser.add_argument('--cal-seeds', type=int, default=20,
+    parser.add_argument('--cal-seeds', type=int, default=30,
                         help="Seeds per grid point, cal_1 and cal_2.")
-    parser.add_argument('--exp-seeds', type=int, default=20,
+    parser.add_argument('--exp-seeds', type=int, default=30,
                         help="Seeds per scenario, final production stage.")
     parser.add_argument('--skip-cal1', action='store_true',
                         help=f"Reuse an already-computed {LONG_NSR_EXP_NAME}_#{{exp_num}} "
@@ -266,6 +294,9 @@ def main():
                       "--ih-virus-emergence-rate", str(args.ih_virus_emergence_rate),
                       *slurm_res_args], log_fh)
 
+        report_simulation_health([f"{LONG_NSR_EXP_NAME}_#{args.exp_num}"],
+                                 log_fh, "stage 1 (cal_1)")
+
         run_stage([py, cal2_path,
                   "--exp-num", str(args.exp_num),
                   "--runner", args.runner,
@@ -279,11 +310,18 @@ def main():
                   "--slurm-mem", args.slurm_mem_cal2,
                   "--slurm-time", args.slurm_time], log_fh)
 
+        report_simulation_health([f"{STD_NSR_SWEEP_NAME}_#{args.exp_num}"],
+                                 log_fh, "stage 2 (cal_2)")
+
         run_stage([py, exp_path,
                   "--exp-num", str(args.exp_num),
                   "--runner", args.runner,
                   "--seeds", str(args.exp_seeds),
                   *slurm_res_args], log_fh)
+
+        report_simulation_health(
+            [f"{PROD_EXP_NAME}_{s['name']}_#{args.exp_num}" for s in SCENARIOS],
+            log_fh, "stage 3 (production)")
 
         submitted = submit_sanity_plots(
             args.exp_num, args.target_osr_std, args.target_osr_long, log_fh)

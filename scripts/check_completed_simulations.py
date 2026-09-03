@@ -20,9 +20,14 @@ def check_output_file(directory, filename):
     return os.path.isfile(os.path.join(directory, filename))
 
 def check_seeded_simulation_output(ssod):
+    # Only files a completed run ALWAYS writes. Deliberately excludes the
+    # sequencing outputs: sequencing_data_regression.csv is written only when
+    # the seed produced at least one sequence, and the FASTAs only when
+    # write_fasta is on, so requiring either marks a legitimately completed
+    # simulation that happened to sequence nobody as invalid.
     required_files = [
         'final_time.csv', 'fitness_trajectory.csv', 'individuals_data.csv',
-        'lineage_frequency.csv', 'phylogenetic_data.csv', 'sequencing_data_regression.csv',
+        'lineage_frequency.csv', 'phylogenetic_data.csv',
         'simulation_trajectory.csv',
     ]
     return all(check_output_file(ssod, f) for f in required_files)

@@ -101,7 +101,7 @@ def dispatch_scenario(row, exp_num, runner, n_seeds):
 def main():
     parser = argparse.ArgumentParser(
         description="Run impact_long_shedders scenarios from a frozen NSR table.")
-    parser.add_argument('--seeds', type=int, default=20,
+    parser.add_argument('--seeds', type=int, default=30,
                         help="Number of seeds per scenario.")
     parser.add_argument('--exp-num', type=int, required=True,
                         help="Experiment number (also selects the calibration table).")
