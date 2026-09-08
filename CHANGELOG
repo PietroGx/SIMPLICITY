@@ -5,6 +5,84 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.31 — 2026-09-08 — pietro gerletti
+
+New second pipeline, `impact_long_shedders_unbound`, run alongside
+`impact_long_shedders`. **The existing pipeline is untouched** -- `git diff`
+over its config, orchestrator and three stage scripts is empty. The only
+modified existing file is `settings_manager.py`, for one spec ceiling.
+
+Why a second pipeline rather than a change to the first: run #7 showed the
+bound design asking calibration to do something it cannot. Fitting the
+standard NSR in-context, per scenario, makes that rate absorb whatever
+divergence long shedders inject through transmission chains. The fitted
+exponent falls monotonically with long-shedder burden -- control 0.366, SOT
+0.252, HIV_low 0.201, HIV_high **0.069** -- so in HIV_high a thousandfold
+change in the standard rate moves its clock by 1.6x, and holding
+target_osr_std required driving that rate to 9.3e-7, 150x below control.
+Standard individuals had to stop mutating to cancel an effect that is
+plausibly the object of study.
+
+The unbound pipeline calibrates each cohort ALONE and lets them loose
+together:
+
+* **Stage 1 (`_unbound_cal_1.py`)** -- 100% long-shedder population, sweeps
+  NSR_long, fits the intra-host clock. Unchanged in kind from the bound
+  cal_1, and it calls the same `plot_and_fit_long_nsr_calibration`, so both
+  pipelines share one implementation of that clock. Measurement code is
+  deliberately not duplicated anywhere; only parameter construction is, and
+  that is what a config file is for.
+* **Stage 2 (`_unbound_cal_2.py`)** -- 0% long-shedder population at
+  production settings, sweeps the standard NSR, fits the global clock.
+  Produces ONE standard rate for every scenario. It never reads stage 1's
+  sweep, only its fitted result when assembling the frozen table, so the two
+  calibrations are genuinely independent.
+* **Stage 3 (`_unbound_exp.py`)** -- applies both rates exactly as
+  calibrated. Nothing compensates for their interaction, so the
+  population-level clock is an OUTPUT of the run rather than a target it was
+  tuned to hit. That is the whole point of the pipeline.
+* Orchestrator, `submit_sanity_plot_unbound.sh` (four scenario rows, 3h
+  budget), per-stage simulation-health reports, artifact zip -- all mirroring
+  the bound pipeline. Every experiment name is prefixed
+  `impact_long_shedders_unbound_*`, so `Data/` output cannot collide at the
+  same `--exp-num`.
+
+* **`edge_case` reintroduced**, at 0.1% prevalence -- exactly one carrier in
+  the initial 1000, to see what a single super-long shedder does to an
+  outbreak. It was dropped in v2.4.24 for raw-Hamming saturation at "~0.34
+  substitutions/site", but that figure predates the corrected intra-host
+  measurement, when the calibration was returning NSR_long ~0.116, about 100x
+  too high. At the rate the pipeline now calibrates, its 350-day infection
+  accumulates 0.0020 subs/site -- 50x below the saturation threshold. Nothing
+  else blocks it: the intra-host precompute table is indexed by Extrande step
+  size, not total duration.
+* **cal_1's window is per group, not global.** `generate_experiment_settings`
+  applies `_scenario_groups` scalars after `fixed_params`, so each group
+  carries its own `final_time`. `cal1_final_time` rounds up in whole years
+  until the window fits three complete infection cycles: SOT and HIV keep
+  365, edge_case gets 3x365. Without it edge_case would not complete one
+  cycle in 365 days and, since the long-shedder census only fires on
+  RECOVERED hosts, would starve the `min_seq` gate -- HPC test #1 in BACKLOG
+  found exactly that and confirmed it clears at 3 years. The rule is keyed on
+  duration rather than a scenario name, so a new duration gets a window that
+  fits it instead of failing silently.
+* cal_2 runs a 365-day window while production runs 1095. Deliberate here,
+  unlike in the bound pipeline: the standard rate is *defined* as the rate a
+  clean standard population mutates at, and the population clock is meant to
+  be free. Control will therefore not sit exactly on target_osr_std -- worth
+  watching in the results, since it is the reference every elevation is
+  measured against.
+* Seeds: 30 per calibration grid point, 50 per production scenario.
+* NSR ranges: `cal_long` 1e-5..1e-2 (a decade below the bound pipeline --
+  edge_case sheds three times as long as HIV and should calibrate lower),
+  `cal_std` 1e-5..1e-3 (brackets run #7's control at 1.38e-4).
+* `settings_manager.write_parameter_specs`: `tau_3_long` max 300 -> 400.
+  edge_case needs 350.23 and would have been out of spec. Specs are only read
+  by the interactive parameter generator, never enforced in the pipeline, so
+  this fixes a latent wrongness rather than an active failure.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.30 — 2026-09-03 — pietro gerletti
 
 NSR sweeps widened for exp #7 after run #6. Ranges only -- no model change,

@@ -62,8 +62,26 @@ Working list of blockers, active refactors, features, and technical debt.
       back); raise `CAL2_FINAL_TIME` 365 -> 1095, which would also close the
       calibration/production window gap below; or lower `min_seq`, which
       just fits noisier regressions on the same thin data.
-- [ ] **HIV_high's standard clock cannot reach `target_osr_std`** — the
-      open design question, now with numbers from run #6. Its entire
+- [~] **HIV_high's standard clock cannot reach `target_osr_std`** — the
+      open design question. **Not resolved, but now has a second arm**: the
+      `impact_long_shedders_unbound` pipeline (v2.4.31) takes the "accept the
+      elevated clock" option — each cohort calibrated alone, one standard
+      rate for every scenario, population clock left free as an output. The
+      bound pipeline is unchanged and still takes the "hold the target"
+      option. Deciding between them is now a matter of comparing two real
+      runs rather than arguing from one. The remaining unbuilt option is to
+      meet `target_osr_std` only against transmission chains that never
+      passed through a long shedder, which would need new extraction code in
+      `evolutionary_rate.py`.
+      Run #7 sharpened the evidence considerably: the fitted exponent falls
+      monotonically with long-shedder burden (control 0.366, SOT 0.252,
+      HIV_low 0.201, HIV_high 0.069), so in HIV_high a 1000x change in the
+      standard rate moves its clock 1.6x, and holding the target required
+      9.3e-7 — 150x below control, i.e. standard individuals essentially not
+      mutating. Note run #7 also corrected run #6's reading: the curve does
+      cross the target, just at a value that makes the scenario meaningless,
+      rather than never crossing at all.
+      Original run #6 diagnosis below. Its entire
       measured cal_2 curve sat ABOVE the 0.0013 target (0.00184 at the
       lowest sampled NSR of 1e-4), so the fit extrapolated to 8.34e-6 to
       find a crossing that is not in the data; production at that value
