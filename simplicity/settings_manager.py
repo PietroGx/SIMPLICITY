@@ -81,7 +81,7 @@ def write_parameter_specs():
         "tau_1":                         {"type": "float", "min": 0, "max": 10},
         "tau_2":                         {"type": "float", "min": 0, "max": 100},
         "tau_3":                         {"type": "float", "min": 0, "max": 300},
-        "tau_3_long":                    {"type": "float", "min": 0, "max": 300},
+        "tau_3_long":                    {"type": "float", "min": 0, "max": 400},
         "tau_4":                         {"type": "float", "min": 0, "max": 30},
         "infected_individuals_at_start": {"type": "int", "min": 0},
         "R":                             {"type": "float", "min": 0, "max": 20},
