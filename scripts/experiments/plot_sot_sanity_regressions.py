@@ -257,13 +257,29 @@ def main():
     for scenario in scenarios:
         combined = load_regression_data(args.exp_name, scenario, args.exp_num,
                                         min_seq=args.min_seq, min_len=args.min_len)
-        intra = load_intrahost_long_data(args.exp_name, scenario, args.exp_num,
-                                         min_seq=args.min_seq, min_len=args.min_len)
+        # A scenario with no long shedders (control) has no intra-host clock to
+        # measure. Include it anyway: it is the reference every elevation in the
+        # other rows is measured against, and its left panel is exactly the
+        # baseline. Its right panel is drawn empty.
+        try:
+            intra = load_intrahost_long_data(args.exp_name, scenario, args.exp_num,
+                                             min_seq=args.min_seq, min_len=args.min_len)
+        except RuntimeError as exc:
+            print(f"[{scenario}][info] no intra-host long-shedder data "
+                  f"({exc}); drawing the global clock only.")
+            intra = pd.DataFrame(columns=["Sequencing_time", "Distance_from_root",
+                                          "individual_type"])
         per_scenario.append((scenario, combined, intra))
 
-    x_left_max = max(max(c["Sequencing_time"].max(), i["Sequencing_time"].max())
+    def _series_max(df, col):
+        return df[col].max() if not df.empty else 0.0
+
+    x_left_max = max(max(_series_max(c, "Sequencing_time"),
+                         _series_max(i, "Sequencing_time"))
                      for _, c, i in per_scenario)
-    x_right_max = max(i["Sequencing_time"].max() for _, _, i in per_scenario)
+    x_right_max = max(_series_max(i, "Sequencing_time") for _, _, i in per_scenario)
+    if x_right_max <= 0:
+        x_right_max = x_left_max
 
     # One shared y-limit across EVERY axis in the grid (left primary, left
     # secondary/twin, and right column all measure the same quantity --
@@ -273,7 +289,7 @@ def main():
         combined[combined["individual_type"] == "standard"]["Distance_from_root"].max()
         if not combined[combined["individual_type"] == "standard"].empty else 0.0
         for _, combined, _ in per_scenario)
-    y_max_intra = max(i["Distance_from_root"].max() for _, _, i in per_scenario)
+    y_max_intra = max(_series_max(i, "Distance_from_root") for _, _, i in per_scenario)
     y_max = max(y_max_std, y_max_intra,
                args.target_osr_std * x_left_max, args.target_osr_long * x_left_max,
                args.target_osr_long * x_right_max)
@@ -315,10 +331,14 @@ def main():
         ax_global2 = ax_global.twinx()
         draw_target(ax_global2, args.target_osr_long, x_left_max, "#e41a1c",
                     f"Target long (intra-host) = {args.target_osr_long}")
-        slope_long, r2_long = plot_cohort(ax_global2, intra, "long_shedder", x_left_max,
-                                          scatter=False, label_suffix=" (intra-host)")
-        print(f"[{scenario}][intra/long_shedder, left panel] OSR={slope_long:.6f} "
-             f"(R²={r2_long:.3f}, n={len(intra)})")
+        if intra.empty:
+            print(f"[{scenario}][intra/long_shedder, left panel] no long shedders")
+        else:
+            slope_long, r2_long = plot_cohort(ax_global2, intra, "long_shedder",
+                                              x_left_max, scatter=False,
+                                              label_suffix=" (intra-host)")
+            print(f"[{scenario}][intra/long_shedder, left panel] OSR={slope_long:.6f} "
+                 f"(R²={r2_long:.3f}, n={len(intra)})")
         ax_global2.set_ylabel("Distance (subs/site) -- intra-host clock")
         ax_global2.set_ylim(0, y_max * 1.05)
         ax_global2.spines['top'].set_visible(False)
@@ -337,9 +357,14 @@ def main():
         # RIGHT: intra-host clock, long shedders only, shared column limits
         draw_target(ax_intra, args.target_osr_long, x_right_max, "#e41a1c",
                     f"Target long = {args.target_osr_long}")
-        slope, r2 = plot_cohort(ax_intra, intra, "long_shedder", x_right_max)
-        print(f"[{scenario}][intra/long_shedder] OSR={slope:.6f} "
-             f"(R²={r2:.3f}, n={len(intra)})")
+        if intra.empty:
+            ax_intra.text(0.5, 0.5, "no long shedders", ha="center", va="center",
+                          transform=ax_intra.transAxes, fontsize=7, color="0.45")
+            print(f"[{scenario}][intra/long_shedder] no long shedders")
+        else:
+            slope, r2 = plot_cohort(ax_intra, intra, "long_shedder", x_right_max)
+            print(f"[{scenario}][intra/long_shedder] OSR={slope:.6f} "
+                 f"(R²={r2:.3f}, n={len(intra)})")
         ax_intra.set_xlim(left=0, right=x_right_max * 1.02)
         ax_intra.set_ylim(0, y_max * 1.05)
         ax_intra.spines['top'].set_visible(False)

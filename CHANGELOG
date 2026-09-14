@@ -5,6 +5,75 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.32 — 2026-09-14 — pietro gerletti
+
+New `scripts/nsr_sensitivity_analysis.py`: why does the calibrated NSR_long
+depend on infection duration? Plus two fixes to the unbound pipeline found by
+reading its first run.
+
+**The study.** Unbound run #1 calibrated NSR_long per duration group and got a
+monotone rise -- 5.56e-4 (63 d), 1.07e-3 (109 d), 1.70e-3 (365 d) -- with fit
+quality rising alongside (R2 0.906 -> 0.967 -> 0.996, B 0.574 -> 0.730 ->
+0.904). Two explanations fitted that pattern and implied opposite things for
+the paper: quantisation (a through-origin slope over mostly-zero integer
+distances is biased low -- artifact), or genuine sublinearity in long
+infections (real). The grid is 5 durations x 3 k_v x 6 NSR_long nodes, in
+cal_1's own isolated 100%-long-shedder context. k_v is in it because
+`sub_events` draws `Poisson(NSR * dt * L * IH_lineages)` -- mutation
+opportunity scales with lineage count, and k_v is what adds lineages, so
+duration and k_v may be two routes to one variable.
+
+* **Both hypotheses look wrong; the dev run points at a third.** The clock for
+  each cell is fitted over a completely different time window, and the window
+  is itself a function of the parameters: mean time-since-infection of the
+  fitted observations ranged from 0.0007 to 0.29 years across a 2x2x3 dev
+  grid -- a 400x spread. At low NSR_long and low k_v few lineages are born and
+  those that exist appear early, so the whole sample sits near the origin, and
+  a through-origin slope fitted there is not comparable to one fitted across a
+  whole infection. Zero-inflation (13.2% at 63 d vs 3.4% at 180 d) and the
+  1/4967 distance quantum are both real but secondary. New figure 6 plots the
+  sampling window directly; it was not in the agreed plan and earned its place
+  by explaining the other five. **Dev-scale only (3 seeds, 2 durations) -- the
+  mechanism is visible, the numbers are not publishable.**
+* **Two commands, not three.** `--run` is the whole HPC job: simulate,
+  extract, fit, draw, compress via the existing `package_simplicity_data.sh`,
+  then print a block naming every output path and its size. `--plot` replots
+  later from the datasets alone.
+* **Figures are replottable without re-simulating**, which drove the
+  architecture: `--run` writes RAW per-point data (every
+  (time_since_infection, distance) pair, plus per-host lineage counts) and
+  `--plot` reads only that. Verified against a genuinely unzipped artifacts
+  archive with no simulation output present, including a changed `--model`.
+  The artifacts zip was 1.5 MB against 131 MB of raw output on the dev run.
+* Methodology is reused, not reimplemented: `extract_ih_regression_data` for
+  the clock, `CAL1_ISOLATED_FIXED_PARAMS` for the context,
+  `factory_model_lmfit` + `compute_calibrated_parameter` for the fit and
+  inversion. The fit deliberately does NOT go through
+  `fit_observed_substitution_rate_regressor` -- that writes into the
+  experiment directory, which would have tied `--plot` to the simulation
+  output it must be independent of (caught in testing).
+* Figure colours: both series axes are ORDERED magnitudes, so each gets a
+  single-hue ordinal ramp rather than categorical hues. Both ramps validated
+  for monotone lightness, adjacent dL, light-end contrast and single hue.
+
+**Unbound pipeline fixes, from reading run #1:**
+
+* **control is now in the sanity grid.** Its standard clock is the baseline
+  every elevation is measured against, and run #1 had to infer it from
+  SOT/HIV_low agreeing to three digits. `plot_sot_sanity_regressions.py` now
+  tolerates a scenario with no long shedders: the intra-host panel is drawn
+  empty rather than raising. Additive -- the bound pipeline never passes
+  control, so its behaviour is unchanged.
+* **edge_case labelled itself `tau=350.23,R_long=1.1`.** The shared
+  `long_nsr_calibration_plot.py` reads SCENARIOS from the BOUND config, which
+  has no edge_case, so the lookup missed and fell through to the raw
+  fallback -- cosmetic in the legend, but it also lands in the saved
+  fit-results filename. `plot_and_fit_long_nsr_calibration` now takes an
+  optional `scenarios`; unbound cal_1 passes its own. Default is unchanged,
+  so bound callers are unaffected.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.31 — 2026-09-08 — pietro gerletti
 
 New second pipeline, `impact_long_shedders_unbound`, run alongside
