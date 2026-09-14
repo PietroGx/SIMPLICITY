@@ -27,7 +27,7 @@ import argparse
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_unbound_config import (
-    LONG_NSR_EXP_NAME, NSR_RANGES, UNBOUND_CAL1_FINAL_TIME,
+    SCENARIOS, LONG_NSR_EXP_NAME, NSR_RANGES, UNBOUND_CAL1_FINAL_TIME,
     CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
     build_cal1_settings, add_slurm_resource_args, set_slurm_resource_env,
     print_fixed_params,
@@ -63,9 +63,12 @@ def run_long_calibration(exp_num, runner, seeds, target_osr_long, R,
 
     numbered = f"{LONG_NSR_EXP_NAME}_#{exp_num}"
     print(f"\n[Plot] Fitting + plotting long-NSR calibration for {numbered}...")
+    # pass our own SCENARIOS: the shared plotter defaults to the bound
+    # pipeline's list, which has no edge_case
     plot_and_fit_long_nsr_calibration(numbered, target_osr_long,
                                       model_type=model_type,
-                                      min_seq=min_seq, min_len=min_len)
+                                      min_seq=min_seq, min_len=min_len,
+                                      scenarios=SCENARIOS)
 
 
 def main():

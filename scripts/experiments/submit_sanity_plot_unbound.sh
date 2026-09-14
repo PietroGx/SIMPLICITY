@@ -12,9 +12,16 @@
 # plot_sot_sanity_regressions.py.
 #
 # Separate from submit_sanity_plot.sh so the bound pipeline stays untouched.
-# The only differences are --exp-name and the scenario list, which now
-# includes edge_case; the plotting script itself is shared, so both pipelines
-# measure their clocks with the same code.
+# The only differences are --exp-name and the scenario list; the plotting
+# script itself is shared, so both pipelines measure their clocks with the
+# same code.
+#
+# control is included, unlike in the bound pipeline. Here the standard rate is
+# calibrated once in a clean population and the population clock is a free
+# output, so control IS the baseline every elevation is measured against --
+# unbound run #1 had to infer it from SOT/HIV_low agreeing. Its right-hand
+# panel is empty (no long shedders); plot_sot_sanity_regressions.py handles
+# that.
 #
 # Time budget 3h rather than 2: four scenario rows instead of three, and
 # edge_case's 350-day infections carry many more intra-host lineages through
@@ -43,7 +50,7 @@ date
 python scripts/experiments/plot_sot_sanity_regressions.py \
     --exp-num "$EXP_NUM" \
     --exp-name impact_long_shedders_unbound \
-    --scenarios SOT,HIV_low,HIV_high,edge_case \
+    --scenarios control,SOT,HIV_low,HIV_high,edge_case \
     --target-osr-std "$TARGET_OSR_STD" \
     --target-osr-long "$TARGET_OSR_LONG" \
     > "${LOG_DIR}/combined_${SLURM_JOB_ID}.log" \

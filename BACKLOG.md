@@ -219,6 +219,26 @@ Working list of blockers, active refactors, features, and technical debt.
       bracketing target 0.00205).
       **Recalibration required**: fresh `--exp-num` (exp #5).
 
+- [ ] **Calibrated NSR_long depends on infection duration** — open.
+      Unbound run #1: 5.56e-4 (63 d), 1.07e-3 (109 d), 1.70e-3 (365 d), with
+      B rising 0.574 -> 0.730 -> 0.904 and R2 0.906 -> 0.967 -> 0.996. If
+      this is a measurement artifact the underlying rate is
+      duration-independent and the paper can say so; if it is real, long
+      shedders in SOT genuinely mutate ~3x slower per day than in edge_case,
+      and "all long shedders share one mutation rate" is not what is being
+      simulated. `scripts/nsr_sensitivity_analysis.py` (v2.4.32) is built to
+      settle it across 5 durations x 3 k_v.
+      **Dev-scale finding, not yet confirmed at HPC scale**: neither of the
+      two obvious explanations (integer quantisation; genuine sublinearity)
+      looks right. The clock for each cell is fitted over a different time
+      window — mean time-since-infection of the fitted observations spanned
+      0.0007 to 0.29 years over a small dev grid — because at low NSR_long
+      and low k_v few lineages are born and those that exist appear early.
+      A through-origin slope fitted near the origin is not comparable to one
+      fitted across a whole infection. If that holds at scale, the fix is to
+      the measurement (a common time window, or an intercept), not to the
+      calibration.
+
 ------------------------------------------------------------------------
 
 ## Active Refactor: Single Pipeline
