@@ -21,7 +21,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 from long_shedders_preprocess import get_clade_metrics, summarize_sod_pies
 
 EXP_NAME = "impact_long_shedders"
-SCENARIOS = ["control", "SOT", "HIV_low", "HIV_high"]
+# Scenario lists come from the pipeline config via _scenarios.resolve_scenarios;
+# callers pass what they resolved. Nothing here hardcodes a list any more.
 
 
 def _experiment_sod(exp_num, scenario, exp_name=EXP_NAME):
@@ -43,8 +44,9 @@ def _experiment_sod(exp_num, scenario, exp_name=EXP_NAME):
 # =============================================================================
 # Panel A -- pies for one scenario
 # =============================================================================
-def get_panel_a_data(exp_num, group, cluster_threshold=5, min_days=100):
-    sod = _experiment_sod(exp_num, group)
+def get_panel_a_data(exp_num, group, cluster_threshold=5, min_days=100,
+                     exp_name=EXP_NAME):
+    sod = _experiment_sod(exp_num, group, exp_name=exp_name)
     if sod is None:
         return {}, 0
     return summarize_sod_pies(sod, cluster_threshold, min_days)
@@ -53,10 +55,11 @@ def get_panel_a_data(exp_num, group, cluster_threshold=5, min_days=100):
 # =============================================================================
 # Panel B -- metrics PCA, one point per seed, all scenarios
 # =============================================================================
-def get_panel_b_data(exp_num, scenarios=SCENARIOS, cluster_threshold=5, min_days=100):
+def get_panel_b_data(exp_num, scenarios, cluster_threshold=5, min_days=100,
+                     exp_name=EXP_NAME):
     rows = []
     for scenario in scenarios:
-        sod = _experiment_sod(exp_num, scenario)
+        sod = _experiment_sod(exp_num, scenario, exp_name=exp_name)
         if sod is None:
             continue
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
@@ -135,9 +138,10 @@ def _build_snp_matrix(genomes):
     return pd.DataFrame(rows, columns=positions)
 
 
-def get_panel_c_scatter_data(exp_num, group, seed, max_long_per_individual=None):
+def get_panel_c_scatter_data(exp_num, group, seed, max_long_per_individual=None,
+                             exp_name=EXP_NAME):
     """One seed's sequenced genomes as a SNP matrix + individual_type labels."""
-    sod = _experiment_sod(exp_num, group)
+    sod = _experiment_sod(exp_num, group, exp_name=exp_name)
     if sod is None:
         return pd.DataFrame(), pd.Series(dtype=str)
 
@@ -152,7 +156,8 @@ def get_panel_c_scatter_data(exp_num, group, seed, max_long_per_individual=None)
     return snp_df, pd.Series(labels, name="individual_type")
 
 
-def get_panel_c_consistency_data(exp_num, group, max_long_per_individual=None, max_pairs=200, rng_seed=42):
+def get_panel_c_consistency_data(exp_num, group, max_long_per_individual=None,
+                                 max_pairs=200, rng_seed=42, exp_name=EXP_NAME):
     """
     Per seed of `group`, independently: mean pairwise hamming_iw(long,
     standard) minus mean pairwise hamming_iw(standard, standard) = "excess
@@ -160,7 +165,7 @@ def get_panel_c_consistency_data(exp_num, group, max_long_per_individual=None, m
     there's no cross-seed batch-effect risk. Pairs are capped/subsampled
     since this is O(n*m) per seed.
     """
-    sod = _experiment_sod(exp_num, group)
+    sod = _experiment_sod(exp_num, group, exp_name=exp_name)
     if sod is None:
         return pd.DataFrame(columns=["seed", "excess_divergence"])
 

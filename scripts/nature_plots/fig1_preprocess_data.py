@@ -20,6 +20,7 @@ def get_clinical_label(scenario):
     if scenario == "control": return "Control"
     if scenario == "SOT": return "SOT"
     if "HIV" in scenario: return "HIV"
+    if scenario == "edge_case": return "Edge Case"
     return scenario.replace("_", " ").title()
 
 def get_panel_a_data(exp_num=1, exp_name="impact_long_shedders"):

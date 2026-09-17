@@ -3,9 +3,16 @@ import matplotlib.gridspec as gridspec
 import argparse
 import fig1_preprocess_data as preproc
 import fig1_plots as plots
+from _scenarios import BOUND_EXP_NAME, figure_path
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Generate Figure 1")
+    parser.add_argument('--exp-num', type=int, required=True,
+                        help="Experiment number to plot. Required on purpose: the "
+                            "old default of 4 pointed at one of the runs that "
+                            "produced invalid science.")
+    parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
+                        help=f"Pipeline arm (default: {BOUND_EXP_NAME}).")
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png',
                         help='Output format for the figure (default: png)')
     return parser.parse_args()
@@ -27,7 +34,7 @@ def add_panel_label(ax, label, x_offset=-0.1, y_offset=1.15):
     ax.text(x_offset, y_offset, label, transform=ax.transAxes, 
             fontsize=8, fontweight='bold', va='top', ha='right')
 
-def build_figure_1(fmt):
+def build_figure_1(exp_num, exp_name, fmt):
     set_nature_rcparams()
     
     width_in = 180 / 25.4
@@ -53,13 +60,11 @@ def build_figure_1(fmt):
         ax.set_box_aspect(1)
     
     # === LOAD DATA ===
-    TARGET_EXP_NUM = 4
-    
-    df_ab_theoretical = preproc.get_panel_a_data(exp_num=TARGET_EXP_NUM)
-    df_ab_realized = preproc.get_panel_b_data(exp_num=TARGET_EXP_NUM)
+    df_ab_theoretical = preproc.get_panel_a_data(exp_num=exp_num, exp_name=exp_name)
+    df_ab_realized = preproc.get_panel_b_data(exp_num=exp_num, exp_name=exp_name)
     df_c = preproc.get_panel_c_data()
     df_d, df_e = preproc.get_panel_de_data()
-    df_f, df_g = preproc.get_panel_fg_data(exp_num=TARGET_EXP_NUM)
+    df_f, df_g = preproc.get_panel_fg_data(exp_num=exp_num, exp_name=exp_name)
     
     # === PLOT DATA ===
     plots.plot_fig1_intra_host(ax_A, df_ab_theoretical)
@@ -107,10 +112,10 @@ def build_figure_1(fmt):
     # Layout Adjustments
     fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.9)
     
-    output_filename = f'Figure_1.{fmt}'
+    output_filename = figure_path(1, exp_name, exp_num, fmt)
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"Successfully generated {output_filename}")
 
 if __name__ == "__main__":
     args = parse_arguments()
-    build_figure_1(args.format)
+    build_figure_1(args.exp_num, args.exp_name, args.format)

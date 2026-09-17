@@ -3,11 +3,17 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 import fig2_preprocess_data as preproc
+from _scenarios import BOUND_EXP_NAME, figure_path, resolve_scenarios
 import fig2_plots as plots
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Generate Figure 2 for SIMPLICITY Nature Paper")
-    parser.add_argument('--exp-num', type=int, default=4, help="Target experiment number (default: 4)")
+    parser.add_argument('--exp-num', type=int, required=True,
+                        help="Experiment number to plot. Required on purpose: the "
+                            "old default of 4 pointed at one of the runs that "
+                            "produced invalid science.")
+    parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
+                        help=f"Pipeline arm (default: {BOUND_EXP_NAME}).")
     parser.add_argument('--seed', type=str, default="1", help="Target seed for lineage frequency plots (Rows 1 & 2)")
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png', help="Output format: pdf or png (default: png)")
     return parser.parse_args()
@@ -25,18 +31,22 @@ def set_nature_rcparams():
         'ps.fonttype': 42
     })
 
-def build_figure_2(exp_num, target_seed, fmt):
+def build_figure_2(exp_num, exp_name, target_seed, fmt):
     set_nature_rcparams()
-    scenarios = ["control", "SOT", "HIV_low", "HIV_high"]
-    palette = {"control": "#333333", "SOT": "#56B4E9", "HIV_low": "#D55E00", "HIV_high": "#E69F00"}
+    # from the pipeline's own config; edge_case appears on the unbound arm
+    scenarios, _ = resolve_scenarios(exp_name, exp_num)
+    if not scenarios:
+        raise SystemExit(f"No scenario output found for {exp_name} #{exp_num}.")
+    palette = {"control": "#333333", "SOT": "#56B4E9", "HIV_low": "#D55E00",
+               "HIV_high": "#E69F00", "edge_case": "#CC79A7"}
 
     # --- Phase A: Pre-calculation for strict alignments ---
-    shared_violin_seeds = preproc.get_shared_valid_seeds(exp_num, scenarios)
+    shared_violin_seeds = preproc.get_shared_valid_seeds(exp_num, scenarios, exp_name=exp_name)
     
     print(f"Calculating global time bounds for Seed #{target_seed}...")
     global_max_t = 0
     for scenario in scenarios:
-        _, _, t_final = preproc.get_fig2_freq_data(exp_num, scenario, target_seed)
+        _, _, t_final = preproc.get_fig2_freq_data(exp_num, scenario, target_seed, exp_name=exp_name)
         if t_final > global_max_t:
             global_max_t = t_final
             
@@ -63,9 +73,9 @@ def build_figure_2(exp_num, target_seed, fmt):
         ax_clust = fig.add_subplot(gs[1, col])
         ax_div = fig.add_subplot(gs[2, col])
         
-        lf, cmap_df, _ = preproc.get_fig2_freq_data(exp_num, scenario, target_seed)
-        _, clade_to_lineages, clade_meta_df, _ = preproc.get_fig2_clustered_data(exp_num, scenario, target_seed)
-        dists = preproc.get_fig2_divergence_data(exp_num, scenario, shared_violin_seeds)
+        lf, cmap_df, _ = preproc.get_fig2_freq_data(exp_num, scenario, target_seed, exp_name=exp_name)
+        _, clade_to_lineages, clade_meta_df, _ = preproc.get_fig2_clustered_data(exp_num, scenario, target_seed, exp_name=exp_name)
+        dists = preproc.get_fig2_divergence_data(exp_num, scenario, shared_violin_seeds, exp_name=exp_name)
         
         plots.plot_fig2_lineage_freq(ax_freq, lf, cmap_df, global_max_t, title=display_name)
         plots.plot_fig2_clustered_freq(ax_clust, lf, clade_to_lineages, clade_meta_df, cmap_df, global_max_t)
@@ -83,10 +93,10 @@ def build_figure_2(exp_num, target_seed, fmt):
         ax_freq.set_xlabel("")
         ax_clust.set_xlabel("Time (days)")
         
-    output_filename = f'Figure_2.{fmt}'
+    output_filename = figure_path(2, exp_name, exp_num, fmt)
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"\n[Success] Generated {output_filename}")
 
 if __name__ == "__main__":
     args = parse_arguments()
-    build_figure_2(args.exp_num, args.seed, args.format)
+    build_figure_2(args.exp_num, args.exp_name, args.seed, args.format)

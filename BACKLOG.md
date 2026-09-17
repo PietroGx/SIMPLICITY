@@ -280,6 +280,38 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 
 ------------------------------------------------------------------------
 
+## Paper figures
+
+- [x] **All four figures runnable once per pipeline arm** — v2.4.33. New
+      `scripts/nature_plots/_scenarios.py` resolves scenarios from the
+      pipeline's own config (4 bound / 5 unbound incl. `edge_case`) and
+      builds `Data/figures/Figure_<n>_<arm>_#<num>.<fmt>`, so the two arms
+      cannot overwrite each other. `--exp-name` threaded through every
+      preprocess function; `--exp-num` now required (its `default=4` pointed
+      at a known-invalid run). Figure 4's missing-scenario crash fixed.
+- [ ] **Figure 1 panel C has no data** — reads
+      `literature_long_shedders_data.csv`, which is not in the repo; the
+      function returns an empty frame and the panel renders blank.
+      Pietro has the file, location TBC (likely HPC). `data_fig1_D.csv`
+      (1638 rows) and `data_fig1_E.csv` (259 rows) are both present, so
+      panels D and E work.
+- [ ] **Figure 1's per-panel scenario lists disagree** — panel A plots
+      `["control","SOT","HIV_low"]` (3, no HIV_high), panel B plots all 4,
+      panels F/G plot the 3 long-shedder scenarios. A and B are
+      theoretical-vs-realized of the same quantity, so differing looks like
+      an oversight; the defensible reading is that HIV_low/HIV_high share
+      `tau_3_long=94.23` and A avoids drawing one duration curve twice — but
+      then B should avoid it too. Deliberately left alone in v2.4.33, to be
+      reviewed once the figures render with real data.
+- [ ] **Figures need an HPC render** — they read raw per-seed output
+      (`individuals_data.csv`, `phylogenetic_data.csv`,
+      `lineage_frequency.csv`), which never leaves the cluster, and `baltic`
+      is not installed locally. Bound arm is run #7, unbound arm run #1.
+      Note bound #7's HIV_high rests on an inversion at 9.3e-7, just below
+      its 1e-6 sweep floor — that panel carries a caveat.
+
+------------------------------------------------------------------------
+
 ## Figures 3 & 4 (long-shedders paper)
 
 - [x] Figure 3: pies (one selected scenario) + metrics PCA (Peak/Burden/

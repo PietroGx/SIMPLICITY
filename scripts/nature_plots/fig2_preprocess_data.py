@@ -14,6 +14,7 @@ def get_clinical_label(scenario):
     if scenario == "SOT": return "SOT"
     if scenario == "HIV_low": return "HIV Low"
     if scenario == "HIV_high": return "HIV High"
+    if scenario == "edge_case": return "Edge Case"
     return scenario.replace("_", " ").title()
 
 def get_target_seed_dir(exp_num, scenario, target_seed, exp_name="impact_long_shedders"):
@@ -80,9 +81,10 @@ def get_shared_valid_seeds(exp_num, scenarios, exp_name="impact_long_shedders", 
     print(f"DEBUG: Selected target seeds for violins (applied universally): {selected}\n")
     return selected
 
-def get_fig2_freq_data(exp_num, scenario, target_seed):
+def get_fig2_freq_data(exp_num, scenario, target_seed,
+                       exp_name="impact_long_shedders"):
     """Row 1: Extract Lineage Frequencies natively for a specific seed."""
-    ssod = get_target_seed_dir(exp_num, scenario, target_seed)
+    ssod = get_target_seed_dir(exp_num, scenario, target_seed, exp_name=exp_name)
     if not ssod: return pd.DataFrame(), None, 0
     
     try:
@@ -95,9 +97,10 @@ def get_fig2_freq_data(exp_num, scenario, target_seed):
         print(f"DEBUG [{scenario}]: Error extracting freq data: {e}")
         return pd.DataFrame(), None, 0
 
-def get_fig2_clustered_data(exp_num, scenario, target_seed, cluster_threshold=5):
+def get_fig2_clustered_data(exp_num, scenario, target_seed, cluster_threshold=5,
+                            exp_name="impact_long_shedders"):
     """Row 2: Extract Phylogenetic Tree and perform clustering natively for a specific seed."""
-    ssod = get_target_seed_dir(exp_num, scenario, target_seed)
+    ssod = get_target_seed_dir(exp_num, scenario, target_seed, exp_name=exp_name)
     if not ssod: return pd.DataFrame(), {}, {}, None
     
     try:
