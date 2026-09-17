@@ -5,6 +5,69 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.33 — 2026-09-17 — pietro gerletti
+
+`scripts/nature_plots` can now generate all four paper figures once per
+pipeline arm. Plumbing and one crash fix -- no panel plots anything new, no
+quantity is computed differently.
+
+* **New `scripts/nature_plots/_scenarios.py`**: one shared scenario resolver
+  and output-path helper, so the four figures can never disagree about which
+  scenarios exist. `resolve_scenarios(exp_name, exp_num)` reads the
+  pipeline's OWN config -- 4 scenarios for `impact_long_shedders`, 5
+  (including `edge_case`) for `impact_long_shedders_unbound` -- and reports
+  which have output on disk. A scenario with no output is dropped but
+  **warned about per scenario**; deriving the list from disk instead would
+  turn a half-finished run into a smaller figure with no indication anything
+  was missing, which is the silent-omission failure mode this repo has been
+  bitten by repeatedly.
+* **`--exp-name` on all four figures**, threaded to the preprocess functions.
+  Most already took `exp_name` as a keyword and simply never received a
+  value; the rest gained it (`get_fig2_freq_data`,
+  `get_fig2_clustered_data`, fig3's four `get_panel_*`,
+  `get_tree_for_scenario`). Default stays `impact_long_shedders`, so the
+  bound arm behaves as before.
+* **`--exp-num` is now required, and `default=4` is gone.** Figures 2-4
+  silently fell back to experiment #4 -- one of the four runs that produced
+  invalid science -- and fig1 had `TARGET_EXP_NUM = 4` hardcoded inside
+  `build_figure_1` with no CLI argument at all. A figure that defaults to a
+  known-bad run is a trap. **Breaking**: bare invocation of figs 2-4 no
+  longer works, deliberately.
+* **Output goes to `Data/figures/Figure_<n>_<arm>_#<num>.<fmt>`.** All four
+  previously wrote a bare `Figure_N.<fmt>` into the working directory, so
+  running the second arm overwrote the first and neither file recorded which
+  run produced it. Covered by the root `.gitignore`'s `Data/*`.
+* **Figure 4 crashed on a missing scenario.** `get_tree_for_scenario`
+  returns `None` when a seed has no tree and `build_figure_4` passed that
+  straight into `plots.plot_fig4_tree`. Figures 2 and 3 already tolerated
+  absence; figure 4 did not. It now draws a labelled empty panel and warns.
+  Verified with the tree loader stubbed to return `None` for all five
+  scenarios: 5 empty panels, plotter never called.
+* `edge_case` restored where it is needed for the unbound arm: the fig2 and
+  fig3 palettes (`#CC79A7`) and the two `get_clinical_label` helpers. Its
+  removal in 2.4.27 was correct at the time -- it was not a scenario then.
+* fig3's `--group` no longer uses `choices=SCENARIOS`. That was evaluated at
+  import against a hardcoded list, so `--group edge_case` would have been
+  rejected as invalid. It now validates against the resolved list at
+  runtime, and names the available scenarios when it rejects one.
+
+**Deliberately unchanged**: figure 1's three per-panel scenario lists still
+disagree with each other -- panel A has 3 (no HIV_high), panel B has 4,
+panels F/G have 3. A and B are theoretical-vs-realized of the same quantity
+so differing looks like an oversight, but HIV_low/HIV_high share
+`tau_3_long=94.23`, so there is a defensible duplicate-avoidance reading for
+A that is then not applied to B. Left for review once the figures render.
+
+**Local verification limit**: the figures need raw per-seed output
+(`individuals_data.csv`, `phylogenetic_data.csv`, `lineage_frequency.csv`),
+which exists only on the HPC, so a full render could not be smoke-tested
+here. `baltic` (fig4's tree loader, declared in `simplicity.yml`) is also not
+installed in the local env. Checked locally: resolver returns 4 vs 5, every
+`--help`, output-path construction per arm, and the fig4 guard with a stubbed
+loader.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.32 — 2026-09-14 — pietro gerletti
 
 New `scripts/nsr_sensitivity_analysis.py`: why does the calibrated NSR_long

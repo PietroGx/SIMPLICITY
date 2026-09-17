@@ -51,14 +51,15 @@ def _get_newick_path(ssod):
     return path
 
 
-def get_tree_for_scenario(exp_num, scenario, seed, cluster_threshold=5):
+def get_tree_for_scenario(exp_num, scenario, seed, cluster_threshold=5,
+                          exp_name=EXP_NAME):
     """
     Loads scenario's phylogenetic tree (for `seed`) into a baltic tree object,
     with every branch's `.traits['cluster']` set to its long/standard/mixed/
     founder label (same color language as Figure 3). Returns None if the
     scenario hasn't been run yet.
     """
-    sod = _experiment_sod(exp_num, scenario, exp_name=EXP_NAME)
+    sod = _experiment_sod(exp_num, scenario, exp_name=exp_name)
     if sod is None:
         return None
 
