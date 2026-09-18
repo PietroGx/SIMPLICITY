@@ -87,24 +87,51 @@ def get_panel_b_data(exp_num=1, exp_name="impact_long_shedders"):
     if not df_list: return pd.DataFrame(columns=['duration', 'cohort'])
     return pd.concat(df_list, ignore_index=True)
 
+# Real-world inputs live in Data/RealWorldData/, resolved from THIS file's
+# location rather than the working directory. They used to be bare relative
+# paths, so every one of them vanished silently if a figure was run from
+# anywhere but the repo root -- and only panel C said so on the plot.
+REAL_WORLD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              os.pardir, os.pardir, 'Data', 'RealWorldData')
+
+
+def _real_world_csv(filename, needed_by):
+    """Read one curated input, or warn by name and return None."""
+    path = os.path.normpath(os.path.join(REAL_WORLD_DIR, filename))
+    if not os.path.exists(path):
+        print(f"[fig1][warn] {needed_by}: missing {path}")
+        return None
+    return pd.read_csv(path)
+
+
 def get_panel_c_data():
-    if not os.path.exists('literature_long_shedders_data.csv'):
-        return pd.DataFrame(columns=['duration', 'clinical_category'])
-    df = pd.read_csv('literature_long_shedders_data.csv')
-    if 'Days (Exact)' in df.columns:
-        df['duration'] = df['Days (Exact)']
-        df = df.dropna(subset=['clinical_category', 'duration']).copy()
-        return df[['duration', 'clinical_category']]
-    return pd.DataFrame(columns=['duration', 'clinical_category'])
+    """Published long-shedder durations: one row per patient, grouped by
+    immunocompromise category. Source table also carries DOI/quotes, which
+    the panel ignores."""
+    df = _real_world_csv('literature_long_shedders_data.csv', 'panel C')
+    empty = pd.DataFrame(columns=['duration', 'clinical_category'])
+    if df is None:
+        return empty
+    if 'Days (Exact)' not in df.columns:
+        print("[fig1][warn] panel C: no 'Days (Exact)' column; got "
+              f"{list(df.columns)[:8]}")
+        return empty
+    df['duration'] = df['Days (Exact)']
+    df = df.dropna(subset=['clinical_category', 'duration']).copy()
+    print(f"[fig1] panel C: {len(df)} patients across "
+          f"{df['clinical_category'].nunique()} categories")
+    return df[['duration', 'clinical_category']]
 
 def get_panel_de_data():
     df_d = pd.DataFrame()
     df_e = pd.DataFrame()
-    if os.path.exists('data_fig1_D.csv'):
-        df_d = pd.read_csv('data_fig1_D.csv')
+    loaded_d = _real_world_csv('data_fig1_D.csv', 'panel D')
+    if loaded_d is not None:
+        df_d = loaded_d
         if 'sampling_date' in df_d.columns: df_d['sampling_date'] = pd.to_datetime(df_d['sampling_date'])
-    if os.path.exists('data_fig1_E.csv'):
-        df_e = pd.read_csv('data_fig1_E.csv')
+    loaded_e = _real_world_csv('data_fig1_E.csv', 'panel E')
+    if loaded_e is not None:
+        df_e = loaded_e
         if 'sampling_date' in df_e.columns: df_e['sampling_date'] = pd.to_datetime(df_e['sampling_date'])
     return df_d, df_e
 

@@ -289,12 +289,22 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
       cannot overwrite each other. `--exp-name` threaded through every
       preprocess function; `--exp-num` now required (its `default=4` pointed
       at a known-invalid run). Figure 4's missing-scenario crash fixed.
-- [ ] **Figure 1 panel C has no data** — reads
-      `literature_long_shedders_data.csv`, which is not in the repo; the
-      function returns an empty frame and the panel renders blank.
-      Pietro has the file, location TBC (likely HPC). `data_fig1_D.csv`
-      (1638 rows) and `data_fig1_E.csv` (259 rows) are both present, so
-      panels D and E work.
+- [x] **Figure 1 panel C had no data** — fixed in v2.4.34. The literature
+      extraction is now committed as
+      `Data/RealWorldData/literature_long_shedders_data.csv` (123 usable
+      patients across 9 clinical categories, all matching the acronym map in
+      `fig1_plots.py`), alongside `data_fig1_D.csv` and `data_fig1_E.csv`,
+      which moved there from the repo root. All three are resolved from the
+      script's own location rather than the working directory, so they no
+      longer vanish silently when a figure is run from elsewhere.
+- [x] **`package_simplicity_data.sh` was corrupting every archive** — fixed
+      in v2.4.34. Its "integrity verification" ran `pixz -t`, which is not a
+      test flag: in pixz `-t` means "don't assume input is in tar format", so
+      each archive was re-compressed to `<name>.tar.xz.xz`, the original
+      deleted, and `SUCCESS` reported. Archives needed `pixz -d` twice and
+      could not be opened by `tar -xf` or `xz -d`. Now `pixz -l`.
+      **Any archive produced before this fix is double-compressed** — open it
+      with `pixz -d` twice, or re-create it.
 - [ ] **Figure 1's per-panel scenario lists disagree** — panel A plots
       `["control","SOT","HIV_low"]` (3, no HIV_high), panel B plots all 4,
       panels F/G plot the 3 long-shedder scenarios. A and B are
