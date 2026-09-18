@@ -50,10 +50,24 @@ done
 [ ${#current_batch[@]} -gt 0 ] && tar -I pixz -cf "$EXPORT_DIR/simplicity_export_${DATE_STAMP}_part${current_part}.tar.xz" "${current_batch[@]}"
 
 echo "--- STEP 3: INTEGRITY VERIFICATION ---"
+# `pixz -l` lists the tarball index: a read-only check that the archive is
+# both valid xz AND a readable tar.
+#
+# This used to be `pixz -t`, which is NOT a test flag -- in pixz, -t means
+# "don't assume input is in tar format", i.e. it COMPRESSES. Every archive was
+# therefore silently re-compressed to <name>.tar.xz.xz and the original
+# deleted, while the script reported SUCCESS. The result needed `pixz -d`
+# twice to open and could not be read by plain `tar -xf` or `xz -d` at all.
 ERRORS=0
-for archive in "$EXPORT_DIR"/simplicity_export_${DATE_STAMP}_*.tar.xz; do
+shopt -s nullglob
+ARCHIVES=("$EXPORT_DIR"/simplicity_export_${DATE_STAMP}_*.tar.xz)
+if [ ${#ARCHIVES[@]} -eq 0 ]; then
+    echo " -> No archives produced; nothing to verify."
+    ERRORS=1
+fi
+for archive in "${ARCHIVES[@]}"; do
     echo -n " -> Verifying $(basename "$archive")... "
-    if pixz -t "$archive" 2>/dev/null; then
+    if pixz -l "$archive" >/dev/null 2>&1; then
         echo "OK"
     else
         echo "FAILED"
@@ -64,6 +78,7 @@ done
 echo "=========================================================="
 if [ "$ERRORS" -eq 0 ]; then
     echo "SUCCESS: Packaging and verification complete."
+    echo "Extract with:  tar -I pixz -xf <archive>"
 else
     echo "WARNING: $ERRORS archive(s) failed the integrity check!"
 fi

@@ -5,6 +5,60 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.35 — 2026-09-18 — pietro gerletti
+
+(2.4.34 landed only `Data/RealWorldData/` and the `.gitignore` rule -- a
+`git add` with a stale pathspec failed silently and staged nothing else.
+This entry covers the whole change; 2.4.35 carries the code.)
+
+Figure 1's real-world inputs are now in the repo, the plotting job runs
+against a chosen pipeline arm, and there is one command to bundle both paper
+runs for download. Plus a packaging bug that has been corrupting every
+archive this repo has ever produced.
+
+* **`pixz -t` is not a test flag, and "integrity verification" was destroying
+  the archives.** `package_simplicity_data.sh` ran `pixz -t "$archive"` to
+  verify each archive; in pixz, `-t` means *"don't assume input is in tar
+  format"* -- a compression flag. Every archive was therefore silently
+  re-compressed to `<name>.tar.xz.xz` and the original deleted, while the
+  script printed `SUCCESS: Packaging and verification complete.` The result
+  needed `pixz -d` run twice to open and could not be read by plain
+  `tar -xf` or `xz -d` at all. Confirmed in isolation: `pixz -t v.tar.xz`
+  turns it into `v.tar.xz.xz`. Now `pixz -l`, which lists the tarball index
+  -- a genuine read-only check that the file is valid xz *and* a readable
+  tar. The verification glob also no longer silently passes when it matches
+  nothing, and the success message prints the extract command. Verified end
+  to end: a single `tar -I pixz -xf` now restores everything.
+* **`Data/RealWorldData/`** holds Figure 1's three curated inputs --
+  `data_fig1_D.csv` and `data_fig1_E.csv` (moved from the repo root) and
+  `literature_long_shedders_data.csv`, the literature extraction panel C
+  needs and which had never been in the repo at all. `.gitignore` gains
+  `!Data/RealWorldData/` to escape the blanket `Data/*`. Figure 1 is now
+  reproducible from a clean checkout.
+* **Figure 1's inputs are resolved from the script's location, not the
+  working directory.** All three were bare relative paths, so every one
+  vanished if a figure ran from anywhere but the repo root -- and only panel
+  C said so on the plot; D and E just went blank. Each now warns by full path
+  when missing, and panel C reports how many patients and categories it
+  loaded. Verified by running from `/tmp`: 123 patients / 9 categories, 1638
+  and 259 rows.
+* **`submit_plots.sh` would have failed on every figure.** It passed no
+  `--exp-num`, which v2.4.33 made required, and it hardcoded
+  `/home/gerlep93/miniconda3` for conda activation while recent pipeline logs
+  run under a different HPC account. Now takes
+  `<exp_num> [exp_name] [figure] [seed] [format]`, activates conda the
+  portable way every other submit script in this repo already used, and
+  creates all four log directories rather than only the one selected.
+* **New `scripts/archive_paper_runs.sh`**: one command to bundle both paper
+  runs -- bound `#7` and unbound `#1` by default -- with their pipeline logs,
+  artifact zips, figures and the real-world inputs, plus a manifest recording
+  commit, branch, host and date. Prints the archive path, its size and an
+  `scp` line. Staging uses **hard links, not symlinks**: the packager's
+  `tar -I pixz -cf` has no `--dereference`, so a symlinked staging tree would
+  have archived the links and none of the data.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.33 — 2026-09-17 — pietro gerletti
 
 `scripts/nature_plots` can now generate all four paper figures once per
