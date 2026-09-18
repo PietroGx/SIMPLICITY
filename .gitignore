@@ -12,3 +12,8 @@ structure.txt
 # SCENARIOS/NSR_RANGES) lives in scripts/experiments/impact_long_shedders_config.py
 # instead, as plain code -- not a Data/ reference file.
 Data/*
+# ...except the real-world inputs Figure 1 reads (literature durations and the
+# two patient root-to-tip datasets). These are hand-curated study data, not
+# simulation output, and Figure 1 is not reproducible from a clean checkout
+# without them.
+!Data/RealWorldData/
