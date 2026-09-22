@@ -182,3 +182,100 @@ def plot_tempest_regression(ax, df, title, x_col='sampling_date', y_col='hamming
     ax.set_ylabel("Hamming D.", fontsize=7)
     ax.text(0.5, 1.05, title, transform=ax.transAxes, ha='center', fontsize=7, fontweight='bold')
     format_clean_axis(ax, remove_ticks=False)
+
+
+# =============================================================================
+# Clock overlay (panels D and E)
+# =============================================================================
+# Real data and model on ONE axes, both in days, so the comparison is read off
+# a single panel instead of across two. Replaces the old D/E (data) + F/G
+# (model) split.
+COHORT_COLORS = {"Control": "#333333", "SOT": "#56B4E9",
+                 "HIV": "#D55E00", "Edge Case": "#CC79A7"}
+DATA_COLOR = "#3b528b"
+
+
+def _through_origin(x, y):
+    """Slope of a through-origin fit, plus its R^2. Matches tempest_regression's
+    fit_intercept=False so model and data rates are comparable."""
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    denom = np.sum(x ** 2)
+    if denom <= 0:
+        return np.nan, np.nan
+    slope = np.sum(x * y) / denom
+    ss_tot = np.sum((y - np.mean(y)) ** 2)
+    r2 = 1 - np.sum((y - slope * x) ** 2) / ss_tot if ss_tot > 0 else np.nan
+    return slope, r2
+
+
+def _thin(df, n=600, seed=42):
+    return df.sample(n=n, random_state=seed) if len(df) > n else df
+
+
+def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
+                       data_label="Patient data", x_label="Days since infection",
+                       x_max=400, y_max=None):
+    """One clock, data and model together. Grey-blue circles are the real
+    cohort; coloured circles are the model, one colour per scenario. All fits
+    are through the origin."""
+    entries = []
+
+    if df_real is not None and not df_real.empty:
+        r = df_real.dropna(subset=[real_x, real_y]).copy()
+        xr = r[real_x].astype(float).values
+        yr = r[real_y].astype(float).values
+        xr = xr - np.min(xr)                      # days since first observation
+        if len(xr) > 1:
+            slope, r2 = _through_origin(xr, yr)
+            ax.scatter(xr, yr, s=7, alpha=0.30, color=DATA_COLOR,
+                       edgecolors='none', zorder=2, label=data_label)
+            xs = np.array([0.0, min(np.max(xr), x_max)])
+            ax.plot(xs, slope * xs, color=DATA_COLOR, lw=1.6, zorder=5)
+            entries.append((data_label, slope * 365.25, r2))
+
+    if df_model is not None and not df_model.empty:
+        for cohort in [c for c in ("Control", "SOT", "HIV", "Edge Case")
+                       if c in set(df_model.get('cohort', []))]:
+            cdf = df_model[df_model['cohort'] == cohort]
+            if cdf.empty:
+                continue
+            xm = cdf['Sequencing_time'].astype(float).values * 365.25
+            ym = cdf['Distance_from_root'].astype(float).values
+            slope, r2 = _through_origin(xm, ym)
+            if not np.isfinite(slope):
+                continue
+            colour = COHORT_COLORS.get(cohort, "#888888")
+            t = _thin(cdf)
+            ax.scatter(t['Sequencing_time'].astype(float) * 365.25,
+                       t['Distance_from_root'].astype(float),
+                       s=7, alpha=0.30, color=colour, edgecolors='none',
+                       zorder=3, label=f"Model, {cohort}")
+            xs = np.array([0.0, min(np.max(xm), x_max)])
+            ax.plot(xs, slope * xs, color=colour, lw=1.6, zorder=6)
+            entries.append((f"Model, {cohort}", slope * 365.25, r2))
+
+    if not entries:
+        format_clean_axis(ax, remove_ticks=True)
+        ax.text(0.5, 0.5, f"{title}\n(Data Missing)", ha='center', va='center',
+                transform=ax.transAxes)
+        return
+
+    txt = "\n".join(f"{n}: {rate:.5f} s/s/y ($R^2$={r2:.2f})"
+                    for n, rate, r2 in entries)
+    ax.text(0.03, 0.97, txt, transform=ax.transAxes, fontsize=5.4,
+            va='top', ha='left',
+            bbox=dict(facecolor='white', alpha=0.78, edgecolor='none', pad=1.2))
+
+    ax.set_xlim(0, x_max)
+    ax.set_ylim(0, y_max)
+    ax.set_xlabel(x_label, fontsize=7)
+    ax.set_ylabel("Divergence (subs/site)", fontsize=7)
+    ax.text(0.5, 1.06, title, transform=ax.transAxes, ha='center',
+            fontsize=7, fontweight='bold')
+    leg = ax.legend(loc='lower right', fontsize=5.2, frameon=True,
+                    handletextpad=0.3, borderaxespad=0.3, markerscale=1.3)
+    leg.get_frame().set_facecolor('white')
+    leg.get_frame().set_alpha(0.78)
+    leg.get_frame().set_linewidth(0.0)
+    format_clean_axis(ax, remove_ticks=False)

@@ -17,3 +17,7 @@ Data/*
 # simulation output, and Figure 1 is not reproducible from a clean checkout
 # without them.
 !Data/RealWorldData/
+
+# Archives produced by package_simplicity_data.sh / archive_paper_runs.sh.
+# Multi-GB, regenerable from Data/.
+Data_Export/

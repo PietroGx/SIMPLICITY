@@ -7,6 +7,8 @@ import ast
 
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
+import simplicity.tuning.evolutionary_rate as er
+from _scenarios import scenario_names
 import simplicity.output_manager as om
 from simplicity.intra_host_model import Host 
 
@@ -23,8 +25,26 @@ def get_clinical_label(scenario):
     if scenario == "edge_case": return "Edge Case"
     return scenario.replace("_", " ").title()
 
+def duration_groups(exp_name):
+    """One scenario per DISTINCT clinical label, in config order.
+
+    Panels A and B show infection-duration distributions, so HIV_low and
+    HIV_high (which share tau_3_long) would draw the same curve twice. Keying
+    on the label collapses them and lets edge_case in wherever the pipeline
+    defines it -- 3 groups on the bound arm, 4 on the unbound one.
+    """
+    seen, out = set(), []
+    for name in scenario_names(exp_name):
+        label = get_clinical_label(name)
+        if label in seen:
+            continue
+        seen.add(label)
+        out.append(name)
+    return out
+
+
 def get_panel_a_data(exp_num=1, exp_name="impact_long_shedders"):
-    scenarios = ["control", "SOT", "HIV_low"]
+    scenarios = duration_groups(exp_name)
     df_list = []
     for scenario in scenarios:
         experiment_string = f"{exp_name}_{scenario}_#{exp_num}"
@@ -51,7 +71,7 @@ def get_panel_a_data(exp_num=1, exp_name="impact_long_shedders"):
     return pd.concat(df_list, ignore_index=True)
 
 def get_panel_b_data(exp_num=1, exp_name="impact_long_shedders"):
-    scenarios = ["control", "SOT", "HIV_low", "HIV_high"]
+    scenarios = duration_groups(exp_name)
     df_list = []
     control_exp_string = f"{exp_name}_control_#{exp_num}"
     try:
@@ -135,102 +155,84 @@ def get_panel_de_data():
         if 'sampling_date' in df_e.columns: df_e['sampling_date'] = pd.to_datetime(df_e['sampling_date'])
     return df_d, df_e
 
-def get_panel_fg_data(exp_num=1, exp_name="impact_long_shedders"):
-    print(f"\n--- EXTRACTING PANELS F & G ---")
-    df_f_list = []
-    df_g_list = []
-    
-    # Extract Panel F (Control Standard)
+def get_model_global_clock(exp_num=1, exp_name="impact_long_shedders"):
+    """Model GLOBAL clock: standard individuals in control, divergence from the
+    outbreak root against absolute sequencing time. The model counterpart of
+    the real standard-cohort root-to-tip regression."""
     control_exp = f"{exp_name}_control_#{exp_num}"
+    rows = []
     try:
         sods = dm.get_simulation_output_dirs(control_exp)
-        if sods:
-            for ssod in dm.get_seeded_simulation_output_dirs(sods[0]):
-                seq_path = os.path.join(ssod, 'sequencing_data_regression.csv')
-                if not os.path.exists(seq_path): continue
-                df = pd.read_csv(seq_path)
-                col = 'individual_type' if 'individual_type' in df.columns else ('Individual_type' if 'Individual_type' in df.columns else None)
-                if col:
-                    filtered_df = df[df[col] == 'standard'].copy()
-                    if not filtered_df.empty:
-                        filtered_df['cohort'] = 'Control'
-                        df_f_list.append(filtered_df)
-    except Exception: pass
+    except Exception:
+        sods = []
+    if not sods:
+        print(f"[fig1][warn] global clock: no output for {control_exp}")
+        return pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root', 'cohort'])
+    for ssod in dm.get_seeded_simulation_output_dirs(sods[0]):
+        seq_path = os.path.join(ssod, 'sequencing_data_regression.csv')
+        if not os.path.exists(seq_path):
+            continue
+        df = pd.read_csv(seq_path)
+        col = next((c for c in ('individual_type', 'Individual_type') if c in df.columns), None)
+        if col is None:
+            continue
+        sub = df[df[col] == 'standard']
+        if not sub.empty:
+            rows.append(sub[['Sequencing_time', 'Distance_from_root']].copy())
+    if not rows:
+        print(f"[fig1][warn] global clock: no standard sequences in {control_exp}")
+        return pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root', 'cohort'])
+    out = pd.concat(rows, ignore_index=True)
+    out['cohort'] = 'Control'
+    print(f"[fig1] global clock: {len(out)} points from {control_exp}")
+    return out
 
-    # Extract Panel G (Long Shedders)
-    scenarios = ["SOT", "HIV_low", "HIV_high"]
-    L = 4967 
 
-    for scenario in scenarios:
+def get_model_intrahost_clock(exp_num=1, exp_name="impact_long_shedders",
+                              max_seeds=None):
+    """Model INTRA-HOST clock for long shedders, via
+    evolutionary_rate.extract_ih_regression_data -- the same function cal_1 and
+    the sanity plots use.
+
+    This replaces a bespoke extraction that read sequencing_data.csv and
+    differenced genome lengths. That file only holds DIAGNOSIS-path sequences,
+    and since v2.4.28 production no longer censuses long shedders, so it
+    carried 11-19 long-shedder rows per run: the panel reported SOT at
+    0.00022 s/s/y where the real intra-host clock reads 0.00202.
+    """
+    rows = []
+    for scenario in duration_groups(exp_name):
+        if scenario == "control":
+            continue
         exp_str = f"{exp_name}_{scenario}_#{exp_num}"
         try:
             sods = dm.get_simulation_output_dirs(exp_str)
-            if not sods: continue
-            for ssod in dm.get_seeded_simulation_output_dirs(sods[0]):
-                seq_path = os.path.join(ssod, 'sequencing_data.csv')
-                ind_path = os.path.join(ssod, 'individuals_data.csv')
-                phylo_path = os.path.join(ssod, 'phylogenetic_data.csv')
-                
-                if not (os.path.exists(seq_path) and os.path.exists(ind_path) and os.path.exists(phylo_path)): 
-                    continue
-                    
-                df_seq = pd.read_csv(seq_path)
-                df_ind = pd.read_csv(ind_path)
-                df_phylo = pd.read_csv(phylo_path)
-                
-                df_phylo['genome_length'] = df_phylo['Genome'].apply(lambda x: len(ast.literal_eval(x)) if isinstance(x, str) else 0)
-                phylo_dict = dict(zip(df_phylo['Lineage_name'], df_phylo['genome_length']))
-                phylo_dict['wt'] = 0 
-                phylo_dict['root'] = 0
-                
-                col_id = 'Unnamed: 0' if 'Unnamed: 0' in df_ind.columns else df_ind.columns[0]
-                df_ind_sub = df_ind[[col_id, 'type', 'inherited_lineage']].copy()
-                df_ind_sub.rename(columns={col_id: 'individual_index'}, inplace=True)
-                
-                df_merged = df_seq.merge(df_ind_sub, on='individual_index', how='inner')
-                
-                if not df_merged.empty:
-                    print(f"\n[DIAGNOSTICS - {scenario} - {os.path.basename(ssod)}]")
-                    
-                    # 1. Map inherited lengths and check for failures
-                    df_merged['inherited_length'] = df_merged['inherited_lineage'].map(phylo_dict)
-                    
-                    unmapped = df_merged[df_merged['inherited_length'].isna()]
-                    if not unmapped.empty:
-                        print(f"  ⚠️ WARNING: {len(unmapped)} sequences failed to map their inherited_lineage!")
-                        print(f"     Example unmapped lineages: {unmapped['inherited_lineage'].unique()[:5]}")
-                        
-                    # Fillna with 0 temporarily just so we can see the resulting impossible math in the next check
-                    df_merged['inherited_length_filled'] = df_merged['inherited_length'].fillna(0)
-                    df_merged['intra_host_mutations'] = df_merged['sequence_lenght'] - df_merged['inherited_length_filled']
-                    
-                    # 2. Check for negative mutations
-                    neg_muts = df_merged[df_merged['intra_host_mutations'] < 0]
-                    if not neg_muts.empty:
-                        print(f"  ⚠️ WARNING: {len(neg_muts)} sequences have NEGATIVE intra-host mutations!")
-                        print(f"     Example (Seq Length vs Inherited Length):")
-                        print(neg_muts[['sequence_lenght', 'inherited_length_filled', 'intra_host_mutations']].head(3))
-                        
-                    # 3. Check for suspiciously high mutations very early in infection (e.g. >5 mutations in <10 days)
-                    impossible = df_merged[(df_merged['infection_duration'] < 10) & (df_merged['intra_host_mutations'] > 5)]
-                    if not impossible.empty:
-                        print(f"  ⚠️ WARNING: {len(impossible)} sequences have suspiciously high mutation counts early in infection!")
-                        print(f"     Example (Duration vs Mutations):")
-                        print(impossible[['infection_duration', 'sequence_lenght', 'inherited_length_filled', 'intra_host_mutations']].head(3))
+        except Exception:
+            sods = []
+        if not sods:
+            print(f"[fig1][warn] intra-host clock: no output for {exp_str}")
+            continue
+        label = get_clinical_label(scenario)
+        ssods = dm.get_seeded_simulation_output_dirs(sods[0])
+        if max_seeds:
+            ssods = ssods[:max_seeds]
+        n = 0
+        for ssod in ssods:
+            try:
+                ih = er.extract_ih_regression_data(ssod)
+            except Exception:
+                continue
+            if ih is None or ih.empty:
+                continue
+            ih = ih.copy()
+            ih['cohort'] = label
+            rows.append(ih)
+            n += len(ih)
+        print(f"[fig1] intra-host clock: {n} points for {label} ({scenario})")
+    if not rows:
+        return pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root', 'cohort'])
+    return pd.concat(rows, ignore_index=True)
 
-                    # Proceed with extraction, keeping the raw values so we can plot them as is
-                    df_merged['Distance_from_root'] = df_merged['intra_host_mutations'] / L
-                    df_merged['Sequencing_time'] = df_merged['infection_duration'] / 365.25
-                    df_merged['cohort'] = get_clinical_label(scenario)
-                    
-                    df_g_list.append(df_merged[['Sequencing_time', 'Distance_from_root', 'cohort']])
-        except Exception as e: 
-            print(f"❌ Error in {scenario}: {e}")
-
-    df_f = pd.concat(df_f_list, ignore_index=True) if df_f_list else pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root', 'cohort'])
-    df_g = pd.concat(df_g_list, ignore_index=True) if df_g_list else pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root', 'cohort'])
-    
-    return df_f, df_g
 
 def main():
     args = parse_arguments()
