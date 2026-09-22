@@ -305,7 +305,16 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
       could not be opened by `tar -xf` or `xz -d`. Now `pixz -l`.
       **Any archive produced before this fix is double-compressed** — open it
       with `pixz -d` twice, or re-create it.
-- [ ] **Figure 1's per-panel scenario lists disagree** — panel A plots
+- [x] **Figure 1's per-panel scenario lists disagreed** — resolved in
+      v2.4.36. Panels A and B now share `duration_groups()`, one scenario per
+      distinct clinical label, derived from the pipeline config; `edge_case`
+      is included where the pipeline defines it.
+- [x] **Figure 1 panel G measured the wrong quantity** — v2.4.36. It read
+      diagnosis-path `sequencing_data.csv` and reported SOT's intra-host rate
+      as 0.00022 s/s/y from 11-19 sequences; `extract_ih_regression_data`
+      gives 0.00202 from ~7,000 points. Panels D/E/F/G were also merged into
+      two overlay panels so data and model share an axis.
+- [~] **Figure 1's old per-panel note (superseded, kept for history)** — panel A plots
       `["control","SOT","HIV_low"]` (3, no HIV_high), panel B plots all 4,
       panels F/G plot the 3 long-shedder scenarios. A and B are
       theoretical-vs-realized of the same quantity, so differing looks like

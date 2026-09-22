@@ -5,6 +5,52 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.36 — 2026-09-22 — pietro gerletti
+
+Figure 1 is now five panels instead of seven, and its long-shedder clock is
+measured with the same function as the rest of the pipeline. The old panel G
+was wrong by an order of magnitude.
+
+* **Panel G was measuring the wrong thing, off 11-19 data points.**
+  `get_panel_fg_data` built a bespoke intra-host clock from
+  `sequencing_data.csv`, differencing genome lengths against
+  `inherited_lineage`. That file holds DIAGNOSIS-path sequences only, and
+  since v2.4.28 production no longer censuses long shedders, so it carried
+  **19 long-shedder sequences across 50 seeds** (unbound SOT) and **11 across
+  30** (bound SOT). The panel reported SOT at **0.00022 s/s/y** against a
+  0.00205 target -- the model missing by 9x -- with R2=0.11. It is not:
+  `extract_ih_regression_data` over the same output gives **0.00202**.
+  Replaced with that function, the one `cal_1` and the sanity plots already
+  use, deleting ~50 lines of bespoke extraction rather than adding any. Point
+  counts went from 19 to 6,925 (SOT), 22,598 (HIV) and 14,788 (edge_case).
+  Textbook instance of the trap in CLAUDE.md: a healthy-looking panel
+  measuring a different quantity from the one its title claims.
+* **Seven panels became five.** The old layout split each clock across a data
+  panel and a model panel (D/F for the global clock, E/G for the intra-host
+  one), so the comparison had to be made by eye across the figure. D and E now
+  each carry both, overlaid on one axes with per-series through-origin fits
+  annotated. New `plot_clock_overlay` in `fig1_plots.py`; all fits use the
+  same zero-intercept convention as `tempest_regression`, so model and patient
+  rates are directly comparable.
+* Panel D's real cohort now plots against `days_since_ref`, a column already
+  present in `data_fig1_D.csv`. The old panel used absolute sampling dates,
+  which cannot share an axis with simulation time.
+* **Panels A and B derive their scenarios from the pipeline config**, via a
+  new `duration_groups()` that keeps one scenario per distinct clinical label.
+  HIV_low and HIV_high share `tau_3_long=94.23`, so keying on the label stops
+  them drawing the same duration curve twice, and `edge_case` now appears
+  wherever the pipeline defines it -- 3 groups on the bound arm, 4 on the
+  unbound one. The two panels previously disagreed (3 vs 4 hardcoded
+  scenarios) for no stated reason.
+* `Data_Export/` added to `.gitignore` -- multi-GB archives, regenerable.
+
+Rendered from the run #7 and unbound #1 output. Both arms now agree with the
+patient data: global clock 0.00130 (patients) vs 0.00108-0.00119 (model);
+intra-host 0.00208 (patients) vs 0.00190-0.00212 across every long-shedder
+scenario in both arms.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.35 — 2026-09-18 — pietro gerletti
 
 (2.4.34 landed only `Data/RealWorldData/` and the `.gitignore` rule -- a
