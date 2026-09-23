@@ -15,6 +15,9 @@ def parse_arguments():
                         help=f"Pipeline arm (default: {BOUND_EXP_NAME}).")
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png',
                         help='Output format for the figure (default: png)')
+    parser.add_argument('--no-fit-stats', action='store_true',
+                        help="Hide the fitted rate / R^2 annotations in panels D "
+                            "and E. The submission version should use this.")
     return parser.parse_args()
 
 def set_nature_rcparams():
@@ -82,6 +85,16 @@ def build_figure_1(exp_num, exp_name, fmt):
     for label, ax in {'A': ax_A, 'B': ax_B, 'C': ax_C, 'D': ax_D, 'E': ax_E}.items():
         add_panel_label(ax, label)
 
+    # The edge-case colour also marks panel C's >300 d patients, so the legend
+    # entry belongs whenever EITHER appears -- on the bound arm there is no
+    # edge_case scenario but panel C still shows those patients in pink.
+    has_edge = ('Edge Case' in set(df_ab_realized.get('cohort', [])))
+    if not df_c.empty:
+        has_edge = has_edge or bool(
+            (df_c['duration'] > plots.LONG_SHEDDER_CUTOFF_DAYS).any())
+    plots.add_figure_legend(fig, has_edge_case=has_edge,
+                            has_patient_data=not (df_real_std.empty and df_real_long.empty))
+
     output_filename = figure_path(1, exp_name, exp_num, fmt)
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"Successfully generated {output_filename}")
@@ -89,4 +102,6 @@ def build_figure_1(exp_num, exp_name, fmt):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    if args.no_fit_stats:
+        plots.SHOW_FIT_STATS = False
     build_figure_1(args.exp_num, args.exp_name, args.format)

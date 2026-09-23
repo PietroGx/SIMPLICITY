@@ -104,13 +104,19 @@ def figures_dir():
     return path
 
 
-def figure_path(number, exp_name, exp_num, fmt):
-    """Data/figures/Figure_<n>_<arm>_#<exp_num>.<fmt>.
+def figure_path(number, exp_name, exp_num, fmt, seed=None, subdir=None):
+    """Data/figures/Figure_<n>_<arm>_#<exp_num>[_seed<s>].<fmt>.
 
     The arm and run number are in the name so the two pipelines cannot
-    overwrite each other -- all four figures previously wrote a bare
-    Figure_N.<fmt> into the working directory.
+    overwrite each other. `seed` is included for the seed-dependent figures
+    (2, 3, 4) so rendering a second seed no longer silently overwrites the
+    first -- which made comparing seeds impossible.
     """
+    out = figures_dir()
+    if subdir:
+        out = os.path.join(out, subdir)
+        os.makedirs(out, exist_ok=True)
+    tail = f"_seed{seed}" if seed is not None else ""
     return os.path.join(
-        figures_dir(),
-        f"Figure_{number}_{arm_label(exp_name)}_#{exp_num}.{fmt}")
+        out,
+        f"Figure_{number}_{arm_label(exp_name)}_#{exp_num}{tail}.{fmt}")

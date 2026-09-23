@@ -20,35 +20,39 @@ def _missing(ax, label):
     ax.text(0.5, 0.5, f"{label}\n(Data Missing)", ha='center', va='center', transform=ax.transAxes)
 
 
-def plot_fig3_metrics_pca(ax, metrics_df, palette=None):
+def plot_fig3_metrics(axes, metrics_df, palette=None, scenario_order=None):
+    """The four clade metrics, one small panel each, scenario on the x-axis.
+
+    Replaces a PCA of the same four metrics. PC1/PC2 carried no units and no
+    stated loadings, so the only readable statement was "control clusters,
+    the rest spread" -- it could not say WHICH metric separated them. These
+    show the metrics directly.
     """
-    One point per seed, all scenarios, colored by scenario. Standardized
-    before PCA -- Burden is a raw count that can be orders of magnitude
-    larger than Peak's 0-1 frequency, so skipping standardization would let
-    Burden's scale dominate the PCA for no biological reason.
-    """
-    if metrics_df.empty or len(metrics_df) < 2:
-        _missing(ax, "Panel B")
+    if metrics_df is None or metrics_df.empty:
+        for ax in axes:
+            _missing(ax, "Panel B")
         return
 
-    X = metrics_df[METRIC_COLS].fillna(0.0).to_numpy(dtype=float)
-    Xs = StandardScaler().fit_transform(X)
-    pcs = PCA(n_components=2).fit_transform(Xs)
+    scenarios = scenario_order or metrics_df["scenario"].unique().tolist()
+    scenarios = [s for s in scenarios if s in set(metrics_df["scenario"])]
+    palette = palette or {}
 
-    scenarios = metrics_df["scenario"].unique().tolist()
-    if palette is None:
-        cycle = plt.rcParams['axes.prop_cycle'].by_key().get('color', [])
-        palette = {s: cycle[i % len(cycle)] for i, s in enumerate(scenarios)}
-
-    for scenario in scenarios:
-        mask = (metrics_df["scenario"] == scenario).to_numpy()
-        ax.scatter(pcs[mask, 0], pcs[mask, 1], s=14, alpha=0.75,
-                  color=palette.get(scenario, "black"), label=scenario, edgecolors="none")
-
-    ax.set_xlabel("PC1", fontsize=7)
-    ax.set_ylabel("PC2", fontsize=7)
-    ax.legend(fontsize=6, frameon=False, loc="best")
-    format_clean_axis(ax, remove_ticks=False)
+    for ax, metric in zip(axes, METRIC_COLS):
+        for i, scenario in enumerate(scenarios):
+            vals = metrics_df.loc[metrics_df["scenario"] == scenario, metric].dropna()
+            if vals.empty:
+                continue
+            colour = palette.get(scenario, "#888888")
+            jitter = np.random.default_rng(42).normal(i, 0.07, size=len(vals))
+            ax.scatter(jitter, vals, s=5, alpha=0.45, color=colour,
+                       edgecolors="none", zorder=3)
+            ax.hlines(np.median(vals), i - 0.28, i + 0.28,
+                      color=colour, lw=1.6, zorder=4)
+        ax.set_xticks(range(len(scenarios)))
+        ax.set_xticklabels(scenarios, rotation=45, ha="right", fontsize=5.4)
+        ax.set_title(metric, fontsize=6.5, pad=2)
+        ax.tick_params(axis='y', labelsize=5.4)
+        format_clean_axis(ax, remove_ticks=False)
 
 
 def plot_fig3_sequence_pca(ax, snp_df, labels, palette=None):
@@ -73,14 +77,26 @@ def plot_fig3_sequence_pca(ax, snp_df, labels, palette=None):
     palette = palette or default_palette
     labels = pd.Series(labels).reset_index(drop=True)
 
-    for label in labels.unique():
+    # Standard genomes are far more numerous but occupy FAR fewer distinct
+    # points (a standard host carries 1-4 near-identical lineages, a long
+    # shedder 5-15 diverse ones), so they stack invisibly under the long
+    # shedders. Draw them last and report both counts: the contrast between
+    # "many genomes, few positions" and "fewer genomes, many positions" is the
+    # panel's actual result, not something to hide.
+    order = [l for l in ("long_shedder", "standard") if l in set(labels)]
+    order += [l for l in labels.unique() if l not in order]
+    for z, label in enumerate(order):
         mask = (labels == label).to_numpy()
-        ax.scatter(pcs[mask, 0], pcs[mask, 1], s=10, alpha=0.5,
-                  color=palette.get(label, "black"), label=label, edgecolors="none")
+        n_total = int(mask.sum())
+        n_unique = len(np.unique(pcs[mask], axis=0))
+        ax.scatter(pcs[mask, 0], pcs[mask, 1], s=11, alpha=0.45,
+                   color=palette.get(label, "black"),
+                   label=f"{label} (n={n_total}, {n_unique} distinct)",
+                   edgecolors="none", zorder=3 + z)
 
     ax.set_xlabel("PC1", fontsize=7)
     ax.set_ylabel("PC2", fontsize=7)
-    ax.legend(fontsize=6, frameon=False, loc="best")
+    ax.legend(fontsize=5.6, frameon=False, loc="best")
     format_clean_axis(ax, remove_ticks=False)
 
 

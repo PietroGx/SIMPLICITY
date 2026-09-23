@@ -94,13 +94,17 @@ def build_figure_3(exp_num, exp_name, group, seed, cluster_threshold, min_days,
         pie_axes[0].text(0.5, 0.5, "No Data", ha="center", va="center", fontsize=8)
     add_panel_label(pie_axes[0], "A")
 
-    # --- Panel B: metrics PCA, all scenarios ---
-    ax_b = fig.add_subplot(gs[0, 1])
-    print("Panel B: metrics PCA...")
+    # --- Panel B: the four clade metrics, one sub-panel each ---
+    print("Panel B: clade metrics...")
+    gs_b = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs[0, 1],
+                                            wspace=0.45, hspace=0.75)
+    b_axes = [fig.add_subplot(gs_b[0, 0]), fig.add_subplot(gs_b[0, 1]),
+              fig.add_subplot(gs_b[1, 0]), fig.add_subplot(gs_b[1, 1])]
     metrics_df = preproc.get_panel_b_data(exp_num, scenarios, cluster_threshold, min_days,
                                            exp_name=exp_name)
-    plots.plot_fig3_metrics_pca(ax_b, metrics_df, palette=SCENARIO_PALETTE)
-    add_panel_label(ax_b, "B")
+    plots.plot_fig3_metrics(b_axes, metrics_df, palette=SCENARIO_PALETTE,
+                            scenario_order=scenarios)
+    add_panel_label(b_axes[0], "B")
 
     # --- Panel C: sequence-space PCA, single seed of the selected group ---
     ax_c = fig.add_subplot(gs[1, 0])
@@ -121,7 +125,7 @@ def build_figure_3(exp_num, exp_name, group, seed, cluster_threshold, min_days,
     fig.suptitle(f"Group: {group}", fontsize=8, y=0.995)
     fig.subplots_adjust(bottom=0.08, top=0.88, left=0.08, right=0.95)
 
-    output_filename = figure_path(3, exp_name, exp_num, fmt)
+    output_filename = figure_path(3, exp_name, exp_num, fmt, seed=seed)
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"\n[Success] Generated {output_filename}")
 

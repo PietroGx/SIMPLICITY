@@ -77,7 +77,7 @@ def build_figure_4(exp_num, exp_name, seed, cluster_threshold, fmt):
     add_global_pie_legend(fig)
     fig.subplots_adjust(bottom=0.15, top=0.8, left=0.05, right=0.98)
 
-    output_filename = figure_path(4, exp_name, exp_num, fmt)
+    output_filename = figure_path(4, exp_name, exp_num, fmt, seed=seed)
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"\n[Success] Generated {output_filename}")
 

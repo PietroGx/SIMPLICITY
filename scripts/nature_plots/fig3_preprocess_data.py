@@ -80,35 +80,20 @@ def get_panel_b_data(exp_num, scenarios, cluster_threshold=5, min_days=100,
 # =============================================================================
 # Panel C -- sequence-space PCA + per-seed consistency, single scenario
 # =============================================================================
-def _standard_sequenced_genomes(ssod):
-    """
-    [(individual_index, genome), ...] for standard-surveillance sequenced
-    reads. sequencing_data.csv's own 'sequence' column already contains the
-    genome (simplicity.population_model embeds it at diagnosis-sampling time)
-    -- no join to phylogenetic_data.csv needed.
-    """
-    path = os.path.join(ssod, 'sequencing_data.csv')
-    if not os.path.isfile(path):
-        return []
-    df = pd.read_csv(path)
-    df = df[df['individual_type'] == 'standard']
-    out = []
-    for _, row in df.iterrows():
-        try:
-            genome = ast.literal_eval(row['sequence']) if isinstance(row['sequence'], str) else row['sequence']
-            out.append((row['individual_index'], genome))
-        except Exception:
-            continue
-    return out
+def _ih_lineage_genomes(ssod, individual_type, max_per_individual=None,
+                        rng_seed=42):
+    """[(individual_index, genome), ...] -- EVERY intra-host lineage of every
+    individual of `individual_type`, joined to its genome.
 
+    Both types come through here, which is the point. The previous code took
+    all intra-host lineages for long shedders but only the DIAGNOSIS-sequenced
+    genomes for standards, and at sequencing_rate=0.05 that is ~6 sequences a
+    seed against ~1,494 lineages -- an asymmetry that inflated every
+    long-vs-standard comparison built on it.
 
-def _long_shedder_sequenced_genomes(ssod, max_per_individual=None, rng_seed=42):
-    """
-    [(individual_index, genome), ...] for every IH lineage of every long
-    shedder -- mirrors save_sequencing_dataset's long-shedder export exactly
-    (every IH lineage gets "sequenced" at end of infection). Needs the join
-    to phylogenetic_data.csv's Genome, since individuals_data.csv only
-    stores lineage names.
+    Note this measures the diversity each host type CARRIES, not what
+    surveillance would DETECT. See BACKLOG: the data-source choice is to be
+    re-checked before the final figures.
     """
     ind_df = om.read_individuals_data(ssod)
     phylo_df = om.read_phylogenetic_data(ssod)
@@ -116,14 +101,22 @@ def _long_shedder_sequenced_genomes(ssod, max_per_individual=None, rng_seed=42):
 
     rng = random.Random(rng_seed)
     out = []
-    long_df = ind_df[ind_df['type'] == 'long_shedder']
-    for idx, row in long_df.iterrows():
+    sub = ind_df[ind_df['type'] == individual_type]
+    for idx, row in sub.iterrows():
         lineages = [l for l in row['IH_lineages'] if l in lin2gen]
         if max_per_individual is not None and len(lineages) > max_per_individual:
             lineages = rng.sample(lineages, max_per_individual)
         for lin in lineages:
             out.append((idx, lin2gen[lin]))
     return out
+
+
+def _standard_sequenced_genomes(ssod, max_per_individual=None):
+    return _ih_lineage_genomes(ssod, 'standard', max_per_individual)
+
+
+def _long_shedder_sequenced_genomes(ssod, max_per_individual=None, rng_seed=42):
+    return _ih_lineage_genomes(ssod, 'long_shedder', max_per_individual, rng_seed)
 
 
 def _build_snp_matrix(genomes):
@@ -173,19 +166,32 @@ def get_panel_c_consistency_data(exp_num, group, max_long_per_individual=None,
     rows = []
     for ssod in dm.get_seeded_simulation_output_dirs(sod):
         try:
-            standard = [g for _, g in _standard_sequenced_genomes(ssod)]
+            standard = [g for _, g in _standard_sequenced_genomes(ssod, max_long_per_individual)]
             long = [g for _, g in _long_shedder_sequenced_genomes(ssod, max_long_per_individual)]
             if not standard or not long:
                 continue
 
-            between_pairs = [(l, s) for l in long for s in standard]
-            if len(between_pairs) > max_pairs:
-                between_pairs = rng.sample(between_pairs, max_pairs)
+            # Sample pair INDICES rather than materialising the product. With
+            # the full IH record a seed holds ~2.7k standard and ~1.5k long
+            # genomes, so the old comprehensions built ~4M and ~3.6M tuples per
+            # seed before discarding all but max_pairs of them.
+            n_l, n_s = len(long), len(standard)
+            total_between = n_l * n_s
+            if total_between > max_pairs:
+                idx = rng.sample(range(total_between), max_pairs)
+                between_pairs = [(long[i // n_s], standard[i % n_s]) for i in idx]
+            else:
+                between_pairs = [(l, s) for l in long for s in standard]
             between_dists = [hamming_iw(l, s) for l, s in between_pairs]
 
-            within_pairs = list(itertools.combinations(standard, 2))
-            if len(within_pairs) > max_pairs:
-                within_pairs = rng.sample(within_pairs, max_pairs)
+            if n_s * (n_s - 1) // 2 > max_pairs:
+                within_pairs = []
+                while len(within_pairs) < max_pairs:
+                    a, b = rng.randrange(n_s), rng.randrange(n_s)
+                    if a != b:
+                        within_pairs.append((standard[a], standard[b]))
+            else:
+                within_pairs = list(itertools.combinations(standard, 2))
             within_dists = [hamming_iw(a, b) for a, b in within_pairs]
 
             if not between_dists or not within_dists:
