@@ -20,7 +20,9 @@ def plot_fig4_tree(ax, bt_tree, title):
 
     bt_tree.drawTree()
     bt_tree.plotTree(ax, colour=_color_for, width=1.2)
-    bt_tree.plotPoints(ax, colour=_color_for, size=20, zorder=3)
+    # 20 was set for a 4-tree layout; at 5 trees each panel is ~34 mm and the
+    # markers merged into blobs.
+    bt_tree.plotPoints(ax, colour=_color_for, size=4, zorder=3)
 
     ax.set_title(title, fontsize=8)
     ax.spines['top'].set_visible(False)

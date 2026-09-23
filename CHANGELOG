@@ -5,6 +5,85 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.37 — 2026-09-23 — pietro gerletti
+
+Figure shape-and-storytelling pass, plus a third instance of the
+wrong-data-source bug. These figures are for developing the argument, NOT
+final -- both pipelines get rerun with final numbers afterwards.
+
+**Figure 3 C/D read 6 standard genomes against 1,494 long-shedder ones.**
+`_long_shedder_sequenced_genomes` took every intra-host lineage of every long
+shedder, while `_standard_sequenced_genomes` took only the DIAGNOSIS-sequenced
+standards. At the production `sequencing_rate = 0.05`, one unbound HIV_high
+seed yields 7 sequences in total out of 1,521 infected individuals -- so the
+sequence-space PCA showed a single colour, and the "excess divergence" panel
+was comparing a within-host diversity cloud against a handful of surveillance
+samples. Both types now read the COMPLETE intra-host record via one
+`_ih_lineage_genomes()`: 2,692 standard and 1,494 long-shedder genomes per
+seed. Subsampling caps apply to both sides instead of one.
+**This is a data-source decision, not just a fix** -- the panels now describe
+the diversity each host type CARRIES rather than what surveillance DETECTS.
+Flagged in BACKLOG for re-checking before the final figures.
+
+* **Pair sampling no longer materialises the product.** With the full pools a
+  seed holds ~2.7k x 1.5k possible cross pairs, and the old code built all ~4M
+  tuples (and ~3.6M within-pairs) before discarding all but 200. Indices are
+  sampled directly now.
+* **Figure 3 panel B: PCA replaced by the four raw metrics.** PC1/PC2 had no
+  units and no stated loadings, so the only readable statement was "control
+  clusters, the rest spread" -- it could not say which metric separated them.
+  Now one small panel per metric, scenario on the x-axis, median bar per group.
+* **New Figure 3S** (`fig3S_save.py`): clade-origin pies for every scenario
+  side by side, so the trend across long-shedder burden is visible rather than
+  asserted. Built on `plot_figures.py::build_figure_4`, reusing
+  `summarize_sod_pies` / `plot_fig4_pies` / `add_global_pie_legend`; only the
+  data access changed, from the old (M, ratio, tau, R) master-log sweep to the
+  current named scenarios.
+
+**Figure 1:**
+
+* One figure-level legend below the panels, replacing the per-axes ones.
+  Entries name the modelled scenario with its clinical category in brackets --
+  "SOT (solid organ transplant)", "Edge case (>300 d shedding)" -- because
+  panel C's categories stand in for the modelled scenarios and now share their
+  colours. The edge-case entry appears whenever EITHER the scenario exists or
+  panel C holds >300 d patients, so the bound arm still explains its pink.
+* Palette unified on Okabe-Ito. Patient data moved to bluish green `#009E73`,
+  a hue no scenario uses, plus a dashed line -- previously it was dark blue
+  against Control's near-black, effectively indistinguishable, and identical
+  in greyscale.
+* Panels B and C y-limit 800 -> 600. Regression lines extend to the panel edge
+  rather than stopping at each series' own data maximum.
+* Fit annotations gated behind `fig1_plots.SHOW_FIT_STATS` / `--no-fit-stats`,
+  since the submission version will not show them.
+
+**Figures 2-4:**
+
+* **Seed is now in the output filename.** Rendering a second seed silently
+  overwrote the first, which made comparing seeds impossible. Figure 1 is
+  unaffected -- it aggregates over all seeds.
+* **Figure 4 node markers 20 -> 4.** Size 20 was set for a four-tree layout;
+  at five trees each panel is ~34 mm and the markers merged into blobs.
+
+**Panel C, what the fix revealed.** With both pools complete, one unbound
+HIV_high seed gives 2,692 standard genomes at 148 DISTINCT positions against
+1,494 long-shedder genomes at 711 -- long shedders occupy ~5x more sequence
+space from half as many samples. The panel had looked broken because the
+standards stacked invisibly; they now draw on top with both counts in the
+legend. **But the two clouds overlap rather than separating**: standard
+positions sit where long-shedder ones do, so the panel does NOT show two
+distinct sequence populations, even though panel D's mean-distance measure
+still puts them apart (median excess ~1.6 substitutions, most seeds positive,
+holding up under the corrected pools). Worth deciding whether panel C earns
+its place on that basis.
+
+Which panels a seed actually controls: Fig 2 rows 1-2 (row 3 pools ~10 shared
+seeds), Fig 3 panel C only (A, B, D aggregate over all seeds), Fig 4 all
+trees. Same seed number across scenarios means the same RNG seed, not the same
+outbreak.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.36 — 2026-09-22 — pietro gerletti
 
 Figure 1 is now five panels instead of seven, and its long-shedder clock is

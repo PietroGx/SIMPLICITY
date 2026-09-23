@@ -93,7 +93,7 @@ def build_figure_2(exp_num, exp_name, target_seed, fmt):
         ax_freq.set_xlabel("")
         ax_clust.set_xlabel("Time (days)")
         
-    output_filename = figure_path(2, exp_name, exp_num, fmt)
+    output_filename = figure_path(2, exp_name, exp_num, fmt, seed=target_seed)
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"\n[Success] Generated {output_filename}")
 

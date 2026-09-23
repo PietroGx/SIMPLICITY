@@ -6,6 +6,57 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import FuncFormatter
 
+# =============================================================================
+# One colour language for the whole figure (Okabe-Ito, colourblind-safe).
+# Patient data gets its own hue AND a dashed line, so data-vs-model survives
+# greyscale printing; the old dark blue sat too close to Control's near-black.
+# =============================================================================
+SCEN_COLORS = {
+    "Control":   "#000000",   # black
+    "SOT":       "#0072B2",   # blue
+    "HIV":       "#D55E00",   # vermillion
+    "Edge Case": "#CC79A7",   # reddish purple
+}
+DATA_COLOR = "#009E73"        # bluish green -- used by no scenario
+DATA_STYLE = (0, (4, 2))
+
+# Panel C keys clinical categories to the scenario they stand in for, so the
+# colours mean the same thing there as everywhere else.
+CATEGORY_TO_SCENARIO = {
+    "SOT": "SOT",
+    "HIV": "HIV",
+}
+LONG_SHEDDER_CUTOFF_DAYS = 300
+UNMODELLED_COLOR = "#B0B0B0"
+
+# Fit annotations are for us, not for the journal. Flip to False (or pass
+# --no-fit-stats) for the submission version.
+SHOW_FIT_STATS = True
+
+LEGEND_ENTRIES = [
+    ("Control (standard)", SCEN_COLORS["Control"]),
+    ("SOT (solid organ transplant)", SCEN_COLORS["SOT"]),
+    ("HIV (HIV/AIDS)", SCEN_COLORS["HIV"]),
+    ("Edge case (>%d d shedding)" % LONG_SHEDDER_CUTOFF_DAYS, SCEN_COLORS["Edge Case"]),
+]
+
+
+def add_figure_legend(fig, has_edge_case=True, has_patient_data=True):
+    """Single legend for the whole figure, below the panels."""
+    from matplotlib.lines import Line2D
+    handles = []
+    for label, colour in LEGEND_ENTRIES:
+        if "Edge case" in label and not has_edge_case:
+            continue
+        handles.append(Line2D([0], [0], color=colour, lw=2.4, label=label))
+    if has_patient_data:
+        handles.append(Line2D([0], [0], color=DATA_COLOR, lw=2.4,
+                              linestyle=DATA_STYLE, label="Patient data"))
+    fig.legend(handles=handles, loc='lower center', ncol=len(handles),
+               frameon=False, fontsize=6.4, bbox_to_anchor=(0.5, -0.015),
+               handlelength=2.2, columnspacing=1.5, handletextpad=0.5)
+
+
 def format_clean_axis(ax, remove_ticks=True):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -18,7 +69,7 @@ def plot_fig1_intra_host(ax, df):
         format_clean_axis(ax, remove_ticks=True)
         ax.text(0.5, 0.5, "Panel A\n(Data Missing)", ha='center', va='center', transform=ax.transAxes)
         return
-    palette = {"Control": "#333333", "SOT": "#56B4E9", "HIV": "#D55E00", "Edge Case": "#CC79A7"}
+    palette = SCEN_COLORS
     sns.lineplot(data=df, x='time', y='p_infectious', hue='cohort', palette=palette, ax=ax, linewidth=1.5, alpha=0.8, legend=False)
     ax.set_xlim(0, 800) 
     ax.set_ylim(bottom=0, top=1.05)
@@ -32,11 +83,11 @@ def plot_fig1_violins(ax, df):
         format_clean_axis(ax, remove_ticks=True)
         ax.text(0.5, 0.5, "Panel B\n(Data Missing)", ha='center', va='center', transform=ax.transAxes)
         return
-    palette = {"Control": "#333333", "SOT": "#56B4E9", "HIV": "#D55E00", "Edge Case": "#CC79A7"}
+    palette = SCEN_COLORS
     order = ["Control", "SOT", "HIV", "Edge Case"]
     existing_order = [c for c in order if c in df['cohort'].unique()]
     sns.violinplot(data=df, x='cohort', y='duration', palette=palette, hue='cohort', order=existing_order, ax=ax, inner="quartile", cut=0, linewidth=0.8, density_norm='width', legend=False)
-    ax.set_ylim(0, 800)
+    ax.set_ylim(0, 600)
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, pos: f"{y:g}"))
     ax.set_xlabel("", fontsize=7)
     ax.set_ylabel("Realized Duration (days)", fontsize=7)
@@ -60,17 +111,21 @@ def plot_infection_duration(ax, df):
     avg_durations = df.groupby('clinical_category')['duration'].mean().sort_values()
     sorted_categories = avg_durations.index.tolist()
     
-    box_palette = {}
-    for cat in sorted_categories:
-        if cat == 'HIV': box_palette[cat] = "#D55E00"
-        elif cat == 'SOT': box_palette[cat] = "#56B4E9"
-        else: box_palette[cat] = "#B0B0B0"
+    # Same colours as the modelled scenarios: a clinical category is drawn in
+    # the colour of the scenario that stands in for it, and unmodelled
+    # categories stay grey. The shared legend names both.
+    box_palette = {
+        cat: SCEN_COLORS.get(CATEGORY_TO_SCENARIO.get(cat), UNMODELLED_COLOR)
+        for cat in sorted_categories
+    }
         
     sns.boxplot(data=df, x='clinical_category', y='duration', order=sorted_categories, ax=ax, 
                 palette=box_palette, hue='clinical_category', showfliers=False, width=0.5, boxprops=dict(alpha=0.4), legend=False)
     
     def get_pt_color(row):
-        if row['duration'] > 300: return "#CC79A7"
+        # Beyond the cutoff a patient is an edge case whatever their category.
+        if row['duration'] > LONG_SHEDDER_CUTOFF_DAYS:
+            return SCEN_COLORS["Edge Case"]
         return box_palette[row['clinical_category']]
     df['pt_color'] = df.apply(get_pt_color, axis=1)
 
@@ -79,7 +134,7 @@ def plot_infection_duration(ax, df):
         x_jitter = np.random.normal(i, 0.05, size=len(cat_data))
         ax.scatter(x_jitter, cat_data['duration'], c=cat_data['pt_color'], s=12, alpha=0.8, zorder=5)
 
-    ax.set_ylim(0, 800)
+    ax.set_ylim(0, 600)
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, pos: f"{y:g}"))
     ax.set_xlabel("", fontsize=7)
     ax.set_ylabel("Literature Duration (days)", fontsize=7)
@@ -190,11 +245,6 @@ def plot_tempest_regression(ax, df, title, x_col='sampling_date', y_col='hamming
 # Real data and model on ONE axes, both in days, so the comparison is read off
 # a single panel instead of across two. Replaces the old D/E (data) + F/G
 # (model) split.
-COHORT_COLORS = {"Control": "#333333", "SOT": "#56B4E9",
-                 "HIV": "#D55E00", "Edge Case": "#CC79A7"}
-DATA_COLOR = "#3b528b"
-
-
 def _through_origin(x, y):
     """Slope of a through-origin fit, plus its R^2. Matches tempest_regression's
     fit_intercept=False so model and data rates are comparable."""
@@ -228,10 +278,11 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
         xr = xr - np.min(xr)                      # days since first observation
         if len(xr) > 1:
             slope, r2 = _through_origin(xr, yr)
-            ax.scatter(xr, yr, s=7, alpha=0.30, color=DATA_COLOR,
+            ax.scatter(xr, yr, s=7, alpha=0.28, color=DATA_COLOR,
                        edgecolors='none', zorder=2, label=data_label)
-            xs = np.array([0.0, min(np.max(xr), x_max)])
-            ax.plot(xs, slope * xs, color=DATA_COLOR, lw=1.6, zorder=5)
+            xs = np.array([0.0, x_max])           # extend to the panel edge
+            ax.plot(xs, slope * xs, color=DATA_COLOR, lw=1.7, zorder=7,
+                    linestyle=DATA_STYLE)
             entries.append((data_label, slope * 365.25, r2))
 
     if df_model is not None and not df_model.empty:
@@ -245,14 +296,14 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
             slope, r2 = _through_origin(xm, ym)
             if not np.isfinite(slope):
                 continue
-            colour = COHORT_COLORS.get(cohort, "#888888")
+            colour = SCEN_COLORS.get(cohort, "#888888")
             t = _thin(cdf)
             ax.scatter(t['Sequencing_time'].astype(float) * 365.25,
                        t['Distance_from_root'].astype(float),
                        s=7, alpha=0.30, color=colour, edgecolors='none',
                        zorder=3, label=f"Model, {cohort}")
-            xs = np.array([0.0, min(np.max(xm), x_max)])
-            ax.plot(xs, slope * xs, color=colour, lw=1.6, zorder=6)
+            xs = np.array([0.0, x_max])           # extend to the panel edge
+            ax.plot(xs, slope * xs, color=colour, lw=1.7, zorder=6)
             entries.append((f"Model, {cohort}", slope * 365.25, r2))
 
     if not entries:
@@ -261,11 +312,12 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
                 transform=ax.transAxes)
         return
 
-    txt = "\n".join(f"{n}: {rate:.5f} s/s/y ($R^2$={r2:.2f})"
-                    for n, rate, r2 in entries)
-    ax.text(0.03, 0.97, txt, transform=ax.transAxes, fontsize=5.4,
-            va='top', ha='left',
-            bbox=dict(facecolor='white', alpha=0.78, edgecolor='none', pad=1.2))
+    if SHOW_FIT_STATS:
+        txt = "\n".join(f"{n}: {rate:.5f} s/s/y ($R^2$={r2:.2f})"
+                        for n, rate, r2 in entries)
+        ax.text(0.03, 0.97, txt, transform=ax.transAxes, fontsize=5.4,
+                va='top', ha='left',
+                bbox=dict(facecolor='white', alpha=0.78, edgecolor='none', pad=1.2))
 
     ax.set_xlim(0, x_max)
     ax.set_ylim(0, y_max)
@@ -273,9 +325,4 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
     ax.set_ylabel("Divergence (subs/site)", fontsize=7)
     ax.text(0.5, 1.06, title, transform=ax.transAxes, ha='center',
             fontsize=7, fontweight='bold')
-    leg = ax.legend(loc='lower right', fontsize=5.2, frameon=True,
-                    handletextpad=0.3, borderaxespad=0.3, markerscale=1.3)
-    leg.get_frame().set_facecolor('white')
-    leg.get_frame().set_alpha(0.78)
-    leg.get_frame().set_linewidth(0.0)
     format_clean_axis(ax, remove_ticks=False)

@@ -282,6 +282,37 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 
 ## Paper figures
 
+- [ ] **DOUBLE-CHECK THE FIGURE DATA SOURCES before the final run.** The
+      figures deliberately bypass `sequencing_data.csv` and read the COMPLETE
+      intra-host record instead (`individuals_data.csv`'s `IH_lineages` joined
+      to `phylogenetic_data.csv`'s `Genome`). This is a decision, not an
+      oversight, and it must be revisited before anything is published.
+      **Why.** Production runs at `sequencing_rate = 0.05`, so a single
+      unbound HIV_high seed yields **7 sequences in total** (6 standard, 1
+      long shedder) out of 1,521 infected individuals. The full record for the
+      same seed holds **2,692 standard** and **1,494 long-shedder** lineage
+      genomes. Figure 3 C/D were previously asymmetric in the worst way --
+      all 1,494 long-shedder lineages against only the 6 sequenced standards
+      -- which inflated the apparent excess divergence. Using the full record
+      for BOTH types is symmetric and ~600x better powered.
+      **What this changes about the claim.** These panels now describe the
+      total viral diversity each host type CARRIES, not what surveillance
+      would DETECT. Those are different statements. At a realistic 5%
+      sequencing rate, surveillance sees almost none of this -- itself worth
+      reporting, and worth a sentence in the methods so no reader mistakes
+      the panels for a surveillance result.
+      **To verify before the final figures:** (a) that `IH_lineages` is the
+      right pool and carries no lineages the host never actually harboured;
+      (b) whether the long-shedder census (`sequence_long_shedders`, off in
+      production since v2.4.28) should be ON for the production runs the
+      figures are built from, which would make `sequencing_data.csv` usable
+      and the question moot; (c) whether any OTHER figure panel still mixes
+      the two sources. Figure 1 panel D still reads
+      `sequencing_data_regression.csv` for the global clock, which is correct
+      there -- the global clock is a surveillance measurement -- but the
+      contrast with C/D should be stated, not left implicit.
+
+
 - [x] **All four figures runnable once per pipeline arm** — v2.4.33. New
       `scripts/nature_plots/_scenarios.py` resolves scenarios from the
       pipeline's own config (4 bound / 5 unbound incl. `edge_case`) and
