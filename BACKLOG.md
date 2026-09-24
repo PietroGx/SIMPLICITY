@@ -282,6 +282,30 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 
 ## Paper figures
 
+- [x] **Panel D was answering a narrower question than its label** — resolved
+      in v2.4.38. It reported `mean(long,standard) - mean(standard,standard)`
+      as "excess divergence" and never computed long-vs-long. With all three:
+      standard-standard 13.59, **long-long 16.26**, long-standard 15.06
+      (median, 20 unbound HIV_high seeds; long-long > long-standard in 17/20).
+      The between-group distance is NOT the largest, so long shedders occupy a
+      broader cloud around the same centre rather than a displaced one.
+      **Framing consequence**: the defensible claim is diversity AMPLIFICATION,
+      not divergence — and by that measure the effect is larger (+2.38 median
+      internal gap vs +1.46 for the old statistic), not smaller. Worth deciding
+      how the paper states this.
+- [ ] **Figure 2 renders a silently-empty figure for a missing seed.** Asking
+      for a seed the arm never ran (e.g. bound #7 has 30 seeds, so seeds 31/48
+      do not exist) produces a valid-looking PNG at ~79 KB against a normal
+      ~336 KB, with blank panels and no error. Figure 4's equivalent was fixed
+      in v2.4.33 to draw a labelled empty panel; figure 2 still degrades
+      quietly. Same failure class as the four bad production runs — output that
+      looks fine and is not.
+- [ ] **Does the dilation effect scale with long-shedder burden?** Only
+      HIV_high has been decomposed. v2.4.38 renders figure 3 per scenario, so
+      the comparison across control/SOT/HIV_low/HIV_high/edge_case is now
+      available — edge_case especially, where one carrier drives it.
+
+
 - [ ] **DOUBLE-CHECK THE FIGURE DATA SOURCES before the final run.** The
       figures deliberately bypass `sequencing_data.csv` and read the COMPLETE
       intra-host record instead (`individuals_data.csv`'s `IH_lineages` joined

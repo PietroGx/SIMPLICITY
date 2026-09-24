@@ -55,8 +55,35 @@ def get_panel_a_data(exp_num, group, cluster_threshold=5, min_days=100,
 # =============================================================================
 # Panel B -- metrics PCA, one point per seed, all scenarios
 # =============================================================================
+_PANEL_B_CACHE = {}
+
+
 def get_panel_b_data(exp_num, scenarios, cluster_threshold=5, min_days=100,
                      exp_name=EXP_NAME):
+    """Clade metrics for every seed of every scenario.
+
+    Cached on disk: this is identical for every --group of a given arm, and
+    rendering one figure per scenario would otherwise recompute clade
+    clustering for all ~250 seed-scenarios each time.
+    """
+    key = (exp_name, exp_num, cluster_threshold, min_days, tuple(sorted(scenarios)))
+    if key in _PANEL_B_CACHE:
+        return _PANEL_B_CACHE[key]
+    cache_dir = os.path.join(dm.get_data_dir(), "figures", ".cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = os.path.join(
+        cache_dir,
+        f"panelB_{exp_name}_{exp_num}_{cluster_threshold}_{min_days}"
+        f"_{len(scenarios)}.pkl")
+    if os.path.exists(cache_file):
+        try:
+            df = pd.read_pickle(cache_file)
+            _PANEL_B_CACHE[key] = df
+            print(f"[fig3] panel B: {len(df)} rows from cache")
+            return df
+        except Exception:
+            pass
+
     rows = []
     for scenario in scenarios:
         sod = _experiment_sod(exp_num, scenario, exp_name=exp_name)
@@ -74,7 +101,13 @@ def get_panel_b_data(exp_num, scenarios, cluster_threshold=5, min_days=100,
                 })
             except Exception:
                 continue
-    return pd.DataFrame(rows, columns=["scenario", "seed", "Peak", "Burden", "Survival", "Growth"])
+    df = pd.DataFrame(rows, columns=["scenario", "seed", "Peak", "Burden", "Survival", "Growth"])
+    try:
+        df.to_pickle(cache_file)
+    except Exception:
+        pass
+    _PANEL_B_CACHE[key] = df
+    return df
 
 
 # =============================================================================
@@ -151,55 +184,72 @@ def get_panel_c_scatter_data(exp_num, group, seed, max_long_per_individual=None,
 
 def get_panel_c_consistency_data(exp_num, group, max_long_per_individual=None,
                                  max_pairs=200, rng_seed=42, exp_name=EXP_NAME):
-    """
-    Per seed of `group`, independently: mean pairwise hamming_iw(long,
-    standard) minus mean pairwise hamming_iw(standard, standard) = "excess
-    divergence". Computed per seed (never pooling genomes across seeds) so
-    there's no cross-seed batch-effect risk. Pairs are capped/subsampled
-    since this is O(n*m) per seed.
+    """Per seed, the THREE mean pairwise Hamming distances:
+
+        standard-standard   how spread the standard population is
+        long-long           how spread the long-shedder population is
+        long-standard       how far apart the two are
+
+    The panel used to report only (long-standard) minus (standard-standard),
+    which invites reading a positive value as "long-shedder virus is
+    diverged". It is not: long-long is the LARGEST of the three in most seeds,
+    which is the signature of a BROADER cloud around the same centre, not a
+    displaced one. Reporting all three makes that visible instead of hiding it
+    behind a single difference.
+
+    Computed per seed, never pooling genomes across seeds, so there is no
+    cross-seed batch effect. Pair INDICES are sampled rather than materialising
+    the product (a seed holds thousands of genomes per type).
     """
     sod = _experiment_sod(exp_num, group, exp_name=exp_name)
     if sod is None:
-        return pd.DataFrame(columns=["seed", "excess_divergence"])
+        return pd.DataFrame(columns=["seed", "comparison", "distance"])
 
     rng = random.Random(rng_seed)
+
+    def mean_within(genomes):
+        n = len(genomes)
+        if n < 2:
+            return np.nan
+        total = n * (n - 1) // 2
+        if total > max_pairs:
+            vals = []
+            while len(vals) < max_pairs:
+                i, j = rng.randrange(n), rng.randrange(n)
+                if i != j:
+                    vals.append(hamming_iw(genomes[i], genomes[j]))
+        else:
+            vals = [hamming_iw(a, b) for a, b in itertools.combinations(genomes, 2)]
+        return float(np.mean(vals)) if vals else np.nan
+
+    def mean_between(a_list, b_list):
+        na, nb = len(a_list), len(b_list)
+        if na == 0 or nb == 0:
+            return np.nan
+        total = na * nb
+        if total > max_pairs:
+            idx = rng.sample(range(total), max_pairs)
+            vals = [hamming_iw(a_list[i // nb], b_list[i % nb]) for i in idx]
+        else:
+            vals = [hamming_iw(a, b) for a in a_list for b in b_list]
+        return float(np.mean(vals)) if vals else np.nan
+
     rows = []
     for ssod in dm.get_seeded_simulation_output_dirs(sod):
         try:
             standard = [g for _, g in _standard_sequenced_genomes(ssod, max_long_per_individual)]
             long = [g for _, g in _long_shedder_sequenced_genomes(ssod, max_long_per_individual)]
-            if not standard or not long:
+            if len(standard) < 2 or len(long) < 2:
                 continue
-
-            # Sample pair INDICES rather than materialising the product. With
-            # the full IH record a seed holds ~2.7k standard and ~1.5k long
-            # genomes, so the old comprehensions built ~4M and ~3.6M tuples per
-            # seed before discarding all but max_pairs of them.
-            n_l, n_s = len(long), len(standard)
-            total_between = n_l * n_s
-            if total_between > max_pairs:
-                idx = rng.sample(range(total_between), max_pairs)
-                between_pairs = [(long[i // n_s], standard[i % n_s]) for i in idx]
-            else:
-                between_pairs = [(l, s) for l in long for s in standard]
-            between_dists = [hamming_iw(l, s) for l, s in between_pairs]
-
-            if n_s * (n_s - 1) // 2 > max_pairs:
-                within_pairs = []
-                while len(within_pairs) < max_pairs:
-                    a, b = rng.randrange(n_s), rng.randrange(n_s)
-                    if a != b:
-                        within_pairs.append((standard[a], standard[b]))
-            else:
-                within_pairs = list(itertools.combinations(standard, 2))
-            within_dists = [hamming_iw(a, b) for a, b in within_pairs]
-
-            if not between_dists or not within_dists:
-                continue
-
-            excess = float(np.mean(between_dists) - np.mean(within_dists))
-            rows.append({"seed": dm.get_seed_from_SSOD(ssod), "excess_divergence": excess})
+            seed = dm.get_seed_from_SSOD(ssod)
+            for label, value in (
+                ("standard-standard", mean_within(standard)),
+                ("long-long", mean_within(long)),
+                ("long-standard", mean_between(long, standard)),
+            ):
+                if np.isfinite(value):
+                    rows.append({"seed": seed, "comparison": label, "distance": value})
         except Exception:
             continue
 
-    return pd.DataFrame(rows, columns=["seed", "excess_divergence"])
+    return pd.DataFrame(rows, columns=["seed", "comparison", "distance"])

@@ -55,6 +55,26 @@ def plot_fig3_metrics(axes, metrics_df, palette=None, scenario_order=None):
         format_clean_axis(ax, remove_ticks=False)
 
 
+def _density_shade(ax, pts, colour, zorder=1, levels=4):
+    """Filled KDE contours for one point cloud; silently skipped if the cloud
+    is degenerate (too few points, or all identical)."""
+    if pts.shape[0] < 20:
+        return
+    try:
+        from scipy.stats import gaussian_kde
+        from matplotlib.colors import LinearSegmentedColormap
+        jitter = np.random.default_rng(0).normal(0, 1e-9, size=pts.shape)
+        kde = gaussian_kde((pts + jitter).T)
+        xs = np.linspace(pts[:, 0].min(), pts[:, 0].max(), 80)
+        ys = np.linspace(pts[:, 1].min(), pts[:, 1].max(), 80)
+        X, Y = np.meshgrid(xs, ys)
+        Z = kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape)
+        cmap = LinearSegmentedColormap.from_list("d", [(1, 1, 1, 0), colour])
+        ax.contourf(X, Y, Z, levels=levels, cmap=cmap, alpha=0.30, zorder=zorder)
+    except Exception:
+        return
+
+
 def plot_fig3_sequence_pca(ax, snp_df, labels, palette=None):
     """
     One point per sequenced genome, colored by individual_type. Features are
@@ -88,11 +108,15 @@ def plot_fig3_sequence_pca(ax, snp_df, labels, palette=None):
     for z, label in enumerate(order):
         mask = (labels == label).to_numpy()
         n_total = int(mask.sum())
-        n_unique = len(np.unique(pcs[mask], axis=0))
-        ax.scatter(pcs[mask, 0], pcs[mask, 1], s=11, alpha=0.45,
-                   color=palette.get(label, "black"),
+        pts = pcs[mask]
+        n_unique = len(np.unique(pts, axis=0))
+        colour = palette.get(label, "black")
+        # Filled density contours: the panel's point is how much sequence space
+        # each type OCCUPIES, and identical genomes stack invisibly in a scatter.
+        _density_shade(ax, pts, colour, zorder=1 + z)
+        ax.scatter(pts[:, 0], pts[:, 1], s=9, alpha=0.40, color=colour,
                    label=f"{label} (n={n_total}, {n_unique} distinct)",
-                   edgecolors="none", zorder=3 + z)
+                   edgecolors="none", zorder=4 + z)
 
     ax.set_xlabel("PC1", fontsize=7)
     ax.set_ylabel("PC2", fontsize=7)
@@ -101,24 +125,43 @@ def plot_fig3_sequence_pca(ax, snp_df, labels, palette=None):
 
 
 def plot_fig3_consistency(ax, consistency_df):
-    """
-    Per-seed excess Hamming divergence (long vs. standard, minus standard's
-    own within-cohort divergence). Tight and consistently positive = robust
-    effect; scattered around zero = not much of one.
+    """Panel D: the three mean pairwise distances, one box per comparison.
+
+    Ordering is the result. If long shedders were a DISPLACED population the
+    between-group bar would be tallest; it is not -- long-long is, which means
+    a broader cloud around the same centre.
     """
     if consistency_df is None or consistency_df.empty:
-        _missing(ax, "Panel C (consistency)")
+        _missing(ax, "Panel D")
         return
 
-    y = consistency_df["excess_divergence"].to_numpy(dtype=float)
-    jitter = np.random.RandomState(42).normal(loc=0, scale=0.04, size=len(y))
+    order = ["standard-standard", "long-long", "long-standard"]
+    order = [o for o in order if o in set(consistency_df["comparison"])]
+    colours = {"standard-standard": "#3b528b",
+               "long-long": "#e41a1c",
+               "long-standard": "#7a7a7a"}
 
-    ax.axhline(0, color="black", linestyle="--", linewidth=1.0, alpha=0.6)
-    ax.boxplot(y, positions=[0], widths=0.5, showfliers=False,
-              boxprops=dict(color="black"), medianprops=dict(color="black"))
-    ax.scatter(jitter, y, s=16, alpha=0.7, color="#4daf4a", edgecolors="none", zorder=3)
+    data = [consistency_df.loc[consistency_df["comparison"] == o, "distance"].dropna().to_numpy()
+            for o in order]
+    bp = ax.boxplot(data, positions=range(len(order)), widths=0.55,
+                    showfliers=False, patch_artist=True)
+    for patch, o in zip(bp["boxes"], order):
+        patch.set_facecolor(colours.get(o, "#999999"))
+        patch.set_alpha(0.30)
+        patch.set_linewidth(0.8)
+    for part in ("medians", "whiskers", "caps"):
+        for line in bp[part]:
+            line.set_color("0.25")
+            line.set_linewidth(0.9)
 
-    ax.set_xticks([])
-    ax.set_ylabel("Excess divergence (Hamming)\nlong vs. standard", fontsize=7)
+    rng = np.random.default_rng(42)
+    for i, (o, vals) in enumerate(zip(order, data)):
+        if len(vals) == 0:
+            continue
+        ax.scatter(rng.normal(i, 0.055, size=len(vals)), vals, s=6, alpha=0.5,
+                   color=colours.get(o, "#999999"), edgecolors="none", zorder=4)
+
+    ax.set_xticks(range(len(order)))
+    ax.set_xticklabels([o.replace("-", "\nvs ") for o in order], fontsize=5.8)
+    ax.set_ylabel("Mean pairwise Hamming\ndistance (substitutions)", fontsize=6.5)
     format_clean_axis(ax, remove_ticks=False)
-    ax.set_xticks([])

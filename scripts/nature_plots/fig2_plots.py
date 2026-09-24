@@ -66,17 +66,30 @@ def plot_fig2_clustered_freq(ax, lf, clade_to_lineages, clade_meta_df, cmap_df, 
     ax.set_ylim(0, 1.0)
     format_clean_axis(ax, remove_ticks=False)
 
-def plot_fig2_divergence_violin(ax, dists, color):
-    """Row 3: Divergence gained during infection."""
+def plot_fig2_divergence_violin(ax, dists, color, y_max=None):
+    """Row 3: distinct genomic positions by which a transmitted genome differs
+    from the one its host was infected with.
+
+    y_max is shared across scenarios by the caller -- per-column autoscaling
+    made control (max 3) look comparable to edge_case (max 15).
+    """
     if not dists:
         format_clean_axis(ax, remove_ticks=True)
+        if y_max:
+            ax.set_ylim(0, y_max)
         return
-        
+
     df = pd.DataFrame({'dist': dists, 'group': '1'})
-    
+
     sns.violinplot(data=df, x='group', y='dist', color=color, cut=0, inner="quartile", ax=ax, linewidth=0.8, density_norm='width')
-    
+
     ax.set_xlabel("")
     ax.set_xticks([])
-    ax.set_ylim(bottom=0)
+    ax.set_ylim(0, y_max) if y_max else ax.set_ylim(bottom=0)
     format_clean_axis(ax, remove_ticks=False)
+
+
+def add_column_label(ax, letter):
+    """Panel letter above a scenario column."""
+    ax.text(-0.22, 1.30, letter, transform=ax.transAxes, fontsize=9,
+            fontweight='bold', va='top', ha='left')
