@@ -5,6 +5,66 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.38 — 2026-09-24 — pietro gerletti
+
+Figure shaping pass. The substantive change is Figure 3 panel D, which was
+answering a narrower question than its label claimed.
+
+**Panel D reported one difference; it now reports three distances.** It
+computed `mean(long,standard) - mean(standard,standard)` and called the result
+"excess divergence", which invites reading a positive value as *long-shedder
+virus is diverged from the population*. It never computed long-vs-long. Adding
+it, over 20 unbound HIV_high seeds:
+
+    standard vs standard   median 13.59 substitutions
+    long vs long           median 16.26          <- the largest
+    long vs standard       median 15.06
+
+The BETWEEN-group distance is not the largest; it sits between the two
+within-group distances, and long-long exceeds long-standard in **17/20 seeds**.
+That is the signature of a broader cloud around the SAME centre, not a
+displaced one. Long shedders are diversity amplifiers, not divergence
+generators -- which is what the mechanism predicts (5-15 concurrent lineages
+against a standard host's 1-4, all from the same founder). The panel now plots
+all three distributions side by side, so the ordering IS the result and the
+y-axis is an honest "mean pairwise Hamming distance" rather than a difference.
+
+* **Panel C gains filled density contours.** The panel's claim is how much
+  sequence space each host type OCCUPIES, and identical genomes stack
+  invisibly in a scatter. It also explains panel D: the clouds overlap.
+* **Figure 3 states its own scope.** Panels A, C and D describe ONE scenario
+  (`--group`, default HIV_high) while B spans all of them; the suptitle now
+  says so instead of leaving it to the caption.
+* **`--group` is in the filename.** Rendering per-scenario would otherwise
+  have written every scenario to the same file. Caught before the sweep, not
+  after.
+* **Panel B's clade metrics are cached** to `Data/figures/.cache/`. They are
+  identical for every `--group` of an arm, and the per-scenario sweep would
+  otherwise recompute clustering for ~250 seed-scenarios on every render.
+
+**Figure 1:**
+
+* Panels D and E scatter the PATIENT data only; the model contributes its
+  fitted line. The model carries thousands of points against the data's
+  hundreds, so its cloud buried the observations it exists to be compared
+  against.
+* Panel A's x-axis is 800 d only when a scenario runs that long (edge_case).
+  The bound arm's longest infection is 109 d, so 800 left it mostly empty; it
+  now uses 400 there.
+
+**Figure 2:**
+
+* One panel letter per scenario column (A-D bound, A-E unbound), and column
+  spacing widened so scenarios read as separate blocks.
+* **The divergence-jump row shares one y-scale.** Per-column autoscaling drew
+  control's maximum of 3 at the same height as edge_case's 15, which made the
+  scenarios look comparable when the whole point is that they are not.
+* That row is relabelled **"distinct gen.pos.count"** — it counts genomic
+  positions at which a transmitted genome differs from the one its host was
+  infected with, which "Divergence Jump" did not convey.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.37 — 2026-09-23 — pietro gerletti
 
 Figure shape-and-storytelling pass, plus a third instance of the

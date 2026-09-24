@@ -64,14 +64,14 @@ def format_clean_axis(ax, remove_ticks=True):
         ax.set_xticks([])
         ax.set_yticks([])
 
-def plot_fig1_intra_host(ax, df):
+def plot_fig1_intra_host(ax, df, x_max=800):
     if df.empty:
         format_clean_axis(ax, remove_ticks=True)
         ax.text(0.5, 0.5, "Panel A\n(Data Missing)", ha='center', va='center', transform=ax.transAxes)
         return
     palette = SCEN_COLORS
     sns.lineplot(data=df, x='time', y='p_infectious', hue='cohort', palette=palette, ax=ax, linewidth=1.5, alpha=0.8, legend=False)
-    ax.set_xlim(0, 800) 
+    ax.set_xlim(0, x_max)
     ax.set_ylim(bottom=0, top=1.05)
     ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x:g}"))
     ax.set_xlabel("Days since infection", fontsize=7)
@@ -265,10 +265,14 @@ def _thin(df, n=600, seed=42):
 
 def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
                        data_label="Patient data", x_label="Days since infection",
-                       x_max=400, y_max=None):
-    """One clock, data and model together. Grey-blue circles are the real
-    cohort; coloured circles are the model, one colour per scenario. All fits
-    are through the origin."""
+                       x_max=400, y_max=None, model_scatter=False):
+    """One clock, data and model together.
+
+    Only the REAL cohort is scattered. The model contributes its fitted line
+    only: it carries thousands of points against the data's hundreds, so its
+    cloud buried the observations it is meant to be compared against. Set
+    model_scatter=True to draw it anyway.
+    """
     entries = []
 
     if df_real is not None and not df_real.empty:
@@ -297,11 +301,12 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
             if not np.isfinite(slope):
                 continue
             colour = SCEN_COLORS.get(cohort, "#888888")
-            t = _thin(cdf)
-            ax.scatter(t['Sequencing_time'].astype(float) * 365.25,
-                       t['Distance_from_root'].astype(float),
-                       s=7, alpha=0.30, color=colour, edgecolors='none',
-                       zorder=3, label=f"Model, {cohort}")
+            if model_scatter:
+                t = _thin(cdf)
+                ax.scatter(t['Sequencing_time'].astype(float) * 365.25,
+                           t['Distance_from_root'].astype(float),
+                           s=7, alpha=0.30, color=colour, edgecolors='none',
+                           zorder=3, label=f"Model, {cohort}")
             xs = np.array([0.0, x_max])           # extend to the panel edge
             ax.plot(xs, slope * xs, color=colour, lw=1.7, zorder=6)
             entries.append((f"Model, {cohort}", slope * 365.25, r2))

@@ -104,7 +104,8 @@ def figures_dir():
     return path
 
 
-def figure_path(number, exp_name, exp_num, fmt, seed=None, subdir=None):
+def figure_path(number, exp_name, exp_num, fmt, seed=None, subdir=None,
+                group=None):
     """Data/figures/Figure_<n>_<arm>_#<exp_num>[_seed<s>].<fmt>.
 
     The arm and run number are in the name so the two pipelines cannot
@@ -116,7 +117,8 @@ def figure_path(number, exp_name, exp_num, fmt, seed=None, subdir=None):
     if subdir:
         out = os.path.join(out, subdir)
         os.makedirs(out, exist_ok=True)
-    tail = f"_seed{seed}" if seed is not None else ""
+    tail = f"_{group}" if group else ""
+    tail += f"_seed{seed}" if seed is not None else ""
     return os.path.join(
         out,
         f"Figure_{number}_{arm_label(exp_name)}_#{exp_num}{tail}.{fmt}")

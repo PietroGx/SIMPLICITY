@@ -122,10 +122,17 @@ def build_figure_3(exp_num, exp_name, group, seed, cluster_threshold, min_days,
     plots.plot_fig3_consistency(ax_d, consistency_df)
     add_panel_label(ax_d, "D")
 
-    fig.suptitle(f"Group: {group}", fontsize=8, y=0.995)
+    # Three of the four panels describe ONE scenario; only B spans all of them.
+    # Say so on the figure rather than leaving it to the caption.
+    fig.suptitle(f"Scenario: {group}   —   A, C, D show this scenario only; "
+                 f"B spans all {len(scenarios)}",
+                 fontsize=7.5, y=0.998)
     fig.subplots_adjust(bottom=0.08, top=0.88, left=0.08, right=0.95)
 
-    output_filename = figure_path(3, exp_name, exp_num, fmt, seed=seed)
+    # group MUST be in the name: figure 3 is per-scenario, so without it
+    # every scenario would overwrite the same file.
+    output_filename = figure_path(3, exp_name, exp_num, fmt, seed=seed,
+                                  group=group)
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"\n[Success] Generated {output_filename}")
 

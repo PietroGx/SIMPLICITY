@@ -61,13 +61,29 @@ def build_figure_2(exp_num, exp_name, target_seed, fmt):
     height_in = 150 / 25.4
     fig = plt.figure(figsize=(width_in, height_in))
     
-    gs = gridspec.GridSpec(3, 5, figure=fig, wspace=0.35, hspace=0.45)
+    # One column per scenario, widely spaced so the scenarios read as separate
+    # blocks rather than one continuous grid.
+    gs = gridspec.GridSpec(3, len(scenarios), figure=fig, wspace=0.62, hspace=0.45)
     
     print(f"--- Building Figure 2 Grid (Exp #{exp_num}) ---")
-    
+
+    # Row 3 shares one y-scale across scenarios; per-column autoscaling made
+    # control's jumps (max 3) look comparable to edge_case's (max 15).
+    global_div_max = 0
+    all_dists = {}
+    for scenario in scenarios:
+        d = preproc.get_fig2_divergence_data(exp_num, scenario, shared_violin_seeds,
+                                             exp_name=exp_name)
+        all_dists[scenario] = d
+        if d:
+            global_div_max = max(global_div_max, max(d))
+    global_div_max = global_div_max * 1.08 if global_div_max else None
+    print(f"Divergence-jump y-axis standardized to {global_div_max}")
+
+    div_axes = []
     for col, scenario in enumerate(scenarios):
         display_name = preproc.get_clinical_label(scenario)
-        print(f"Processing column {col+1}/5: {display_name}...")
+        print(f"Processing column {col+1}/{len(scenarios)}: {display_name}...")
         
         ax_freq = fig.add_subplot(gs[0, col])
         ax_clust = fig.add_subplot(gs[1, col])
@@ -75,16 +91,21 @@ def build_figure_2(exp_num, exp_name, target_seed, fmt):
         
         lf, cmap_df, _ = preproc.get_fig2_freq_data(exp_num, scenario, target_seed, exp_name=exp_name)
         _, clade_to_lineages, clade_meta_df, _ = preproc.get_fig2_clustered_data(exp_num, scenario, target_seed, exp_name=exp_name)
-        dists = preproc.get_fig2_divergence_data(exp_num, scenario, shared_violin_seeds, exp_name=exp_name)
+        dists = all_dists[scenario]
         
         plots.plot_fig2_lineage_freq(ax_freq, lf, cmap_df, global_max_t, title=display_name)
         plots.plot_fig2_clustered_freq(ax_clust, lf, clade_to_lineages, clade_meta_df, cmap_df, global_max_t)
-        plots.plot_fig2_divergence_violin(ax_div, dists, color=palette[scenario])
-        
+        plots.plot_fig2_divergence_violin(ax_div, dists, color=palette[scenario],
+                                          y_max=global_div_max)
+        div_axes.append(ax_div)
+
+        # One letter per scenario, above its column.
+        plots.add_column_label(ax_freq, chr(ord('A') + col))
+
         if col == 0:
             ax_freq.set_ylabel("Lineage Freq", fontsize=7)
             ax_clust.set_ylabel("Clade Freq", fontsize=7)
-            ax_div.set_ylabel("Divergence Jump", fontsize=7)
+            ax_div.set_ylabel("distinct gen.pos.count", fontsize=7)
         else:
             ax_freq.set_ylabel("")
             ax_clust.set_ylabel("")

@@ -61,7 +61,11 @@ def build_figure_1(exp_num, exp_name, fmt):
     df_model_ih = preproc.get_model_intrahost_clock(exp_num=exp_num, exp_name=exp_name)
 
     # === PLOT ===
-    plots.plot_fig1_intra_host(ax_A, df_ab_theoretical)
+    # Panel A: 800 d only when a scenario actually runs that long (edge_case).
+    # The bound arm's longest is HIV at 109 d, so 800 left it mostly empty.
+    has_edge_scen = 'Edge Case' in set(df_ab_theoretical.get('cohort', []))
+    plots.plot_fig1_intra_host(ax_A, df_ab_theoretical,
+                               x_max=800 if has_edge_scen else 400)
     plots.plot_fig1_violins(ax_B, df_ab_realized)
     plots.plot_infection_duration(ax_C, df_c)
 
