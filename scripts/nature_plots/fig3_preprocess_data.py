@@ -18,7 +18,8 @@ from simplicity.phenotype.distance import hamming_iw
 # it needs its own directory on sys.path (same cross-directory sibling-import
 # pattern already used by long_nsr_calibration_plot.py).
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
-from long_shedders_preprocess import get_clade_metrics, summarize_sod_pies
+from long_shedders_preprocess import (get_clade_metrics, summarize_sod_pies,
+                                     _clade_analysis, _peak_values, _resolve_label)
 
 EXP_NAME = "impact_long_shedders"
 # Scenario lists come from the pipeline config via _scenarios.resolve_scenarios;
@@ -253,3 +254,131 @@ def get_panel_c_consistency_data(exp_num, group, max_long_per_individual=None,
             continue
 
     return pd.DataFrame(rows, columns=["seed", "comparison", "distance"])
+
+
+# =============================================================================
+# Conversion efficiency -- the non-circular measurement
+# =============================================================================
+# Long shedders generate more substitutions BY CONSTRUCTION (NSR_long is ~13x
+# NSR, IH_lineages_max is 5-15 against 1-4, infections last longer). Counting
+# their lineages therefore recovers the parameter file, not a result: in
+# SIMPLICITY one substitution IS one lineage.
+#
+# The question that is not circular: does that output convert into ESTABLISHED
+# CLADES at a higher rate than the raw output predicts? Clustering is what
+# makes a "clade" a stand-in for a real-world lineage -- several co-occurring
+# substitutions, not a single SNV -- so it is essential here, not a nuisance.
+#
+#     efficiency(origin) = successful clades of that origin
+#                          --------------------------------
+#                          substitutions arising in those hosts
+#
+# Reported as long / standard. Above 1: long shedders convert BETTER than
+# their mutational output predicts. Below 1: worse.
+# =============================================================================
+
+EFFICIENCY_THRESHOLDS = [3, 5, 8, 10, 15]
+EFFICIENCY_PEAKS = [0.10, 0.25, 0.50, 0.75]
+REF_THRESHOLD = 5
+REF_PEAK = 0.50
+
+
+def _substitutions_by_type(ind_df):
+    """Substitution events arising in each host type. A lineage in a host's
+    IH_lineages that is not the one it was infected with arose there."""
+    out = {}
+    for host_type, key in (('standard', 'standard'), ('long_shedder', 'long')):
+        n = 0
+        for _, row in ind_df[ind_df['type'] == host_type].iterrows():
+            lineages = row['IH_lineages']
+            if isinstance(lineages, (list, tuple)):
+                n += len([l for l in lineages if l != row.get('inherited_lineage')])
+        out[key] = n
+    return out
+
+
+def get_efficiency_data(exp_num, scenarios, exp_name=EXP_NAME, min_days=100):
+    """Per seed x scenario x threshold: substitutions and successful clades by
+    origin, for every peak criterion. Cached -- this walks every seed's
+    individuals_data and re-clusters at five thresholds.
+    """
+    cache_dir = os.path.join(dm.get_data_dir(), "figures", ".cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = os.path.join(cache_dir, f"efficiency_{exp_name}_{exp_num}.pkl")
+    if os.path.exists(cache_file):
+        try:
+            df = pd.read_pickle(cache_file)
+            print(f"[fig3] efficiency: {len(df)} rows from cache")
+            return df
+        except Exception:
+            pass
+
+    rows = []
+    for scenario in scenarios:
+        sod = _experiment_sod(exp_num, scenario, exp_name=exp_name)
+        if sod is None:
+            continue
+        print(f"[fig3] efficiency: {scenario}...", flush=True)
+        for ssod in dm.get_seeded_simulation_output_dirs(sod):
+            try:
+                if om.read_final_time(ssod) < min_days:
+                    continue
+                ind = om.read_individuals_data(ssod)
+                if ind.empty:
+                    continue
+                subs = _substitutions_by_type(ind)
+            except Exception:
+                continue
+            for ct in EFFICIENCY_THRESHOLDS:
+                try:
+                    F, _c2l, _tot, labels = _clade_analysis(ssod, ct)
+                    peaks = _peak_values(F)
+                except Exception:
+                    continue
+                rec = {"scenario": scenario, "seed": dm.get_seed_from_SSOD(ssod),
+                       "threshold": ct,
+                       "subs_long": subs["long"], "subs_std": subs["standard"]}
+                for pk in EFFICIENCY_PEAKS:
+                    for origin, key in (("long", "long"), ("standard", "std")):
+                        rec[f"succ_{key}_{pk}"] = sum(
+                            1 for c in F.columns
+                            if _resolve_label(labels, c) == origin
+                            and peaks.get(c, 0.0) > pk)
+                rows.append(rec)
+
+    df = pd.DataFrame(rows)
+    try:
+        df.to_pickle(cache_file)
+    except Exception:
+        pass
+    return df
+
+
+def efficiency_ratio(df, threshold=REF_THRESHOLD, peak=REF_PEAK):
+    """Pooled long/standard conversion efficiency per scenario, plus the raw
+    per-1000-substitution rates behind it."""
+    d = df[df["threshold"] == threshold]
+    if d.empty:
+        return pd.DataFrame()
+    g = d.groupby("scenario").sum(numeric_only=True)
+    out = pd.DataFrame(index=g.index)
+    out["eff_long"] = 1000 * g[f"succ_long_{peak}"] / g["subs_long"].replace(0, np.nan)
+    out["eff_std"] = 1000 * g[f"succ_std_{peak}"] / g["subs_std"].replace(0, np.nan)
+    out["ratio"] = out["eff_long"] / out["eff_std"]
+    out["n_succ_long"] = g[f"succ_long_{peak}"]
+    out["n_succ_std"] = g[f"succ_std_{peak}"]
+    out["subs_long"] = g["subs_long"]
+    out["subs_std"] = g["subs_std"]
+    return out
+
+
+def efficiency_robustness(df):
+    """Ratio across every (threshold, peak) pair -- the sensitivity grid."""
+    rows = []
+    for ct in sorted(df["threshold"].unique()):
+        for pk in EFFICIENCY_PEAKS:
+            r = efficiency_ratio(df, threshold=ct, peak=pk)
+            for scenario, rec in r.iterrows():
+                rows.append({"scenario": scenario, "threshold": ct, "peak": pk,
+                             "ratio": rec["ratio"]})
+    return pd.DataFrame(rows)

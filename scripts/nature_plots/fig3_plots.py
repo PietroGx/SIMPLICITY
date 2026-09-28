@@ -165,3 +165,122 @@ def plot_fig3_consistency(ax, consistency_df):
     ax.set_xticklabels([o.replace("-", "\nvs ") for o in order], fontsize=5.8)
     ax.set_ylabel("Mean pairwise Hamming\ndistance (substitutions)", fontsize=6.5)
     format_clean_axis(ax, remove_ticks=False)
+
+
+# =============================================================================
+# Conversion efficiency panels
+# =============================================================================
+ORIGIN_COLORS = {"long": "#e41a1c", "standard": "#3b528b"}
+
+
+def plot_efficiency_bars(ax, eff, scenario_order=None):
+    """Panel A: successful clades per 1000 substitutions, by host origin.
+
+    The comparison controls for the fact that long shedders mutate far more by
+    construction -- the denominator is their own substitution count. Above the
+    standard bar means they convert mutations into established clades better
+    than their raw output predicts.
+    """
+    if eff is None or eff.empty:
+        _missing(ax, "Panel A")
+        return
+    order = [s for s in (scenario_order or eff.index) if s in eff.index]
+    order = [s for s in order if np.isfinite(eff.loc[s, "eff_long"])]
+    if not order:
+        _missing(ax, "Panel A")
+        return
+
+    x = np.arange(len(order))
+    w = 0.38
+    ax.bar(x - w/2, [eff.loc[s, "eff_std"] for s in order], w,
+           color=ORIGIN_COLORS["standard"], alpha=0.75, label="standard hosts")
+    ax.bar(x + w/2, [eff.loc[s, "eff_long"] for s in order], w,
+           color=ORIGIN_COLORS["long"], alpha=0.75, label="long shedders")
+
+    for i, s in enumerate(order):
+        r = eff.loc[s, "ratio"]
+        top = max(eff.loc[s, "eff_std"] if np.isfinite(eff.loc[s, "eff_std"]) else 0,
+                  eff.loc[s, "eff_long"])
+        if np.isfinite(r):
+            ax.text(i, top * 1.06, f"{r:.2f}x", ha="center", va="bottom",
+                    fontsize=5.8, fontweight="bold",
+                    color=ORIGIN_COLORS["long"] if r > 1 else "0.35")
+        else:
+            # No standard successes at all -- the ratio is undefined, not zero.
+            # In the BOUND arm this is what calibrating the standard NSR down to
+            # 9.3e-7 does: the baseline stops mutating, so there is nothing to
+            # compare against. Say so rather than drawing a bar with no partner.
+            ax.text(i, top * 1.06, "no standard\nbaseline", ha="center",
+                    va="bottom", fontsize=5.0, fontweight="bold", color="#A33527")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(order, rotation=45, ha="right", fontsize=5.8)
+    ax.set_ylabel("Successful clades per\n1000 substitutions", fontsize=6.5)
+    ax.tick_params(axis="y", labelsize=5.8)
+    ax.legend(fontsize=5.4, frameon=False, loc="upper left")
+    format_clean_axis(ax, remove_ticks=False)
+
+
+def plot_efficiency_vs_duration(ax, eff, meta):
+    """Panel B: the ratio against infection duration. Marker area encodes
+    long-shedder prevalence, because HIV_low and HIV_high share a duration
+    (109 d) yet differ -- duration is not the only driver."""
+    pts = []
+    for scenario, rec in eff.iterrows():
+        m = meta.get(scenario, {})
+        dur, ratio = m.get("duration"), rec.get("ratio")
+        if dur is None or not np.isfinite(ratio):
+            continue
+        pts.append((dur, ratio, m.get("ratio", 0.0), scenario))
+    if not pts:
+        _missing(ax, "Panel B")
+        return
+
+    ax.axhline(1.0, color="0.45", lw=0.9, ls=(0, (4, 3)), zorder=2)
+    ax.text(0.99, 1.0, "no advantage", transform=ax.get_yaxis_transform(),
+            ha="right", va="bottom", fontsize=5.2, color="0.45")
+
+    for dur, ratio, prev, scenario in pts:
+        size = 26 + 620 * float(prev)
+        ax.scatter([dur], [ratio], s=size, alpha=0.55,
+                   color=ORIGIN_COLORS["long"], edgecolors="none", zorder=4)
+        ax.annotate(scenario, (dur, ratio), textcoords="offset points",
+                    xytext=(7, 5), fontsize=5.4, color="0.3")
+
+    ax.set_xlabel("Infection duration (days)", fontsize=6.5)
+    ax.set_ylabel("Conversion efficiency\n(long / standard)", fontsize=6.5)
+    ax.tick_params(labelsize=5.8)
+    ax.set_ylim(bottom=0)
+    format_clean_axis(ax, remove_ticks=False)
+
+
+def plot_efficiency_robustness(ax, rob, scenario_order=None):
+    """Panel D: the ratio under every clustering threshold and success
+    criterion. Declares the dependency instead of hiding it."""
+    if rob is None or rob.empty:
+        _missing(ax, "Panel D")
+        return
+    order = [s for s in (scenario_order or rob.scenario.unique())
+             if s in set(rob.scenario)]
+    order = [s for s in order if np.isfinite(rob.loc[rob.scenario == s, "ratio"]).any()]
+    if not order:
+        _missing(ax, "Panel D")
+        return
+
+    ax.axhline(1.0, color="0.45", lw=0.9, ls=(0, (4, 3)), zorder=2)
+    rng = np.random.default_rng(1)
+    for i, scenario in enumerate(order):
+        v = rob.loc[rob.scenario == scenario, "ratio"].replace(
+            [np.inf, -np.inf], np.nan).dropna().to_numpy()
+        if not len(v):
+            continue
+        ax.scatter(rng.normal(i, 0.08, size=len(v)), v, s=7, alpha=0.5,
+                   color=ORIGIN_COLORS["long"], edgecolors="none", zorder=4)
+        ax.hlines(np.median(v), i - 0.27, i + 0.27, color="0.2", lw=1.5, zorder=5)
+
+    ax.set_xticks(range(len(order)))
+    ax.set_xticklabels(order, rotation=45, ha="right", fontsize=5.8)
+    ax.set_ylabel("Conversion efficiency\nacross 5 thresholds x 4 criteria", fontsize=6.2)
+    ax.tick_params(axis="y", labelsize=5.8)
+    ax.set_yscale("log")
+    format_clean_axis(ax, remove_ticks=False)

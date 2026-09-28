@@ -60,6 +60,19 @@ def scenario_names(exp_name=BOUND_EXP_NAME):
     return [s["name"] for s in module.SCENARIOS]
 
 
+def scenario_meta(exp_name):
+    """{scenario: {duration, ratio}} from the pipeline config -- infection
+    duration (days) and long-shedder prevalence, used to explain the
+    conversion-efficiency gradient."""
+    module_name = _CONFIG_MODULES.get(exp_name)
+    if module_name is None:
+        return {}
+    module = __import__(module_name)
+    return {s["name"]: {"duration": s.get("inf_duration_long"),
+                        "ratio": s.get("long_shedders_ratio", 0.0)}
+            for s in module.SCENARIOS}
+
+
 def has_output(exp_name, scenario, exp_num):
     """True if this scenario's experiment produced output."""
     try:

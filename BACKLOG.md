@@ -282,6 +282,18 @@ coherent, fully sequential pipeline. No manual multi-script invocation.
 
 ## Paper figures
 
+- [ ] **SOT's "below baseline" result rests on 6 successes.** 0.14x at 50 seeds
+      (6 long successes against 145 standard). Consistent across all 20
+      threshold x criterion combinations, but thin. The planned 100-seed rerun
+      should settle it.
+- [ ] **Does the efficiency gradient track duration or prevalence?** HIV_low
+      and HIV_high share 109 d but give 2.03x and 3.39x. Panel B encodes
+      prevalence as marker area but the two cannot be separated with four
+      scenarios. A duration sweep at fixed prevalence would.
+- [x] **Figure 3 rebuilt around conversion efficiency** — v2.4.39. Replaces
+      the lineage-count measure, which was circular (one substitution = one
+      lineage, and long shedders are parameterised to mutate more).
+
 - [x] **Panel D was answering a narrower question than its label** — resolved
       in v2.4.38. It reported `mean(long,standard) - mean(standard,standard)`
       as "excess divergence" and never computed long-vs-long. With all three:
