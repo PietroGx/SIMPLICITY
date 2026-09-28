@@ -5,6 +5,77 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.39 — 2026-09-28 — pietro gerletti
+
+Figure 3 rebuilt around the question it is supposed to answer: **do long
+shedders drive variant emergence, and are long-shedder lineages more
+successful?** The old panels answered neither.
+
+**The circularity that had to be removed.** In SIMPLICITY one substitution IS
+one lineage, and long shedders are parameterised to mutate more (NSR_long ~13x
+NSR, IH_lineages_max 5-15 against 1-4, longer infections). So "long shedders
+generate more lineages" recovers the parameter file -- it is not a result.
+Counting lineages without clustering, as an earlier draft of this analysis
+proposed, is a self-fulfilling prophecy. Clustering is what makes a clade a
+stand-in for a real-world lineage (several co-occurring substitutions, not a
+single SNV), so it is **essential to the question**, not a nuisance parameter.
+
+**The non-circular measurement.** Normalise clade success by the mutational
+output that produced it:
+
+    efficiency(origin) = successful clades of that origin
+                         / substitutions arising in those hosts
+
+Reported long/standard. Unbound #1, all 50 seeds, clades at 5 substitutions,
+success = peak frequency > 50%:
+
+    SOT        (63 d)   0.14x     6 successes / 2,612 substitutions
+    HIV_low   (109 d)   2.03x   110 / 7,230
+    HIV_high  (109 d)   3.39x   297 / 73,724   (only 8 standard successes)
+    edge_case (365 d)   6.89x    90 / 1,151    (112 standard -- clean baseline)
+
+**SOT long shedders convert mutations into established clades ~7x WORSE than
+standard hosts.** The advantage appears only above ~100 days and reaches ~7x
+at 365. Within-host diversity has to be transmitted to establish: a 63-day
+host generates diversity that dies with it, a 365-day host has time to
+diversify AND seed those lineages outward. Mutational output is necessary but
+not sufficient; duration converts it into epidemiological establishment. That
+is not something the parameterisation hands you.
+
+* **Robustness swept, not assumed.** The ratio holds across 5 clustering
+  thresholds (3-15) x 4 success criteria (peak > 10/25/50/75%) -- 20
+  combinations, now panel D. SOT stays below 1 in all of them. The earlier
+  per-clade takeover rate, which was NOT normalised by output, flipped between
+  3.83x and 1.06x across thresholds and has been dropped.
+* **edge_case is the cleanest evidence**, not HIV_high. At 0.1% prevalence the
+  standard baseline is well populated (112 successes); at 12% almost all
+  transmission routes through long shedders, leaving 8.
+* **The bound arm cannot support this analysis at all.** Its HIV_high standard
+  NSR was calibrated to 9.35e-7, so standard hosts produce **zero** successful
+  clades and the ratio is undefined. Panel A now prints "no standard baseline"
+  there instead of drawing a bar with no partner -- a silently missing bar is
+  precisely the failure mode this repo keeps hitting. This is a further
+  argument for leading with the unbound arm.
+
+**Panels:** A conversion efficiency by scenario; B the same ratio against
+infection duration, marker area encoding prevalence (HIV_low and HIV_high
+share 109 d yet differ, so duration is not the only driver); C the four clade
+metrics, unchanged; D the robustness grid.
+
+**Dropped:** the sequence-space PCA and the pairwise-distance panel. Host type
+explains almost none of the sequence-space structure (Cohen's d = 0.004 on
+PC1), so they measured something real but unrelated to the question.
+
+**Interface change:** every panel now spans all scenarios and all seeds, so
+`--group` and `--seed` are gone. Figure 3 has no per-scenario form any more,
+and the 45 per-scenario renders from v2.4.38 are obsolete.
+
+New `get_efficiency_data()` caches per-seed substitution and clade counts to
+`Data/figures/.cache/` -- it walks every seed's individuals_data and
+re-clusters at five thresholds, which is far too slow to repeat per render.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.38 — 2026-09-24 — pietro gerletti
 
 Figure shaping pass. The substantive change is Figure 3 panel D, which was
