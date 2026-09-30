@@ -58,47 +58,63 @@ def build_figure_3(exp_num, exp_name, cluster_threshold, min_days, fmt):
     if not scenarios:
         raise SystemExit(f"No scenario output found for {exp_name} #{exp_num}.")
 
-    fig = plt.figure(figsize=(180 / 25.4, 150 / 25.4))
-    gs = gridspec.GridSpec(2, 2, figure=fig, wspace=0.42, hspace=0.62)
+    fig = plt.figure(figsize=(180 / 25.4, 165 / 25.4))
+    gs = gridspec.GridSpec(2, 2, figure=fig, wspace=0.40, hspace=0.55,
+                           top=0.90, bottom=0.07)
 
-    # --- A: conversion efficiency, the non-circular measurement -------------
-    print("Panel A: conversion efficiency...")
     eff_raw = preproc.get_efficiency_data(exp_num, scenarios, exp_name=exp_name,
                                           min_days=min_days)
     eff = preproc.efficiency_ratio(eff_raw, threshold=cluster_threshold)
-    ax_a = fig.add_subplot(gs[0, 0])
-    plots.plot_efficiency_bars(ax_a, eff, scenario_order=scenarios)
-    add_panel_label(ax_a, "A")
 
-    # --- B: what drives it --------------------------------------------------
-    print("Panel B: efficiency vs duration...")
+    # --- A: which host type produced the standout clade --------------------
+    print("Panel A: standout clade by origin...")
+    wr = preproc.winrate_summary(
+        preproc.get_winrate_data(exp_num, scenarios, exp_name=exp_name,
+                                 cluster_threshold=cluster_threshold,
+                                 min_days=min_days))
+    gs_a = gridspec.GridSpecFromSubplotSpec(3, 1, subplot_spec=gs[0, 0],
+                                            hspace=0.50)
+    a_axes = [fig.add_subplot(gs_a[i, 0]) for i in range(3)]
+    plots.plot_winrate(a_axes, wr, scenario_order=scenarios)
+    # Header and legend positioned from the block's own bbox, so they sit
+    # inside panel A rather than drifting into the suptitle or the panel below.
+    box = gs[0, 0].get_position(fig)
+    fig.text(box.x0 - 0.030, box.y1 + 0.052, "A",
+             fontsize=8, fontweight="bold", ha="right", va="bottom")
+    fig.text(box.x0 - 0.042, box.y0 + box.height / 2, plots.WIN_YLABEL,
+             rotation=90, va="center", ha="center", fontsize=5.8)
+    plots.winrate_legend(fig, loc="upper center",
+                         bbox_to_anchor=(box.x0 + box.width / 2, box.y1 + 0.056),
+                         ncol=2)
+
+    # --- B: conversion rate, pooled ----------------------------------------
+    print("Panel B: conversion rate, pooled...")
     ax_b = fig.add_subplot(gs[0, 1])
-    plots.plot_efficiency_vs_duration(ax_b, eff, scenario_meta(exp_name))
-    add_panel_label(ax_b, "B")
+    plots.plot_efficiency_bars(ax_b, eff, scenario_order=scenarios)
+    add_panel_label(ax_b, "B", y_offset=1.22)
 
-    # --- C: outcome ---------------------------------------------------------
-    print("Panel C: clade metrics...")
-    gs_c = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs[1, 0],
-                                            wspace=0.45, hspace=0.75)
-    c_axes = [fig.add_subplot(gs_c[0, 0]), fig.add_subplot(gs_c[0, 1]),
-              fig.add_subplot(gs_c[1, 0]), fig.add_subplot(gs_c[1, 1])]
-    metrics_df = preproc.get_panel_b_data(exp_num, scenarios, cluster_threshold,
-                                          min_days, exp_name=exp_name)
-    plots.plot_fig3_metrics(c_axes, metrics_df, palette=SCENARIO_PALETTE,
-                            scenario_order=scenarios)
-    add_panel_label(c_axes[0], "C")
+    # --- C: conversion rate, per simulation --------------------------------
+    print("Panel C: conversion rate, per simulation...")
+    ax_c = fig.add_subplot(gs[1, 0])
+    plots.plot_efficiency_vs_duration(ax_c, eff_raw, scenario_meta(exp_name),
+                                      threshold=cluster_threshold,
+                                      scenario_order=scenarios)
+    add_panel_label(ax_c, "C", y_offset=1.30)
 
-    # --- D: robustness ------------------------------------------------------
-    print("Panel D: threshold x criterion robustness...")
+    # --- D: robustness to both analysis choices ----------------------------
+    print("Panel D: robustness...")
     ax_d = fig.add_subplot(gs[1, 1])
     plots.plot_efficiency_robustness(ax_d, preproc.efficiency_robustness(eff_raw),
-                                     scenario_order=scenarios)
-    add_panel_label(ax_d, "D")
+                                     scenario_order=scenarios,
+                                     palette=SCENARIO_PALETTE)
+    add_panel_label(ax_d, "D", y_offset=1.30)
 
     fig.suptitle(
-        f"Do long shedders drive variant emergence?   "
-        f"(clades at {cluster_threshold} substitutions; all {len(scenarios)} scenarios, "
-        f"all seeds)", fontsize=7.5, y=0.995)
+        "Do long shedders drive variant emergence?"
+        f"   (clades at {cluster_threshold} substitutions; "
+        f"simulations \u2265 {preproc.MIN_FINAL_TIME} d, "
+        f"measured after day {preproc.BURNIN_CUTOFF_DAYS})",
+        fontsize=7.5, y=1.025)
 
     output_filename = figure_path(3, exp_name, exp_num, fmt)
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')

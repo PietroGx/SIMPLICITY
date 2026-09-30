@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
@@ -172,115 +173,255 @@ def plot_fig3_consistency(ax, consistency_df):
 # =============================================================================
 ORIGIN_COLORS = {"long": "#e41a1c", "standard": "#3b528b"}
 
+# Panels B, C and D all show ONE quantity. Naming it identically in each title is
+# what makes the figure readable at a glance; the subtitle carries the only thing
+# that differs between them, which is how it was aggregated.
+METRIC_NAME = "Substitutions that founded a dominant clade"
+METRIC_NOTE = "dominant = reached >50% of circulating infections"
+
+
+def _titled(ax, title, subtitle=None, size=6.4, pad=3):
+    ax.set_title(title, fontsize=size, pad=pad + (7 if subtitle else 0))
+    if subtitle:
+        ax.text(0.5, 1.015, subtitle, transform=ax.transAxes, ha="center",
+                va="bottom", fontsize=4.9, color="0.45")
+
 
 def plot_efficiency_bars(ax, eff, scenario_order=None):
-    """Panel A: successful clades per 1000 substitutions, by host origin.
+    """Panel A: what share of a host type's substitutions found a clade that
+    reached more than half of circulating infections, pooled over simulations.
 
-    The comparison controls for the fact that long shedders mutate far more by
-    construction -- the denominator is their own substitution count. Above the
-    standard bar means they convert mutations into established clades better
-    than their raw output predicts.
+    Scenarios on the x-axis, percentage on the y, the two host types joined so
+    the direction of the gap reads first. SOT pointing the other way is the
+    result.
     """
     if eff is None or eff.empty:
         _missing(ax, "Panel A")
         return
-    order = [s for s in (scenario_order or eff.index) if s in eff.index]
-    order = [s for s in order if np.isfinite(eff.loc[s, "eff_long"])]
+    order = [x for x in (scenario_order or eff.index) if x in eff.index]
+    order = [x for x in order if np.isfinite(eff.loc[x, "eff_long"])]
     if not order:
         _missing(ax, "Panel A")
         return
 
     x = np.arange(len(order))
-    w = 0.38
-    ax.bar(x - w/2, [eff.loc[s, "eff_std"] for s in order], w,
-           color=ORIGIN_COLORS["standard"], alpha=0.75, label="standard hosts")
-    ax.bar(x + w/2, [eff.loc[s, "eff_long"] for s in order], w,
-           color=ORIGIN_COLORS["long"], alpha=0.75, label="long shedders")
-
-    for i, s in enumerate(order):
-        r = eff.loc[s, "ratio"]
-        top = max(eff.loc[s, "eff_std"] if np.isfinite(eff.loc[s, "eff_std"]) else 0,
-                  eff.loc[s, "eff_long"])
+    for xi, sc in zip(x, order):
+        lo, st = eff.loc[sc, "eff_long"] * 100, eff.loc[sc, "eff_std"] * 100
+        if np.isfinite(st) and np.isfinite(lo):
+            ax.plot([xi, xi], [st, lo], color="0.55", lw=1.2, zorder=2,
+                    solid_capstyle="round")
+            ax.scatter([xi], [st], s=36, color=ORIGIN_COLORS["standard"],
+                       zorder=4, edgecolors="none")
+        ax.scatter([xi], [lo], s=36, color=ORIGIN_COLORS["long"], zorder=4,
+                   edgecolors="none")
+        r = eff.loc[sc, "ratio"]
         if np.isfinite(r):
-            ax.text(i, top * 1.06, f"{r:.2f}x", ha="center", va="bottom",
-                    fontsize=5.8, fontweight="bold",
+            ax.text(xi + 0.14, max(lo, st if np.isfinite(st) else 0), f"{r:.1f}x",
+                    va="center", ha="left", fontsize=5.8, fontweight="bold",
                     color=ORIGIN_COLORS["long"] if r > 1 else "0.35")
-        else:
-            # No standard successes at all -- the ratio is undefined, not zero.
-            # In the BOUND arm this is what calibrating the standard NSR down to
-            # 9.3e-7 does: the baseline stops mutating, so there is nothing to
-            # compare against. Say so rather than drawing a bar with no partner.
-            ax.text(i, top * 1.06, "no standard\nbaseline", ha="center",
-                    va="bottom", fontsize=5.0, fontweight="bold", color="#A33527")
 
     ax.set_xticks(x)
     ax.set_xticklabels(order, rotation=45, ha="right", fontsize=5.8)
-    ax.set_ylabel("Successful clades per\n1000 substitutions", fontsize=6.5)
-    ax.tick_params(axis="y", labelsize=5.8)
-    ax.legend(fontsize=5.4, frameon=False, loc="upper left")
+    ax.set_xlim(-0.5, len(order) - 0.1)
+    top = max(max(eff.loc[v, "eff_long"] * 100,
+                  (eff.loc[v, "eff_std"] * 100) if np.isfinite(eff.loc[v, "eff_std"]) else 0)
+              for v in order)
+    ax.set_ylim(0, top * 1.42)        # headroom for the legend, top right
+    ax.set_ylabel("% substitutions", fontsize=6.5)
+    _titled(ax, METRIC_NAME, "all simulations pooled")
+    ax.tick_params(axis="y", labelsize=5.6)
+
+    from matplotlib.lines import Line2D
+    ax.legend(handles=[
+        Line2D([0], [0], marker="o", ls="none", color=ORIGIN_COLORS["long"],
+               markersize=3.6, label="long shedders"),
+        Line2D([0], [0], marker="o", ls="none", color=ORIGIN_COLORS["standard"],
+               markersize=3.6, label="standard hosts")],
+        fontsize=5.4, frameon=False, loc="upper right")
     format_clean_axis(ax, remove_ticks=False)
 
 
-def plot_efficiency_vs_duration(ax, eff, meta):
-    """Panel B: the ratio against infection duration. Marker area encodes
-    long-shedder prevalence, because HIV_low and HIV_high share a duration
-    (109 d) yet differ -- duration is not the only driver."""
-    pts = []
-    for scenario, rec in eff.iterrows():
-        m = meta.get(scenario, {})
-        dur, ratio = m.get("duration"), rec.get("ratio")
-        if dur is None or not np.isfinite(ratio):
-            continue
-        pts.append((dur, ratio, m.get("ratio", 0.0), scenario))
-    if not pts:
+def plot_efficiency_vs_duration(ax, raw, meta, threshold=5, peak=0.50,
+                                scenario_order=None):
+    """Panel B: the same rate, once per simulation.
+
+    Scenarios on the x-axis rather than duration -- with four scenarios, two of
+    which share a duration, a numeric axis left most of its range empty and
+    overplotted the pair. Duration is annotated under each label instead.
+    """
+    if raw is None or raw.empty:
+        _missing(ax, "Panel B")
+        return
+    d = raw[raw["threshold"] == threshold]
+    if d.empty:
         _missing(ax, "Panel B")
         return
 
-    ax.axhline(1.0, color="0.45", lw=0.9, ls=(0, (4, 3)), zorder=2)
-    ax.text(0.99, 1.0, "no advantage", transform=ax.get_yaxis_transform(),
-            ha="right", va="bottom", fontsize=5.2, color="0.45")
+    order = [x for x in (scenario_order or d["scenario"].unique())
+             if x in set(d["scenario"])]
+    rng = np.random.default_rng(3)
+    drawn = False
+    for i, scenario in enumerate(order):
+        g = d[d["scenario"] == scenario]
+        for key, colour, off in (("std", ORIGIN_COLORS["standard"], -0.17),
+                                 ("long", ORIGIN_COLORS["long"], +0.17)):
+            subs = g[f"subs_{key}"].to_numpy(float)
+            succ = g[f"succ_{key}_{peak}"].to_numpy(float)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                e = np.where(subs > 0, 100.0 * succ / subs, np.nan)
+            e = e[np.isfinite(e)]
+            if not len(e):
+                continue
+            ax.scatter(rng.normal(i + off, 0.045, size=len(e)), e, s=6.5,
+                       alpha=0.45, color=colour, edgecolors="none", zorder=3)
+            ax.hlines(np.median(e), i + off - 0.12, i + off + 0.12,
+                      color=colour, lw=1.7, zorder=5)
+            drawn = True
+    if not drawn:
+        _missing(ax, "Panel B")
+        return
 
-    for dur, ratio, prev, scenario in pts:
-        size = 26 + 620 * float(prev)
-        ax.scatter([dur], [ratio], s=size, alpha=0.55,
-                   color=ORIGIN_COLORS["long"], edgecolors="none", zorder=4)
-        ax.annotate(scenario, (dur, ratio), textcoords="offset points",
-                    xytext=(7, 5), fontsize=5.4, color="0.3")
-
-    ax.set_xlabel("Infection duration (days)", fontsize=6.5)
-    ax.set_ylabel("Conversion efficiency\n(long / standard)", fontsize=6.5)
-    ax.tick_params(labelsize=5.8)
-    ax.set_ylim(bottom=0)
+    labels = []
+    for sc in order:
+        dur = (meta.get(sc) or {}).get("duration")
+        labels.append(f"{sc}\n{dur:.0f} d" if dur else sc)
+    ax.set_xticks(range(len(order)))
+    ax.set_xticklabels(labels, fontsize=5.4)
+    ax.set_ylabel("% substitutions", fontsize=6.5)
+    _titled(ax, METRIC_NAME, "one point per simulation")
+    ax.set_ylim(0, None)          # a percentage: the axis starts at zero
+    ax.margins(y=0.05)
+    ax.tick_params(axis="y", labelsize=5.6)
     format_clean_axis(ax, remove_ticks=False)
 
 
-def plot_efficiency_robustness(ax, rob, scenario_order=None):
-    """Panel D: the ratio under every clustering threshold and success
-    criterion. Declares the dependency instead of hiding it."""
+# One title per subplot, no block title. Peak was dropped: its maximum
+# saturates at 1.0 in 88-98% of simulations and ties are broken by dict order
+# (see BACKLOG). B/C/D still use _peak_values, thresholded rather than ranked.
+WIN_TITLES = {
+    "Burden":   "Most infections caused",
+    "Survival": "Longest time in circulation",
+    "Growth":   "Spread fastest",
+}
+WIN_METRICS = ["Burden", "Survival", "Growth"]
+WIN_YLABEL = "% of simulations where a long-shedder clade ranked first"
+
+
+def plot_winrate(axes, summary, scenario_order=None, metrics=None):
+    """Panel C: how often the top-scoring clade of a simulation came from a
+    long shedder, against what chance alone would give.
+
+    The measures rank clades WITHIN a simulation, so only a proportion across
+    simulations is comparable -- absolute values are not, each being its own
+    stochastic trajectory. The black bar is the expectation: the share of
+    candidate clades that were long-origin. The gap is the result.
+    """
+    metrics = metrics or WIN_METRICS
+    if summary is None or summary.empty:
+        for ax in axes:
+            _missing(ax, "Panel C")
+        return
+
+    for ax, metric in zip(axes, metrics):
+        sub = summary[summary["metric"] == metric]
+        order = [x for x in (scenario_order or sub["scenario"].unique())
+                 if x in set(sub["scenario"])]
+        if not order:
+            _missing(ax, metric)
+            continue
+        sub = sub.set_index("scenario")
+        x = np.arange(len(order))
+        win = [sub.loc[v, "win"] for v in order]
+        lo = [max(0.0, sub.loc[v, "win"] - sub.loc[v, "lo"]) for v in order]
+        hi = [max(0.0, sub.loc[v, "hi"] - sub.loc[v, "win"]) for v in order]
+
+        for i, v in enumerate(order):
+            ax.hlines(sub.loc[v, "null"], i - 0.3, i + 0.3, color="0.1", lw=1.1,
+                      zorder=3)
+        ax.errorbar(x, win, yerr=[lo, hi], fmt="o", ms=2.8, lw=0,
+                    elinewidth=0.9, capsize=1.5, color=ORIGIN_COLORS["long"],
+                    zorder=5)
+
+        ax.set_xticks(x)
+        last = metric == metrics[-1]
+        ax.set_xticklabels(order if last else [""] * len(order),
+                           rotation=45 if last else 0, ha="right" if last else "center",
+                           fontsize=5.4)
+        ax.set_ylim(0, 1.10)
+        ax.set_yticks([0, 0.5, 1.0])
+        ax.set_yticklabels(["0", "50", "100"], fontsize=5.4)
+        ax.set_title(WIN_TITLES.get(metric, metric), fontsize=6.2, pad=2.5)
+        format_clean_axis(ax, remove_ticks=False)
+
+
+def winrate_legend(fig, **kw):
+    """Shared legend for the win-rate panels."""
+    from matplotlib.lines import Line2D
+    handles = [
+        Line2D([0], [0], marker="o", ls="none", color=ORIGIN_COLORS["long"],
+               markersize=3.0, label="observed (95% CI)"),
+        Line2D([0], [0], color="0.1", lw=1.1,
+               label="expected from the long-origin share of clades"),
+    ]
+    return fig.legend(handles=handles, frameon=False, fontsize=5.2, **kw)
+
+
+def plot_efficiency_robustness(ax, rob, scenario_order=None, palette=None):
+    """Panel D: does the ratio survive the two arbitrary analysis choices?
+
+    One line per scenario against the clade threshold, with a band spanning the
+    four incidence cutoffs. That replaces a strip plus four heat-maps: the
+    earlier version encoded the same number three ways (position, colour, text)
+    across six sub-axes, and none of them said what the number was. Here the
+    reader sees directly that every scenario's band stays on one side of parity
+    whatever either choice is set to.
+    """
     if rob is None or rob.empty:
         _missing(ax, "Panel D")
-        return
-    order = [s for s in (scenario_order or rob.scenario.unique())
-             if s in set(rob.scenario)]
-    order = [s for s in order if np.isfinite(rob.loc[rob.scenario == s, "ratio"]).any()]
-    if not order:
-        _missing(ax, "Panel D")
-        return
+        return None
 
-    ax.axhline(1.0, color="0.45", lw=0.9, ls=(0, (4, 3)), zorder=2)
-    rng = np.random.default_rng(1)
-    for i, scenario in enumerate(order):
-        v = rob.loc[rob.scenario == scenario, "ratio"].replace(
-            [np.inf, -np.inf], np.nan).dropna().to_numpy()
-        if not len(v):
+    order = [x for x in (scenario_order or rob["scenario"].unique())
+             if x in set(rob["scenario"])]
+    palette = palette or {}
+    taus = sorted(rob["threshold"].unique())
+    ax.axhline(1.0, color="0.4", lw=1.0, ls=(0, (4, 3)), zorder=2)
+    ax.text(0.995, 1.0, "parity", transform=ax.get_yaxis_transform(),
+            ha="right", va="bottom", fontsize=4.8, color="0.4")
+
+    drawn = False
+    for scenario in order:
+        g = rob[rob["scenario"] == scenario]
+        med, lo, hi, xs = [], [], [], []
+        for t in taus:
+            v = (g.loc[g.threshold == t, "ratio"]
+                 .replace([np.inf, -np.inf], np.nan).dropna())
+            v = v[v > 0]
+            if v.empty:
+                continue
+            xs.append(t); med.append(float(v.median()))
+            lo.append(float(v.min())); hi.append(float(v.max()))
+        if not xs:
             continue
-        ax.scatter(rng.normal(i, 0.08, size=len(v)), v, s=7, alpha=0.5,
-                   color=ORIGIN_COLORS["long"], edgecolors="none", zorder=4)
-        ax.hlines(np.median(v), i - 0.27, i + 0.27, color="0.2", lw=1.5, zorder=5)
+        colour = palette.get(scenario, "#888888")
+        ax.fill_between(xs, lo, hi, color=colour, alpha=0.16, lw=0, zorder=3)
+        ax.plot(xs, med, color=colour, lw=1.4, zorder=4)
+        ax.scatter(xs, med, s=9, color=colour, zorder=5, edgecolors="none")
+        ax.text(xs[-1] + 0.35, med[-1], scenario, fontsize=5.0, color=colour,
+                va="center", ha="left")
+        drawn = True
+    if not drawn:
+        _missing(ax, "Panel D")
+        return None
 
-    ax.set_xticks(range(len(order)))
-    ax.set_xticklabels(order, rotation=45, ha="right", fontsize=5.8)
-    ax.set_ylabel("Conversion efficiency\nacross 5 thresholds x 4 criteria", fontsize=6.2)
-    ax.tick_params(axis="y", labelsize=5.8)
     ax.set_yscale("log")
+    ax.set_xticks(taus)
+    ax.set_xticklabels([str(t) for t in taus], fontsize=5.4)
+    ax.set_xlim(min(taus) - 0.6, max(taus) + 4.2)
+    ax.set_xlabel("clade threshold (substitutions)", fontsize=6.0)
+    ax.set_ylabel("ratio, long \u00f7 standard", fontsize=6.0)
+    ax.tick_params(axis="y", labelsize=5.4)
+    _titled(ax, METRIC_NAME,
+            "ratio of that %, under every analysis choice "
+            "(band = 10\u201375% incidence cutoffs)")
     format_clean_axis(ax, remove_ticks=False)
+    return None
