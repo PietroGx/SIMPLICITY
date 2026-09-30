@@ -131,7 +131,6 @@ def test_experiment_output(experiment_name):
         for subfolder in os.listdir(simulation_directory):
             seed_directory = os.path.join(simulation_directory,subfolder)
             check_output_file(seed_directory, 'final_time.csv')
-            check_output_file(seed_directory, 'fitness_trajectory.csv')
             check_output_file(seed_directory, 'individuals_data.csv')
             check_output_file(seed_directory, 'lineage_frequency.csv')
             check_output_file(seed_directory, 'phylogenetic_data.csv')
@@ -211,7 +210,6 @@ def compare_experiment_outputs(experiment_name_1, experiment_name_2):
 
     files_to_compare = [
         'final_time.csv',
-        'fitness_trajectory.csv',
         'individuals_data.csv',
         'lineage_frequency.csv',
         'phylogenetic_data.csv',

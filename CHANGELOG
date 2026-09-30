@@ -5,6 +5,85 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.42 — 2026-09-30 — pietro gerletti
+
+Five performance changes. **2.34x on identical work at production settings**:
+118.3 s -> 50.6 s for population 1000, NSR 1.4e-4, 1095 days, same 1072
+lineages and 14040 infections. A 300-simulation rerun goes from 9.9 to 4.2
+CPU-hours. Detail and the full measurement set are in `PERFORMANCE.md`.
+
+Three of the five are bit-identical and were verified as such: a fixed-seed run
+produced **0 of 8 output files differing**. Two change behaviour deliberately
+and are described below.
+
+**No model change.** Nothing here alters what the simulation computes except
+where stated under the rounding removal, which moves `fitness_score` by at most
+5e-5 and leaves every other column of `individuals_data.csv` untouched.
+
+**The output path stopped walking the reservoir.**
+`population.update_ih_lineages_trajectories` built a DataFrame from all 100,000
+reservoir individuals, iterated every row, wrote each result back with `.at[]`,
+and then `individuals_data_to_df` discarded every susceptible -- 99% of what had
+just been processed. It now filters first, normalises the trajectory dicts in
+`self.individuals` directly (the frame was holding them by reference, so this is
+the same mutation with the frame removed from the middle) and builds the frame
+once. Prototyped at the real proportions this is 3.11 s -> 0.02 s; end to end it
+is 8.79 -> 5.88 s on the benchmark, byte-identical.
+
+**`np.average` is no longer called to average one number.** In a real run 100%
+of the 434,714 calls at `phenotype/update.py:78,113` average a single value,
+which costs 3.05 us of numpy machinery to return a number already in hand. The
+length-one guard is 0.04 us and exact -- `np.average([x])` is `x` bit-for-bit
+(0 differences over 300,000 values) -- and anything longer still goes through
+`np.average` unchanged. Note `sum(v)/len(v)` is NOT a valid substitute: it
+differs in the last bit for 12% of multi-element cases, because numpy sums
+pairwise and Python sums left to right.
+
+**`round(..., 4)` removed from `fitness_score`** (`population_model.py:237,299`).
+The same field was written unrounded from `update.py`, so the model held
+4-decimal values from one path and full precision from another. The rounding
+carried no comment, dates from v0.17.00 and v2.0.0, and no consumer needs 4 dp:
+the readers are the transmission weights, the fitness diagnostic and the
+tree/plot builders. It was also close to vestigial, since `update_fitness_step`
+overwrites the field at full precision for every infectious host on every step.
+**This is a behaviour change**: `individuals_data.csv` differs in `fitness_score`
+only, 39 of 1012 rows, by at most 4.90e-05 -- the 5e-5 half-step of 4 dp
+rounding. Every other column is identical, so the trajectory does not move.
+Removing it also made the length-one guard safe at those two sites: numpy and
+Python round differently at exact ties (87,099 of 200,000 tie values differ),
+which is invisible to a test on random values and is why an earlier attempt to
+apply the guard there moved `fitness_trajectory.csv`.
+
+**The fitness trajectory is now opt-in**, behind `population.track_fitness_traj`
+(default False). An internal constant, not a simulation parameter -- nothing to
+thread through configs, flip the line to record it again. Nothing in the model
+reads it, and of the four columns it writes only Time, Mean and Std are read
+downstream; the `Entropy` column is read by nothing at all. When enabled it now
+uses one array conversion for mean and std and
+`np.sum(special.entr(a / a.sum()))` for the entropy: 68x faster, and the same
+computation `scipy.stats.entropy` performs internally, without its dispatch
+wrapper and without the redundant second normalisation the old code paid for by
+pre-dividing its input (scipy normalises whatever it is given).
+`fitness_trajectory.csv` is therefore optional output and was removed from
+`required_files` in `check_completed_simulations.py` and from both lists in
+`tests/test_local_runme.py`, matching how that file already treats the optional
+FASTAs.
+
+**One matrix power became an identity.** `tuning/diagnosis_rate.py` computed
+`fractional_matrix_power(expm(B_aug), 1000)`, which for integer powers is just
+`expm(1000 * B_aug)`: 40.81 ms -> 2.92 ms, agreeing to 4.6e-15. `k_d` comes out
+identical (0.0055 after 54 steps) for both production diagnosis rates, so the
+value the model consumes does not move. Small -- ~0.12 s per simulation -- and
+taken because it is exact and one line.
+
+Two things are recorded in `PERFORMANCE.md` rather than fixed: `_init_individuals`
+costs 0.79 s building 100,000 reservoir records for a population of 1,000, and
+`get_k_d_from_diagnosis_rate` is a linear scan whose cost is proportional to
+k_d (54 steps at the production value, but 5,000 if a scenario ever lands near
+0.5).
+
+------------------------------------------------------------------------
+
 ## Version 2.4.41 — 2026-09-30 — pietro gerletti
 
 Genome representation, host-counting rules, a second consensus distance behind

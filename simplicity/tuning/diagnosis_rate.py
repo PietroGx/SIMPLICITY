@@ -70,8 +70,8 @@ def get_diagnosis_rate_in_percent(tau_1, tau_2, tau_3, tau_4, k_d):
     B_aug = np.concatenate((B,y))
     z = np.zeros((22,1))
     B_aug = np.concatenate((B_aug,z),axis=1)
-    B_ex = scipy.linalg.expm(B_aug)
-    Bt = scipy.linalg.fractional_matrix_power(B_ex,1000)
+    # (e^A)^n = e^(nA) for integer n, so one expm replaces expm + a matrix power
+    Bt = scipy.linalg.expm(1000 * B_aug)
     p_t0 = np.zeros((1,22))[0]
     p_t0[0] = 1
     prob_t = np.matmul(Bt,p_t0) 

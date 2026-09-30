@@ -25,6 +25,13 @@ from   simplicity.random_gen          import randomgen
 import pandas as pd
 import numpy as np
 import scipy.stats
+import scipy.special
+
+# Internal switch, not a simulation parameter. The fitness trajectory is a
+# diagnostic: nothing in the model reads it, and of the columns it writes only
+# Time, Mean and Std are read downstream (plots_manager, the archived figures).
+# Off by default; flip this to record it again.
+track_fitness_traj = False
 
 class Population:
     '''
@@ -444,18 +451,25 @@ class Population:
                            ])
     
     def update_fitness_trajectory(self):
+        if not track_fitness_traj:
+            return
+
         fitness_scores = [self.individuals[i]['fitness_score'] for i in self.infected_i]
         if not fitness_scores:
             self.fitness_trajectory.append([self.time, 0, 0, 0])
             return
-    
-        mean_fitness = np.mean(fitness_scores)
-        std_fitness = np.std(fitness_scores)
-    
-        # Entropy of normalized fitness 
-        total = sum(fitness_scores)
-        normed = [f / total for f in fitness_scores]
-        entropy = scipy.stats.entropy(normed) if total > 0 else 0.0
+
+        scores = np.asarray(fitness_scores, dtype=float)
+        mean_fitness = scores.mean()
+        std_fitness = scores.std()
+
+        # Shannon entropy of the normalised fitness. This is what
+        # scipy.stats.entropy does internally -- normalise, entr, sum -- without
+        # its dispatch wrapper, and without the redundant second normalisation
+        # the previous code paid for by pre-dividing.
+        total = scores.sum()
+        entropy = (float(np.sum(scipy.special.entr(scores / total)))
+                   if total > 0 else 0.0)
     
         self.fitness_trajectory.append({
                                         'Time': self.time,
@@ -504,8 +518,13 @@ class Population:
 # -----------------------------------------------------------------------------
 
     def update_ih_lineages_trajectories(self):
-        individuals_data = pd.DataFrame(self.individuals).transpose()
-        for idx, row in individuals_data.iterrows():
+        # Only hosts that were ever infected carry a trajectory, and
+        # individuals_data_to_df drops the rest, so normalise those alone. The
+        # trajectory dicts live in self.individuals, so mutating them here is
+        # exactly what the frame would have carried.
+        kept = {i: ind for i, ind in self.individuals.items()
+                if 'susceptible' not in ind['state']}
+        for idx, row in kept.items():
             lineage_traj_dic = row['IH_lineages_trajectory']  
         
             for lineage in lineage_traj_dic:
@@ -521,15 +540,12 @@ class Population:
                 if lineage_traj_dic[lineage].get('ih_death') is not None:
                     lineage_traj_dic[lineage]['ih_death'] = float(lineage_traj_dic[lineage]['ih_death'])
         
-            individuals_data.at[idx, 'IH_lineages_trajectory'] = lineage_traj_dic
-        return individuals_data
+        return pd.DataFrame(kept).transpose()
         
     def individuals_data_to_df(self):
         # return population dictionary as data frame
         df = self.update_ih_lineages_trajectories()
-        filtered_df = df[~df['state'].str.contains('susceptible')]
-        filtered_df = filtered_df.drop('t_next_state', axis=1)
-        return filtered_df
+        return df.drop('t_next_state', axis=1)
     
     def phylogenetic_data_to_df(self):
         # return phylogeny dictionary as data frame

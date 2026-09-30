@@ -6,6 +6,13 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Blockers (before next production rerun)
 
+- [ ] **`plots_manager.plot_fitness` is stale** — `plots_manager.py:101-103`
+      reads the in-memory fitness trajectory as a nested list
+      (`coord[1][0]`) while `update_fitness_trajectory` appends a dict, so it
+      raises on its first call. Since v2.4.42 the list is also empty by default
+      (`population.track_fitness_traj` is off). Not on any pipeline path; the
+      CSV-reading plot at `:254` is the one in use and is unaffected.
+
 - [x] **Genome stored the mutation history, not the sequence** — fixed in
       v2.4.41. A position mutated twice was stored twice, and five code paths
       read that differently (oldest base / newest base / both / two clade

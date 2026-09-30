@@ -234,7 +234,8 @@ def infection(population, from_long_shedder=False):
     new_inf['IH_lineages_fitness_score'] = list(fitness_sorted)
     
     # Update individual fitness (average of lineage's fitness)
-    new_inf['fitness_score'] = round(np.average(fitness_sorted), 4)
+    new_inf['fitness_score'] = (fitness_sorted[0] if len(fitness_sorted) == 1
+                                else np.average(fitness_sorted))
 
     # distinct lineage count, and its contribution to active_lineages_n
     population.refresh_unique_lineages(new_infected_index)
@@ -296,4 +297,5 @@ def add_lineage(population):
     population.refresh_unique_lineages(individual_index)
 
     # update individual fitness
-    individual['fitness_score'] = round(np.average(individual['IH_lineages_fitness_score']), 4)
+    _fs = individual['IH_lineages_fitness_score']
+    individual['fitness_score'] = _fs[0] if len(_fs) == 1 else np.average(_fs)

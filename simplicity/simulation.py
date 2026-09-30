@@ -80,8 +80,9 @@ class Simplicity:
         # print('DONE.')
         # print('')
         # print('Saving fitness trajectory data...')
-        om.save_fitness_trajectory(self.simulation_output, 
-                                      self.output_directory)
+        if pop.track_fitness_traj:
+            om.save_fitness_trajectory(self.simulation_output,
+                                       self.output_directory)
         # print('DONE.')
         # print('')
         # print('Saving final time datapoint...')

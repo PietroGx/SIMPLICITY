@@ -25,8 +25,10 @@ def check_seeded_simulation_output(ssod):
     # the seed produced at least one sequence, and the FASTAs only when
     # write_fasta is on, so requiring either marks a legitimately completed
     # simulation that happened to sequence nobody as invalid.
+    # fitness_trajectory.csv is optional like the FASTAs: it is only written
+    # when population.track_fitness_traj is on, and nothing in the model reads it.
     required_files = [
-        'final_time.csv', 'fitness_trajectory.csv', 'individuals_data.csv',
+        'final_time.csv', 'individuals_data.csv',
         'lineage_frequency.csv', 'phylogenetic_data.csv',
         'simulation_trajectory.csv',
     ]
