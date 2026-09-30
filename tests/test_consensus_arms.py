@@ -94,9 +94,82 @@ def test_bound_untouched():
           list(sig.parameters), ['row', 'n_seeds'])
 
 
+# ---------------------------------------------------------------------------
+# sanity plots: one grid per consensus arm
+# ---------------------------------------------------------------------------
+import io
+import contextlib
+import subprocess as _sp
+
+import run_impact_long_shedders_unbound_pipeline as runner
+
+
+def test_sanity_plots():
+    """submit_sanity_plots must issue one sbatch per arm, each naming that
+    arm's experiment, with the dispatcher stubbed."""
+    calls = []
+
+    class FakeResult:
+        returncode = 0
+        stdout = "Submitted batch job 12345"
+        stderr = ""
+
+    real_run = _sp.run
+    runner.subprocess.run = lambda cmd, **k: (calls.append(cmd), FakeResult())[1]
+    try:
+        log = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()):
+            got = runner.submit_sanity_plots(7, 0.0013, 0.00205, log,
+                                             list(cfg.CONSENSUS_MODES))
+    finally:
+        runner.subprocess.run = real_run
+
+    check("one sbatch per consensus arm", len(calls), len(cfg.CONSENSUS_MODES))
+    for mode, cmd in zip(cfg.CONSENSUS_MODES, calls):
+        check(f"{mode}: sbatch carries its own experiment name",
+              cmd[-1], cfg.prod_exp_name(mode))
+        check(f"{mode}: exp_num and targets passed",
+              cmd[2:5], ['7', '0.0013', '0.00205'])
+    check("returned arms are tagged by mode",
+          [m for m, _ in got], list(cfg.CONSENSUS_MODES))
+    check("job ids returned for the waiter",
+          all('12345' in s for _, s in got), True)
+
+
+def test_archive_lists_both():
+    """write_artifacts_archive must look for a sanity plot per arm."""
+    import tempfile
+    buf = io.StringIO()
+    with tempfile.TemporaryDirectory() as tmp:
+        arc = os.path.join(tmp, 'a.zip')
+        with contextlib.redirect_stdout(buf):
+            runner.write_artifacts_archive(arc, 7, os.path.join(tmp, 'no.log'))
+    looked_for = buf.getvalue()
+    for mode in cfg.CONSENSUS_MODES:
+        want = f"{cfg.prod_exp_name(mode)}_sanity_#7"
+        check(f"archive looks for the {mode} sanity plot",
+              want in looked_for, True)
+
+
+def test_shell_passes_exp_name():
+    """The sbatch wrapper must forward a 4th argument and default it."""
+    sh = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir,
+                           'scripts', 'experiments',
+                           'submit_sanity_plot_unbound.sh')).read()
+    check("shell reads a 4th argument with a default",
+          'EXP_NAME="${4:-impact_long_shedders_unbound}"' in sh, True)
+    check("shell forwards it to the plotting script",
+          '--exp-name "$EXP_NAME"' in sh, True)
+    check("hardcoded experiment name is gone",
+          '--exp-name impact_long_shedders_unbound \\' in sh, False)
+
+
 if __name__ == '__main__':
     print("-- builder --");            test_builder()
     print("-- dispatch (stubbed) --"); test_dispatch()
     print("-- bound pipeline --");     test_bound_untouched()
+    print("-- sanity plots --");       test_sanity_plots()
+    print("-- artifacts archive --");  test_archive_lists_both()
+    print("-- sbatch wrapper --");     test_shell_passes_exp_name()
     print("\nCONSENSUS ARMS PASSED" if not _fails else f"\nFAILED: {_fails}")
     raise SystemExit(1 if _fails else 0)
