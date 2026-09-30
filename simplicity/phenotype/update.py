@@ -75,7 +75,8 @@ def update_fitness_factory(type, consensus_mode='argmax'):
                             population.get_lineage_genome(lineage_name))
                 ind['IH_lineages_fitness_score'] = [scores[l] for l in ind['IH_lineages']]
                 # host score averages over DISTINCT lineages: copies do not count twice
-                ind['fitness_score'] = np.average(list(scores.values()))
+                vals = list(scores.values())
+                ind['fitness_score'] = vals[0] if len(vals) == 1 else np.average(vals)
             # # update relative fitness scores for the population
             # update_relative_fitness(population)
         
@@ -110,7 +111,8 @@ def update_fitness_factory(type, consensus_mode='argmax'):
                         scores[lineage_name] = fitness_from_distance(population, d)
                 ind['IH_lineages_fitness_score'] = [scores[l] for l in ind['IH_lineages']]
                 # host score averages over DISTINCT lineages: copies do not count twice
-                ind['fitness_score'] = np.average(list(scores.values()))
+                vals = list(scores.values())
+                ind['fitness_score'] = vals[0] if len(vals) == 1 else np.average(vals)
             # # update relative fitness scores for the population
             # update_relative_fitness(population)
         
