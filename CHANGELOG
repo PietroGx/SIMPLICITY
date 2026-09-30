@@ -5,6 +5,61 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.40 — 2026-09-30 — pietro gerletti
+
+Figure 3: burn-in window, panel reorder, and the Peak metric dropped.
+
+**Burn-in.** Under the immune_waning phenotype model a lineage's fitness is
+phi*d(lineage, consensus) + (1-phi)/active_lineages_n, so while the population
+is immune-naive every lineage scores identically and selection on antigenic
+novelty is off. Measured: phi reaches 1.0 at day 198-335 depending on scenario.
+Everything in the figure is now measured from day 200 onward
+(BURNIN_CUTOFF_DAYS), and simulations ending before 365 days are excluded
+(MIN_FINAL_TIME) -- 14 of 243. `_windowed_clade_data` and `_usable` apply both.
+This removed a prior artefact: the Burden deficit was -79pp before windowing and
++0pp after, so the earlier "conspicuous lineage vs bulk transmission" reading is
+withdrawn.
+
+**Panel order** now follows the argument: A win rates, B pooled conversion rate,
+C per simulation, D robustness. B, C and D carry the same title verbatim
+(METRIC_NAME) with only the subtitle differing, so the figure names one quantity
+and shows it three ways.
+
+**Panel D rebuilt** from six sub-axes (strip + four heatmaps + colorbar) into a
+single line panel: one line per scenario against clade threshold, band spanning
+the four incidence cutoffs, log y, parity line. The old version encoded the same
+number three ways across six axes and never said what the number was.
+
+**Peak dropped from panel A.** It was the strongest result in the panel (+25pp
+in edge_case) and does not survive inspection: the winning clade's peak
+frequency is exactly 1.0 in 88-98% of simulations, so the measure saturates
+rather than ranks; two or more clades tie at that ceiling in 30-39% of
+simulations and `max()` breaks the tie by dict order, which settles
+long-versus-standard in 8 of 46 edge_case simulations. The enrichment is
+therefore somewhere in +8pp to +43pp, not +25pp. A first explanation -- peaks
+reached during epidemic bottlenecks -- was tested and refuted: the host pool at
+the winning peak (64-80 carriage slots) is comparable to the window median
+(67-90). The quantity survives in panels B, C and D, thresholded rather than
+ranked, where no tie-break arises.
+
+**Panel A labelling.** One title per subplot, no block title, y label written
+once. Metrics renamed for what they measure: "most infections caused", "longest
+time in circulation", "spread fastest". "Incidence" was wrong in the old names
+-- the quantity is a frequency (a share of carriage), not incidence.
+
+**Growth's null corrected.** Peak, Burden and Survival rank every eligible
+clade; Growth ranks only clades crossing both 1% and 50% (3-6 per simulation
+against 49-84). Each metric's expectation now uses its own pool, which halved
+edge_case's Growth enrichment (+32 -> +14pp).
+
+**Known, not fixed here.** "Most infections caused" does not race the same field
+as the other two: it ranks every clade including the founder and counts
+infections in long shedders, which the frequency-derived metrics exclude. The
+founder wins it in 18-28% of simulations and none of the others. Its flat result
+is not yet evidence of anything. Tracked in UPSTREAM_TODO.md.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.39 — 2026-09-28 — pietro gerletti
 
 Figure 3 rebuilt around the question it is supposed to answer: **do long
