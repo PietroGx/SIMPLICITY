@@ -118,22 +118,32 @@ def report_simulation_health(exp_names, log_fh, label):
             _log(log_fh, f"  [skip] health report exited {result.returncode} for {name}")
 
 
-def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh):
+def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh,
+                        consensus_modes):
+    """One sanity grid per consensus arm. Each reads its own production
+    experiments and writes into its own plots directory, both derived from the
+    arm's experiment name."""
     sanity_sh = os.path.join(SCRIPT_DIR, "submit_sanity_plot_unbound.sh")
-    cmd = ["sbatch", sanity_sh, str(exp_num), str(target_osr_std), str(target_osr_long)]
-    header = f"\n$ {' '.join(cmd)}"
-    print(header)
-    log_fh.write(header + "\n")
+    submitted = []
+    for mode in consensus_modes:
+        exp_name = prod_exp_name(mode)
+        cmd = ["sbatch", sanity_sh, str(exp_num), str(target_osr_std),
+               str(target_osr_long), exp_name]
+        header = f"\n$ {' '.join(cmd)}"
+        print(header)
+        log_fh.write(header + "\n")
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    for stream in (result.stdout, result.stderr):
-        if stream:
-            print(stream, end="")
-            log_fh.write(stream)
-    if result.returncode != 0:
-        raise SystemExit("[FAILED] sbatch submission for combined sanity plot")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        for stream in (result.stdout, result.stderr):
+            if stream:
+                print(stream, end="")
+                log_fh.write(stream)
+        if result.returncode != 0:
+            raise SystemExit(
+                f"[FAILED] sbatch submission for the {mode} sanity plot")
+        submitted.append((mode, result.stdout.strip()))
 
-    return [("combined", result.stdout.strip())]
+    return submitted
 
 
 def wait_for_sanity_plots(submitted, log_fh, poll_interval=SANITY_PLOT_POLL_INTERVAL_S):
@@ -168,16 +178,19 @@ def artifacts_archive_path(exp_num):
 
 def write_artifacts_archive(archive_path, exp_num, log_file):
     os.makedirs(os.path.dirname(archive_path), exist_ok=True)
-    sanity_exp = f"{PROD_EXP_NAME}_sanity_#{exp_num}"
     candidates = [
         log_file,
         os.path.join("Data", f"{LONG_NSR_EXP_NAME}_#{exp_num}", "05_Plots",
                      f"{LONG_NSR_EXP_NAME}_#{exp_num}_long_nsr_calibration_fit.png"),
         os.path.join("Data", f"{STD_NSR_EXP_NAME}_#{exp_num}", "05_Plots",
                      f"{STD_NSR_EXP_NAME}_#{exp_num}_std_nsr_calibration_fit.png"),
-        os.path.join("Data", sanity_exp, "05_Plots",
-                     f"{sanity_exp}_all_scenarios_global_vs_intrahost.png"),
     ]
+    # one sanity grid per consensus arm
+    for mode in CONSENSUS_MODES:
+        sanity_exp = f"{prod_exp_name(mode)}_sanity_#{exp_num}"
+        candidates.append(
+            os.path.join("Data", sanity_exp, "05_Plots",
+                         f"{sanity_exp}_all_scenarios_global_vs_intrahost.png"))
     with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in candidates:
             if os.path.isfile(path):
@@ -279,7 +292,8 @@ def main():
                 log_fh, f"stage 3 (production, consensus={mode})")
 
         submitted = submit_sanity_plots(
-            args.exp_num, args.target_osr_std, args.target_osr_long, log_fh)
+            args.exp_num, args.target_osr_std, args.target_osr_long, log_fh,
+            args.consensus)
         wait_for_sanity_plots(submitted, log_fh)
 
         table_path = os.path.join(

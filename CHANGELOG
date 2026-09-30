@@ -5,6 +5,31 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.43 — 2026-09-30 — pietro gerletti
+
+Both consensus arms of the unbound pipeline now produce a sanity grid.
+
+`submit_sanity_plot_unbound.sh` takes the experiment name as a fourth argument,
+defaulting to `impact_long_shedders_unbound`, and forwards it to
+`plot_sot_sanity_regressions.py` in place of the name it previously hardcoded.
+The runner submits one job per arm and waits on both before archiving; the
+artifacts zip collects a sanity plot per arm alongside the two calibration fits.
+
+Nothing in the plotting script changed. It already derived both its inputs
+(`<exp_name>_<scenario>_#<num>`) and its output directory
+(`<exp_name>_sanity_#<num>`) from `--exp-name`, so the distribution arm reads
+its own production experiments and writes into its own plots directory with no
+possibility of collision. SLURM logs are now named per arm rather than
+`combined_*`, so the two jobs no longer read as one.
+
+Verification in `tests/test_consensus_arms.py`, exercising the real
+`submit_sanity_plots` with `subprocess.run` stubbed: one sbatch per arm, each
+carrying its own experiment name, exp_num and both targets forwarded, arms
+tagged by mode so the waiter can block on them, and the archive looking for both
+plots.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.42 — 2026-09-30 — pietro gerletti
 
 Five performance changes. **2.34x on identical work at production settings**:
