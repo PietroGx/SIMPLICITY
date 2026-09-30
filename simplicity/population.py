@@ -122,7 +122,7 @@ class Population:
         self.phylogenetic_data = [{  'Time_emergence'  : 0,
                                      'Lineage_name'    : 'wt',
                                      'Lineage_parent'  : None,
-                                     'Genome'          : [],
+                                     'Genome'          : {},
                                      'Host_type'       : 'standard',
                                      'Total_infections': 0
                                  }]
@@ -135,8 +135,8 @@ class Population:
         
         # -------------------------------------------------------------------------   
 
-        self.consensus_snapshot = [[[],1,0]] # [sequence, lineage_frequency, w_t(t_sim)]
-        self.consensus_sequences_t = [[[],0]] # list to store consensus everytime is calculated in a simulation [consensus,t]
+        self.consensus_snapshot = [[{},1,0]] # [sequence, lineage_frequency, w_t(t_sim)]
+        self.consensus_sequences_t = [[{},0]] # list to store consensus everytime is calculated in a simulation [consensus,t]
         
         # system trajectory ---------------------------------------------------
         self.time         = 0 
@@ -303,6 +303,15 @@ class Population:
     #                               Updates
     # -------------------------------------------------------------------------
     
+    def refresh_unique_lineages(self, i):
+        '''Recompute a host's distinct lineage count and carry the delta into
+        active_lineages_n, which sums distinct lineages over hosts. Call it
+        wherever IH_lineages changes.'''
+        ind = self.individuals[i]
+        n = len(set(ind['IH_lineages']))
+        self.active_lineages_n += n - ind['IH_unique_lineages_number']
+        ind['IH_unique_lineages_number'] = n
+
     def update_time(self,time):
         # update the time 
         self.time = time
@@ -360,7 +369,7 @@ class Population:
                 self.recovered += 1
                 self.susceptibles += 1
     
-                self.active_lineages_n -= ind['IH_lineages_number']
+                self.active_lineages_n -= ind['IH_unique_lineages_number']
     
                 new_susceptible = self.reservoir_i.pop()
                 self.susceptibles_i.add(new_susceptible)
@@ -457,40 +466,40 @@ class Population:
     
     def update_lineage_frequency_t(self, t):
         '''
-        Count how many individuals are infected by each lineage at time
-        t in the population and store the following information:
-        time, lineage_name, frequency.
+        Frequency of each lineage among the infected, undiagnosed population at
+        time t. Every host -- long shedders included -- contributes total weight
+        1, split equally over the DISTINCT lineages it carries, so frequencies
+        sum to 1 and a host carrying many lineages does not outvote one carrying
+        few. Feeds both lineage_frequency.csv and consensus_snapshot.
         '''
-        # store lineages here: {'lineage name': number of infected individuals}
-        count_lineages_t = {}
-        
-        # Loop through the infected individuals and get a list of unique IH_virus names (lineage)
-        for individual_index in set(self.infected_i) - set(self.long_shedder_i):
+        share_lineages_t = {}   # lineage -> summed per-host share
+        count_lineages_t = {}   # lineage -> hosts carrying it
+        hosts_at_t = 0
+
+        for individual_index in self.infected_i:
             unique_lineages = set(self.individuals[individual_index]['IH_lineages'])
+            if not unique_lineages:
+                continue
+            hosts_at_t += 1
+            host_share = 1.0 / len(unique_lineages)
             for lineage_name in unique_lineages:
+                share_lineages_t[lineage_name] = share_lineages_t.get(lineage_name, 0.0) + host_share
                 count_lineages_t[lineage_name] = count_lineages_t.get(lineage_name, 0) + 1
-    
-        # Calculate the total count for normalization
-        infected_individuals_at_t_total = sum(count_lineages_t.values()) # note that if an individual is infected by more than one lineage it  will count double
-        
-        # Store: [time, lineage_name, frequency, infected_individuals_at_t]
-        for lineage_name in count_lineages_t:
-            # Compute frequency as the relative count
-            infected_individuals_lin = count_lineages_t[lineage_name]
-            frequency = infected_individuals_lin / infected_individuals_at_t_total
-            # store frequency data
-            dic = {'Lineage_name'              :lineage_name,
-                   'Time_sampling'             :t,
-                   'Frequency_at_t'            :frequency,
-                   'Individuals_infected_at_t' :infected_individuals_lin
-                }
-            self.lineage_frequency.append(dic)
-        
-        for lineage_name in count_lineages_t:
-            frequency = count_lineages_t[lineage_name] / infected_individuals_at_t_total
+
+        if not hosts_at_t:
+            return
+
+        for lineage_name, share in share_lineages_t.items():
+            frequency = share / hosts_at_t
+            self.lineage_frequency.append({
+                'Lineage_name'              : lineage_name,
+                'Time_sampling'             : t,
+                'Frequency_at_t'            : frequency,
+                'Individuals_infected_at_t' : count_lineages_t[lineage_name],
+                })
             self.consensus_snapshot.append([self.get_lineage_genome(lineage_name),
-                                                frequency,
-                                                t])
+                                            frequency,
+                                            t])
             
 # -----------------------------------------------------------------------------
 

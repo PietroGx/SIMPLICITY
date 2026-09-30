@@ -19,9 +19,22 @@
 import simplicity.phenotype.distance as dis
 import numpy as np
 
-def immune_waning_fitness_score(population,lineage_genome,consensus):
-    # get the hamming distance from the weighted consensus
-    distance_from_weighted_consensus = dis.hamming_iw(lineage_genome,consensus)
+def consensus_distance(lineage_genome, consensus, use_distribution=False):
+    # consensus is (sequence, column distributions, delta) from get_consensus
+    chat, column_dist, delta = consensus
+    if use_distribution:
+        return dis.distributional(lineage_genome, column_dist, delta)
+    return dis.hamming_iw(lineage_genome, chat)
+
+
+def immune_waning_fitness_score(population,lineage_genome,consensus,
+                                use_distribution=False):
+    return fitness_from_distance(
+        population,
+        consensus_distance(lineage_genome, consensus, use_distribution))
+
+
+def fitness_from_distance(population, distance_from_weighted_consensus):
     # compute fitness score
     infected_fraction = min((population.diagnosed + population.recovered)/population.size,1)
     non_infected_fraction = max((population.size-(population.diagnosed + population.recovered))/population.size,0)
@@ -42,7 +55,7 @@ def immune_waning_fitness_score(population,lineage_genome,consensus):
 #     for i in infectious_i_list : 
 #         population.individuals[i]['fitness_score'] /= fitsum
 
-def update_fitness_factory(type):
+def update_fitness_factory(type, consensus_mode='argmax'):
     '''
     Factory of fitness update function. Returns update_fitness, depending on selected
     phenotype model. Update_fitness computes and assigns the  fitness score of every 
@@ -54,32 +67,53 @@ def update_fitness_factory(type):
             # individuals - dictionary of individuals in the simulation
             # individuals_to_update - indices of individuals to be updated
             for individual in sorted(individuals_to_update):
-                fitness = []
-                for lineage_name in population.individuals[individual]['IH_lineages']:
-                    lineage_genome = population.get_lineage_genome(lineage_name)
-                    fitness.append(dis.hamming(lineage_genome))
-                population.individuals[individual]['IH_lineages_fitness_score'] = fitness
-                population.individuals[individual]['fitness_score'] = np.average(fitness)
+                ind = population.individuals[individual]
+                scores = {}
+                for lineage_name in ind['IH_lineages']:
+                    if lineage_name not in scores:
+                        scores[lineage_name] = dis.hamming(
+                            population.get_lineage_genome(lineage_name))
+                ind['IH_lineages_fitness_score'] = [scores[l] for l in ind['IH_lineages']]
+                # host score averages over DISTINCT lineages: copies do not count twice
+                ind['fitness_score'] = np.average(list(scores.values()))
             # # update relative fitness scores for the population
             # update_relative_fitness(population)
         
         return update_fitness
     
     elif type == "immune_waning":
-        
+        use_distribution = consensus_mode == 'distribution'
+        # A lineage's distance from the consensus cannot change while that
+        # consensus holds: its genome is fixed at creation and a mutation makes
+        # a NEW lineage. Keep the distances until the consensus is rebuilt.
+        distance_cache = {}
+        cached_for = [None]
+
         def update_fitness(population,individuals_to_update,consensus):
+            if cached_for[0] is not consensus:
+                distance_cache.clear()
+                cached_for[0] = consensus
             # individuals - dictionary of individuals in the simulation
             # individuals_to_update - indices of individuals to be updated
             # consensus - consensus sequence
             for individual_index in sorted(individuals_to_update):
-                fitness = []
-                for lineage_name in population.individuals[individual_index]['IH_lineages']:
-                    lineage_genome = population.get_lineage_genome(lineage_name)
-                    fitness.append(immune_waning_fitness_score(population,lineage_genome,consensus))
-                population.individuals[individual_index]['IH_lineages_fitness_score'] = fitness
-                population.individuals[individual_index]['fitness_score'] = np.average(fitness)
+                ind = population.individuals[individual_index]
+                scores = {}
+                for lineage_name in ind['IH_lineages']:
+                    if lineage_name not in scores:
+                        d = distance_cache.get(lineage_name)
+                        if d is None:
+                            d = consensus_distance(
+                                population.get_lineage_genome(lineage_name),
+                                consensus, use_distribution)
+                            distance_cache[lineage_name] = d
+                        scores[lineage_name] = fitness_from_distance(population, d)
+                ind['IH_lineages_fitness_score'] = [scores[l] for l in ind['IH_lineages']]
+                # host score averages over DISTINCT lineages: copies do not count twice
+                ind['fitness_score'] = np.average(list(scores.values()))
             # # update relative fitness scores for the population
             # update_relative_fitness(population)
         
         return update_fitness
 
+    raise ValueError(f"Unknown phenotype_model: {type!r}")

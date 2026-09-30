@@ -31,6 +31,7 @@ from impact_long_shedders_unbound_config import (
     PROD_EXP_NAME, SETUP_DIR_TEMPLATE, TABLE_FILENAME, USER_FIXED_PARAMS,
     build_exp_scenario_settings, add_slurm_resource_args,
     set_slurm_resource_env, print_fixed_params,
+    CONSENSUS_MODES, prod_exp_name,
 )
 
 REQUIRED_COLUMNS = [
@@ -58,12 +59,13 @@ def load_calibration_table(path):
     return df
 
 
-def dispatch_scenario(row, exp_num, runner, n_seeds):
+def dispatch_scenario(row, exp_num, runner, n_seeds, consensus="argmax"):
     name = row["scenario_name"]
-    settings_func = build_exp_scenario_settings(row, n_seeds)
+    settings_func = build_exp_scenario_settings(row, n_seeds, consensus)
+    prefix = prod_exp_name(consensus)
 
     print(f"\n{'='*60}")
-    print(f"[Dispatch] {PROD_EXP_NAME}_{name}")
+    print(f"[Dispatch] {prefix}_{name}   (consensus: {consensus})")
     print(f"   R            : {float(row['R'])}")
     print(f"   k_v          : {float(row['IH_virus_emergence_rate'])}")
     print(f"   standard NSR : {float(row['nucleotide_substitution_rate']):.8f}")
@@ -76,7 +78,7 @@ def dispatch_scenario(row, exp_num, runner, n_seeds):
         print(f"   (control: no long shedders)")
     print(f"{'='*60}")
 
-    run_experiment_script(runner, exp_num, settings_func, f"{PROD_EXP_NAME}_{name}")
+    run_experiment_script(runner, exp_num, settings_func, f"{prefix}_{name}")
 
 
 def main():
@@ -86,7 +88,12 @@ def main():
     parser.add_argument('--exp-num', type=int, required=True)
     parser.add_argument('--runner', type=str,
                         choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
-    parser.add_argument('--seeds', type=int, default=50)
+    parser.add_argument('--seeds', type=int, default=30)
+    parser.add_argument('--consensus', type=str, choices=list(CONSENSUS_MODES),
+                        default='argmax',
+                        help="Consensus distance arm. 'distribution' writes to "
+                            "the _dist experiment names, so both arms can share "
+                            "one --exp-num.")
     parser.add_argument('--only', type=str, default=None,
                         help="Optional: run only this scenario_name.")
     add_slurm_resource_args(parser)
@@ -102,12 +109,13 @@ def main():
         if df.empty:
             raise ValueError(f"Scenario '{args.only}' not found in the table.")
 
-    print(f"\n[Runner] Dispatching {len(df)} scenario(s) from {table_path}")
+    print(f"\n[Runner] Dispatching {len(df)} scenario(s) from {table_path} "
+          f"with consensus={args.consensus} -> {prod_exp_name(args.consensus)}_<scenario>")
     shared = {k: v for k, v in USER_FIXED_PARAMS.items() if k != "R"}
     print_fixed_params(shared, label="Shared parameters (R shown per scenario below)")
 
     for _, row in df.iterrows():
-        dispatch_scenario(row, args.exp_num, args.runner, args.seeds)
+        dispatch_scenario(row, args.exp_num, args.runner, args.seeds, args.consensus)
 
     print(f"\n[Success] All scenarios dispatched.")
 

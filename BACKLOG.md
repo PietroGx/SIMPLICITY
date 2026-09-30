@@ -6,6 +6,47 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Blockers (before next production rerun)
 
+- [x] **Genome stored the mutation history, not the sequence** — fixed in
+      v2.4.41. A position mutated twice was stored twice, and five code paths
+      read that differently (oldest base / newest base / both / two clade
+      mutations). 489 of 62,622 lineages in unbound #1 held a duplicate
+      position, 138 held a reference-valued entry that `hamming_iw` scored as a
+      difference. Genomes are now `{position: base}`, so neither can occur.
+      **Recalibration required.**
+- [x] **Long shedders were absent from the frequency table and the consensus**
+      — fixed in v2.4.41. `update_lineage_frequency_t` looped over
+      `infected_i - long_shedder_i`, so `lineage_frequency.csv` and the
+      `immune_waning` consensus both excluded them; long shedders' lineages
+      were scored against a target their own sequences never shaped. The same
+      loop counted carriage slots rather than hosts, so a host with k lineages
+      voted k times. Every infected, undiagnosed host now contributes weight 1
+      split over its distinct lineages. **Recalibration required.**
+- [x] **Within-host copy number leaked into transmission and fitness** — fixed
+      in v2.4.41. The transmission draw and the host's mean fitness both counted
+      lineage instances, so a lineage holding 3 of 5 slots was transmitted 3x as
+      often and pulled the host's score 3x as hard. This applied to 70-100% of
+      long shedders and 2.9% of standard hosts. Both now count distinct
+      lineages; only `select_positions` still sees copies. **Recalibration
+      required.**
+- [x] **`IH_unique_lineages_number` was wrong for 92.8% of individuals** —
+      fixed in v2.4.41. Never written on infection, never updated by
+      `add_lineage`, so it read 0 for every host that had not mutated (7.2%
+      correct across 206,725 individuals in unbound #1). Reporting only — no
+      engine path read it — but `output_manager.get_IH_lineages_data_simulation`
+      and the `plots_manager` within-host diversity panels did, so those figures
+      were wrong in every prior run.
+- [ ] **Figure 3's Peak metric is ceiling-saturated** — dropped from panel A in
+      v2.4.40, still the basis of panels B, C and D in thresholded form. The
+      winning clade's peak frequency is exactly 1.0 in 88-98% of simulations and
+      two or more clades tie at that ceiling in 30-39%, with `max()` breaking
+      the tie by dict order. If Peak is ever reinstated as a ranking it needs a
+      tie rule, or restating as "share of clades that swept".
+- [ ] **"Most infections caused" does not race the same field as the other
+      metrics** — it ranks every clade including the founder and counts
+      infections in long shedders, which the frequency-derived metrics exclude.
+      The founder wins it in 18-28% of simulations and none of the others. Its
+      flat result is not yet evidence of anything.
+
 - [x] **`long_shedders_ratio` was an incidence rate, not a population
       share** — fixed in v2.4.28. Status was drawn per new infection in
       `infect_long_shedder`, so the parameter set the FLOW of long-shedder

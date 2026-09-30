@@ -163,9 +163,12 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     seq_rate = parameters["sequencing_rate"]
     max_runtime = parameters["max_runtime"]
     # for fitness update
-    update_all_fitness = pheno.update_fitness_factory(phenotype_model)
+    consensus_mode = parameters.get("consensus", "argmax")
+    update_all_fitness = pheno.update_fitness_factory(phenotype_model, consensus_mode)
     use_consensus = phenotype_model == "immune_waning"
-    last_consensus_snapshot = {"t_snapshot": 0, "consensus": []} if use_consensus else None
+    # (sequence, column distributions, delta) -- see consensus.get_consensus
+    last_consensus_snapshot = ({"t_snapshot": 0, "consensus": ({}, {}, 0.0)}
+                               if use_consensus else None)
     
     def compute_upperbound(population):
         propensities, params = SIDR.SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v, seq_rate)
@@ -201,7 +204,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
             if np.floor(t) > last_consensus_snapshot["t_snapshot"]:
                 last_consensus_snapshot["t_snapshot"] += 5
                 consensus = c.get_consensus(population.consensus_snapshot, t)
-                population.consensus_sequences_t.append([consensus, t])
+                population.consensus_sequences_t.append([consensus[0], t])
                 last_consensus_snapshot['consensus'] = consensus 
             else:
                 consensus = last_consensus_snapshot['consensus']
@@ -216,9 +219,9 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         delta_t_y = delta_t / 365.25 # time in years
         if use_consensus:
             consensus = last_consensus_snapshot['consensus']
-            evo.mutate(population, NSR, L, delta_t_y, phenotype_model, consensus)
+            evo.mutate(population, NSR, L, delta_t_y, update_all_fitness, consensus)
         else:
-            evo.mutate(population, NSR, L, delta_t_y, phenotype_model)
+            evo.mutate(population, NSR, L, delta_t_y, update_all_fitness)
     
     def fire_reaction(population, propensities, tau_2):
         a0 = sum(rate for _, rate, _ in propensities)

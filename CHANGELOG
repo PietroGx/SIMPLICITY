@@ -5,6 +5,100 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.41 — 2026-09-30 — pietro gerletti
+
+Genome representation, host-counting rules, a second consensus distance behind
+a parameter, and three optimisations. **Recalibration required** — every change
+below except the parameter plumbing alters simulation dynamics under
+`immune_waning`, which is what both long-shedder pipelines run.
+
+**Genomes are now `{position: base}`** instead of a list of `[position, base]`
+pairs, holding only positions differing from the reference. A second
+substitution at a position overwrites; a back-mutation to the reference removes
+the entry. The genome is the lineage's current sequence; its history is the
+chain of `Lineage_parent` pointers, which was always true and is now the only
+place it lives.
+
+The old form was the cumulative mutation history, so a position hit twice was
+stored twice, and five code paths read that differently: `fetch_bases` took the
+OLDEST base at a repeated position, `hamming_iw` the newest, the consensus
+matrix and `hamming` counted BOTH, and `clustering.parse_genome` counted it as
+two mutations when defining clades at threshold 5. Measured in unbound #1: 489
+of 62,622 lineages held a duplicate position, 138 held a reference-valued entry.
+`parse_genome`'s bare `except Exception: return frozenset()` also went — it
+returned an empty genome for every lineage on any error, silently collapsing
+every clade into one.
+
+**Every host now votes once.** `update_lineage_frequency_t` gives each infected,
+undiagnosed host total weight 1, split over the DISTINCT lineages it carries,
+and includes long shedders, who were excluded entirely. Frequencies sum to 1 by
+construction, so "50% of circulating infections" now means half the infected
+people rather than half the carriage slots. Long shedders carry 2.4-8.6 distinct
+lineages against 1.03 for standard hosts, so under the old slot-counting they
+would have taken 41% of the denominator in HIV_high on 12% of the hosts.
+
+Consistently, transmission draws uniformly over distinct lineages
+(`population_model.py:208`), the host's fitness averages over distinct lineages
+(`update.py`, both phenotype branches), and `active_lineages_n` sums distinct
+lineages per host. Within-host copy number now confers mutational opportunity
+and nothing else — `select_positions` still pools over instances.
+
+Fixing `active_lineages_n` required fixing `IH_unique_lineages_number`, which
+was wrong for 92.8% of individuals in unbound #1: never written on infection and
+never updated by `add_lineage`, so it read 0 for every host that had not
+mutated. It is now maintained by `Population.refresh_unique_lineages` wherever
+`IH_lineages` changes. This also corrects
+`output_manager.get_IH_lineages_data_simulation` and the `plots_manager`
+within-host diversity panels, which had been reporting from that field.
+
+**A second consensus distance**, selected by the new `consensus` parameter
+(`argmax` default, or `distribution`), IW only. The argmax consensus collapses
+each column to one base, so a position split 51/49 is indistinguishable from
+100/0. The alternative scores against the full column distribution:
+
+    d(l) = delta + sum over the lineage's own mutated positions of
+           [ P(p, reference) - P(p, lineage's base) ]  + |positions outside C|
+    delta = sum over columns of [ P(p, consensus base) - P(p, reference) ]
+
+It is the expected Hamming distance to a randomly drawn circulating genome,
+CENTRED on the consensus. The centring matters: without it the distance is
+anchored to the wild type by a term common to every lineage that grows all run,
+and since transmission weights are normalised, that would flatten selection over
+time. Centred, it reduces exactly to the argmax distance when every column is
+pure, and the argmax tie-break stops mattering. The parameter enters the output
+filename as `cdist`, and since only non-default parameters do, the argmax arm's
+paths are unchanged.
+
+**Three optimisations**, same experiment, base 20.9/19.4 s -> 11.9/9.9 s:
+
+- `build_weighted_consensus_matrix` seeds every column with the total weight on
+  the reference base and corrects only where a genome differs. Inner steps
+  9,866,192 -> 113,168; isolated 2.222 s -> 0.046 s. Verified numerically
+  identical (max diff 7.7e-12).
+- A per-lineage distance cache, cleared when the consensus is rebuilt. A
+  lineage's genome never changes — a mutation makes a new lineage — so the
+  distance is constant within a consensus epoch. Measured redundancy 153.6x:
+  434,714 calls for 2,831 distinct answers. Caches the distance only; the
+  fitness arithmetic still recomputes, since phi and n_act change constantly.
+- `hamming_iw` without the set union, 1.4-1.65x, keeping the reference guard so
+  it agrees with `hamming` whatever is upstream.
+
+**The unbound pipeline runs both arms off one calibration.**
+`run_impact_long_shedders_unbound_pipeline.py --exp-num N` now dispatches
+production once per consensus arm from the SAME frozen table, so the arms differ
+in nothing else. `--exp-seeds` defaults to 30. The argmax arm keeps the existing
+experiment names; the distribution arm is suffixed `_dist`. The calibration
+itself runs under argmax, so the distribution arm uses rates fitted under the
+other model — the price of making the comparison attributable to the consensus
+alone.
+
+Verification in `tests/`: genome invariants on a live run, frequency sums, the
+counting invariants asserted every simulated day, the distance properties and
+both arms end to end, the three optimisations against the implementations they
+replace, and the pipeline dispatch with the runner stubbed.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.40 — 2026-09-30 — pietro gerletti
 
 Figure 3: burn-in window, panel reorder, and the Peak metric dropped.

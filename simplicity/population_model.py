@@ -66,9 +66,8 @@ def diagnosis(population, from_long_shedder, seq_rate=0):
         i = 0
         for lineage_name in population.individuals[diagnosed_individual_i]['IH_lineages']:
             genome = population.get_lineage_genome(lineage_name)
-            # a genome is a position-sorted list of [position, base] pairs, so
-            # this is comparing actual sequence content, not lineage identity
-            genome_key = tuple(map(tuple, genome))
+            # compare sequence content, not lineage identity
+            genome_key = tuple(sorted(genome.items()))
             if genome_key in seen_genomes:
                 continue
             seen_genomes.add(genome_key)
@@ -85,7 +84,7 @@ def diagnosis(population, from_long_shedder, seq_rate=0):
             i += 1
 
     # update the active lineages number
-    population.active_lineages_n -= population.individuals[diagnosed_individual_i]['IH_lineages_number']
+    population.active_lineages_n -= population.individuals[diagnosed_individual_i]['IH_unique_lineages_number']
     
     population.diagnosed += 1
     if from_long_shedder:               
@@ -204,10 +203,13 @@ def infection(population, from_long_shedder=False):
     # parent
     new_inf['parent'] = parent
 
-    # Select random lineage from parent
-    index = population.rng4.integers(0, population.individuals[parent]['IH_lineages_number'])
-    transmitted_lineage = population.individuals[parent]['IH_lineages'][index]
-    transmitted_fitness = population.individuals[parent]['IH_lineages_fitness_score'][index]
+    # Select random lineage from parent, uniform over DISTINCT lineages:
+    # within-host copy number confers no transmission advantage
+    parent_lineages = population.individuals[parent]['IH_lineages']
+    distinct = sorted(set(parent_lineages))
+    transmitted_lineage = distinct[population.rng4.integers(0, len(distinct))]
+    transmitted_fitness = population.individuals[parent]['IH_lineages_fitness_score'][
+        parent_lineages.index(transmitted_lineage)]
     # count lineage infection
     population._phylo_name_map[transmitted_lineage]['Total_infections'] = population._phylo_name_map[transmitted_lineage].get('Total_infections', 0) + 1
     
@@ -218,9 +220,6 @@ def infection(population, from_long_shedder=False):
     new_inf['IH_lineages_trajectory'][transmitted_lineage] = {'ih_birth':None,'ih_death':None}
     # update mutation weight event timer
     new_inf['time_last_weight_event'] = population.time
-    
-    # update the active lineages number
-    population.active_lineages_n += new_inf['IH_lineages_number']
     
     # Append transmitted lineage + fitness
     new_lineages = new_inf['IH_lineages']
@@ -236,6 +235,9 @@ def infection(population, from_long_shedder=False):
     
     # Update individual fitness (average of lineage's fitness)
     new_inf['fitness_score'] = round(np.average(fitness_sorted), 4)
+
+    # distinct lineage count, and its contribution to active_lineages_n
+    population.refresh_unique_lineages(new_infected_index)
 
     # store infection info for R effective
     population.individuals[parent]['new_infections'].append({
@@ -270,7 +272,6 @@ def add_lineage(population):
         individual['IH_lineages'].append(duplicated_lineage)
         individual['IH_lineages_fitness_score'].append(individual['IH_lineages_fitness_score'][idx])
         individual['IH_lineages_number'] += 1
-        population.active_lineages_n += 1
         
     # Replace one lineage (delete + duplicate) if at max
     elif IH_lineage_n == IH_lineages_max and IH_lineages_max > 1:
@@ -290,6 +291,9 @@ def add_lineage(population):
     # Keep IH_lineages and IH_lineages_fitness_score sorted
     combined = sorted(zip(individual['IH_lineages'], individual['IH_lineages_fitness_score']))
     individual['IH_lineages'], individual['IH_lineages_fitness_score'] = map(list, zip(*combined))
+
+    # duplication, or delete+duplicate at capacity, can change the distinct set
+    population.refresh_unique_lineages(individual_index)
 
     # update individual fitness
     individual['fitness_score'] = round(np.average(individual['IH_lineages_fitness_score']), 4)

@@ -77,7 +77,7 @@ def build_weighted_consensus_matrix(data):
 
     '''
     # Extract unique positions
-    unique_positions= sorted(set(num for entry in data for num, _ in entry[0]))
+    unique_positions = sorted({num for entry in data for num in entry[0]})
     num_index = {num: i for i, num in enumerate(unique_positions)}
     
     bases = ['A', 'T', 'C', 'G']  
@@ -85,25 +85,24 @@ def build_weighted_consensus_matrix(data):
     
     # Initialize the matrix
     matrix = np.zeros((len(bases), len(unique_positions)), dtype=float)
-    
-    # Populate the matrix, accounting for missing positions
+    if not unique_positions:
+        return matrix, bases, unique_positions
+
+    # Every genome votes in every column: its own base where it stores one, the
+    # reference otherwise. Since a genome differs from the reference at only a
+    # handful of the columns, seed every column with the full weight on the
+    # reference base and then correct where a genome differs. Identical result,
+    # inner loop over mutations rather than over all columns.
+    total = sum(n_infected * weight for _, n_infected, weight in data)
+    ref_rows = np.fromiter((letter_index[reference[p]] for p in unique_positions),
+                           dtype=np.intp, count=len(unique_positions))
+    matrix[ref_rows, np.arange(len(unique_positions))] = total
     for seq, n_infected, weight in data:
-        # Determine missing positions
-        existing_positions = set(num for num, _ in seq)
-        missing_positions = set(unique_positions) - existing_positions
-        
-        # Update matrix for existing positions
-        for num, char in seq:
-            row = letter_index[char]
+        v = n_infected * weight
+        for num, char in seq.items():
             col = num_index[num]
-            matrix[row, col] += n_infected * weight
-        
-        # Update matrix for missing positions
-        for num in missing_positions:
-            char = reference[num]  # fetch base from reference genome
-            row = letter_index[char]
-            col = num_index[num]
-            matrix[row, col] += n_infected * weight 
+            matrix[ref_rows[col], col] -= v
+            matrix[letter_index[char], col] += v
     
     return matrix, bases, unique_positions
 
@@ -113,7 +112,7 @@ def weighted_consensus(matrix, positions):
     '''
     bases = ['A', 'T', 'C', 'G']
     
-    consensus = []
+    consensus = {}
     
     # Iterate through each column in the matrix to find the base with the highest count
     for col_idx, pos in enumerate(positions):
@@ -124,15 +123,36 @@ def weighted_consensus(matrix, positions):
         max_base= bases[max_base_idx]
         # if position is diffrent from wt, append it. (we encode sequences as only positions that differ from wt)
         if max_base != reference[pos]:
-            # Append the position (num) and the letter with the highest count
-            consensus.append([pos, max_base])
+            # same encoding as a lineage genome: only positions differing from wt
+            consensus[pos] = max_base
     
     return consensus
 
+def consensus_distribution(matrix, bases, positions):
+    '''Per-column distributions P(p,b), normalised column by column, and
+
+        delta = sum over columns of [ P(p, consensus base) - P(p, reference) ]
+
+    the offset used by the centred distributional distance.
+    '''
+    P = {}
+    delta = 0.0
+    for col, pos in enumerate(positions):
+        total = matrix[:, col].sum()
+        if not total:
+            continue
+        column = matrix[:, col] / total
+        P[pos] = {b: float(column[i]) for i, b in enumerate(bases)}
+        delta += float(column.max()) - P[pos][reference[pos]]
+    return P, delta
+
 def get_consensus(data,t):
+    '''(consensus sequence, column distributions, delta). The argmax distance
+    reads the first only; the distributional distance reads the other two.'''
     data = get_seq_weights(data,t)
     matrix, bases, positions= build_weighted_consensus_matrix(data)
-    return weighted_consensus(matrix, positions)
+    return (weighted_consensus(matrix, positions),
+            *consensus_distribution(matrix, bases, positions))
 
 
 # ## example use 

@@ -213,15 +213,9 @@ def fetch_bases(population, sub_coord_dicmap):
         lineage_name = population.individuals[coord[0]]['IH_lineages'][coord[1]]
         lineage_genome = population.get_lineage_genome(lineage_name)
         
-        # get mutation if the lineage already have one at position
-        mut_coord = [mut for mut in lineage_genome if coord[2] in mut]
-        # if so, fetch the base from lineage
-        if mut_coord:
-            coord.append(mut_coord[0][1])
-            
-        # else, fetch it from reference genome
-        else:
-            coord.append(population.ref_genome[coord[2]])
+        # the lineage's current base at that position, else the reference
+        coord.append(lineage_genome.get(coord[2],
+                                        population.ref_genome[coord[2]]))
         
     return sub_coord_dicmap
 
@@ -418,14 +412,18 @@ def update_lineages(population, sub_coord_dicmap):
             individual['IH_lineages_trajectory'][parent_lineage_name]['ih_death'] = population.time
             
     
-        # update lineages count inside individual
-        individual['IH_unique_lineages_number'] = len(
-            set(individual['IH_lineages']))
+        # a mutation renames one slot, which can add a distinct lineage
+        population.refresh_unique_lineages(coord[0])
         
+        # a genome is {position: base}, holding only positions that differ from
+        # the reference: a second hit overwrites, a back-mutation removes
         parent_lineage_genome = population.get_lineage_genome(parent_lineage_name)
-        new_lineage_genome = copy.deepcopy(parent_lineage_genome)
-        new_lineage_genome.append([int(coord[2]), str(coord[3])])
-        new_lineage_genome.sort(key=lambda x: x[0])  # sort by position
+        pos, base = int(coord[2]), str(coord[3])
+        new_lineage_genome = dict(parent_lineage_genome)
+        if base == population.ref_genome[pos]:
+            new_lineage_genome.pop(pos, None)
+        else:
+            new_lineage_genome[pos] = base
         
         new_row_dict = {'Time_emergence'  : population.time,
          'Lineage_name'    : new_lineage_name,
@@ -456,7 +454,7 @@ def get_individuals_to_update(subst_coord):
     
     return mutated_individuals
 
-def mutate(population, NSR, L, dt, phenotype_model, *args):
+def mutate(population, NSR, L, dt, update_fitness, *args):
     '''
     Mutation model, mutates the viruses in the population.
 
@@ -499,7 +497,6 @@ def mutate(population, NSR, L, dt, phenotype_model, *args):
         # print('Substitution coordinates: ', subst_coord)
         individuals_to_update = get_individuals_to_update(subst_coord)
         # print('Individuals to be updated: ', individuals_to_update)
-        update_fitness = pheno.update_fitness_factory(phenotype_model)
         if args:
             consensus = args[0]
             update_fitness(population, individuals_to_update, consensus)
