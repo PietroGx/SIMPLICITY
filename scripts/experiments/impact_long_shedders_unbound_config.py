@@ -223,9 +223,30 @@ def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
 # =============================================================================
 # STAGE 3 -- production
 # =============================================================================
-def build_exp_scenario_settings(row, n_seeds):
+CONSENSUS_MODES = ("argmax", "distribution")
+# The distribution arm's experiments carry this suffix so the two arms cannot
+# collide in Data/ at the same --exp-num.
+CONSENSUS_SUFFIX = {"argmax": "", "distribution": "_dist"}
+
+
+def prod_exp_name(consensus):
+    """Production experiment prefix for one consensus arm."""
+    if consensus not in CONSENSUS_MODES:
+        raise ValueError(f"consensus must be one of {CONSENSUS_MODES}, got {consensus!r}")
+    return PROD_EXP_NAME + CONSENSUS_SUFFIX[consensus]
+
+
+def build_exp_scenario_settings(row, n_seeds, consensus="argmax"):
     """One simulation point per frozen-table row. Both rates are applied as
-    calibrated; nothing here compensates for their interaction."""
+    calibrated; nothing here compensates for their interaction.
+
+    `consensus` selects how a lineage's distance from the population consensus
+    is measured -- 'argmax' against the consensus sequence, 'distribution'
+    against the full column distribution. Everything else is identical, which
+    is what makes the two arms comparable.
+    """
+    if consensus not in CONSENSUS_MODES:
+        raise ValueError(f"consensus must be one of {CONSENSUS_MODES}, got {consensus!r}")
     is_control = float(row["long_shedders_ratio"]) == 0.0
 
     fixed = USER_FIXED_PARAMS.copy()
@@ -238,6 +259,7 @@ def build_exp_scenario_settings(row, n_seeds):
         "R_long": float(row["R_long"]),
         "nucleotide_substitution_rate": float(row["nucleotide_substitution_rate"]),
         "sequence_long_shedders": False,
+        "consensus": consensus,
     })
 
     if not is_control:

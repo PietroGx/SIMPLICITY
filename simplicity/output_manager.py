@@ -236,7 +236,7 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
                     for lineage_name in ind_data['IH_lineages']:
                         # Retrieve the genome sequence
                         sequence_list = simulation_output.get_lineage_genome(lineage_name)
-                        genome_key = tuple(map(tuple, sequence_list))
+                        genome_key = tuple(sorted(sequence_list.items()))
                         if genome_key in seen_genomes:
                             continue
                         seen_genomes.add(genome_key)

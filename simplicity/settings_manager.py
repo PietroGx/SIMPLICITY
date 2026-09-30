@@ -58,6 +58,7 @@ _STANDARD_VALUES_DEFAULTS = {
         "final_time": 365,
         "max_runtime": 86000,
         "phenotype_model": 'immune_waning',  # or 'linear'
+        "consensus": 'argmax',  # or 'distribution' (immune_waning only)
         "sequencing_rate": 0.05,
         "sequence_long_shedders": False,
         "susceptibility_long": 1.0,
@@ -94,6 +95,7 @@ def write_parameter_specs():
         "final_time":                    {"type": "int", "min": 0},    
         "max_runtime":                   {"type": "int", "min": 0},
         "phenotype_model":               {"type": "str"},
+        "consensus":                     {"type": "str"},
         "sequencing_rate":               {"type": "float", "min": 0, "max": 1},
         "sequence_long_shedders":        {"type": "bool"},
         "susceptibility_long":           {"type": "float", "min": 0},
@@ -278,7 +280,8 @@ def write_simulation_parameters(file_path,
                                 sequence_long_shedders,
                                 susceptibility_long,
                                 write_fasta,
-                                seed
+                                seed,
+                                consensus='argmax'
                                 ):
     settings = {
         "population_size": population_size,
@@ -300,6 +303,7 @@ def write_simulation_parameters(file_path,
         "final_time": final_time,
         "max_runtime": max_runtime,
         "phenotype_model": phenotype_model,
+        "consensus": consensus,
         "sequencing_rate": sequencing_rate,
         "sequence_long_shedders":sequence_long_shedders,
         "susceptibility_long": susceptibility_long,
@@ -325,7 +329,8 @@ def generate_filename_from_params(params: dict):
     "IH_virus_emergence_rate": "kv",
     "nucleotide_substitution_rate": "NSR",
     "final_time": "T",
-    "phenotype_model": "pheno"
+    "phenotype_model": "pheno",
+    "consensus": "cdist"
     # excluded: max_runtime, sequencing_rate, seed, F
 }
     exclude  = {"max_runtime", "sequencing_rate", "seed"}
@@ -413,7 +418,8 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                     settings["sequence_long_shedders"],
                                     settings["susceptibility_long"],
                                     settings["write_fasta"],
-                                    settings["seed"]
+                                    settings["seed"],
+                                    consensus=settings["consensus"]
                                     )
 
     print(f"Simulation parameters written to directory: {simulation_parameters_file_path}")

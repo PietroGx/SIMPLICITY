@@ -19,7 +19,9 @@
 #   1. cal_1  100% long shedders, sweep NSR_long, intra-host clock
 #   2. cal_2  0% long shedders, sweep standard NSR, global clock -> ONE
 #             standard rate for every scenario, then the frozen table
-#   3. exp    production, both rates applied exactly as calibrated
+#   3. exp    production, both rates applied exactly as calibrated, run ONCE
+#             PER CONSENSUS ARM off the SAME frozen table, so the arms differ
+#             in nothing but how the distance from the consensus is measured
 #   4. sanity combined root-to-tip grid over real output
 #   5. artifacts zipped into one file per run
 #
@@ -47,7 +49,7 @@ sys.path.insert(0, SCRIPT_DIR)
 from impact_long_shedders_unbound_config import (
     LONG_NSR_EXP_NAME, STD_NSR_EXP_NAME, PROD_EXP_NAME, SETUP_DIR_TEMPLATE,
     TABLE_FILENAME, SCENARIOS, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
-    add_slurm_resource_args,
+    add_slurm_resource_args, CONSENSUS_MODES, prod_exp_name,
 )
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
@@ -196,8 +198,12 @@ def main():
     parser.add_argument('--target-osr-long', type=float, default=0.00205)
     parser.add_argument('--cal-seeds', type=int, default=30,
                         help="Seeds per grid point, cal_1 and cal_2.")
-    parser.add_argument('--exp-seeds', type=int, default=50,
+    parser.add_argument('--exp-seeds', type=int, default=30,
                         help="Seeds per scenario, production stage.")
+    parser.add_argument('--consensus', type=str, nargs='+',
+                        choices=list(CONSENSUS_MODES), default=list(CONSENSUS_MODES),
+                        help="Consensus arms to run in production, off the same "
+                            "calibration. Default: both.")
     parser.add_argument('--skip-cal1', action='store_true',
                         help=f"Reuse an existing {LONG_NSR_EXP_NAME}_#{{exp_num}}.")
     parser.add_argument('--r-cal1', type=float, default=CAL1_ISOLATED_FIXED_PARAMS['R'])
@@ -257,15 +263,20 @@ def main():
         report_simulation_health([f"{STD_NSR_EXP_NAME}_#{args.exp_num}"],
                                  log_fh, "stage 2 (standard alone)")
 
-        run_stage([py, exp_path,
-                  "--exp-num", str(args.exp_num),
-                  "--runner", args.runner,
-                  "--seeds", str(args.exp_seeds),
-                  *slurm_res_args], log_fh)
+        # Every arm reads the SAME frozen table, so the only thing that differs
+        # between them is the consensus distance.
+        for mode in args.consensus:
+            run_stage([py, exp_path,
+                      "--exp-num", str(args.exp_num),
+                      "--runner", args.runner,
+                      "--seeds", str(args.exp_seeds),
+                      "--consensus", mode,
+                      *slurm_res_args], log_fh)
 
-        report_simulation_health(
-            [f"{PROD_EXP_NAME}_{s['name']}_#{args.exp_num}" for s in SCENARIOS],
-            log_fh, "stage 3 (production)")
+            report_simulation_health(
+                [f"{prod_exp_name(mode)}_{s['name']}_#{args.exp_num}"
+                 for s in SCENARIOS],
+                log_fh, f"stage 3 (production, consensus={mode})")
 
         submitted = submit_sanity_plots(
             args.exp_num, args.target_osr_std, args.target_osr_long, log_fh)
@@ -279,7 +290,8 @@ def main():
             f"Frozen calibration table : {table_path}",
             f"Long calibration exp     : {LONG_NSR_EXP_NAME}_#{args.exp_num}",
             f"Standard calibration exp : {STD_NSR_EXP_NAME}_#{args.exp_num}",
-            f"Production experiments   : {PROD_EXP_NAME}_<scenario>_#{args.exp_num}",
+            *[f"Production ({m:<12}): {prod_exp_name(m)}_<scenario>_#{args.exp_num}"
+              for m in args.consensus],
             "Sanity plot jobs submitted:",
         ]
         for scenario, sbatch_out in submitted:

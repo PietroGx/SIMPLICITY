@@ -100,13 +100,14 @@ def get_clustering_for_ssod(
     return path
 
 def parse_genome(genome):
-    """Convert a genome (list of mutations) into a frozenset of mutation tuples."""
-    if genome is None:
+    """Convert a genome ({position: base}) into a frozenset of (position, base).
+
+    No bare except: a malformed genome must raise rather than silently yield an
+    empty set, which would collapse every clade into one.
+    """
+    if not genome:
         return frozenset()
-    try:
-        return frozenset(tuple(x) for x in genome)
-    except Exception:
-        return frozenset()
+    return frozenset(genome.items())
     
 def build_lineage_to_mutation_dict(phylogenetic_data_df):
     """Return {Lineage_name -> frozenset of mutation tuples} from the phylo table."""
