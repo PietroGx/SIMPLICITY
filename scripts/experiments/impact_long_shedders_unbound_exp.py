@@ -81,6 +81,71 @@ def dispatch_scenario(row, exp_num, runner, n_seeds, consensus="argmax"):
     run_experiment_script(runner, exp_num, settings_func, f"{prefix}_{name}")
 
 
+# Scenarios are independent: each submits its own Slurm array and each array's
+# tasks share one cap. Run them one after another and only one scenario's seeds
+# are ever in flight -- 30 at a time, five times over, against a cap of 200.
+# Submitting them together puts every scenario's seeds in the queue at once and
+# finishes the stage in roughly the time of its slowest scenario rather than the
+# sum of all five.
+#
+# Threads, not processes: run_seeded_simulations is entirely subprocess calls
+# and sleeps, so the GIL is never the constraint, and threads share the Data
+# directory and signal files without any extra coordination.
+def dispatch_all(rows, exp_num, runner, n_seeds, consensus, parallel=True):
+    if runner != "slurm" or not parallel or len(rows) <= 1:
+        for row in rows:
+            dispatch_scenario(row, exp_num, runner, n_seeds, consensus)
+        return
+
+    import threading
+
+    # Split the global cap between the scenarios rather than letting each take
+    # it in full: five scenarios at the 200 default would otherwise put 1000
+    # tasks in the queue. run_seeded_simulations reads this per call, so it has
+    # to be set before any thread starts.
+    key = "SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"
+    cap = int(os.environ.get(key, 200))
+    budget = max(1, cap // len(rows))
+    print(f"\n[Runner] Submitting {len(rows)} scenarios together: "
+          f"{budget} concurrent seeds each, {budget * len(rows)} of a {cap} cap.")
+
+    errors = []
+    lock = threading.Lock()
+
+    def worker(row):
+        try:
+            dispatch_scenario(row, exp_num, runner, n_seeds, consensus)
+        except BaseException as exc:            # noqa: BLE001 -- re-raised below
+            with lock:
+                errors.append((row["scenario_name"], exc))
+
+    previous = os.environ.get(key)
+    os.environ[key] = str(budget)
+    try:
+        threads = [threading.Thread(target=worker, args=(row,),
+                                    name=f"scenario-{row['scenario_name']}")
+                   for row in rows]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+    finally:
+        # restore it: a second dispatch_all in the same process would otherwise
+        # divide the already-divided budget again
+        if previous is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = previous
+
+    if errors:
+        # every scenario is reported, then the first failure is re-raised so
+        # the pipeline still stops here rather than calibrating against data
+        # that was never produced
+        for name, exc in errors:
+            print(f"[FAILED] scenario {name}: {type(exc).__name__}: {exc}")
+        raise errors[0][1]
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Unbound pipeline stage 3: production runs from the frozen "
@@ -96,6 +161,11 @@ def main():
                             "names, so both pipelines can share one --exp-num.")
     parser.add_argument('--only', type=str, default=None,
                         help="Optional: run only this scenario_name.")
+    parser.add_argument('--sequential', action='store_true',
+                        help="Submit one scenario at a time and wait for each, "
+                            "as before v2.4.49. The default submits all "
+                            "scenarios together, splitting the concurrency cap "
+                            "between them.")
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 
@@ -114,8 +184,8 @@ def main():
     shared = {k: v for k, v in USER_FIXED_PARAMS.items() if k != "R"}
     print_fixed_params(shared, label="Shared parameters (R shown per scenario below)")
 
-    for _, row in df.iterrows():
-        dispatch_scenario(row, args.exp_num, args.runner, args.seeds, args.consensus)
+    dispatch_all([row for _, row in df.iterrows()], args.exp_num, args.runner,
+                 args.seeds, args.consensus, parallel=not args.sequential)
 
     print(f"\n[Success] All scenarios dispatched.")
 

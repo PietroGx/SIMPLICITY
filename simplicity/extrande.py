@@ -160,7 +160,6 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     k_v = parameters["IH_virus_emergence_rate"]
     NSR = parameters["nucleotide_substitution_rate"]
     L = len(ref.get_reference())
-    seq_rate = parameters["sequencing_rate"]
     max_runtime = parameters["max_runtime"]
     # for fitness update
     consensus_mode = parameters.get("consensus", "argmax")
@@ -171,7 +170,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
                                if use_consensus else None)
     
     def compute_upperbound(population):
-        propensities, params = SIDR.SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v, seq_rate)
+        propensities, params = SIDR.SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v)
         # a0 = sum(rate for rate, _ in propensities)
         B = np.sum(params) * population.infected
         # print(f"B = {B}")
@@ -237,7 +236,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
                 return reaction_id
     
     def reaction_step(population, B):
-        propensities, _ = SIDR.SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v, seq_rate)
+        propensities, _ = SIDR.SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v)
         tau_2 = rng2.uniform(0, B)
         return fire_reaction(population, propensities, tau_2)
     

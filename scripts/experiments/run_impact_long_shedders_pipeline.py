@@ -67,13 +67,6 @@ from impact_long_shedders_config import (
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
 PROD_EXP_NAME = "impact_long_shedders"
 
-# SimulationsStatus lines are NOT dropped: since v2.4.47 they print once per
-# status change, timestamped, so they are the log's record of when each
-# simulation moved.
-_NOISE_PATTERNS = [
-    re.compile(r'^submitted \d+ seeded simulations$'),
-]
-
 _SBATCH_JOB_ID_RE = re.compile(r'Submitted batch job (\d+)')
 SANITY_PLOT_POLL_INTERVAL_S = 15
 
@@ -83,10 +76,6 @@ SANITY_PLOT_POLL_INTERVAL_S = 15
 CAL2_SLURM_MEM = "5G"
 
 
-def _is_slurm_monitor_noise(line):
-    stripped = line.strip()
-    return any(p.match(stripped) for p in _NOISE_PATTERNS)
-
 
 def _log(log_fh, line):
     print(line)
@@ -95,8 +84,8 @@ def _log(log_fh, line):
 
 
 def run_stage(cmd, log_fh):
-    """Run one pipeline stage, streaming output live and to the log file
-    (minus SLURM-monitor noise). Raises SystemExit on non-zero exit."""
+    """Run one stage, streaming output live and to the log. Raises SystemExit
+    on non-zero exit."""
     header = f"\n$ {' '.join(cmd)}"
     print(header)
     log_fh.write(header + "\n")
@@ -106,10 +95,9 @@ def run_stage(cmd, log_fh):
     for raw_line in proc.stdout:
         line = raw_line.rstrip("\n")
         print(line)
-        # Blank lines (printed liberally as visual spacing, and repeatedly by
-        # the SLURM runner's polling wait) carry no diagnostic value in a
-        # saved log -- drop them along with the named noise patterns.
-        if line.strip() and not _is_slurm_monitor_noise(line):
+        # blank lines are printed liberally as visual spacing and carry no
+        # diagnostic value in a saved log; everything else is kept
+        if line.strip():
             log_fh.write(line + "\n")
             log_fh.flush()
     proc.wait()

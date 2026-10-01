@@ -6,6 +6,26 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Blockers (before next production rerun)
 
+- [x] **Distributional consensus distance could go one ulp negative** — fixed
+      in v2.4.48. `d_P` is >= 0 by construction, but the exact-zero case (a
+      lineage that is the consensus) is reached by near-total cancellation and
+      landed at -5.55e-17. Once `phi` saturates at 1 the `(1-phi)/n_act` term
+      no longer masks it, so that sign reached `rng4.choice` as a selection
+      weight and numpy raised `Probabilities are not non-negative`
+      (`population_model.py:176`, whose guard tests the SUM of weights, not
+      each one). Unbound #1's distribution pipeline kept only 4-9 of 30 seeds
+      per scenario against argmax's 30/30. `distributional` now clamps at 0.
+      **The distribution half of unbound #1 must be rerun**; the argmax half
+      and the calibration (which runs on argmax) are unaffected, so no
+      recalibration.
+
+- [ ] **`population_model.py:170` guards the sum, not each weight** — a single
+      negative `fitness_score` among many positives passes `fitness_sum > 0`
+      and then kills the run inside `rng4.choice`. v2.4.48 removed the only
+      known source of a negative rather than clipping here, deliberately: a
+      clip would mask a real modelling error. Worth revisiting if another
+      phenotype model is added.
+
 - [x] **Concurrent jobs raced on the matrix-exponential cache** — fixed in
       v2.4.44. `Host._load_or_precompute_exponentials` wrote a shared
       `Data/precomputed_A_exponentials_*.pkl` non-atomically, so a task that

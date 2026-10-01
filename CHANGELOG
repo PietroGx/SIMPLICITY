@@ -5,6 +5,198 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.50 — 2026-10-01 — pietro gerletti
+
+Submitting over an earlier attempt's signal files now refuses, and the
+"submitted N" line says what actually happens.
+
+A cal_long #1 run on hpc-login02 reported, before anything had run:
+
+    submitted 900 seeded simulations
+    SimulationsStatus(total=900, submitted=900, released=900, left=0,
+                      pending=0, started=900, running=0, completed=900, failed=0)
+
+and then died two stages later on "No valid long-calibration data found". The
+900-task array sat (JobHeldUser) in the queue the whole time.
+
+`poll_simulations_status` reads the `.submitted`/`.released`/`.started`/
+`.completed`/`.failed` files next to each seeded-params file, NOT Slurm. A set
+left behind by an earlier attempt at the same `--exp-num` therefore decides the
+run before it starts: with `.completed` present, `left = submitted -
+(completed+failed)` is 0 on the first poll, the `while ... left > 0` loop never
+executes, and `release_simulations` -- which is only reached from inside that
+loop -- is never called. Nothing in `run_experiment` clears those files;
+`create_directories` and the parameter rewrite leave them, and a Data tree
+copied between machines carries them without the outputs.
+
+New `find_stale_signals` / `raise_on_stale_signals`, called at the top of
+`submit_simulations`, BEFORE sbatch, so a refused run leaves no held array
+behind. It refuses on any leftover signal, not just `.completed` -- a stray
+`.started` miscounts the run just as surely -- and it deletes nothing: which of
+two runs matters is not something this code can know. The message names the
+counts per suffix, says plainly that nothing was submitted, and gives both ways
+out (a clean `--exp-num`, or the exact `find ... -delete`).
+
+The submission line read as "N are running now", which it never was. It now
+says:
+
+    [2026-10-01 20:25:58] probe: queued 900 seeded simulations as one held
+    Slurm array; at most 200 released to run at a time
+
+That is the actual mechanism: the whole array goes to Slurm at once with
+`--hold`, and `release_simulations` lets them go a capped number at a time.
+Submitting 900 against a cap of 200 was never a bug.
+
+With that line now worth keeping, both pipelines' `_NOISE_PATTERNS` are empty
+-- v2.4.47 already stopped dropping `SimulationsStatus` -- so the list and
+`_is_slurm_monitor_noise` are removed and `run_stage` keeps every non-blank
+line.
+
+Verification in `tests/test_stale_signals.py`: a clean directory submits; the
+hpc-login02 shape (all four signals on every seed) refuses with the counts in
+the message; a single stray `.started` refuses too; and with signals present
+`submit_simulations` raises without calling sbatch and without writing any new
+`.submitted`. `tests/test_status_reporting.py` asserts the new wording.
+
+------------------------------------------------------------------------
+
+## Version 2.4.49 — 2026-10-01 — pietro gerletti
+
+Sequencing moves out of the simulation, scenarios submit together, and the
+pipeline packs its own results.
+
+SEQUENCING (UPSTREAM_TODO item 1, **RECAL**)
+
+`population_model.diagnosis` no longer draws `rng6.uniform(0,1) < seq_rate`. It
+records `t_diagnosis` instead, and the run writes the COMPLETE record -- every
+diagnosed host, every distinct genome it carried -- which is what
+`sequencing_rate = 1.0` produced before and what both calibration stages
+already asked for. `sequencing_rate` is gone from `settings_manager`, `runme`
+and both pipeline configs; `seq_rate` is gone from `SIDR_propensities` and
+`extrande`; `rng6` is gone, with `Population.sequencing_data`.
+
+New `simplicity/sequencing.py` builds these datasets after the fact.
+`complete_sequencing_rows(population)` is what the writer now calls;
+`reconstruct_sequencing_data(individuals_data, phylogenetic_data,
+sequencing_ratio, seed)` rebuilds one at ANY ratio from a finished run's CSVs,
+so a ratio is an argument rather than a reason to simulate again. The draw is
+per INDIVIDUAL, never per row: a host is sequenced or not, and then all of its
+distinct genomes are read, matching the mechanism it replaces. It refuses, with
+an explanatory error, on output that predates `t_diagnosis`.
+
+The calibration path is untouched: it reads `sequencing_data_regression.csv`,
+which is still written, now from the complete record.
+
+PARALLEL SCENARIO SUBMISSION
+
+`impact_long_shedders_unbound_exp.dispatch_all` submits every scenario at once.
+`run_seeded_simulations` blocks until its own experiment finishes, so five
+scenarios ran strictly one after another -- 30 seeds in flight at a time
+against a cap of 200, five times over. They now go together in threads (the
+work is subprocess calls and sleeps, so the GIL is never the constraint), with
+the cap SPLIT between them -- 40 each of 200, not 200 each -- and restored
+afterwards. The stage should now take about as long as its slowest scenario
+rather than the sum of all five. `--sequential` restores the old behaviour;
+serial/multiprocessing runners are unaffected. A failing scenario is reported
+alongside the others and then re-raised, so the pipeline still stops.
+
+`print_simulations_status` now names the experiment, because five polling loops
+interleave: `[2026-10-01 12:57:15] my_experiment_#3 SimulationsStatus(...)`.
+The `submitted N seeded simulations` line names it too, so both runners' noise
+patterns lost their `$` anchor.
+
+PACKING
+
+The pipeline ends by submitting `package_simplicity_data.sh Data _#<exp_num>`
+to Slurm, so `Data_Export/*.tar.xz` is ready to download without a second
+command. The glob takes every directory from the run -- both calibrations,
+setup data, every scenario of every consensus mode, both sanity dirs -- with no
+bound/unbound assumption and no run number written out. `--no-compress` skips
+it. A packing failure is reported, never raised: the data is on disk either
+way.
+
+`package_simplicity_data.sh` now keeps `slurm/` when
+`SIMPLICITY_KEEP_SLURM_LOGS=1`, and the pipeline sets it. Its STEP 1 deleted
+those directories in place on the real `Data/`, and they are the only record of
+why a task failed -- both of today's diagnoses (a truncated pickle, a numpy
+ValueError) came out of them. `--drop-slurm-logs` restores the old behaviour.
+
+VERIFICATION
+
+`tests/test_sequencing_removal.py` compares two runs of the same three seeds
+across the change: `final_time`, `lineage_frequency`, `phylogenetic_data` and
+`simulation_trajectory` are byte-identical for every seed, and
+`individuals_data` differs only by the added `t_diagnosis` column -- every
+pre-existing column holds the same values, 741/721/895 individuals. rng6 was
+drawn nowhere else and was created last from `seeds_generator`, so rng3/4/5 are
+unchanged. The old sampled file is a strict subset of the new complete one with
+identical sequences for every host it recorded (3 sampled hosts -> 36 in the
+complete record, 1 -> 40, 2 -> 66), and `reconstruct_sequencing_data` at ratio
+1.0 reproduces the written file row for row, is reproducible from its seed, and
+never sequences a host partially.
+
+`tests/test_parallel_dispatch.py`: all five scenarios in flight at once,
+`--sequential` holds it to one, non-Slurm runners stay sequential, the cap
+divides to 40 and is restored between calls (a bug this test found -- it was
+compounding), failures are collected and re-raised, and `compress_results`
+invokes the packager with the right suffix, `--slurm`, and the log-keeping
+variable.
+
+------------------------------------------------------------------------
+
+## Version 2.4.48 — 2026-10-01 — pietro gerletti
+
+`distance.distributional` clamps at zero. One ulp of round-off was destroying
+most of the distribution-consensus production run.
+
+In unbound #1 the argmax pipeline produced 30/30 valid simulations in all five
+scenarios while the distribution pipeline produced 4-9/30, and in four of five
+not one survivor reached two thirds of the 1,095-day horizon. Both ran off the
+same frozen table, same seeds, same resources, back to back in one invocation.
+
+The failures were `ValueError: Probabilities are not non-negative` from
+`population_model.py:176`, where `rng4.choice` is handed per-host
+`fitness_score` as `p=`. The chain:
+
+1. `d_P` is >= 0 by construction -- the consensus base is each column's argmax,
+   so `P(ref) - P(l) >= P(ref) - P(chat)` at every position and the sum cannot
+   fall below `-delta`. A lineage that IS the consensus reaches exactly 0 by
+   near-total cancellation. In doubles that cancellation landed at
+   -5.551115123125783e-17, one ulp near delta=1.701898852462236.
+2. `F = phi*d + (1-phi)/n_act`. While phi < 1 the second term is ~1e-3 and
+   swamps a 1e-17 negative. phi saturates at exactly 1 around day 200, the term
+   becomes exactly 0, and F inherits the sign -- which is why the crashes come
+   late and why four scenarios have no long runs at all.
+3. The guard at `population_model.py:170` tests `fitness_sum > 0`. One host at
+   -5.55e-17 among hundreds of positive scores passes it; numpy then validates
+   each probability individually and raises.
+
+`distributional` now returns `distance if distance > 0.0 else 0.0`, restoring
+the invariant the maths already guarantees. Argmax is untouched: `hamming_iw`
+returns a non-negative integer, `consensus_distance` dispatches to it whenever
+`consensus_mode != 'distribution'`, and `update.py:26` is the only caller of
+`distributional` in the codebase -- so every argmax result stays bit-identical.
+The fitness floor at `update.py:44-45` and the per-weight clip at
+`population_model.py:170` were considered and deliberately NOT applied: the
+quantity is provably non-negative, so the source is the right place.
+
+Effect on unbound #1: the argmax half stands, all 150 seeds. The distribution
+half is void -- too few seeds, and those that survived are a biased sample of
+short epidemics -- and must be rerun. The calibration stages run on argmax and
+are unaffected, so NO recalibration: the frozen table is still good.
+
+Verification in `tests/test_distributional_nonnegative.py`, replacing three
+scratch diagnostics. Unit: the consensus scores exactly 0 rather than -1e-17; a
+sweep over 7 weightings x 9 genomes finds no negative; an unmapped position
+still costs exactly 1, so the clamp has not flattened real distances. Live, at
+production parameters through the pipeline's own `build_exp_scenario_settings`:
+6/6 seeds complete, against 1/6 before the clamp and 6/6 for argmax. The
+pre-fix numbers were established by monkeypatching the clamp in, so the
+diagnosis never depended on an unapproved edit. `test_consensus_distance.py`
+(C8) still passes, including `d_P == d_H` on pure columns.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.47 — 2026-10-01 — pietro gerletti
 
 The SLURM monitor reports on events instead of on a timer, and the

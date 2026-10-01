@@ -30,7 +30,6 @@ STANDARD_VALUES for SIMPLICITY simulation:
     "final_time": 365*3 
     "max_runtime": 300
     "phenotype_model": 'immune waning' or 'distance from wt'
-    "sequencing_rate": 0.05
     "seed": None
     "F": 1.25
     

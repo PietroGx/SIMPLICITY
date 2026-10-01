@@ -59,7 +59,6 @@ _STANDARD_VALUES_DEFAULTS = {
         "max_runtime": 86000,
         "phenotype_model": 'immune_waning',  # or 'linear'
         "consensus": 'argmax',  # or 'distribution' (immune_waning only)
-        "sequencing_rate": 0.05,
         "sequence_long_shedders": False,
         "susceptibility_long": 1.0,
         "write_fasta": False,
@@ -96,7 +95,6 @@ def write_parameter_specs():
         "max_runtime":                   {"type": "int", "min": 0},
         "phenotype_model":               {"type": "str"},
         "consensus":                     {"type": "str"},
-        "sequencing_rate":               {"type": "float", "min": 0, "max": 1},
         "sequence_long_shedders":        {"type": "bool"},
         "susceptibility_long":           {"type": "float", "min": 0},
         "write_fasta":                   {"type": "bool"}
@@ -276,7 +274,6 @@ def write_simulation_parameters(file_path,
                                 final_time, 
                                 max_runtime, 
                                 phenotype_model,
-                                sequencing_rate,
                                 sequence_long_shedders,
                                 susceptibility_long,
                                 write_fasta,
@@ -304,7 +301,6 @@ def write_simulation_parameters(file_path,
         "max_runtime": max_runtime,
         "phenotype_model": phenotype_model,
         "consensus": consensus,
-        "sequencing_rate": sequencing_rate,
         "sequence_long_shedders":sequence_long_shedders,
         "susceptibility_long": susceptibility_long,
         "write_fasta": write_fasta,
@@ -331,9 +327,9 @@ def generate_filename_from_params(params: dict):
     "final_time": "T",
     "phenotype_model": "pheno",
     "consensus": "cdist"
-    # excluded: max_runtime, sequencing_rate, seed, F
+    # excluded: max_runtime, seed, F
 }
-    exclude  = {"max_runtime", "sequencing_rate", "seed"}
+    exclude  = {"max_runtime", "seed"}
     parts = []
     for key, value in params.items():
         if key in exclude:
@@ -414,7 +410,6 @@ def read_settings_and_write_simulation_parameters(experiment_name):
                                     settings["final_time"],
                                     settings["max_runtime"],
                                     settings["phenotype_model"],
-                                    settings["sequencing_rate"],
                                     settings["sequence_long_shedders"],
                                     settings["susceptibility_long"],
                                     settings["write_fasta"],

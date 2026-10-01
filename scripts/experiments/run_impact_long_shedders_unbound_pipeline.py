@@ -56,13 +56,6 @@ from impact_long_shedders_unbound_config import (
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
 
-# SimulationsStatus lines are NOT dropped: since v2.4.47 they print once per
-# status change, timestamped, so they are the log's record of when each
-# simulation moved.
-_NOISE_PATTERNS = [
-    re.compile(r'^submitted \d+ seeded simulations$'),
-]
-
 _SBATCH_JOB_ID_RE = re.compile(r'Submitted batch job (\d+)')
 SANITY_PLOT_POLL_INTERVAL_S = 15
 
@@ -70,10 +63,6 @@ SANITY_PLOT_POLL_INTERVAL_S = 15
 # every OOM kill the bound pipeline ever took was in its equivalent stage.
 CAL2_SLURM_MEM = "5G"
 
-
-def _is_slurm_monitor_noise(line):
-    stripped = line.strip()
-    return any(p.match(stripped) for p in _NOISE_PATTERNS)
 
 
 def _log(log_fh, line):
@@ -83,8 +72,8 @@ def _log(log_fh, line):
 
 
 def run_stage(cmd, log_fh):
-    """Run one stage, streaming output live and to the log (minus SLURM
-    polling noise). Raises SystemExit on non-zero exit."""
+    """Run one stage, streaming output live and to the log. Raises SystemExit
+    on non-zero exit."""
     header = f"\n$ {' '.join(cmd)}"
     print(header)
     log_fh.write(header + "\n")
@@ -94,7 +83,9 @@ def run_stage(cmd, log_fh):
     for raw_line in proc.stdout:
         line = raw_line.rstrip("\n")
         print(line)
-        if line.strip() and not _is_slurm_monitor_noise(line):
+        # blank lines are printed liberally as visual spacing and carry no
+        # diagnostic value in a saved log; everything else is kept
+        if line.strip():
             log_fh.write(line + "\n")
             log_fh.flush()
     proc.wait()
@@ -203,6 +194,38 @@ def write_artifacts_archive(archive_path, exp_num, log_file):
                 print(f"  [skip] artifact not found: {path}")
 
 
+def compress_results(exp_num, log_fh, keep_slurm_logs=True):
+    """Pack everything this run produced into Data_Export/*.tar.xz.
+
+    Hands Data/*_#<exp_num> to package_simplicity_data.sh, which globs every
+    experiment directory from this run -- both calibrations, setup data, every
+    production scenario of every consensus mode, both sanity directories --
+    with no bound/unbound assumption and no run numbers written out anywhere.
+
+    Submitted to Slurm (16 cpus) rather than run here: pixz over several GB
+    does not belong on a login node. The pipeline does not wait for it; the
+    parts appear in Data_Export/ when the packing job finishes.
+    """
+    script = os.path.join(SCRIPT_DIR, os.pardir, "package_simplicity_data.sh")
+    cmd = [script, "Data", f"_#{exp_num}", "--slurm"]
+    env = dict(os.environ,
+               SIMPLICITY_KEEP_SLURM_LOGS="1" if keep_slurm_logs else "0")
+    header = f"\n$ {' '.join(cmd)}"
+    _log(log_fh, header)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, env=env)
+    for line in result.stdout.splitlines():
+        _log(log_fh, line)
+    if result.returncode != 0:
+        # the data is on disk and intact either way, so this is reported and
+        # not raised: a packing failure must not read as a failed pipeline
+        _log(log_fh, f"[warn] packaging exited {result.returncode}; "
+                     f"the run itself is unaffected. Pack it by hand with:\n"
+                     f"  {' '.join(cmd)}")
+        return None
+    return result.stdout.strip()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run the full impact_long_shedders_unbound pipeline: each "
@@ -230,6 +253,15 @@ def main():
     parser.add_argument('--ih-virus-emergence-rate', type=float,
                         default=USER_FIXED_PARAMS['IH_virus_emergence_rate'])
     parser.add_argument('--log-file', type=str, default=None)
+    parser.add_argument('--no-compress', action='store_true',
+                        help="Skip the final packaging step. By default the "
+                            "run's Data/*_#<exp_num> directories are packed "
+                            "into Data_Export/*.tar.xz by a Slurm job.")
+    parser.add_argument('--drop-slurm-logs', action='store_true',
+                        help="Let the packager delete each experiment's slurm/ "
+                            "directory (its old behaviour). They are kept by "
+                            "default: they are the only record of why a task "
+                            "failed, and the deletion is in place on Data/.")
     add_slurm_resource_args(parser)
     parser.add_argument('--slurm-mem-cal2', type=str, default=CAL2_SLURM_MEM,
                         help=f"Per-task SLURM memory for cal_2 only (default "
@@ -317,11 +349,19 @@ def main():
             summary_lines.append(f"  - {scenario}: {sbatch_out}")
         summary_lines.append(f"Full log: {log_file}")
         summary_lines.append(f"Artifacts archive: {archive_path}")
+        if not args.no_compress:
+            summary_lines.append("Full results    : Data_Export/*.tar.xz "
+                                 "(packing job submitted below)")
 
         for line in summary_lines:
             _log(log_fh, line)
 
         write_artifacts_archive(archive_path, args.exp_num, log_file)
+
+        if not args.no_compress:
+            _log(log_fh, "\n===== Packing results for download =====")
+            compress_results(args.exp_num, log_fh,
+                             keep_slurm_logs=not args.drop_slurm_logs)
 
 
 if __name__ == "__main__":

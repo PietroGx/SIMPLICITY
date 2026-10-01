@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import simplicity.runners.slurm as slurm
 
-TS = r'\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] '
+TS = r'\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\](?: \S+)? '
 failures = []
 
 
@@ -73,6 +73,9 @@ def test_prints_once_per_change():
     done = _status(released=10, started=10, left=0, completed=10)
     # polled once before submit, then once per while-condition evaluation
     out = _drive([first, first, first, first, second, second, done])
+    check('every status line names its experiment',
+          all('probe' in l for l in out.splitlines()
+              if 'SimulationsStatus' in l), True)
     lines = [l for l in out.splitlines() if 'SimulationsStatus' in l]
     for l in lines:
         print(f'    {l}')
@@ -103,41 +106,44 @@ def test_timestamp_format():
     print(f'    {line}')
     check('timestamped', bool(re.match(TS, line)), True)
     check('status payload intact', 'SimulationsStatus(total=10' in line, True)
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        slurm.print_simulations_status(_status(), 'my_experiment_#3')
+    tagged = buf.getvalue().strip()
+    print(f'    {tagged}')
+    check('experiment name is on the line when given',
+          'my_experiment_#3' in tagged, True)
+    check('tagged line still matches the format',
+          bool(re.match(TS, tagged)), True)
     stamp = line[1:20]
     drift = abs(time.mktime(time.strptime(stamp, '%Y-%m-%d %H:%M:%S')) - time.time())
     check('timestamp is now (<5s drift)', drift < 5, True)
 
 
-def test_pipeline_logs_keep_status_lines():
-    '''Both runners used to strip SimulationsStatus from the saved log. Now
-    that the line prints on change only, it belongs in the record.'''
-    sys.path.insert(0, os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'scripts', 'experiments'))
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        slurm.print_simulations_status(_status())
-    status_line = buf.getvalue().strip()
-
-    for mod_name in ['run_impact_long_shedders_pipeline',
-                     'run_impact_long_shedders_unbound_pipeline']:
-        mod = __import__(mod_name)
-        check(f'{mod_name}: status line kept',
-              mod._is_slurm_monitor_noise(status_line), False)
-        check(f'{mod_name}: bare status line kept too',
-              mod._is_slurm_monitor_noise(str(_status())), False)
-        check(f'{mod_name}: submitted line still dropped',
-              mod._is_slurm_monitor_noise('submitted 900 seeded simulations'),
-              True)
-        check(f'{mod_name}: ordinary output still kept',
-              mod._is_slurm_monitor_noise('[long-running] seed_0003.json: ...'),
-              False)
+def test_queued_message_is_unambiguous():
+    """'submitted N' read as 'N are running'. The line now says what actually
+    happens: the whole array goes to Slurm at once, held, and is released a
+    capped number at a time."""
+    import os
+    os.environ.setdefault('SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM', '200')
+    stable = _status(total=900, submitted=900, left=900)
+    done = _status(total=900, submitted=900, released=900, started=900,
+                   completed=900, left=0)
+    out = _drive([stable, done])
+    line = next(l for l in out.splitlines() if 'queued' in l)
+    print(f'    {line}')
+    check('names the experiment', 'probe' in line, True)
+    check('says they are queued, not running', 'queued 900' in line, True)
+    check('says the array is held', 'held Slurm array' in line, True)
+    check('states the release cap', 'at a time' in line, True)
+    check('no longer says "submitted"', 'submitted' in line, False)
 
 
 if __name__ == '__main__':
     for t in [test_thresholds_are_reachable, test_prints_once_per_change,
               test_no_timer_reprint, test_timestamp_format,
-              test_pipeline_logs_keep_status_lines]:
+              test_queued_message_is_unambiguous]:
         print(f'\n{t.__name__}')
         t()
     print('\n' + ('FAILURES:\n  ' + '\n  '.join(failures) if failures

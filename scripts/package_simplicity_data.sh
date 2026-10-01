@@ -16,7 +16,8 @@ fi
 if [[ "$FLAG" == "--slurm" ]]; then
     echo "Submitting packaging job to SLURM..."
     sbatch --job-name="simp_pkg" --cpus-per-task=16 --mem=32G --time=04:00:00 \
-           --mail-type=END --wrap="./scripts/package_simplicity_data.sh $SOURCE_DIR '$SUFFIX'"
+           --mail-type=END --export=ALL,SIMPLICITY_KEEP_SLURM_LOGS="${SIMPLICITY_KEEP_SLURM_LOGS:-0}" \
+           --wrap="./scripts/package_simplicity_data.sh $SOURCE_DIR '$SUFFIX'"
     exit 0
 fi
 
@@ -25,8 +26,16 @@ if ! command -v pixz &> /dev/null; then echo "Error: pixz not found."; exit 1; f
 mkdir -p "$EXPORT_DIR"
 mapfile -t TARGET_FOLDERS < <(find "$SOURCE_DIR" -maxdepth 1 -type d -name "*$SUFFIX" | sort)
 
-echo "--- STEP 1: CLEANING LOGS ---"
-for folder in "${TARGET_FOLDERS[@]}"; do [ -d "$folder/slurm" ] && rm -rf "$folder/slurm"; done
+# Set SIMPLICITY_KEEP_SLURM_LOGS=1 to archive the slurm/ directories instead of
+# deleting them. They are the only record of why a task failed -- a truncated
+# pickle, a numpy ValueError -- and this runs in place on the real Data/, not
+# on a copy, so the default is destructive and irreversible.
+if [[ "${SIMPLICITY_KEEP_SLURM_LOGS:-0}" == "1" ]]; then
+    echo "--- STEP 1: KEEPING LOGS (SIMPLICITY_KEEP_SLURM_LOGS=1) ---"
+else
+    echo "--- STEP 1: CLEANING LOGS ---"
+    for folder in "${TARGET_FOLDERS[@]}"; do [ -d "$folder/slurm" ] && rm -rf "$folder/slurm"; done
+fi
 
 echo "--- STEP 2: MULTI-CORE COMPRESSION ---"
 current_part=1

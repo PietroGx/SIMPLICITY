@@ -113,11 +113,15 @@ class SimulationsStatus(typing.NamedTuple):
     failed   : int
 
     
-def print_simulations_status(status):
+def print_simulations_status(status, experiment_name=None):
     """One timestamped status line. Printed on every change of status and
     never otherwise: a fixed-interval reprint of an unchanged line buries
-    the transitions that actually carry information."""
-    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {status}")
+    the transitions that actually carry information. The experiment name is
+    on the line because several experiments can now poll concurrently (see
+    impact_long_shedders_unbound_exp.dispatch_all) and their output
+    interleaves."""
+    tag = f" {experiment_name}" if experiment_name else ""
+    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]{tag} {status}")
 
 
 def get_platform_executable_extension():
@@ -125,9 +129,58 @@ def get_platform_executable_extension():
     return ".exe" if platform.system() == "Windows" else  ""
 
 
-def submit_simulations(experiment_name: str, 
-                       run_seeded_simulation: typing.Callable, 
+SIGNAL_SUFFIXES = (".submitted", ".released", ".started", ".completed", ".failed")
+
+
+def find_stale_signals(experiment_name):
+    """{suffix: count} of signal files already on disk for this experiment.
+
+    poll_simulations_status reads these files, not Slurm. A set left behind by
+    an earlier attempt at the same --exp-num therefore decides the run before
+    it starts: with .completed present, `left` is 0 on the first poll, the
+    polling loop never runs, release_simulations is never called -- it is only
+    reached from inside that loop -- and the held array sits in the queue
+    forever while the pipeline walks on to a fit with no data behind it.
+    Nothing deletes these files, and a Data tree copied between machines
+    carries them along without the outputs.
+    """
+    counts = {}
+    for path in sm.get_seeded_simulation_parameters_paths(experiment_name):
+        for suffix in SIGNAL_SUFFIXES:
+            if pathlib.Path(path + suffix).exists():
+                counts[suffix] = counts.get(suffix, 0) + 1
+    return counts
+
+
+def raise_on_stale_signals(experiment_name):
+    """Refuse to submit over an earlier attempt's signals.
+
+    Checked BEFORE sbatch, so a refused run leaves no held array behind. This
+    never deletes anything: which of the two runs matters is not something
+    this code can know.
+    """
+    counts = find_stale_signals(experiment_name)
+    if not counts:
+        return
+    summary = ", ".join(f"{n}x {suffix}" for suffix, n in sorted(counts.items()))
+    params_dir = os.path.dirname(
+        sm.get_seeded_simulation_parameters_paths(experiment_name)[0])
+    raise RuntimeError(
+        f"{experiment_name} already carries signal files from an earlier "
+        f"attempt: {summary}.\n"
+        f"Status is read from these files, so submitting now would either "
+        f"skip the run entirely (if .completed is among them) or miscount it. "
+        f"Nothing has been submitted.\n"
+        f"Either run at an --exp-num with nothing under it, or clear them:\n"
+        f"  find {params_dir} "
+        f"\\( -name '*.submitted' -o -name '*.released' -o -name '*.started' "
+        f"-o -name '*.completed' -o -name '*.failed' \\) -delete")
+
+
+def submit_simulations(experiment_name: str,
+                       run_seeded_simulation: typing.Callable,
                        n:int):
+    raise_on_stale_signals(experiment_name)
     # run_seeded_simulation to qualname
     fn_name = run_seeded_simulation.__name__
     run_seeded_simulation_module_qualname = run_seeded_simulation.__module__
@@ -535,7 +588,13 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
 
     # submit simulations
     submit_simulations(experiment_name, run_seeded_simulation, n=status.total)
-    print(f"submitted {status.total} seeded simulations")
+    # "submitted" used to read as "N are running now", which it never was: the
+    # whole array goes to Slurm at once, on hold, and release_simulations lets
+    # them go a capped number at a time from the polling loop below.
+    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {experiment_name}: queued "
+          f"{status.total} seeded simulations as one held Slurm array; "
+          f"at most {SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM} "
+          f"released to run at a time")
 
     # loop until no simulation left to release
     last_status  = None
@@ -545,7 +604,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
     while (status := poll_simulations_status(experiment_name)).left > 0:
         # print only when a simulation actually changed status
         if last_status != status:
-            print_simulations_status(status)
+            print_simulations_status(status, experiment_name)
         last_status = status
 
         # release simluations (silently -- this can fire every poll cycle
@@ -580,7 +639,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
         time.sleep(7.)
 
     # completed
-    print_simulations_status(status)
+    print_simulations_status(status, experiment_name)
 
     
 def job():
