@@ -3,7 +3,7 @@
 
 Unit:  d_P(consensus) == 0, d_P == d_H when every column is pure, and a
        position no snapshot carries costs exactly 1.
-Live:  both arms run, land in different output paths, and diverge.
+Live:  both pipelines run, land in different output paths, and diverge.
 
 Run from the repo root:
     python tests/test_consensus_distance.py
@@ -87,11 +87,11 @@ def live():
     da, db = seed_dir(a), seed_dir(b)
     na, nb = os.path.basename(os.path.dirname(da)), os.path.basename(os.path.dirname(db))
     print(f"\n  argmax path: {na}\n  dist   path: {nb}")
-    check("default arm's path carries no cdist segment", 'cdist' in na, False)
-    check("distribution arm's path is distinguished", 'cdist_distribution' in nb, True)
+    check("default pipeline's path carries no cdist segment", 'cdist' in na, False)
+    check("distribution pipeline's path is distinguished", 'cdist_distribution' in nb, True)
     same = filecmp.cmp(os.path.join(da, 'phylogenetic_data.csv'),
                        os.path.join(db, 'phylogenetic_data.csv'), shallow=False)
-    check("the two arms diverge", same, False)
+    check("the two pipelines diverge", same, False)
     return [a, b]
 
 

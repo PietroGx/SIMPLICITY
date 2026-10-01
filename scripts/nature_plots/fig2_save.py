@@ -13,7 +13,7 @@ def parse_arguments():
                             "old default of 4 pointed at one of the runs that "
                             "produced invalid science.")
     parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
-                        help=f"Pipeline arm (default: {BOUND_EXP_NAME}).")
+                        help=f"Pipeline to plot (default: {BOUND_EXP_NAME}).")
     parser.add_argument('--seed', type=str, default="1", help="Target seed for lineage frequency plots (Rows 1 & 2)")
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png', help="Output format: pdf or png (default: png)")
     return parser.parse_args()
@@ -33,7 +33,7 @@ def set_nature_rcparams():
 
 def build_figure_2(exp_num, exp_name, target_seed, fmt):
     set_nature_rcparams()
-    # from the pipeline's own config; edge_case appears on the unbound arm
+    # from the pipeline's own config; edge_case appears on the unbound pipeline
     scenarios, _ = resolve_scenarios(exp_name, exp_num)
     if not scenarios:
         raise SystemExit(f"No scenario output found for {exp_name} #{exp_num}.")

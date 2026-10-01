@@ -5,6 +5,160 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.47 — 2026-10-01 — pietro gerletti
+
+The SLURM monitor reports on events instead of on a timer, and the
+long-running report's threshold is low enough to fire again.
+
+`run_seeded_simulations`' polling loop printed the `SimulationsStatus` line
+whenever the status changed OR 17 seconds had passed, so an unchanged line was
+reprinted every 17s for the whole run and buried the transitions that carry
+information. The timer branch is gone: the line now prints only when a
+simulation actually changes status, and carries a `[YYYY-MM-DD HH:MM:SS]`
+stamp so the record says when each transition happened. The date is in the
+stamp because calibration arrays run across midnight. New
+`print_simulations_status(status)` holds the format, used by the loop and by
+the final completion line; `last_printed` is gone with the timer.
+
+`LONG_RUNNING_THRESHOLD_S` 3600 -> 300 and `LONG_RUNNING_REPORT_INTERVAL_S`
+3600 -> 600. At an hour nothing had qualified for a long time: measured
+`.started` -> `.completed` across unbound #1's 1,400 tasks, the slowest was
+2,423 s (HIV_high; median 227 s, p95 1,217 s) and every other experiment's
+maximum was under 900 s. The v2.4.41-43 speedups cut those a further ~6x. The
+write path was never at fault -- 3,371 `.progress` files on disk, one per
+`.started` in every experiment, contents current (`{"time": 1062.5,
+"final_time": 1095, "infected": 70}`) -- and `report_long_running_simulations`
+prints nothing at all when nothing qualifies, so a correct silent report was
+indistinguishable from a broken one.
+
+Verification in `tests/test_status_reporting.py`, driving the real
+`run_seeded_simulations` over a scripted status sequence with the Slurm-facing
+calls stubbed: 40 unchanged polls produce one line rather than 40, a sequence
+with two transitions produces exactly three lines (including the completion
+one), every line is timestamped within 5 s of now, the payload is unchanged,
+and the thresholds are asserted against the measured task runtimes rather than
+against themselves.
+
+Both pipeline runners dropped status lines from the saved log via
+`re.compile(r'^SimulationsStatus\(')`; that pattern is removed from
+`run_impact_long_shedders_pipeline.py` and
+`run_impact_long_shedders_unbound_pipeline.py`. It existed because the 17s
+reprint spammed the log; now that the line prints once per transition and
+carries a timestamp, it IS the log's record of when each simulation moved, so
+the archived log gains that record. `submitted N seeded simulations` is still
+dropped. The test asserts both the kept and the dropped case against the real
+`_is_slurm_monitor_noise` in both runners.
+
+------------------------------------------------------------------------
+
+## Version 2.4.46 — 2026-10-01 — pietro gerletti
+
+"Arm" is gone from the unbound experiment code too. There is one production
+pipeline for the argmax consensus and one for the distributional consensus;
+calling them arms of a single thing described the design wrongly.
+
+Reworded throughout `run_impact_long_shedders_unbound_pipeline.py` (stage-3
+header, `submit_sanity_plots` docstring, the archive comment, the `--consensus`
+help and the frozen-table comment), `impact_long_shedders_unbound_config.py`
+(`CONSENSUS_SUFFIX` comment, `prod_exp_name` and `build_exp_scenario_settings`
+docstrings), `impact_long_shedders_unbound_exp.py` (`--consensus` help) and
+`submit_sanity_plot_unbound.sh` (usage block).
+
+Comments, docstrings and help strings only — nothing in `scripts/experiments/`
+was ever named `arm`, so no identifier, experiment name, output path or CLI flag
+changed. `CONSENSUS_MODES` and `CONSENSUS_SUFFIX` keep their names and values.
+
+`tests/test_consensus_arms.py` is renamed `tests/test_consensus_pipelines.py`
+(git mv) and reworded with it, as is the wording in
+`tests/test_consensus_distance.py`.
+
+Verified by running the real thing: `test_consensus_pipelines.py`,
+`test_consensus_distance.py` and `test_figure_pipelines.py` all pass, both
+`--help` screens render the new text, and `bash -n` accepts the shell script.
+
+------------------------------------------------------------------------
+
+## Version 2.4.45 — 2026-10-01 — pietro gerletti
+
+The paper figures can now be built from the distributional-consensus pipeline,
+and "arm" is gone from the figure code in favour of "pipeline".
+
+`_scenarios.py` mapped an experiment name to its scenario config and to a short
+filename label, and knew only `impact_long_shedders` and
+`impact_long_shedders_unbound`. The distribution pipeline writes to
+`impact_long_shedders_unbound_dist` (v2.4.42's `CONSENSUS_SUFFIX`), which was in
+neither table, so every figure script exited on it:
+
+    SystemExit: No scenario config known for --exp-name
+    'impact_long_shedders_unbound_dist'.
+
+It now resolves to the same config module as the argmax pipeline — the two share
+one config by design, since the consensus mode changes the model and not the
+scenario list — and carries the label `unbound_distribution`, so
+`Figure_3_unbound_#2.pdf` and `Figure_3_unbound_distribution_#2.pdf` sit side by
+side. The argmax pipeline's filenames are unchanged.
+
+`_ARM_LABELS`/`arm_label()` are renamed `_PIPELINE_LABELS`/`pipeline_label()`.
+Nothing imported `arm_label` — it was only reached through `figure_path` — so
+the rename is contained to `_scenarios.py`. The `--exp-name` help in the four
+save scripts now reads "Pipeline to plot", and the stray "arm" in the comments
+of `fig1_save`, `fig1_preprocess_data`, `fig2_save` and `fig3_preprocess_data`
+is reworded. No behaviour change there.
+
+"Arm" still means *consensus arm* throughout `scripts/experiments/`; that sense
+is untouched.
+
+Verification in `tests/test_figure_pipelines.py`: all three pipelines resolve,
+the two unbound ones return the identical five scenarios, the three figure paths
+are distinct and spelled as above, the seed suffix survives, `arm_label` and
+`_ARM_LABELS` are gone, and all five save scripts still parse their arguments.
+The dist experiment name is asserted against
+`impact_long_shedders_unbound_config.prod_exp_name('distribution')` rather than
+being written out twice, so the figure code cannot drift from the pipeline that
+produces the directories.
+
+------------------------------------------------------------------------
+
+## Version 2.4.44 — 2026-09-30 — pietro gerletti
+
+Fixed a startup race on the precomputed matrix-exponential cache that killed
+nine tasks of the unbound production array (`26554931_16` through `_24`, all
+`FAILED 1:0` at 00:00:10).
+
+`Host._load_or_precompute_exponentials` wrote the table with a plain
+`open(file_path, "wb")` on a path shared by every concurrent job
+(`output_manager.get_procomputed_matrix_table_filepath` resolves to `Data/`,
+with no experiment scoping). `open(..., "wb")` truncates before `pickle.dump`
+writes, so for the length of that window the file exists at zero bytes. A peer
+task reaching the `os.path.exists` branch in that window loaded an empty file
+and died on `EOFError: Ran out of input`.
+
+`Population.__init__` builds two Hosts — `standard` on `tau_3` and
+`long_shedder` on `tau_3_long` — so each task touches two such files and gets
+two chances to lose. In the observed failures the standard host wrote its table
+successfully (the `.out` ends with its "Saved 300 matrix exponentials" line) and
+the long shedder then crashed on the other file at `population.py:177`.
+
+The write now goes to `<file_path>.<pid>.tmp` followed by `os.replace`, which is
+atomic within a filesystem, so a reader sees either no file or a complete one.
+The read branch additionally catches `EOFError` and `UnpicklingError` and falls
+through to recompute, which recovers from any zero-length file an earlier
+version left behind. Losers of the race recompute in ~10 s and replace the
+target with byte-identical content.
+
+No recalibration: the table's contents and every downstream number are
+unchanged. The failures were at construction, before any output was written, so
+no completed seed is affected — the nine lost grid points simply need rerunning.
+
+Verification in `tests/test_exp_table_race.py`: cold write leaves no `.tmp`
+behind, a warm read reproduces the table exactly, a zero-byte and a
+mid-stream-truncated cache both recover, and 16 processes released on a common
+start barrier against one shared path all return the same 300-entry table. The
+zero-byte case was replayed against the pre-fix body and reproduces the
+production traceback verbatim (`EOFError: Ran out of input`).
+
+------------------------------------------------------------------------
+
 ## Version 2.4.43 — 2026-09-30 — pietro gerletti
 
 Both consensus arms of the unbound pipeline now produce a sanity grid.

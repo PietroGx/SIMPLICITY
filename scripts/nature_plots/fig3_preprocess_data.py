@@ -64,7 +64,7 @@ def get_panel_b_data(exp_num, scenarios, cluster_threshold=5, min_days=100,
                      exp_name=EXP_NAME):
     """Clade metrics for every seed of every scenario.
 
-    Cached on disk: this is identical for every --group of a given arm, and
+    Cached on disk: this is identical for every --group of a given pipeline, and
     rendering one figure per scenario would otherwise recompute clade
     clustering for all ~250 seed-scenarios each time.
     """

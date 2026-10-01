@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Verification for the two-arm unbound pipeline.
+"""Verification for the two unbound consensus pipelines.
 
 Exercises the actual dispatch with run_experiment_script stubbed, per the
 repo rule that "the config is correct" is not verification.
 
 Run from the repo root:
-    python tests/test_consensus_arms.py
+    python tests/test_consensus_pipelines.py
 """
 import os
 import sys
@@ -52,12 +52,12 @@ def test_builder():
         check("bad consensus rejected", True, True)
     check("argmax keeps the existing experiment prefix",
           cfg.prod_exp_name("argmax"), cfg.PROD_EXP_NAME)
-    check("distribution arm is suffixed",
+    check("distribution pipeline is suffixed",
           cfg.prod_exp_name("distribution"), cfg.PROD_EXP_NAME + "_dist")
 
 
 def test_dispatch():
-    """Run exp.main() for both arms with the dispatcher stubbed."""
+    """Run exp.main() for both pipelines with the dispatcher stubbed."""
     table = pd.DataFrame([CONTROL, ROW])
     exp.load_calibration_table = lambda path: table
     exp.set_slurm_resource_env = lambda *a, **k: None
@@ -80,10 +80,10 @@ def test_dispatch():
         check(f"{mode}: seeds reached every settings dict",
               sorted({s for _, _, s in seen}), [30])
 
-    # the two arms must not share experiment names
+    # the two pipelines must not share experiment names
     a = {f"{cfg.prod_exp_name('argmax')}_{s}" for s in ('control', 'HIV_high')}
     b = {f"{cfg.prod_exp_name('distribution')}_{s}" for s in ('control', 'HIV_high')}
-    check("the arms' experiment names do not collide", bool(a & b), False)
+    check("the pipelines' experiment names do not collide", bool(a & b), False)
 
 
 def test_bound_untouched():
@@ -95,7 +95,7 @@ def test_bound_untouched():
 
 
 # ---------------------------------------------------------------------------
-# sanity plots: one grid per consensus arm
+# sanity plots: one grid per consensus pipeline
 # ---------------------------------------------------------------------------
 import io
 import contextlib
@@ -105,8 +105,8 @@ import run_impact_long_shedders_unbound_pipeline as runner
 
 
 def test_sanity_plots():
-    """submit_sanity_plots must issue one sbatch per arm, each naming that
-    arm's experiment, with the dispatcher stubbed."""
+    """submit_sanity_plots must issue one sbatch per pipeline, each naming that
+    pipeline's experiment, with the dispatcher stubbed."""
     calls = []
 
     class FakeResult:
@@ -124,20 +124,20 @@ def test_sanity_plots():
     finally:
         runner.subprocess.run = real_run
 
-    check("one sbatch per consensus arm", len(calls), len(cfg.CONSENSUS_MODES))
+    check("one sbatch per consensus pipeline", len(calls), len(cfg.CONSENSUS_MODES))
     for mode, cmd in zip(cfg.CONSENSUS_MODES, calls):
         check(f"{mode}: sbatch carries its own experiment name",
               cmd[-1], cfg.prod_exp_name(mode))
         check(f"{mode}: exp_num and targets passed",
               cmd[2:5], ['7', '0.0013', '0.00205'])
-    check("returned arms are tagged by mode",
+    check("returned pipelines are tagged by mode",
           [m for m, _ in got], list(cfg.CONSENSUS_MODES))
     check("job ids returned for the waiter",
           all('12345' in s for _, s in got), True)
 
 
 def test_archive_lists_both():
-    """write_artifacts_archive must look for a sanity plot per arm."""
+    """write_artifacts_archive must look for a sanity plot per pipeline."""
     import tempfile
     buf = io.StringIO()
     with tempfile.TemporaryDirectory() as tmp:
@@ -171,5 +171,5 @@ if __name__ == '__main__':
     print("-- sanity plots --");       test_sanity_plots()
     print("-- artifacts archive --");  test_archive_lists_both()
     print("-- sbatch wrapper --");     test_shell_passes_exp_name()
-    print("\nCONSENSUS ARMS PASSED" if not _fails else f"\nFAILED: {_fails}")
+    print("\nCONSENSUS PIPELINES PASSED" if not _fails else f"\nFAILED: {_fails}")
     raise SystemExit(1 if _fails else 0)

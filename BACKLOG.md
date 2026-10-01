@@ -6,6 +6,17 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Blockers (before next production rerun)
 
+- [x] **Concurrent jobs raced on the matrix-exponential cache** — fixed in
+      v2.4.44. `Host._load_or_precompute_exponentials` wrote a shared
+      `Data/precomputed_A_exponentials_*.pkl` non-atomically, so a task that
+      checked `os.path.exists` inside another task's `open(..., "wb")` window
+      loaded a zero-byte file and raised `EOFError: Ran out of input`. Nine of
+      900 tasks in the unbound array died this way. Now written via a per-pid
+      temp plus `os.replace`, with the read falling through to recompute on a
+      corrupt load. No recalibration — the table and all downstream numbers are
+      unchanged, and the crashes happened before any output was written. The
+      nine lost grid points need rerunning.
+
 - [ ] **`plots_manager.plot_fitness` is stale** — `plots_manager.py:101-103`
       reads the in-memory fitness trajectory as a nested list
       (`coord[1][0]`) while `update_fitness_trajectory` appends a dict, so it

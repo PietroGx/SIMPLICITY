@@ -108,19 +108,25 @@ class Host:
         return MethodType(get_A_t, self)
     
     def _load_or_precompute_exponentials(self):
+        # the table is one file shared by every concurrent job, so a reader must
+        # never see a half-written one: write to a per-process temp and rename
         file_path = om.get_procomputed_matrix_table_filepath(self.tau_1,self.tau_2,self.tau_3,self.tau_4)
         if os.path.exists(file_path):
-            with open(file_path, "rb") as f:
-                # print(f"Loaded matrix exponential table from {file_path}")
-                return pickle.load(f)
-        else:
-            print('Precomputing matrix exponentials...')
-            dts = self._generate_dts()
-            exp_table = {round(dt, 8): scipy.linalg.expm(self.A * dt) for dt in dts}
-            with open(file_path, "wb") as f:
-                pickle.dump(exp_table, f)
-                print(f"Saved {len(exp_table)} matrix exponentials to {file_path}")
-            return exp_table
+            try:
+                with open(file_path, "rb") as f:
+                    # print(f"Loaded matrix exponential table from {file_path}")
+                    return pickle.load(f)
+            except (EOFError, pickle.UnpicklingError):
+                pass  # truncated by a concurrent writer: recompute below
+        print('Precomputing matrix exponentials...')
+        dts = self._generate_dts()
+        exp_table = {round(dt, 8): scipy.linalg.expm(self.A * dt) for dt in dts}
+        tmp_path = f"{file_path}.{os.getpid()}.tmp"
+        with open(tmp_path, "wb") as f:
+            pickle.dump(exp_table, f)
+        os.replace(tmp_path, file_path)
+        print(f"Saved {len(exp_table)} matrix exponentials to {file_path}")
+        return exp_table
 
     @staticmethod
     def _generate_dts():
