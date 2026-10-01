@@ -32,6 +32,7 @@ from simplicity.evolution.decoder import decode_genome
 import simplicity.phenotype.distance  as dis
 import pandas as pd
 import simplicity.tuning.evolutionary_rate as er
+import simplicity.sequencing as sq
 import glob
 import ast
 import numpy as np
@@ -147,7 +148,9 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
 
     Outputs:
     1. sequencing_data_regression.csv: Combined metrics for both groups.
-    2. sequencing_data.csv: Raw surveillance metadata
+    2. sequencing_data.csv: Raw surveillance metadata, for EVERY diagnosed
+       individual. Subsample it with simplicity.sequencing for a given
+       sequencing ratio.
     3. sequencing_data.fasta / sequencing_data_long.fasta: only when
        write_fasta is True.
     """
@@ -169,7 +172,10 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
         # ==============================================================================
         # Process Random Surveillance Data 
         # ==============================================================================
-        sequencing_data = simulation_output.sequencing_data
+        # the COMPLETE record -- every diagnosed host, every distinct
+        # genome. The run no longer draws a sample; sq.subsample /
+        # reconstruct_sequencing_data take any ratio from this afterwards.
+        sequencing_data = sq.complete_sequencing_rows(simulation_output)
         
         if sequencing_data:
             fasta_file = open(fasta_file_path, 'w') if write_fasta else None

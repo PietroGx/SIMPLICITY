@@ -294,7 +294,6 @@ def build_cal2_settings(scenario_groups, seeds, R=None, ih_virus_emergence_rate=
     building) so exp.py's production run matches what was calibrated."""
     fixed_params = USER_FIXED_PARAMS.copy()
     fixed_params["final_time"] = CAL2_FINAL_TIME
-    fixed_params["sequencing_rate"] = CAL2_SEQUENCING_RATE
     if R is not None:
         fixed_params["R"] = R
     if ih_virus_emergence_rate is not None:

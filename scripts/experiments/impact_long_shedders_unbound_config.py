@@ -205,7 +205,6 @@ def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
         "long_shedders_ratio": 0.0,
         "sequence_long_shedders": False,
         "final_time": UNBOUND_CAL2_FINAL_TIME,
-        "sequencing_rate": UNBOUND_CAL2_SEQUENCING_RATE,
     })
     if R is not None:
         fixed_params["R"] = R

@@ -8,7 +8,14 @@ Legend: `[ ]` open · `[x]` resolved · **RECAL** = fixing it invalidates prior 
 
 ---
 
-## [ ] 1. Remove the sequencing mechanism; persist diagnosis times  **RECAL**
+## [x] 1. Remove the sequencing mechanism; persist diagnosis times  **RECAL**
+
+**Done in v2.4.49.** The run records `t_diagnosis` and writes the complete
+record; `simplicity/sequencing.py` reconstructs a dataset at any ratio from
+saved output. Dynamics verified byte-identical across the change
+(`tests/test_sequencing_removal.py`): rng6 drove nothing else. Prior runs lack
+`t_diagnosis`, so a sequencing dataset cannot be reconstructed from them --
+that is the RECAL.
 
 Agreed before this audit. `sequencing_rate = 0.05` yields ~20 sequences per
 simulation out of ~3,500 infections; in SOT and edge_case the median

@@ -49,7 +49,11 @@ def distributional(lineage, column_dist, delta):
             distance += 1.0   # no snapshot carries this position: certain disagreement
         else:
             distance += column.get(reference[position], 0.0) - column.get(base, 0.0)
-    return distance
+    # >= 0 by construction: the consensus base is each column's argmax, so the
+    # sum above cannot fall below -delta. A lineage that IS the consensus hits
+    # exactly 0 by near-total cancellation, which in doubles lands ~1e-17 below
+    # it -- and that sign reaches rng4.choice as a weight once phi saturates.
+    return distance if distance > 0.0 else 0.0
 
 def hamming_iw(lineage,lineage2):
     # distance between two genomes. A position absent from a genome carries the

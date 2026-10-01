@@ -23,15 +23,15 @@ Created on Fri Mar 28 12:51:33 2025
 """
 import numpy as np
 
-def SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v, seq_rate):
+def SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v):
     propensities_params = [beta_standard, beta_long, k_ds, k_dl, k_v]
     # system propensities
     # reaction_id, reaction_rate, action
     propensities = [
         ('infection_standard', beta_standard * population.infectious_standard, lambda: infection(population, from_long_shedder=False)),
         ('infection_long',     beta_long * population.infectious_long  ,       lambda: infection(population, from_long_shedder=True)),
-        ('diagnosis_standard', k_ds * population.detectables_standard,         lambda: diagnosis(population, from_long_shedder=False, seq_rate=seq_rate)),
-        ('diagnosis_long',     k_dl * population.detectables_long,             lambda: diagnosis(population, from_long_shedder=True, seq_rate=seq_rate)),
+        ('diagnosis_standard', k_ds * population.detectables_standard,         lambda: diagnosis(population, from_long_shedder=False)),
+        ('diagnosis_long',     k_dl * population.detectables_long,             lambda: diagnosis(population, from_long_shedder=True)),
         ('add_ih_lineage',     k_v * population.infected,                      lambda: add_lineage(population))
     ]
     # print('a1:',beta * population.infectious)
@@ -39,11 +39,16 @@ def SIDR_propensities(population, beta_standard, beta_long, k_ds, k_dl, k_v, seq
     # print('a3:',k_v * population.infected)
     return propensities, propensities_params
 
-def diagnosis(population, from_long_shedder, seq_rate=0):
+def diagnosis(population, from_long_shedder):
     '''
     Select an infected (and detectable) individual at random and tags it
-    as "diagnosed". Update the infected and diagnosed compartments. 
+    as "diagnosed". Update the infected and diagnosed compartments.
     Update detectable_i, infectious_i, infected_i and diagnosed_i.
+
+    Records t_diagnosis. The simulation no longer draws a sequencing sample:
+    with the diagnosis time persisted next to the complete intra-host record,
+    any sequencing ratio is reconstructed afterwards by
+    simplicity.sequencing.reconstruct_sequencing_data.
     '''
     population.infected -= 1
     
@@ -54,35 +59,6 @@ def diagnosis(population, from_long_shedder, seq_rate=0):
         # select random patient to be diagnosed
         diagnosed_individual_i = population.rng4.choice(population.detectables_standard_i)
         
-    if population.rng6.uniform(0, 1) < seq_rate:
-        # store sequencing data
-        # patient_id, time, genome, subst number, patient type, infection duration, ih lineage number
-        # One row per DISTINCT genome carried by the host. IH_lineages is a
-        # multiset: add_lineage duplicates an existing lineage into a new slot,
-        # and that copy stays byte-identical until it mutates, so emitting
-        # every slot records the same genome several times and weights the
-        # host by its lineage count instead of its actual diversity.
-        seen_genomes = set()
-        i = 0
-        for lineage_name in population.individuals[diagnosed_individual_i]['IH_lineages']:
-            genome = population.get_lineage_genome(lineage_name)
-            # compare sequence content, not lineage identity
-            genome_key = tuple(sorted(genome.items()))
-            if genome_key in seen_genomes:
-                continue
-            seen_genomes.add(genome_key)
-            population.sequencing_data.append({
-                'individual_index': diagnosed_individual_i,
-                'sequencing_time' : population.time,
-                'lineage_name'    : lineage_name,
-                'sequence'        : genome,
-                'sequence_lenght' : len(genome),
-                'individual_type' : population.individuals[diagnosed_individual_i]['type'],
-                'infection_duration' : population.time - population.individuals[diagnosed_individual_i]['t_infection'],
-                'intra-host_lineage_index' :i
-            })
-            i += 1
-
     # update the active lineages number
     population.active_lineages_n -= population.individuals[diagnosed_individual_i]['IH_unique_lineages_number']
     
@@ -95,6 +71,10 @@ def diagnosis(population, from_long_shedder, seq_rate=0):
     # set patient as diagnosed
     population.individuals[diagnosed_individual_i]['t_not_infectious'] = population.time
     population.individuals[diagnosed_individual_i]['state'] = 'diagnosed'
+    # the surveillance timestamp. t_not_infected/t_not_infectious are also set
+    # on recovery, so neither identifies a diagnosis on its own; this is what a
+    # post-hoc sequencing draw selects on.
+    population.individuals[diagnosed_individual_i]['t_diagnosis'] = population.time
 
    
     if population.individuals[diagnosed_individual_i]['t_not_infected'] is None:

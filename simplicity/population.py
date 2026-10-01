@@ -41,7 +41,7 @@ class Population:
     def __init__(self,
                  size,I_0,
                  ih_model_parameters,
-                 rng3,rng4,rng5,rng6,
+                 rng3,rng4,rng5,
                  NSR_long,
                  long_shedders_ratio=0,
                  sequence_long_shedders=False,
@@ -53,7 +53,6 @@ class Population:
         self.rng3 = rng3 # for intra-host model states update
         self.rng4 = rng4 # for electing individuals|lineages when reactions happen
         self.rng5 = rng5 # for mutation model
-        self.rng6 = rng6 # for synthetic sequencing data
         
         self.size = size
         # Share of the POPULATION that sheds long, fixed per individual at
@@ -135,7 +134,6 @@ class Population:
                                  }]
         self._phylo_name_map = { row['Lineage_name']: row for row in self.phylogenetic_data }
         self.phylodots = []         # needed to name lineages
-        self.sequencing_data = []   # to store sequencing data
         # ---------------------------------------------------------------------
         
         self.lineage_frequency = [] # count lineage frequency in the population
@@ -231,6 +229,8 @@ class Population:
 
                      't_infectious': None,
                      't_not_infectious': None,
+
+                     't_diagnosis' : None,
 
                      'type'        : 'long_shedder' if is_long else 'standard',
                      'state_t'     : 0,
@@ -593,10 +593,9 @@ def create_population(parameters):
     rng3 = randomgen(seeds_generator.integers(0,10000)) # for intra-host model states update
     rng4 = randomgen(seeds_generator.integers(0,10000)) # for electing individuals|lineages when reactions happen
     rng5 = randomgen(seeds_generator.integers(0,10000)) # for mutation model
-    rng6 = randomgen(seeds_generator.integers(0,10000)) # for synthetic sequencing data
     
     # create population
-    pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5,rng6, NSR_long,
+    pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5, NSR_long,
                      long_shedders_ratio, sequence_long_shedders,
                      susceptibility_long, write_fasta)
     return pop
