@@ -91,9 +91,9 @@ def main():
     parser.add_argument('--seeds', type=int, default=30)
     parser.add_argument('--consensus', type=str, choices=list(CONSENSUS_MODES),
                         default='argmax',
-                        help="Consensus distance arm. 'distribution' writes to "
-                            "the _dist experiment names, so both arms can share "
-                            "one --exp-num.")
+                        help="How the consensus distance is measured. "
+                            "'distribution' writes to the _dist experiment "
+                            "names, so both pipelines can share one --exp-num.")
     parser.add_argument('--only', type=str, default=None,
                         help="Optional: run only this scenario_name.")
     add_slurm_resource_args(parser)

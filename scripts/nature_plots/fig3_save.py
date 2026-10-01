@@ -25,7 +25,7 @@ def parse_arguments():
                             "old default of 4 pointed at one of the runs that "
                             "produced invalid science.")
     parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
-                        help=f"Pipeline arm (default: {BOUND_EXP_NAME}).")
+                        help=f"Pipeline to plot (default: {BOUND_EXP_NAME}).")
     parser.add_argument('--cluster-threshold', type=int, default=5)
     parser.add_argument('--min-days', type=int, default=100)
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png')

@@ -55,18 +55,21 @@ Kown bugs:
    as TIMEOUT/OUT_OF_MEMORY/CANCELLED/etc.
 
 """
-import typing, os, json, pathlib, subprocess, platform
+import typing, os, json, time, pathlib, subprocess, platform
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
 
 # How often (seconds) run_seeded_simulations' polling loop reports the
 # internal state (time/final_time/infected) of simulations that have been
-# running for a while -- separate from the ~17s SimulationsStatus printout,
-# since this is meant as an occasional deeper look, not a repeated ping.
-LONG_RUNNING_REPORT_INTERVAL_S = 3600
+# running for a while -- separate from the SimulationsStatus line, which
+# prints on change; this is meant as an occasional deeper look.
+LONG_RUNNING_REPORT_INTERVAL_S = 600
 # How long a simulation must have been running (since its .started signal)
-# before it's included in that report.
-LONG_RUNNING_THRESHOLD_S = 3600
+# before it's included in that report. Was 3600, at which nothing ever
+# qualified: the slowest of unbound #1's 1,400 tasks took 2,423s, and the
+# v2.4.41-43 speedups cut runtimes a further ~6x. The report prints nothing
+# at all when nothing qualifies, so that read as the feature being broken.
+LONG_RUNNING_THRESHOLD_S = 300
 
 # How often (seconds) run_seeded_simulations' polling loop reconciles
 # .started-but-unresolved tasks against Slurm's own accounting (sacct). This
@@ -110,6 +113,13 @@ class SimulationsStatus(typing.NamedTuple):
     failed   : int
 
     
+def print_simulations_status(status):
+    """One timestamped status line. Printed on every change of status and
+    never otherwise: a fixed-interval reprint of an unchanged line buries
+    the transitions that actually carry information."""
+    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {status}")
+
+
 def get_platform_executable_extension():
     """file extension to use when calling Slurm command-line utilities (sbatch, squeue, scontrol)."""
     return ".exe" if platform.system() == "Windows" else  ""
@@ -525,17 +535,17 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
 
     # submit simulations
     submit_simulations(experiment_name, run_seeded_simulation, n=status.total)
-    print(f"submitted {status.total} seeded simulations"); last_printed = time.time()
-    
+    print(f"submitted {status.total} seeded simulations")
+
     # loop until no simulation left to release
     last_status  = None
     last_long_running_report = time.time()
     last_reconcile = time.time()
     last_launch_failure_reconcile = time.time()
     while (status := poll_simulations_status(experiment_name)).left > 0:
-        # print if status changed or after 17 seconds
-        if last_status != status or (time.time() - last_printed) > 17.:
-            print(status); last_printed = time.time()
+        # print only when a simulation actually changed status
+        if last_status != status:
+            print_simulations_status(status)
         last_status = status
 
         # release simluations (silently -- this can fire every poll cycle
@@ -570,7 +580,7 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
         time.sleep(7.)
 
     # completed
-    print(status); last_printed = time.time()
+    print_simulations_status(status)
 
     
 def job():

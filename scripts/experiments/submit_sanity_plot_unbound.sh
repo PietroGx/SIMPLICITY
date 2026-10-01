@@ -30,10 +30,10 @@
 # Usage: sbatch submit_sanity_plot_unbound.sh <exp_num> <target_osr_std> \
 #            <target_osr_long> [exp_name]
 #
-# exp_name selects the consensus arm and defaults to the argmax one. The
+# exp_name selects the consensus pipeline and defaults to the argmax one. The
 # plotting script derives both its inputs (<exp_name>_<scenario>_#<num>) and its
-# output directory (<exp_name>_sanity_#<num>) from it, so the two arms cannot
-# collide.
+# output directory (<exp_name>_sanity_#<num>) from it, so the two pipelines
+# cannot collide.
 #
 # No 'set -u': conda's activate.d hooks are not nounset-safe (same reason
 # submit_sanity_plot.sh omits it).

@@ -15,8 +15,14 @@
 # The four figures must agree on which scenarios exist, so the list comes from
 # the pipeline's OWN config rather than being repeated in each script:
 #
-#   impact_long_shedders          -> 4 scenarios
-#   impact_long_shedders_unbound  -> 5 scenarios, including edge_case
+#   impact_long_shedders               -> 4 scenarios
+#   impact_long_shedders_unbound       -> 5 scenarios, including edge_case
+#   impact_long_shedders_unbound_dist  -> the same 5, run with distributional
+#                                         consensus instead of argmax
+#
+# The two unbound pipelines share one config: the consensus mode changes the
+# model, not the scenario list, so they must stay the same five scenarios for
+# the comparison to mean anything.
 #
 # resolve_scenarios also reports which of those have no output on disk. A
 # scenario is DROPPED but WARNED about -- never silently omitted. Discovering
@@ -35,17 +41,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 BOUND_EXP_NAME = "impact_long_shedders"
 UNBOUND_EXP_NAME = "impact_long_shedders_unbound"
+# impact_long_shedders_unbound_config.CONSENSUS_SUFFIX['distribution']
+UNBOUND_DIST_EXP_NAME = "impact_long_shedders_unbound_dist"
 
 # exp_name -> the module holding that pipeline's SCENARIOS
 _CONFIG_MODULES = {
     BOUND_EXP_NAME: "impact_long_shedders_config",
     UNBOUND_EXP_NAME: "impact_long_shedders_unbound_config",
+    UNBOUND_DIST_EXP_NAME: "impact_long_shedders_unbound_config",
 }
 
 # exp_name -> short label for output filenames
-_ARM_LABELS = {
+_PIPELINE_LABELS = {
     BOUND_EXP_NAME: "bound",
     UNBOUND_EXP_NAME: "unbound",
+    UNBOUND_DIST_EXP_NAME: "unbound_distribution",
 }
 
 
@@ -105,9 +115,9 @@ def resolve_scenarios(exp_name, exp_num, required=None, verbose=True):
     return present, missing
 
 
-def arm_label(exp_name):
-    """Short label for the pipeline arm, for output filenames."""
-    return _ARM_LABELS.get(exp_name, exp_name)
+def pipeline_label(exp_name):
+    """Short label for the pipeline, for output filenames."""
+    return _PIPELINE_LABELS.get(exp_name, exp_name)
 
 
 def figures_dir():
@@ -119,9 +129,9 @@ def figures_dir():
 
 def figure_path(number, exp_name, exp_num, fmt, seed=None, subdir=None,
                 group=None):
-    """Data/figures/Figure_<n>_<arm>_#<exp_num>[_seed<s>].<fmt>.
+    """Data/figures/Figure_<n>_<pipeline>_#<exp_num>[_seed<s>].<fmt>.
 
-    The arm and run number are in the name so the two pipelines cannot
+    The pipeline and run number are in the name so no two pipelines can
     overwrite each other. `seed` is included for the seed-dependent figures
     (2, 3, 4) so rendering a second seed no longer silently overwrites the
     first -- which made comparing seeds impossible.
@@ -134,4 +144,4 @@ def figure_path(number, exp_name, exp_num, fmt, seed=None, subdir=None,
     tail += f"_seed{seed}" if seed is not None else ""
     return os.path.join(
         out,
-        f"Figure_{number}_{arm_label(exp_name)}_#{exp_num}{tail}.{fmt}")
+        f"Figure_{number}_{pipeline_label(exp_name)}_#{exp_num}{tail}.{fmt}")

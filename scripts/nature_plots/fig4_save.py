@@ -22,7 +22,7 @@ def parse_arguments():
                             "old default of 4 pointed at one of the runs that "
                             "produced invalid science.")
     parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
-                        help=f"Pipeline arm (default: {BOUND_EXP_NAME}).")
+                        help=f"Pipeline to plot (default: {BOUND_EXP_NAME}).")
     parser.add_argument('--seed', type=str, default="1",
                         help="Seed used for all 5 trees (same seed across scenarios)")
     parser.add_argument('--cluster-threshold', type=int, default=5)

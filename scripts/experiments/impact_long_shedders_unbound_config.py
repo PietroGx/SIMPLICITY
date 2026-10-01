@@ -224,13 +224,13 @@ def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
 # STAGE 3 -- production
 # =============================================================================
 CONSENSUS_MODES = ("argmax", "distribution")
-# The distribution arm's experiments carry this suffix so the two arms cannot
+# The distribution pipeline's experiments carry this suffix so the two cannot
 # collide in Data/ at the same --exp-num.
 CONSENSUS_SUFFIX = {"argmax": "", "distribution": "_dist"}
 
 
 def prod_exp_name(consensus):
-    """Production experiment prefix for one consensus arm."""
+    """Production experiment prefix for one consensus mode's pipeline."""
     if consensus not in CONSENSUS_MODES:
         raise ValueError(f"consensus must be one of {CONSENSUS_MODES}, got {consensus!r}")
     return PROD_EXP_NAME + CONSENSUS_SUFFIX[consensus]
@@ -243,7 +243,7 @@ def build_exp_scenario_settings(row, n_seeds, consensus="argmax"):
     `consensus` selects how a lineage's distance from the population consensus
     is measured -- 'argmax' against the consensus sequence, 'distribution'
     against the full column distribution. Everything else is identical, which
-    is what makes the two arms comparable.
+    is what makes the two pipelines comparable.
     """
     if consensus not in CONSENSUS_MODES:
         raise ValueError(f"consensus must be one of {CONSENSUS_MODES}, got {consensus!r}")

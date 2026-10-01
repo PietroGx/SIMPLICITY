@@ -20,8 +20,10 @@
 #   2. cal_2  0% long shedders, sweep standard NSR, global clock -> ONE
 #             standard rate for every scenario, then the frozen table
 #   3. exp    production, both rates applied exactly as calibrated, run ONCE
-#             PER CONSENSUS ARM off the SAME frozen table, so the arms differ
-#             in nothing but how the distance from the consensus is measured
+#             PER CONSENSUS MODE off the SAME frozen table: one production
+#             pipeline for the argmax consensus and one for the distributional
+#             consensus, differing in nothing but how the distance from the
+#             consensus is measured
 #   4. sanity combined root-to-tip grid over real output
 #   5. artifacts zipped into one file per run
 #
@@ -54,8 +56,10 @@ from impact_long_shedders_unbound_config import (
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
 
+# SimulationsStatus lines are NOT dropped: since v2.4.47 they print once per
+# status change, timestamped, so they are the log's record of when each
+# simulation moved.
 _NOISE_PATTERNS = [
-    re.compile(r'^SimulationsStatus\('),
     re.compile(r'^submitted \d+ seeded simulations$'),
 ]
 
@@ -120,9 +124,9 @@ def report_simulation_health(exp_names, log_fh, label):
 
 def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh,
                         consensus_modes):
-    """One sanity grid per consensus arm. Each reads its own production
-    experiments and writes into its own plots directory, both derived from the
-    arm's experiment name."""
+    """One sanity grid per consensus mode. Each reads its own production
+    experiments and writes into its own plots directory, both derived from that
+    pipeline's experiment name."""
     sanity_sh = os.path.join(SCRIPT_DIR, "submit_sanity_plot_unbound.sh")
     submitted = []
     for mode in consensus_modes:
@@ -185,7 +189,7 @@ def write_artifacts_archive(archive_path, exp_num, log_file):
         os.path.join("Data", f"{STD_NSR_EXP_NAME}_#{exp_num}", "05_Plots",
                      f"{STD_NSR_EXP_NAME}_#{exp_num}_std_nsr_calibration_fit.png"),
     ]
-    # one sanity grid per consensus arm
+    # one sanity grid per consensus mode
     for mode in CONSENSUS_MODES:
         sanity_exp = f"{prod_exp_name(mode)}_sanity_#{exp_num}"
         candidates.append(
@@ -215,8 +219,9 @@ def main():
                         help="Seeds per scenario, production stage.")
     parser.add_argument('--consensus', type=str, nargs='+',
                         choices=list(CONSENSUS_MODES), default=list(CONSENSUS_MODES),
-                        help="Consensus arms to run in production, off the same "
-                            "calibration. Default: both.")
+                        help="Consensus modes to run in production, one "
+                            "pipeline each, off the same calibration. "
+                            "Default: both.")
     parser.add_argument('--skip-cal1', action='store_true',
                         help=f"Reuse an existing {LONG_NSR_EXP_NAME}_#{{exp_num}}.")
     parser.add_argument('--r-cal1', type=float, default=CAL1_ISOLATED_FIXED_PARAMS['R'])
@@ -276,8 +281,8 @@ def main():
         report_simulation_health([f"{STD_NSR_EXP_NAME}_#{args.exp_num}"],
                                  log_fh, "stage 2 (standard alone)")
 
-        # Every arm reads the SAME frozen table, so the only thing that differs
-        # between them is the consensus distance.
+        # Both pipelines read the SAME frozen table, so the only thing that
+        # differs between them is the consensus distance.
         for mode in args.consensus:
             run_stage([py, exp_path,
                       "--exp-num", str(args.exp_num),

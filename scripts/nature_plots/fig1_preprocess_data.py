@@ -31,7 +31,7 @@ def duration_groups(exp_name):
     Panels A and B show infection-duration distributions, so HIV_low and
     HIV_high (which share tau_3_long) would draw the same curve twice. Keying
     on the label collapses them and lets edge_case in wherever the pipeline
-    defines it -- 3 groups on the bound arm, 4 on the unbound one.
+    defines it -- 3 groups on the bound pipeline, 4 on the unbound one.
     """
     seen, out = set(), []
     for name in scenario_names(exp_name):

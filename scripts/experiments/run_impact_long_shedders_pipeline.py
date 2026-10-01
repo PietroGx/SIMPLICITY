@@ -31,12 +31,12 @@
 #
 # Every stage keeps its own independently-runnable CLI; this script is a
 # thin sequencer that aborts immediately if any stage fails. All stage
-# output is echoed live AND appended to --log-file, except the SLURM
-# runner's periodic polling noise (simplicity/runners/slurm.py's
-# SimulationsStatus(...) prints and "submitted N seeded simulations" lines),
-# which is dropped from the log file only. The old "release up to N seeded
-# simulations" ping was removed at the source (slurm.py no longer prints it
-# at all -- it fired on every poll cycle once jobs started turning over).
+# output is echoed live AND appended to --log-file, except the "submitted N
+# seeded simulations" line, which is dropped from the log file only. The old
+# "release up to N seeded simulations" ping was removed at the source
+# (slurm.py no longer prints it at all -- it fired on every poll cycle once
+# jobs started turning over), and SimulationsStatus lines no longer repeat on
+# a timer, so they are kept.
 #
 # NSR sweep ranges (and per-scenario R_long) are NOT arguments here -- they
 # live in impact_long_shedders_config.py (NSR_RANGES / SCENARIOS), reviewed/
@@ -67,8 +67,10 @@ from impact_long_shedders_config import (
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
 PROD_EXP_NAME = "impact_long_shedders"
 
+# SimulationsStatus lines are NOT dropped: since v2.4.47 they print once per
+# status change, timestamped, so they are the log's record of when each
+# simulation moved.
 _NOISE_PATTERNS = [
-    re.compile(r'^SimulationsStatus\('),
     re.compile(r'^submitted \d+ seeded simulations$'),
 ]
 

@@ -12,7 +12,7 @@ def parse_arguments():
                             "old default of 4 pointed at one of the runs that "
                             "produced invalid science.")
     parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
-                        help=f"Pipeline arm (default: {BOUND_EXP_NAME}).")
+                        help=f"Pipeline to plot (default: {BOUND_EXP_NAME}).")
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png',
                         help='Output format for the figure (default: png)')
     parser.add_argument('--no-fit-stats', action='store_true',
@@ -62,7 +62,7 @@ def build_figure_1(exp_num, exp_name, fmt):
 
     # === PLOT ===
     # Panel A: 800 d only when a scenario actually runs that long (edge_case).
-    # The bound arm's longest is HIV at 109 d, so 800 left it mostly empty.
+    # The bound pipeline's longest is HIV at 109 d, so 800 left it mostly empty.
     has_edge_scen = 'Edge Case' in set(df_ab_theoretical.get('cohort', []))
     plots.plot_fig1_intra_host(ax_A, df_ab_theoretical,
                                x_max=800 if has_edge_scen else 400)
@@ -90,7 +90,7 @@ def build_figure_1(exp_num, exp_name, fmt):
         add_panel_label(ax, label)
 
     # The edge-case colour also marks panel C's >300 d patients, so the legend
-    # entry belongs whenever EITHER appears -- on the bound arm there is no
+    # entry belongs whenever EITHER appears -- on the bound pipeline there is no
     # edge_case scenario but panel C still shows those patients in pink.
     has_edge = ('Edge Case' in set(df_ab_realized.get('cohort', [])))
     if not df_c.empty:
