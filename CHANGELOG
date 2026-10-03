@@ -5,6 +5,53 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.51 — 2026-10-03 — pietro gerletti
+
+`tests/test_r_sweep.py`: does raising R stop the epidemics fizzling out?
+
+Run #3 reached the horizon in only 238 of 500 production simulations under the
+distributional consensus -- 33% for control, 79% for HIV_high. Almost none died
+out (1-3 per scenario) and NONE saturated. They stopped on extrande's third
+condition, `t > 60 and infectious == 0`: a few hosts still flagged infected,
+none in an infectious compartment, so transmission was over. At R = 1.03 in a
+population of 1000 that is expected behaviour, not a failure -- and it means
+any "ran to completion" filter selects a biased subset, which is how the ten
+seeds for the tree comparison were chosen.
+
+The test reuses run #3's frozen table unchanged and runs the same five
+scenarios at R = R_long = 1.05 and 1.10, 10 seeds each, distributional
+consensus only -- equalising R and R_long so infection duration is the only
+thing separating the cohorts. 100 tasks, written to
+`rtest_<R>_<scenario>_#903` so nothing touches real data. All ten experiments
+submit together, splitting the concurrency cap as the production dispatcher
+does and restoring it afterwards.
+
+Reports, to stdout and `Data/rtest_report_#903.txt`: completion against the
+horizon with run #3 as the baseline column; why the rest stopped, classified by
+extrande's real conditions in their real order (so saturation appearing is
+visible as the opposite failure); peak infected and the day phi saturates,
+which also bears on figure 4's burn-in; timing; and a verdict.
+
+Timing measures per-task wall clock from the .started/.completed signal mtimes
+rather than the sweep's own elapsed time, which carries queue wait, then
+projects a full pipeline as ceil(tasks/cap) waves at the p95 task. Measured at
+the swept R on purpose: higher R means bigger epidemics and slower tasks, so it
+projects the run actually being considered. Against HIV_high #3 the per-task
+median is 2m28s and p95 6m38s, projecting ~1h19m for a full pipeline at 100
+seeds under a cap of 200.
+
+The NSR in that table was fitted at R = 1.03 and is wrong for the swept values.
+Deliberate, and stated at the top of the output: fade-out is a property of
+transmission, not of the mutation clock. Completion rates only -- no clocks, no
+clades.
+
+Verified locally without running any simulation: `--analyse-only` against the
+existing #3 data reproduces the baseline column exactly (33/39/43/79/44 per
+scenario, 238/500 overall, phi medians 203/208/217/310/204), and `task_seconds`
+plus `projection` were exercised against real signal files.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.50 — 2026-10-01 — pietro gerletti
 
 Submitting over an earlier attempt's signal files now refuses, and the
