@@ -5,6 +5,51 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.52 — 2026-10-03 — pietro gerletti
+
+`test_r_sweep.py` sweeps population size as well as R.
+
+The first sweep answered its question and killed its own premise. R = 1.05
+lifted completion from 48% to 68%; R = 1.10 produced 0 of 50, every run ending
+on `susceptibles == 0` with a median peak of 1000 infected -- the whole
+population at once, burnt out by day ~340. The usable window between
+stochastic fade-out and susceptible exhaustion is narrow, and that is a
+property of a 1000-host population rather than of R.
+
+(A correction: v2.4.51's framing said saturation was unlikely because the
+reservoir tops susceptibles back up on every diagnosis. It refills at the
+DIAGNOSIS rate, so once infection outruns diagnosis the susceptibles drain
+anyway. The R = 1.10 column is that being wrong.)
+
+New `--population-size` (default 1000) and `--i0`, which by default scales the
+initial infected with the population so starting prevalence -- and with it the
+chance of early stochastic death -- matches production's 50/1000. Overrides
+reach the simulation through `with_overrides`, which wraps
+`build_exp_scenario_settings` rather than rebuilding the parameter dict.
+
+`measure` now takes the population it must normalise phi by. It was hardcoded
+to 1000, which at 5000 hosts would have reported phi = 1 at a fifth of the real
+day and moved every burn-in number without any sign that it had. The baseline
+column keeps 1000, the swept runs use theirs, and the header says so:
+completion rates stay comparable across populations, absolute counts do not.
+
+Experiment names carry the population (`rtest_<R>_N<pop>_<scenario>`) so sweeps
+at different sizes cannot collide; the report file does too.
+
+Timing is now reported per R as well as pooled. The pooled figure from the
+first sweep (median 51s) was dragged down by R = 1.10 runs that all died by day
+~340 -- the cheapest configuration was the one nobody would run. The projection
+note now says to read the slowest R.
+
+Warns when the population is above 1000 and `--slurm-mem` is still the default
+4G, which was sized on production's 1000 hosts.
+
+Verified with `--analyse-only` against run #3: the baseline column reproduces
+unchanged at its own population, and the new header, per-R timing and naming
+all render.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.51 — 2026-10-03 — pietro gerletti
 
 `tests/test_r_sweep.py`: does raising R stop the epidemics fizzling out?
