@@ -24,12 +24,11 @@ from this and nothing else -- no clocks, no clades.
 Usage on the HPC, from the repo root:
 
     python tests/test_r_sweep.py --runner slurm \
-        --population-size 5000 --r-values 1.05 1.06 1.07 \
-        --slurm-mem 16G
+        --population-size 5000 --r-values 1.05 1.06 1.07
 
     --population-size N population for the swept runs    (default 1000)
-    --i0 N              initial infected; by default scales with the
-                        population so starting prevalence matches production
+    --i0 N              initial infected (default: production's 50, held
+                        fixed regardless of population size)
     --r-values A B C    R values to test                 (default 1.05 1.1)
     --seeds N           seeds per scenario per R         (default 10)
     --table-exp-num N   frozen table to reuse            (default 3)
@@ -469,9 +468,8 @@ def main():
     p.add_argument('--population-size', type=int, default=BASELINE_POP,
                    help='population for the swept runs (default %(default)s)')
     p.add_argument('--i0', type=int, default=None,
-                   help='initial infected; default scales the production '
-                        'value with the population so starting prevalence '
-                        'is unchanged')
+                   help='initial infected (default: production\'s value, '
+                        'held fixed regardless of population size)')
     p.add_argument('--seeds', type=int, default=10)
     p.add_argument('--r-values', type=float, nargs='+', default=[1.05, 1.1])
     p.add_argument('--runner', default='slurm',
@@ -492,26 +490,18 @@ def main():
     table_path, rows = rows_from_table(args.table_exp_num)
     wall = None
 
-    # Scale the initial infected with the population unless told otherwise, so
-    # starting prevalence -- and with it the chance of early stochastic death
-    # -- is the same as production's 50/1000.
+    # Initial infected is held at production's absolute value, not scaled with
+    # the population: the seeding stays what it is and the population size is
+    # the only thing that moves.
     pop = args.population_size
-    base_i0 = int(USER_FIXED_PARAMS['infected_individuals_at_start'])
-    i0 = args.i0 if args.i0 is not None else max(
-        1, round(base_i0 * pop / BASELINE_POP))
+    i0 = (args.i0 if args.i0 is not None
+          else int(USER_FIXED_PARAMS['infected_individuals_at_start']))
     overrides = {'population_size': pop, 'infected_individuals_at_start': i0}
 
     if not args.analyse_only:
         set_slurm_resource_env(args.slurm_mem, args.slurm_time)
         print(f'[rtest] table      : {table_path}')
         print(f'[rtest] population : {pop}  (initial infected {i0})')
-        if pop > BASELINE_POP and args.slurm_mem == os.environ['SIMPLICITY_SLURM_MEM']:
-            # cost scales with the number of infected hosts and the lineages
-            # they carry, and 4G was sized on production's 1000
-            print(f'[rtest][warn] population is {pop / BASELINE_POP:.0f}x '
-                  f'production and --slurm-mem is still the default '
-                  f'{args.slurm_mem}. A task killed for memory is a wasted '
-                  f'run; consider --slurm-mem 16G --slurm-time 2-00:00:00.')
         print(f'[rtest] R values   : {args.r_values}  (R_long set equal to R)')
         print(f'[rtest] scenarios  : {[r["scenario_name"] for r in rows]}')
         print(f'[rtest] seeds each : {args.seeds}')
