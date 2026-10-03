@@ -5,6 +5,18 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.53 — 2026-10-03 — pietro gerletti
+
+`test_r_sweep.py`: initial infected is held at production's 50 regardless of
+population size, reversing v2.4.52's scaling. Population size is then the only
+thing that moves between the sweeps, which is what the comparison is for; at
+5000 hosts that means 1% starting prevalence against production's 5%, by
+choice. `--i0` still overrides.
+
+Dropped the warning about --slurm-mem at larger populations: 4G is enough.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.52 — 2026-10-03 — pietro gerletti
 
 `test_r_sweep.py` sweeps population size as well as R.
