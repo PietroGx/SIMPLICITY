@@ -5,6 +5,38 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.56 — 2026-10-04 — pietro gerletti
+
+`test_config_grid.py` submits the grid as several sequential arrays instead of
+one, because one 4500-task array is refused outright.
+
+v2.4.55 put the whole grid in a single array on the reasoning that this is what
+Slurm arrays are for. sbatch rejected it: `squeue --me` came back empty and
+`submit_simulations`' assert fired, which interpolates the entire environment
+dict into its message and buries the actual sbatch error under pages of LMOD
+and PATH. The release cap is irrelevant here -- `submit_simulations` queues the
+WHOLE array at once with `--hold`, so all 4500 jobs hit the submit limit before
+a single one is released.
+
+New `--max-array-tasks` (default 900, the size cal_1 is known to submit
+successfully; 0 restores a single array). `chunk_groups` splits the
+`_scenario_groups` list so no array exceeds it, and they are submitted one
+after another as `config_grid_part1`, `part2`, ... under one --exp-num, so only
+one array is ever queued. At 50 seeds that is 5 arrays of 900.
+
+Collection, timing and the `.failed` count now span every part:
+`grid_params_files` globs both the single-array and the part names, and each
+combination's output root is derived from its own parameters file rather than
+assumed, so a grid split one way and re-analysed later still resolves.
+
+The MaxArraySize pre-flight now checks the per-array size rather than the
+grand total, and reports the `--max-array-tasks` value that would fit.
+
+Verified locally: 90 groups chunk to 5 arrays of 900 at the default, 9 of 500
+when asked, and 1 of 4500 at 0, with the task total preserved in every case.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.55 — 2026-10-04 — pietro gerletti
 
 `test_config_grid.py` submits the whole grid as ONE Slurm array, and refuses

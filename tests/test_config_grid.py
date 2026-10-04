@@ -43,11 +43,15 @@ Usage on the HPC, from the repo root:
     --seeds N               per scenario per cell   (default 10)
     --table-exp-num N       frozen table to reuse   (default 3)
     --exp-num N             write under             (default 906)
+    --max-array-tasks N     largest single array      (default 900, 0 = all)
     --analyse-only          skip the run, re-print the report
 
-18 cells x 5 scenarios x N seeds: 900 tasks at 10 seeds, 4500 at 50, all in one
-array. The task count is checked against the cluster's MaxArraySize before
-anything is submitted.
+18 cells x 5 scenarios x N seeds: 900 tasks at 10 seeds, 4500 at 50. The grid
+is split into arrays of at most --max-array-tasks (default 900, the size cal_1
+submits successfully) and they go in one after another, because
+submit_simulations queues a whole array at once -- a grid above the cluster's
+array or submit limit is refused outright and the release cap never applies.
+Each array's size is checked against MaxArraySize before anything is sent.
 '''
 import argparse
 import csv
@@ -157,13 +161,39 @@ def max_array_size():
     return None
 
 
-def run_grid(rows, cells, exp_num, runner, n_seeds):
+def chunk_groups(groups, n_seeds, max_array_tasks):
+    '''Split the groups so no single array exceeds max_array_tasks.
+
+    submit_simulations puts the WHOLE array in the queue at once, on hold, so
+    a grid larger than the cluster's array or submit limit is refused outright
+    -- the release cap never gets a chance to apply. Chunks are submitted one
+    after another, so only one array is ever queued.
+    '''
+    if max_array_tasks <= 0:
+        return [groups]
+    per_chunk = max(1, max_array_tasks // max(1, n_seeds))
+    return [groups[i:i + per_chunk]
+            for i in range(0, len(groups), per_chunk)]
+
+
+def part_name(index, total):
+    return GRID_EXP_NAME if total == 1 else f'{GRID_EXP_NAME}_part{index + 1}'
+
+
+def run_grid(rows, cells, exp_num, runner, n_seeds, max_array_tasks):
     groups, base_fixed = build_groups(rows, cells, n_seeds)
+    chunks = chunk_groups(groups, n_seeds, max_array_tasks)
+    print(f'[grid] submitting {len(chunks)} array(s), '
+          f'{len(chunks[0]) * n_seeds} tasks each at most, one after another')
+    for i, chunk in enumerate(chunks):
+        name = part_name(i, len(chunks))
 
-    def make_settings():
-        return ({'_scenario_groups': groups}, base_fixed, n_seeds)
+        def make_settings(chunk=chunk):
+            return ({'_scenario_groups': chunk}, base_fixed, n_seeds)
 
-    run_experiment_script(runner, exp_num, make_settings, GRID_EXP_NAME)
+        print(f'[grid] --- {name}: {len(chunk)} groups, '
+              f'{len(chunk) * n_seeds} tasks ---')
+        run_experiment_script(runner, exp_num, make_settings, name)
 
 
 # ---------------------------------------------------------------- measuring
@@ -219,6 +249,24 @@ def measure(paths, pop_size):
     return m
 
 
+def grid_params_files(exp_num):
+    '''Every parameter file across the grid's parts. The grid may have been
+    submitted as several arrays, each its own experiment.'''
+    return glob.glob(f'Data/{GRID_EXP_NAME}_#{exp_num}/'
+                     f'02_Simulation_parameters/*.json') + \
+           glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{exp_num}/'
+                     f'02_Simulation_parameters/*.json')
+
+
+def merge(a, b):
+    '''Combine two metric dicts for the same cell and scenario. Only arises if
+    a grid was resubmitted under different chunking.'''
+    out = dict(a)
+    for k, v in b.items():
+        out[k] = out[k] + v if isinstance(v, (int, list)) else v
+    return out
+
+
 def scenario_lookup(rows):
     '''(long_shedders_ratio, tau_3_long) -> scenario. Unique across the five:
     HIV_low and HIV_high share tau but differ in prevalence.'''
@@ -244,8 +292,7 @@ def collect(rows, cells, exp_num, table_exp_num):
         out[BASELINE] = base
 
     lookup = scenario_lookup(rows)
-    root = f'Data/{GRID_EXP_NAME}_#{exp_num}'
-    for params_file in sorted(glob.glob(f'{root}/02_Simulation_parameters/*.json')):
+    for params_file in sorted(grid_params_files(exp_num)):
         try:
             with open(params_file) as fh:
                 params = json.load(fh)
@@ -258,11 +305,14 @@ def collect(rows, cells, exp_num, table_exp_num):
             continue
         cell = (float(params['R']), int(params['population_size']),
                 int(params['infected_individuals_at_start']))
+        root = os.path.dirname(os.path.dirname(params_file))
         name = os.path.splitext(os.path.basename(params_file))[0]
         paths = sorted(glob.glob(
             f'{root}/04_Output/{name}/seed_*/simulation_trajectory.csv'))
         if paths:
-            out.setdefault(cell, {})[scenario] = measure(paths, cell[1])
+            per = out.setdefault(cell, {}).get(scenario)
+            got = measure(paths, cell[1])
+            out[cell][scenario] = merge(per, got) if per else got
     return out
 
 
@@ -270,9 +320,8 @@ def task_seconds_by_cell(rows, exp_num):
     '''Per-simulation seconds, grouped by cell, from the .started/.completed
     signal mtimes next to each seeded params file.'''
     lookup = scenario_lookup(rows)
-    root = f'Data/{GRID_EXP_NAME}_#{exp_num}'
     by_cell = {}
-    for params_file in sorted(glob.glob(f'{root}/02_Simulation_parameters/*.json')):
+    for params_file in sorted(grid_params_files(exp_num)):
         try:
             with open(params_file) as fh:
                 params = json.load(fh)
@@ -284,6 +333,7 @@ def task_seconds_by_cell(rows, exp_num):
             continue
         cell = (float(params['R']), int(params['population_size']),
                 int(params['infected_individuals_at_start']))
+        root = os.path.dirname(os.path.dirname(params_file))
         name = os.path.splitext(os.path.basename(params_file))[0]
         for started in glob.glob(
                 f'{root}/03_Seeded_simulation_parameters/{name}/*.started'):
@@ -300,6 +350,8 @@ def task_seconds_by_cell(rows, exp_num):
 
 def failed_count(exp_num):
     return len(glob.glob(f'Data/{GRID_EXP_NAME}_#{exp_num}/'
+                         f'03_Seeded_simulation_parameters/*/*.failed')) + \
+           len(glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{exp_num}/'
                          f'03_Seeded_simulation_parameters/*/*.failed'))
 
 
@@ -516,6 +568,12 @@ def main():
     p.add_argument('--runner', default='slurm',
                    choices=['serial', 'multiprocessing', 'slurm'])
     p.add_argument('--analyse-only', action='store_true')
+    p.add_argument('--max-array-tasks', type=int, default=900,
+                   help='largest single Slurm array to submit; the grid is '
+                        'split into that many tasks at a time and submitted '
+                        'one array after another (default %(default)s, the '
+                        'size cal_1 is known to submit successfully). 0 '
+                        'submits the whole grid as one array.')
     p.add_argument('--project-cap', type=int, default=200)
     p.add_argument('--project-seeds', type=int, default=100)
     add_slurm_resource_args(p)
@@ -534,7 +592,14 @@ def main():
               f'{len(args.i0_fractions)} fractions x {len(args.r_values)} R)')
         print(f'[grid] groups     : {len(cells) * len(rows)}  '
               f'(one per cell x scenario, all in ONE experiment)')
-        print(f'[grid] tasks      : {tasks}  in a single Slurm array')
+        n_groups = len(cells) * len(rows)
+        per_chunk_groups = (n_groups if args.max_array_tasks <= 0
+                            else max(1, args.max_array_tasks // max(1, args.seeds)))
+        n_arrays = math.ceil(n_groups / per_chunk_groups)
+        per_array = min(per_chunk_groups, n_groups) * args.seeds
+        print(f'[grid] tasks      : {tasks} total, '
+              f'{n_arrays} array(s) of at most {per_array}, '
+              f'submitted one after another')
         print(f'[grid] precision  : {len(rows) * args.seeds} simulations per '
               f'cell, completion +/-'
               f'{se_pct(len(rows) * args.seeds // 2, len(rows) * args.seeds):.0f}'
@@ -545,16 +610,16 @@ def main():
                 print('[grid][warn] could not read MaxArraySize from scontrol; '
                       'if sbatch refuses the array, lower --seeds or split '
                       'the grid with --populations.')
-            elif tasks > limit:
+            elif per_array > limit:
                 raise SystemExit(
-                    f'[grid] {tasks} tasks exceeds this cluster\'s '
-                    f'MaxArraySize of {limit}. Lower --seeds (to '
-                    f'{limit // (len(cells) * len(rows))} or fewer) or split '
-                    f'the grid, e.g. one --populations value at a time.')
+                    f'[grid] an array of {per_array} tasks exceeds this '
+                    f'cluster\'s MaxArraySize of {limit}. Lower '
+                    f'--max-array-tasks to {limit} or less.')
             else:
-                print(f'[grid] MaxArraySize: {limit}, array fits')
+                print(f'[grid] MaxArraySize: {limit}, each array fits')
         t0 = time.monotonic()
-        run_grid(rows, cells, args.exp_num, args.runner, args.seeds)
+        run_grid(rows, cells, args.exp_num, args.runner, args.seeds,
+                 args.max_array_tasks)
         wall = time.monotonic() - t0
         print(f'[grid] wall clock : {hms(wall)}')
 
