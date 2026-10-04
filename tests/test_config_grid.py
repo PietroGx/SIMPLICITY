@@ -12,52 +12,52 @@ the other:
                        empties and extrande stops on `susceptibles == 0`.
                        At R = 1.10, N = 1000 this took all of them.
 
-A third constraint only showed up once N rose: phi = (diagnosed + recovered)/N
-has to reach 1 before the burn-in window opens, and at N = 5000 seeded with 50
-it was not reaching 1 until day 450-900 of 1095, leaving almost nothing to
-measure. More hosts to expose, from the same seed.
+A third constraint appeared once N rose: phi = (diagnosed + recovered)/N has to
+reach 1 before the burn-in opens, and at N = 5000 seeded with 50 it was not
+reaching 1 until day 450-900 of 1095, leaving almost nothing to measure. More
+hosts to expose, from the same seed.
 
-So the configuration has to clear three bars at once -- most runs reach the
-horizon, no saturation, and phi saturates early enough to leave a window --
-and this sweeps the grid to find where that is. It reuses run #3's frozen
-table unchanged, under the distributional consensus only.
+So a configuration has to clear three bars at once, and this sweeps the grid to
+find where that is, reusing run #3's frozen table unchanged under the
+distributional consensus only.
+
+ONE SLURM ARRAY. The whole grid goes in as a single experiment via
+settings_manager's `_scenario_groups`, one group per (cell, scenario), exactly
+as cal_1 submits its 30 groups as 900 tasks in one array. The previous version
+submitted 90 separate arrays from 90 threads; Slurm refused most of them, two
+thirds of the grid never ran, and the report printed a decision table anyway.
+Hence section 0.
 
 The calibrated NSR in that table was fitted at R = 1.03, N = 1000 and is wrong
 for every cell here. Deliberate and harmless: all three bars are properties of
-transmission, not of the mutation clock. Read this report for configuration
-only -- no clocks, no clades.
+transmission, not of the mutation clock. Configuration only -- no clocks, no
+clades.
 
 Usage on the HPC, from the repo root:
 
-    python tests/test_config_grid.py --runner slurm
+    python tests/test_config_grid.py --runner slurm --seeds 50
 
     --populations A B C     default 1000 2500 5000
     --i0-fractions A B C    default 0.01 0.03 0.05  (production is 50/1000)
     --r-values A B          default 1.06 1.07
     --seeds N               per scenario per cell   (default 10)
     --table-exp-num N       frozen table to reuse   (default 3)
-    --exp-num N             write under             (default 905)
-    --analyse-only          skip the runs, re-print the report
-    --sequential            one experiment at a time
+    --exp-num N             write under             (default 906)
+    --analyse-only          skip the run, re-print the report
 
-Grid size is populations x fractions x R x 5 scenarios x seeds: 18 cells x 5
-scenarios x N seeds, so 900 tasks at 10 seeds and 4500 at 50. The task count,
-wave count and a wall-clock estimate print before anything is submitted.
-
-At 10 seeds a cell pools 50 simulations and its completion rate carries about
-+/-7 points of standard error -- enough to rank 48% against 90%, not enough to
-separate 88% from 90%. At 50 seeds it is 250 simulations and about +/-3.
-
-Runs land in Data/rtest_<R>_N<pop>_I<i0>_<scenario>_#<exp-num>.
+18 cells x 5 scenarios x N seeds: 900 tasks at 10 seeds, 4500 at 50, all in one
+array. The task count is checked against the cluster's MaxArraySize before
+anything is submitted.
 '''
 import argparse
 import csv
 import glob
+import json
 import math
 import os
 import statistics
+import subprocess
 import sys
-import threading
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -76,17 +76,8 @@ from impact_long_shedders_unbound_config import (
 CONSENSUS = 'distribution'
 HORIZON = 1095.0
 SCENARIO_ORDER = ['control', 'SOT', 'HIV_low', 'HIV_high', 'edge_case']
-# run #3, for the reference row
-BASELINE = (1.03, 1000, 50)
-
-
-def r_tag(r):
-    return 'R' + format(float(r), 'g').replace('.', 'p')
-
-
-def exp_name(cell, scenario):
-    r, pop, i0 = cell
-    return f'rtest_{r_tag(r)}_N{pop}_I{i0}_{scenario}'
+GRID_EXP_NAME = 'config_grid'
+BASELINE = (1.03, 1000, 50)          # run #3, carried as a reference row
 
 
 def cell_label(cell):
@@ -94,7 +85,7 @@ def cell_label(cell):
     return f'N={pop:<5} I0={i0:<4} R={r}'
 
 
-# ---------------------------------------------------------------- running
+# ---------------------------------------------------------------- building
 
 def rows_from_table(table_exp_num):
     path = os.path.join(SETUP_DIR_TEMPLATE.format(exp_num=table_exp_num),
@@ -118,76 +109,61 @@ def with_r(row, r):
     return out
 
 
-def with_overrides(builder, extra):
-    '''Wrap the pipeline's own settings builder rather than rebuilding the
-    parameter dict here.'''
-    def make_settings():
-        varying, fixed, n_seeds = builder()
-        fixed = dict(fixed)
-        fixed.update(extra)
-        return varying, fixed, n_seeds
-    return make_settings
-
-
 def build_grid(r_values, populations, i0_fractions):
     '''(R, population, initial infected), i0 rounded from the fraction.'''
-    cells = []
-    for pop in populations:
-        for frac in i0_fractions:
-            i0 = max(1, round(pop * frac))
-            for r in r_values:
-                cells.append((r, pop, i0))
-    return cells
+    return [(r, pop, max(1, round(pop * frac)))
+            for pop in populations for frac in i0_fractions for r in r_values]
 
 
-def run_all(rows, cells, exp_num, runner, n_seeds, parallel):
-    jobs = [(c, row) for c in cells for row in rows]
+def build_groups(rows, cells, n_seeds):
+    '''One `_scenario_groups` entry per (cell, scenario).
 
-    def one(cell, row):
+    Each group is all-scalar, so it is exactly one parameter combination;
+    generate_experiment_settings applies group scalars AFTER fixed_params, so
+    these win. Parameters come from the pipeline's own
+    build_exp_scenario_settings rather than being rebuilt here -- only
+    population and starting infections are added on top.
+    '''
+    base_fixed, groups = None, []
+    for cell in cells:
         r, pop, i0 = cell
-        settings = with_overrides(
-            build_exp_scenario_settings(with_r(row, r), n_seeds,
-                                        consensus=CONSENSUS),
-            {'population_size': pop, 'infected_individuals_at_start': i0})
-        run_experiment_script(runner, exp_num, settings,
-                              exp_name(cell, row['scenario_name']))
+        for row in rows:
+            _, fixed, _ = build_exp_scenario_settings(
+                with_r(row, r), n_seeds, consensus=CONSENSUS)()
+            if base_fixed is None:
+                base_fixed = dict(fixed)
+            group = dict(fixed)
+            group['population_size'] = pop
+            group['infected_individuals_at_start'] = i0
+            groups.append(group)
+    return groups, (base_fixed or {})
 
-    if runner != 'slurm' or not parallel or len(jobs) == 1:
-        for cell, row in jobs:
-            one(cell, row)
-        return []
 
-    key = 'SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM'
-    cap = int(os.environ.get(key, 200))
-    budget = max(1, cap // len(jobs))
-    print(f'[grid] submitting {len(jobs)} experiments together: '
-          f'{budget} concurrent seeds each, {budget * len(jobs)} of a {cap} cap')
-
-    errors, lock = [], threading.Lock()
-
-    def worker(cell, row):
-        try:
-            one(cell, row)
-        except BaseException as exc:                      # noqa: BLE001
-            with lock:
-                errors.append((cell, row['scenario_name'], exc))
-
-    previous = os.environ.get(key)
-    os.environ[key] = str(budget)
+def max_array_size():
+    '''The cluster's MaxArraySize, or None if it cannot be read. A single
+    array larger than this is refused outright by sbatch.'''
     try:
-        threads = [threading.Thread(target=worker, args=(c, row),
-                                    name=f"{r_tag(c[0])}-N{c[1]}-I{c[2]}")
-                   for c, row in jobs]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-    finally:
-        if previous is None:
-            os.environ.pop(key, None)
-        else:
-            os.environ[key] = previous
-    return errors
+        out = subprocess.run(['scontrol', 'show', 'config'],
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                             text=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in out.splitlines():
+        if line.strip().startswith('MaxArraySize'):
+            try:
+                return int(line.split('=')[1].strip())
+            except (IndexError, ValueError):
+                return None
+    return None
+
+
+def run_grid(rows, cells, exp_num, runner, n_seeds):
+    groups, base_fixed = build_groups(rows, cells, n_seeds)
+
+    def make_settings():
+        return ({'_scenario_groups': groups}, base_fixed, n_seeds)
+
+    run_experiment_script(runner, exp_num, make_settings, GRID_EXP_NAME)
 
 
 # ---------------------------------------------------------------- measuring
@@ -197,7 +173,7 @@ def measure(paths, pop_size):
     saturates. Mirrors extrande.check_stop_conditions, in its order.
 
     pop_size must be the population the run actually used: phi is
-    (diagnosed + recovered) / size, so a wrong size silently moves every
+    (diagnosed + recovered)/size, so a wrong size silently moves every
     burn-in number without any sign that it has.'''
     m = {'n': 0, 'full': 0, 'died': 0, 'noinfectious': 0, 'saturated': 0,
          'other': 0, 'stop_days': [], 'peak': [], 'phi_days': [],
@@ -223,7 +199,6 @@ def measure(paths, pop_size):
             m['phi_never'] += 1
         else:
             m['phi_days'].append(phi_day)
-            # days of measurable run left once the burn-in has opened
             m['window'].append(max(0.0, t - phi_day))
 
         if t >= HORIZON:
@@ -244,22 +219,18 @@ def measure(paths, pop_size):
     return m
 
 
-def task_seconds(name, exp_num):
-    '''Per-simulation wall time from the .started/.completed signal mtimes.'''
-    out = []
-    for started in glob.glob(f'Data/{name}_#{exp_num}/'
-                             f'03_Seeded_simulation_parameters/*/*.started'):
-        done = started[:-len('.started')] + '.completed'
-        if os.path.exists(done):
-            try:
-                out.append(os.path.getmtime(done) - os.path.getmtime(started))
-            except OSError:
-                pass
-    return [s for s in out if s >= 0]
+def scenario_lookup(rows):
+    '''(long_shedders_ratio, tau_3_long) -> scenario. Unique across the five:
+    HIV_low and HIV_high share tau but differ in prevalence.'''
+    return {(round(float(r['long_shedders_ratio']), 6),
+             round(float(r['tau_3_long']), 2)): r['scenario_name']
+            for r in rows}
 
 
-def collect(cells, exp_num, table_exp_num):
-    '''{cell: {scenario: metrics}}, plus the run #3 reference row.'''
+def collect(rows, cells, exp_num, table_exp_num):
+    '''{cell: {scenario: metrics}} for the single grid experiment, plus the
+    run #3 reference row. Each parameter combination is identified from its
+    own written parameters file, not from the directory name.'''
     out = {}
     base_prefix = prod_exp_name(CONSENSUS)
     base = {}
@@ -271,25 +242,75 @@ def collect(cells, exp_num, table_exp_num):
             base[s] = measure(paths, BASELINE[1])
     if base:
         out[BASELINE] = base
-    for cell in cells:
-        per = {}
-        for s in SCENARIO_ORDER:
-            paths = sorted(glob.glob(
-                f'Data/{exp_name(cell, s)}_#{exp_num}/04_Output/*/seed_*/'
-                f'simulation_trajectory.csv'))
-            if paths:
-                per[s] = measure(paths, cell[1])
-        if per:
-            out[cell] = per
+
+    lookup = scenario_lookup(rows)
+    root = f'Data/{GRID_EXP_NAME}_#{exp_num}'
+    for params_file in sorted(glob.glob(f'{root}/02_Simulation_parameters/*.json')):
+        try:
+            with open(params_file) as fh:
+                params = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        key = (round(float(params.get('long_shedders_ratio', 0.0)), 6),
+               round(float(params.get('tau_3_long', 0.0)), 2))
+        scenario = lookup.get(key)
+        if scenario is None:
+            continue
+        cell = (float(params['R']), int(params['population_size']),
+                int(params['infected_individuals_at_start']))
+        name = os.path.splitext(os.path.basename(params_file))[0]
+        paths = sorted(glob.glob(
+            f'{root}/04_Output/{name}/seed_*/simulation_trajectory.csv'))
+        if paths:
+            out.setdefault(cell, {})[scenario] = measure(paths, cell[1])
     return out
 
 
-def pooled(per_scenario, key):
-    return sum(m[key] for m in per_scenario.values())
+def task_seconds_by_cell(rows, exp_num):
+    '''Per-simulation seconds, grouped by cell, from the .started/.completed
+    signal mtimes next to each seeded params file.'''
+    lookup = scenario_lookup(rows)
+    root = f'Data/{GRID_EXP_NAME}_#{exp_num}'
+    by_cell = {}
+    for params_file in sorted(glob.glob(f'{root}/02_Simulation_parameters/*.json')):
+        try:
+            with open(params_file) as fh:
+                params = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        key = (round(float(params.get('long_shedders_ratio', 0.0)), 6),
+               round(float(params.get('tau_3_long', 0.0)), 2))
+        if lookup.get(key) is None:
+            continue
+        cell = (float(params['R']), int(params['population_size']),
+                int(params['infected_individuals_at_start']))
+        name = os.path.splitext(os.path.basename(params_file))[0]
+        for started in glob.glob(
+                f'{root}/03_Seeded_simulation_parameters/{name}/*.started'):
+            done = started[:-len('.started')] + '.completed'
+            if os.path.exists(done):
+                try:
+                    dt = os.path.getmtime(done) - os.path.getmtime(started)
+                except OSError:
+                    continue
+                if dt >= 0:
+                    by_cell.setdefault(cell, []).append(dt)
+    return by_cell
 
 
-def pooled_list(per_scenario, key):
-    return [v for m in per_scenario.values() for v in m[key]]
+def failed_count(exp_num):
+    return len(glob.glob(f'Data/{GRID_EXP_NAME}_#{exp_num}/'
+                         f'03_Seeded_simulation_parameters/*/*.failed'))
+
+
+# ---------------------------------------------------------------- helpers
+
+def pooled(per, key):
+    return sum(m[key] for m in per.values())
+
+
+def pooled_list(per, key):
+    return [v for m in per.values() for v in m[key]]
 
 
 def med(xs):
@@ -318,9 +339,6 @@ def hms(seconds):
 
 
 def se_pct(k, n):
-    '''Standard error of a completion rate, in points. At 50 seeds a 10-point
-    difference is about one standard error -- worth printing so the table is
-    not over-read.'''
     if not n:
         return float('nan')
     p = k / n
@@ -332,6 +350,7 @@ def se_pct(k, n):
 def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
     L = []
     w = L.append
+    expected_per_cell = len(SCENARIO_ORDER) * n_seeds
     ordered = ([BASELINE] if BASELINE in data else []) + \
               [c for c in cells if c in data]
 
@@ -342,8 +361,48 @@ def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
       f'/{TABLE_FILENAME}   (fitted at R=1.03, N=1000)')
     w(f'consensus    : {CONSENSUS} only      R_long set equal to R throughout')
     w(f'seeds        : {n_seeds} per scenario per cell, 5 scenarios '
-      f'= {5 * n_seeds} per cell')
+      f'= {expected_per_cell} per cell')
     w('')
+
+    # ---- section 0: is this report even complete? --------------------------
+    w('-' * 96)
+    w('0. COMPLETENESS          read this before anything else')
+    w('-' * 96)
+    complete = partial = absent = 0
+    missing_lines = []
+    for cell in cells:
+        per = data.get(cell, {})
+        n = pooled(per, 'n') if per else 0
+        if n >= expected_per_cell:
+            complete += 1
+        elif n:
+            partial += 1
+            missing_lines.append(f'  PARTIAL  {cell_label(cell):<26}'
+                                 f'{n} of {expected_per_cell} simulations, '
+                                 f'{len(per)} of 5 scenarios')
+        else:
+            absent += 1
+            missing_lines.append(f'  ABSENT   {cell_label(cell):<26}'
+                                 f'no output at all')
+    got = sum(pooled(data[c], 'n') for c in cells if c in data)
+    want = len(cells) * expected_per_cell
+    w(f'cells complete : {complete} of {len(cells)}')
+    w(f'simulations    : {got} of {want} ({pct(got, want):.0f}%)')
+    nfailed = failed_count(exp_num)
+    if nfailed:
+        w(f'tasks marked .failed: {nfailed}')
+    for line in missing_lines:
+        w(line)
+    if partial or absent:
+        w('')
+        w('  *** THE TABLES BELOW ARE INCOMPLETE. A partial cell pools a')
+        w('  *** different mix of scenarios from a complete one, so its')
+        w('  *** numbers are not comparable. Do not choose a configuration')
+        w('  *** from this report until every cell is complete.')
+    else:
+        w('every cell complete.')
+    w('')
+
     w('NOTE: the NSR is wrong for every cell here, on purpose. Fade-out,')
     w('saturation and phi are transmission properties. Configuration only.')
     w('')
@@ -355,27 +414,24 @@ def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
       f'{"saturated":>11}{"phi=1 day":>11}{"window":>9}{"never phi=1":>13}')
     for cell in ordered:
         per = data[cell]
-        n = pooled(per, 'n')
-        full = pooled(per, 'full')
-        sat = pooled(per, 'saturated')
-        never = pooled(per, 'phi_never')
+        n, full = pooled(per, 'n'), pooled(per, 'full')
         weakest = min((pct(m['full'], m['n']) for m in per.values()),
                       default=float('nan'))
-        tag = cell_label(cell) + ('  *' if cell == BASELINE else '')
-        w(f'{tag:<26}{full:>8}/{n:<4}{pct(full, n):>4.0f}%'
-          f'{fmt(weakest):>13}%{sat:>11}'
+        flag = '  *' if cell == BASELINE else (
+            '  !' if n < expected_per_cell and cell != BASELINE else '')
+        w(f'{cell_label(cell) + flag:<26}{full:>8}/{n:<4}{pct(full, n):>4.0f}%'
+          f'{fmt(weakest):>13}%{pooled(per, "saturated"):>11}'
           f'{fmt(med(pooled_list(per, "phi_days"))):>11}'
           f'{fmt(med(pooled_list(per, "window"))):>9}'
-          f'{never:>7}/{n:<5}')
+          f'{pooled(per, "phi_never"):>7}/{n:<5}')
     w('')
-    w('* run #3, for reference.  weakest scen = the worst single scenario\'s')
-    w('  completion: an uneven cell reintroduces the survival bias that makes')
-    w('  scenarios incomparable.  window = days between phi=1 and the run')
-    w('  ending, i.e. what is left to measure after the burn-in opens.')
-    base_n = pooled(data[BASELINE], 'n') if BASELINE in data else 0
-    cell_n = 5 * n_seeds
-    w(f'  Completion is +/-{se_pct(cell_n // 2, cell_n):.0f} points at '
-      f'{cell_n} seeds — differences below that are noise.')
+    w('* run #3, for reference.   ! incomplete cell, not comparable.')
+    w('  weakest scen = the worst single scenario\'s completion: an uneven')
+    w('  cell reintroduces the survival bias that makes scenarios')
+    w('  incomparable.  window = days between phi=1 and the run ending, i.e.')
+    w('  what is left to measure once the burn-in opens.')
+    w(f'  Completion is +/-{se_pct(expected_per_cell // 2, expected_per_cell):.0f}'
+      f' points at {expected_per_cell} simulations — smaller gaps are noise.')
     w('')
 
     w('-' * 96)
@@ -398,8 +454,7 @@ def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
       f'{"saturated":>11}{"other":>7}{"med stop day":>14}{"med peak":>10}')
     for cell in ordered:
         per = data[cell]
-        n = pooled(per, 'n')
-        early = n - pooled(per, 'full')
+        early = pooled(per, 'n') - pooled(per, 'full')
         w(f'{cell_label(cell):<26}{early:>7}{pooled(per, "died"):>10}'
           f'{pooled(per, "noinfectious"):>15}{pooled(per, "saturated"):>11}'
           f'{pooled(per, "other"):>7}'
@@ -412,36 +467,36 @@ def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
         w('4. COST')
         w('-' * 96)
         if timing.get('wall') is not None:
-            w(f'sweep wall clock : {hms(timing["wall"])}   '
-              f'({timing["jobs"]} experiments, {timing["tasks"]} tasks)')
+            w(f'grid wall clock : {hms(timing["wall"])}   '
+              f'({timing["tasks"]} tasks in one array)')
         w(f'{"configuration":<26}{"median task":>14}{"p95 task":>12}'
           f'{"full pipeline at 100 seeds":>30}')
+        cap = timing['cap']
+        waves = (math.ceil(900 / cap) + math.ceil(300 / cap)
+                 + math.ceil(5 * timing['seeds'] * 2 / cap))
         for cell in ordered:
             secs = timing.get('by_cell', {}).get(cell)
             if not secs:
                 continue
             ss = sorted(secs)
             p95 = ss[min(len(ss) - 1, int(len(ss) * 0.95))]
-            cap = timing['cap']
-            waves = (math.ceil(900 / cap) + math.ceil(300 / cap)
-                     + math.ceil(5 * timing['seeds'] * 2 / cap))
             w(f'{cell_label(cell):<26}{hms(statistics.median(ss)):>14}'
               f'{hms(p95):>12}{hms(waves * p95):>30}')
         w('')
         w('Pipeline estimate = (cal_1 + cal_2 + production) waves at the p95')
-        w('task, where waves = ceil(tasks/cap). Calibration would also have to')
-        w('move to the chosen population, which is why it is costed here.')
+        w('task, waves = ceil(tasks/cap). Calibration would also move to the')
+        w('chosen population, which is why it is costed here.')
         w('')
 
     w('-' * 96)
     w('5. WHAT TO PICK')
     w('-' * 96)
-    w('Rank the cells yourself against the three bars, in this order:')
+    w('Rank the cells against the three bars, in this order:')
     w('  1. saturated == 0        a cell that saturates is above the cliff')
     w('  2. weakest scenario high an uneven cell is a biased comparison')
     w('  3. window large          days left to measure after phi=1')
-    w('Completion rate alone is not the criterion; a cell can reach the')
-    w('horizon often and still open its burn-in too late to measure anything.')
+    w('Completion alone is not the criterion: a cell can reach the horizon')
+    w('often and still open its burn-in too late to measure anything.')
     w('=' * 96)
     return '\n'.join(L)
 
@@ -451,7 +506,7 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--table-exp-num', type=int, default=3)
-    p.add_argument('--exp-num', type=int, default=905)
+    p.add_argument('--exp-num', type=int, default=906)
     p.add_argument('--populations', type=int, nargs='+',
                    default=[1000, 2500, 5000])
     p.add_argument('--i0-fractions', type=float, nargs='+',
@@ -461,12 +516,8 @@ def main():
     p.add_argument('--runner', default='slurm',
                    choices=['serial', 'multiprocessing', 'slurm'])
     p.add_argument('--analyse-only', action='store_true')
-    p.add_argument('--sequential', action='store_true')
     p.add_argument('--project-cap', type=int, default=200)
     p.add_argument('--project-seeds', type=int, default=100)
-    p.add_argument('--assume-p95-minutes', type=float, default=25.0,
-                   help='p95 task minutes used for the pre-flight estimate '
-                        'only (default %(default)s, measured at N=5000 R=1.07)')
     add_slurm_resource_args(p)
     args = p.parse_args()
 
@@ -481,42 +532,40 @@ def main():
         print(f'[grid] cells      : {len(cells)}  '
               f'({len(args.populations)} populations x '
               f'{len(args.i0_fractions)} fractions x {len(args.r_values)} R)')
-        for c in cells:
-            print(f'[grid]              {cell_label(c)}')
-        cap = int(os.environ.get(
-            'SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM', 200))
-        waves = math.ceil(tasks / cap) if cap else tasks
-        est = waves * args.assume_p95_minutes * 60
-        print(f'[grid] tasks      : {tasks}  '
-              f'({len(rows)} scenarios x {args.seeds} seeds per cell)')
-        print(f'[grid] estimate   : {waves} waves at cap {cap}, '
-              f'~{hms(est)} at a {args.assume_p95_minutes:.0f}min p95 task')
-        print(f'[grid]              (p95 was 20m at N=5000 R=1.06 and 32m at '
-              f'R=1.07; smaller populations are cheaper)')
-        print(f'[grid] precision  : {5 * args.seeds} simulations per cell, '
-              f'completion +/-{se_pct(5 * args.seeds // 2, 5 * args.seeds):.0f} points')
-        print(f'[grid] writing to : '
-              f'Data/rtest_<R>_N<pop>_I<i0>_<scenario>_#{args.exp_num}')
+        print(f'[grid] groups     : {len(cells) * len(rows)}  '
+              f'(one per cell x scenario, all in ONE experiment)')
+        print(f'[grid] tasks      : {tasks}  in a single Slurm array')
+        print(f'[grid] precision  : {len(rows) * args.seeds} simulations per '
+              f'cell, completion +/-'
+              f'{se_pct(len(rows) * args.seeds // 2, len(rows) * args.seeds):.0f}'
+              f' points')
+        if args.runner == 'slurm':
+            limit = max_array_size()
+            if limit is None:
+                print('[grid][warn] could not read MaxArraySize from scontrol; '
+                      'if sbatch refuses the array, lower --seeds or split '
+                      'the grid with --populations.')
+            elif tasks > limit:
+                raise SystemExit(
+                    f'[grid] {tasks} tasks exceeds this cluster\'s '
+                    f'MaxArraySize of {limit}. Lower --seeds (to '
+                    f'{limit // (len(cells) * len(rows))} or fewer) or split '
+                    f'the grid, e.g. one --populations value at a time.')
+            else:
+                print(f'[grid] MaxArraySize: {limit}, array fits')
         t0 = time.monotonic()
-        errors = run_all(rows, cells, args.exp_num, args.runner, args.seeds,
-                         parallel=not args.sequential)
+        run_grid(rows, cells, args.exp_num, args.runner, args.seeds)
         wall = time.monotonic() - t0
         print(f'[grid] wall clock : {hms(wall)}')
-        for cell, s, exc in errors:
-            print(f'[grid][FAILED] {cell_label(cell)} {s}: '
-                  f'{type(exc).__name__}: {exc}')
 
-    data = collect(cells, args.exp_num, args.table_exp_num)
+    data = collect(rows, cells, args.exp_num, args.table_exp_num)
     if not data:
-        raise SystemExit('No output found to measure. Did the runs complete?')
+        raise SystemExit('No output found to measure. Did the run complete?')
 
-    by_cell = {c: [t for s in SCENARIO_ORDER
-                   for t in task_seconds(exp_name(c, s), args.exp_num)]
-               for c in cells}
-    timing = {'wall': wall, 'jobs': len(cells) * len(rows),
+    timing = {'wall': wall,
               'tasks': len(cells) * len(rows) * args.seeds,
               'cap': args.project_cap, 'seeds': args.project_seeds,
-              'by_cell': by_cell}
+              'by_cell': task_seconds_by_cell(rows, args.exp_num)}
 
     text = report(data, cells, args.exp_num, args.table_exp_num, args.seeds,
                   timing)

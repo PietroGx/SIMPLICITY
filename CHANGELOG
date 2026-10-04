@@ -5,6 +5,52 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.55 — 2026-10-04 — pietro gerletti
+
+`test_config_grid.py` submits the whole grid as ONE Slurm array, and refuses
+to present an incomplete report as a finished one.
+
+The first run of it lost two thirds of the grid. `run_all` started one thread
+per (cell, scenario) and fired 90 `sbatch` calls at once; Slurm refused most of
+them, `submit_simulations`' assert raised, the worker caught it, and the
+failures went to stdout only -- never into the report file. 2 of 18 cells came
+back complete, 6 partial, 10 absent, and the decision table rendered as though
+nothing was wrong. The cap split 90 ways also gave each surviving experiment
+`200 // 90 = 2` concurrent seeds, so a third of the work took 6h53m.
+
+The grid is now a single experiment. `build_groups` emits one all-scalar
+`_scenario_groups` entry per (cell, scenario) -- the same mechanism cal_1 uses
+to submit its 30 groups as 900 tasks in one array -- so 18 cells x 5 scenarios
+becomes 90 parameter combinations and 4500 tasks under one `--array`. No
+threads, no cap arithmetic, and Slurm schedules it. Group scalars are layered
+over the pipeline's own `build_exp_scenario_settings` output rather than
+rebuilt, with population and starting infections added on top.
+
+Because one experiment now holds every cell, a combination is identified from
+its own written parameters file -- population, initial infected, R, and
+(long_shedders_ratio, tau_3_long) mapped back to a scenario -- rather than from
+a directory name. `02_Simulation_parameters/<name>.json` and
+`04_Output/<name>/` share a basename, which is what makes that reliable.
+
+New section 0, printed before anything else: cells complete, simulations
+measured against expected, `.failed` count, and a line per partial or absent
+cell. When any cell is incomplete it says in full that the tables below are not
+comparable and that no configuration should be chosen from them. Incomplete
+cells are also flagged inline in the decision table. The previous report was
+authoritative-looking and two-thirds empty; this is the fix for that, not for
+the submission bug.
+
+Before submitting, the task count is checked against the cluster's
+MaxArraySize read from `scontrol show config`, and the run aborts with the
+largest `--seeds` that would fit rather than letting sbatch refuse the array.
+
+Verified locally without simulating: 18 cells x 5 scenarios produce exactly 90
+settings with no list-valued group entries (so no accidental cartesian
+expansion), all pass `check_parameters_names`, every one maps back to its
+scenario, and section 0 renders the all-absent case correctly.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.54 — 2026-10-03 — pietro gerletti
 
 New `tests/test_config_grid.py`: sweeps population x starting infections x R
