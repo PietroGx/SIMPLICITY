@@ -21,6 +21,7 @@ Created on Tue Jun  6 13:13:14 2023
 """
 import simplicity.intra_host_model    as h
 import simplicity.evolution.reference as ref
+import simplicity.phenotype.consensus  as c
 from   simplicity.random_gen          import randomgen
 import pandas as pd
 import numpy as np
@@ -140,7 +141,12 @@ class Population:
         
         # -------------------------------------------------------------------------   
 
-        self.consensus_snapshot = [[{},1,0]] # [sequence, lineage_frequency, w_t(t_sim)]
+        # Running weighted consensus. The per-entry history used to be kept as
+        # a list and rescanned on every rebuild; it grew without bound (millions
+        # of genome dicts by day 1095 at N=5000) and nothing ever read it back,
+        # since only consensus_sequences_t is written out. See
+        # consensus.ConsensusAccumulator.
+        self.consensus = c.ConsensusAccumulator()
         self.consensus_sequences_t = [[{},0]] # list to store consensus everytime is calculated in a simulation [consensus,t]
         
         # system trajectory ---------------------------------------------------
@@ -484,7 +490,7 @@ class Population:
         time t. Every host -- long shedders included -- contributes total weight
         1, split equally over the DISTINCT lineages it carries, so frequencies
         sum to 1 and a host carrying many lineages does not outvote one carrying
-        few. Feeds both lineage_frequency.csv and consensus_snapshot.
+        few. Feeds both lineage_frequency.csv and the running consensus.
         '''
         share_lineages_t = {}   # lineage -> summed per-host share
         count_lineages_t = {}   # lineage -> hosts carrying it
@@ -503,6 +509,12 @@ class Population:
         if not hosts_at_t:
             return
 
+        # Lineages carrying byte-identical genomes contribute identically to
+        # the consensus -- add_lineage duplicates a lineage into a new slot and
+        # the copy stays identical until it mutates -- and frequency enters
+        # every weighted sum linearly, so they are merged into one accumulate
+        # instead of one per lineage.
+        by_genome = {}
         for lineage_name, share in share_lineages_t.items():
             frequency = share / hosts_at_t
             self.lineage_frequency.append({
@@ -511,9 +523,15 @@ class Population:
                 'Frequency_at_t'            : frequency,
                 'Individuals_infected_at_t' : count_lineages_t[lineage_name],
                 })
-            self.consensus_snapshot.append([self.get_lineage_genome(lineage_name),
-                                            frequency,
-                                            t])
+            genome = self.get_lineage_genome(lineage_name)
+            key = tuple(sorted(genome.items()))
+            if key in by_genome:
+                by_genome[key][1] += frequency
+            else:
+                by_genome[key] = [genome, frequency]
+
+        for genome, frequency in by_genome.values():
+            self.consensus.add(genome, frequency, t)
             
 # -----------------------------------------------------------------------------
 

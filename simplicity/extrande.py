@@ -202,7 +202,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
         if use_consensus:
             if np.floor(t) > last_consensus_snapshot["t_snapshot"]:
                 last_consensus_snapshot["t_snapshot"] += 5
-                consensus = c.get_consensus(population.consensus_snapshot, t)
+                consensus = population.consensus.consensus(t)
                 population.consensus_sequences_t.append([consensus[0], t])
                 last_consensus_snapshot['consensus'] = consensus 
             else:

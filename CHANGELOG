@@ -5,6 +5,88 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.57 — 2026-10-04 — pietro gerletti
+
+The consensus is accumulated incrementally instead of rescanned, and the
+snapshot list is gone.
+
+`get_consensus` rebuilt from the whole snapshot every 5 simulated days, so cost
+grew with elapsed days x circulating lineages while the list itself grew
+without bound. Run #3 at N=1000 reached 160,319 entries by day 1095 in
+HIV_high; the grid task that sat at an identical progress value for 3.5 hours
+was at N=5000 with 2,234 infected, where the list plausibly held two to three
+million genome dicts. Measured, a snapshot entry costs ~1,281 bytes, so a
+million of them is 1.3 GB against a 4 GB task limit.
+
+The Bateman kernel is a difference of two pure exponentials in dt, so the
+exponent separates and every weighted sum over history factorises into
+e^(-k*t) times a quantity that does not depend on t. New
+`consensus.ConsensusAccumulator` keeps that quantity per (position, base) for
+each exponential, plus two scalars, and recovers the matrix at any t in
+O(positions). Accumulators are held relative to a moving reference time,
+rescaled at each evaluation, so stored exponents never exceed ~e^0.43 instead
+of e^(k_a*1095) ~ 3e40. The layout mirrors build_weighted_consensus_matrix
+exactly -- each entry adds to its own base row and subtracts from the reference
+row, which is then seeded with the running total -- so a genome holding a
+reference-valued base cancels in both implementations.
+
+`population.consensus_snapshot` is replaced by `population.consensus`. Nothing
+ever persisted the list (only consensus_sequences_t is written out), so it is
+deleted rather than pruned. A day's lineages are now keyed by genome before
+being added: lineages carrying byte-identical genomes contribute identically
+and frequency enters linearly, so they merge into one accumulate.
+
+`distance.DISTANCE_TOL` (1e-9) extends v2.4.48's clamp from "negative" to "in
+the noise band". The centred distance is a cancellation that should give
+exactly 0 for a lineage carrying the consensus, and in doubles it lands either
+side of zero; the negative case was v2.4.48, and the positive case is just as
+unstable -- a one-ulp change moves it by 100% relative. Measured on a real run,
+distances are either 0 or >= 1e-3 with nothing in between, so the threshold has
+six orders of magnitude of clearance and can only catch rounding.
+
+EQUIVALENCE
+
+The maths is identical, proven two ways. Both paths reimplemented in 60-digit
+decimal arithmetic agree to 5.47e-59 relative -- the rounding floor of that
+precision, i.e. no difference at all. In float64 the live run compares both at
+every one of 184 rebuilds: max |dP| 1.8e-14, |d(delta)| 2.3e-13, consensus
+sequence identical every time.
+
+The argmax pipeline is byte-identical, 21 files of 21: hamming_iw returns an
+integer, so last-bit matrix changes cannot reach the distance unless an argmax
+flips, and none did.
+
+The distribution pipeline's EPIDEMIC is byte-identical -- compartment counts
+and final_time -- because propensities depend on counts, not fitness. Its
+GENEALOGY is not. Fitness steers rng4.choice when an infection picks its
+parent; hundreds of hosts carry near-identical fitness, so the selection CDF
+has tightly spaced boundaries and a reordered sum eventually moves one past a
+uniform draw. Measured: at day 53.01 one host inherits wt.7 instead of wt.0
+(20->21 and 31->30 carriers) and everything downstream follows.
+
+That is a property of the model, not of this change: the genome keying alone
+would do it, as would a numpy upgrade on untouched code. The clamp does not
+prevent it either -- it was added on the hypothesis that it would, which was
+wrong; it is kept because returning 1.1e-16 where the answer is 0 is simply
+incorrect. Byte-identity is not achievable for that pipeline and is not the
+bar; the maths being provably identical is.
+
+COST
+
+Live, at N=1000 control with the snapshot reaching 8,648 entries: 23.70 ms per
+rebuild rescanning against 1.39 ms accumulating, 17.1x, with the rescan
+accounting for 24% of an 18-second run. The accumulator's cost is flat in
+history, so the ratio grows with it -- roughly 390x at HIV_high's 160k entries.
+Memory goes from unbounded to 1.88 MB with every one of the 4,967 positions
+occupied.
+
+Verification in `tests/test_consensus_accumulator.py` (a simple snapshot, a
+1,095-day span, 219 rescalings against one, genome keying, and the live
+both-paths run) and `tests/test_consensus_wiring.py` (argmax strict on every
+file, distribution strict on the epidemic and reporting the genealogy).
+
+------------------------------------------------------------------------
+
 ## Version 2.4.56 — 2026-10-04 — pietro gerletti
 
 `test_config_grid.py` submits the grid as several sequential arrays instead of
