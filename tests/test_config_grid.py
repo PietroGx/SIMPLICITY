@@ -72,6 +72,7 @@ sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 import pandas as pd
 
 from experiment_script_runner import run_experiment_script
+import simplicity.settings_manager as sm
 from impact_long_shedders_unbound_config import (
     SETUP_DIR_TEMPLATE, TABLE_FILENAME, build_exp_scenario_settings,
     add_slurm_resource_args, set_slurm_resource_env, prod_exp_name,
@@ -247,6 +248,24 @@ def measure(paths, pop_size):
         else:
             m['other'] += 1
     return m
+
+
+def seeds_on_disk(exp_num, fallback):
+    """The seed count the grid was actually RUN with, read from the experiment
+    rather than from --seeds.
+
+    --analyse-only has its own --seeds default, so analysing a 50-seed grid
+    without repeating the flag computed the expected totals from 10 and
+    reported "1100 of 900 (122%)" while marking partial cells complete. The
+    number is on disk; take it from there.
+    """
+    for name in ([GRID_EXP_NAME]
+                 + [f'{GRID_EXP_NAME}_part{i}' for i in range(1, 100)]):
+        try:
+            return int(sm.read_n_seeds_file(f'{name}_#{exp_num}')['n_seeds'])
+        except (OSError, KeyError, ValueError):
+            continue
+    return fallback
 
 
 def grid_params_files(exp_num):
@@ -438,8 +457,12 @@ def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
                                  f'no output at all')
     got = sum(pooled(data[c], 'n') for c in cells if c in data)
     want = len(cells) * expected_per_cell
+    w(f'seeds per scenario : {n_seeds}   (read from the run, not the flag)')
     w(f'cells complete : {complete} of {len(cells)}')
     w(f'simulations    : {got} of {want} ({pct(got, want):.0f}%)')
+    if got > want:
+        w('  *** MORE output than expected. The seed count used for this')
+        w('  *** report does not match the run. Numbers below are unsafe.')
     nfailed = failed_count(exp_num)
     if nfailed:
         w(f'tasks marked .failed: {nfailed}')
@@ -627,12 +650,18 @@ def main():
     if not data:
         raise SystemExit('No output found to measure. Did the run complete?')
 
+    # what the grid was run with, not what this invocation was asked for
+    seeds = seeds_on_disk(args.exp_num, args.seeds)
+    if seeds != args.seeds:
+        print(f'[grid] seeds on disk: {seeds} (not --seeds {args.seeds}); '
+              f'measuring against {seeds}')
+
     timing = {'wall': wall,
               'tasks': len(cells) * len(rows) * args.seeds,
               'cap': args.project_cap, 'seeds': args.project_seeds,
               'by_cell': task_seconds_by_cell(rows, args.exp_num)}
 
-    text = report(data, cells, args.exp_num, args.table_exp_num, args.seeds,
+    text = report(data, cells, args.exp_num, args.table_exp_num, seeds,
                   timing)
     print('\n' + text)
 

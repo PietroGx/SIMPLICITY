@@ -5,6 +5,31 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.58 — 2026-10-04 — pietro gerletti
+
+`test_config_grid.py --analyse-only` takes the seed count from the run instead
+of from its own flag.
+
+Grid #906 was run with `--seeds 50` and analysed without repeating the flag, so
+the report computed its expectations from the default 10 and printed
+`simulations : 1100 of 900 (122%)` while marking three partial cells complete.
+Section 0 exists to stop an incomplete report reading as trustworthy and it
+mislabelled this one; 24% of the grid was present, not 122%.
+
+New `seeds_on_disk` reads `n_seeds` from the experiment's own file, across
+whichever part names exist, and the report says which number it used. A
+mismatch is announced on stdout, and a total above 100% now prints an explicit
+warning that the numbers are unsafe rather than a cheerful percentage.
+
+Also recorded from that report: the losses are monotone in population --
+N=1000 kept 57% of its simulations, N=2500 17%, N=5000 none of 1500, across two
+separate attempts. That is the unbounded consensus snapshot, which v2.4.57
+replaced: at N=5000 over 1095 days it reached millions of genome dicts at
+~1,281 bytes each, well past the 4G task limit. The N=5000 row should be
+runnable for the first time now.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.57 — 2026-10-04 — pietro gerletti
 
 The consensus is accumulated incrementally instead of rescanned, and the
