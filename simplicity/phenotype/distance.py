@@ -38,6 +38,12 @@ def hamming(lineage):
     # distance of a lineage from the reference genome
     return sum(1 for pos, base in lineage.items() if reference[pos] != base)
 
+# Below this, a distributional distance is rounding rather than signal: the
+# centred form is a cancellation that should give exactly 0 for a lineage
+# carrying the consensus, and real distances start at ~1e-3.
+DISTANCE_TOL = 1e-9
+
+
 def distributional(lineage, column_dist, delta):
     # centred distributional distance: the expected hamming distance to a
     # randomly drawn circulating genome, minus the consensus's own. Reduces to
@@ -51,9 +57,16 @@ def distributional(lineage, column_dist, delta):
             distance += column.get(reference[position], 0.0) - column.get(base, 0.0)
     # >= 0 by construction: the consensus base is each column's argmax, so the
     # sum above cannot fall below -delta. A lineage that IS the consensus hits
-    # exactly 0 by near-total cancellation, which in doubles lands ~1e-17 below
-    # it -- and that sign reaches rng4.choice as a weight once phi saturates.
-    return distance if distance > 0.0 else 0.0
+    # exactly 0 by near-total cancellation, and in doubles that lands either
+    # side of zero -- the negative case reached rng4.choice as a weight once
+    # phi saturated (v2.4.48), and the positive case is just as unstable: a
+    # one-ulp change in a column moves it by 100% relative, which reroutes the
+    # whole run. Snapping the whole noise band to exactly 0 removes that.
+    #
+    # Measured on a real run, distances are either 0 or >= 1e-3, with nothing
+    # in between, so this threshold has six orders of magnitude of clearance
+    # below the smallest meaningful distance and can only ever catch rounding.
+    return distance if distance > DISTANCE_TOL else 0.0
 
 def hamming_iw(lineage,lineage2):
     # distance between two genomes. A position absent from a genome carries the
