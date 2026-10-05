@@ -61,14 +61,18 @@ class ProgressReporter:
         self.progress_file_path = progress_file_path
         self.last_progress_write = 0.0
 
-        self.pbar = tqdm(
-                    total=total_time,
-                    desc=f"RUNNING SIMULATION:  {simulation_id[:40]}",
-                    unit="step",
-                    bar_format="{l_bar}{bar}| {n:.2f}/{total_fmt} {unit} {postfix}",
-                    position=1,
-                    leave=False
-                    )
+        # Progress bar disabled: it redraws on EVERY event (330k times in an
+        # N=5000 run) and cost 18% of total runtime under Slurm, where it
+        # writes to a log nobody reads. Measured in profile_grid_#910.
+        # The .progress snapshot below is what the monitor actually reads.
+        # self.pbar = tqdm(
+        #             total=total_time,
+        #             desc=f"RUNNING SIMULATION:  {simulation_id[:40]}",
+        #             unit="step",
+        #             bar_format="{l_bar}{bar}| {n:.2f}/{total_fmt} {unit} {postfix}",
+        #             position=1,
+        #             leave=False
+        #             )
 
     def _write_progress_snapshot(self):
         snapshot = {
@@ -98,26 +102,28 @@ class ProgressReporter:
             if reaction_id == "thinning":
                 self.thinning_counter += 1
 
-        # Compute leap and thinning percentage
-        total_events = self.leap_counter + self.reactions_counter
-        leap_pct     =  100 * self.leap_counter / total_events if total_events > 0 else 0
-        thinning_pct = 100 * self.thinning_counter / self.reactions_counter if self.reactions_counter > 0 else 0
-
-        # Elapsed CPU time
-        cpu_time = time.time() - self.start_wall
-
-        # Update tqdm
-        self.pbar.update(delta_t)
-        self.pbar.set_postfix({
-            "time": f"{self.current_time:.2f}",
-            "step": f"{self.step_size:.2e}",
-            "leap%": f"{leap_pct:.1f}%",
-            "thin%": f"{thinning_pct:.1f}%",
-            "last react": self.reaction_id if self.reaction_id is not None else "-",
-            "infected": self.infected,
-            "CPU(s)": f"{cpu_time:.1f}",
-            "Time left": f"{(cpu_time / self.current_time * (self.total_time - self.current_time)):.0f}s"
-        })
+        # Everything below only fed the progress bar, so it goes with it. The
+        # counters above are kept: they are the run's own event accounting.
+        # # Compute leap and thinning percentage
+        # total_events = self.leap_counter + self.reactions_counter
+        # leap_pct     =  100 * self.leap_counter / total_events if total_events > 0 else 0
+        # thinning_pct = 100 * self.thinning_counter / self.reactions_counter if self.reactions_counter > 0 else 0
+        #
+        # # Elapsed CPU time
+        # cpu_time = time.time() - self.start_wall
+        #
+        # # Update tqdm
+        # self.pbar.update(delta_t)
+        # self.pbar.set_postfix({
+        #     "time": f"{self.current_time:.2f}",
+        #     "step": f"{self.step_size:.2e}",
+        #     "leap%": f"{leap_pct:.1f}%",
+        #     "thin%": f"{thinning_pct:.1f}%",
+        #     "last react": self.reaction_id if self.reaction_id is not None else "-",
+        #     "infected": self.infected,
+        #     "CPU(s)": f"{cpu_time:.1f}",
+        #     "Time left": f"{(cpu_time / self.current_time * (self.total_time - self.current_time)):.0f}s"
+        # })
 
         if self.progress_file_path is not None:
             now = time.time()
@@ -126,7 +132,8 @@ class ProgressReporter:
                 self.last_progress_write = now
 
     def close(self):
-        self.pbar.close()
+        pass   # nothing to close while the bar is disabled
+        # self.pbar.close()
 
 
 def get_helpers(phenotype_model, parameters, rng1, rng2):

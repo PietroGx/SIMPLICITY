@@ -30,7 +30,7 @@ class Simplicity:
     def __init__(self, parameters, output_directory, sim_id, progress_file_path=None):
         self.parameters       = parameters
         self.output_directory = output_directory
-        self.population       = pop.create_population(parameters)
+        self.population       = pop.create_population(parameters, output_directory)
         self.sim_id  = sim_id
         self.progress_file_path = progress_file_path
        

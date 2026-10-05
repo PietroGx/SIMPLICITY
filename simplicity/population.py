@@ -19,6 +19,8 @@ Created on Tue Jun  6 13:13:14 2023
 
 @author: pietro
 """
+import csv
+import os
 import simplicity.intra_host_model    as h
 import simplicity.evolution.reference as ref
 import simplicity.phenotype.consensus  as c
@@ -27,6 +29,21 @@ import pandas as pd
 import numpy as np
 import scipy.stats
 import scipy.special
+
+# Streamed outputs: name and column order of the files Population writes row by
+# row. output_manager imports these rather than keeping a second copy -- the
+# header is written here and the file is renamed there, so a drift between the
+# two would be a silently malformed csv.
+LINEAGE_FREQUENCY_FILE = "lineage_frequency.csv"
+LINEAGE_FREQUENCY_COLUMNS = ['Lineage_name', 'Time_sampling', 'Frequency_at_t',
+                             'Individuals_infected_at_t']
+TRAJECTORY_FILE = "simulation_trajectory.csv"
+TRAJECTORY_COLUMNS = ['time', 'infected', 'diagnosed', 'recovered',
+                      'infectious', 'detectables', 'susceptibles',
+                      'long_shedders']
+# where a row goes when there is no output directory to stream to
+_BUFFER_ATTRS = {LINEAGE_FREQUENCY_FILE: 'lineage_frequency',
+                 TRAJECTORY_FILE: 'trajectory'}
 
 # Internal switch, not a simulation parameter. The fitness trajectory is a
 # diagnostic: nothing in the model reads it, and of the columns it writes only
@@ -39,6 +56,15 @@ class Population:
     The class defines a population for the SIMPLICITY simulations. It contains
     the data about every individual as well as their intra-host model.
     '''
+    # Exposed on the instance so output_manager can name the streamed files
+    # without importing this module: it already receives the Population, and a
+    # top-level import would close the cycle output_manager -> population ->
+    # intra_host_model -> output_manager.
+    LINEAGE_FREQUENCY_FILE = LINEAGE_FREQUENCY_FILE
+    LINEAGE_FREQUENCY_COLUMNS = LINEAGE_FREQUENCY_COLUMNS
+    TRAJECTORY_FILE = TRAJECTORY_FILE
+    TRAJECTORY_COLUMNS = TRAJECTORY_COLUMNS
+
     def __init__(self,
                  size,I_0,
                  ih_model_parameters,
@@ -48,8 +74,9 @@ class Population:
                  sequence_long_shedders=False,
                  susceptibility_long=1.0,
                  write_fasta=False,
-                 reservoir=100000):
-        
+                 reservoir=100000,
+                 output_directory=None):
+
         # random number generator
         self.rng3 = rng3 # for intra-host model states update
         self.rng4 = rng4 # for electing individuals|lineages when reactions happen
@@ -138,7 +165,25 @@ class Population:
         # ---------------------------------------------------------------------
         
         self.lineage_frequency = [] # count lineage frequency in the population
-        
+
+        # lineage_frequency and the system trajectory are append-only and
+        # nothing reads them back during a run, so with an output directory
+        # they go straight to disk instead of growing in memory: 555 MB and
+        # 47 MB respectively in the worst N=5000 task of profile_grid_#910.
+        # Rows land in "<name>.partial" and are renamed on save, so a file
+        # under its real name still means the run finished -- which is what
+        # scripts/check_completed_simulations.py reads it as.
+        # phylogenetic_data deliberately stays in memory: its rows are read
+        # on the hot path (get_lineage_genome) and MUTATED after the fact
+        # (population_model.py increments Total_infections), so a streamed
+        # copy would be stale.
+        self._streams = {}
+        if output_directory is not None:
+            self._open_stream(output_directory, LINEAGE_FREQUENCY_FILE,
+                              LINEAGE_FREQUENCY_COLUMNS)
+            self._open_stream(output_directory, TRAJECTORY_FILE,
+                              TRAJECTORY_COLUMNS)
+
         # -------------------------------------------------------------------------   
 
         # Running weighted consensus. The per-entry history used to be kept as
@@ -151,15 +196,8 @@ class Population:
         
         # system trajectory ---------------------------------------------------
         self.time         = 0 
-        self.trajectory = [[self.time,
-                           self.infected,
-                           self.diagnosed,
-                           self.recovered,
-                           self.infectious,
-                           self.detectables,
-                           self.susceptibles,
-                           self.long_shedders
-                           ]]
+        self.trajectory = []
+        self.update_trajectory()   # t=0 row, through the same path as the rest
         
         self.last_infection = {}    # tracks the information about the last infection event
                                     # that happened in the simulaiton, used for 
@@ -195,6 +233,35 @@ class Population:
         
     # -------------------------------------------------------------------------   
     # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    #                            Streamed outputs
+    # -------------------------------------------------------------------------
+    def _open_stream(self, directory, filename, columns):
+        path = os.path.join(directory, filename + '.partial')
+        handle = open(path, 'w', newline='')
+        # pandas' to_csv ends lines with \n; csv.writer defaults to \r\n, which
+        # would change every line of the file.
+        writer = csv.writer(handle, lineterminator='\n')
+        writer.writerow(columns)
+        self._streams[filename] = [handle, writer, path]
+
+    def _record(self, filename, row):
+        '''Write one output row, or buffer it when there is nothing to stream to.'''
+        stream = self._streams.get(filename)
+        if stream is None:
+            getattr(self, _BUFFER_ATTRS[filename]).append(row)
+        else:
+            stream[1].writerow(row)
+
+    def finalize_stream(self, filename):
+        '''Close a streamed output and return its partial path, or None if this
+        run buffered the rows in memory instead.'''
+        stream = self._streams.pop(filename, None)
+        if stream is None:
+            return None
+        stream[0].close()
+        return stream[2]
+
     def _init_individuals(self,size,I_0):
         '''
         Create dictionary with all individuals in the simulation
@@ -297,11 +364,7 @@ class Population:
                 self.long_shedders += 1
 
         # update lineage_frequency
-        self.lineage_frequency.append({'Lineage_name'              :'wt',
-                                       'Time_sampling'             :0,
-                                       'Frequency_at_t'            :1,
-                                       'Individuals_infected_at_t' : I_0
-                                       })
+        self._record(LINEAGE_FREQUENCY_FILE, ['wt', 0.0, 1.0, int(I_0)])
         
         # return dictionary containing all individuals data (self.individuals)
         return dic        
@@ -445,15 +508,18 @@ class Population:
             raise ValueError(f"Unknown update_mode: {self.update_mode}")
     
     def update_trajectory(self):
-        # update the system trajectory
-        self.trajectory.append([self.time,
-                           self.infected,
-                           self.diagnosed,
-                           self.recovered,
-                           self.infectious,
-                           self.detectables,
-                           self.susceptibles,
-                           self.long_shedders
+        # update the system trajectory. Types are pinned here because the
+        # streamed writer has no dtype inference to fall back on: pandas read
+        # the t=0 row's int 0 as part of a float64 column and wrote "0.0", so
+        # an uncoerced csv.writer would emit "0" and the file would differ.
+        self._record(TRAJECTORY_FILE, [float(self.time),
+                           int(self.infected),
+                           int(self.diagnosed),
+                           int(self.recovered),
+                           int(self.infectious),
+                           int(self.detectables),
+                           int(self.susceptibles),
+                           int(self.long_shedders)
                            ])
     
     def update_fitness_trajectory(self):
@@ -497,7 +563,17 @@ class Population:
         hosts_at_t = 0
 
         for individual_index in self.infected_i:
-            unique_lineages = set(self.individuals[individual_index]['IH_lineages'])
+            # sorted, like population_model's transmitted-lineage draw: a plain
+            # set of lineage NAMES iterates in string-hash order, which Python
+            # randomises per process. That set the insertion order of
+            # share_lineages_t below, so the same seed gave a different row
+            # order in lineage_frequency.csv and a different summation order
+            # for fitness -- last-bit differences that reach rng4.choice.
+            # Measured: two runs of identical code agreed on every output only
+            # with PYTHONHASHSEED fixed. The index sets (infected_i and the
+            # rest) hold ints, whose hash is not randomised, so they are
+            # already deterministic.
+            unique_lineages = sorted(set(self.individuals[individual_index]['IH_lineages']))
             if not unique_lineages:
                 continue
             hosts_at_t += 1
@@ -517,12 +593,9 @@ class Population:
         by_genome = {}
         for lineage_name, share in share_lineages_t.items():
             frequency = share / hosts_at_t
-            self.lineage_frequency.append({
-                'Lineage_name'              : lineage_name,
-                'Time_sampling'             : t,
-                'Frequency_at_t'            : frequency,
-                'Individuals_infected_at_t' : count_lineages_t[lineage_name],
-                })
+            self._record(LINEAGE_FREQUENCY_FILE,
+                         [lineage_name, float(t), float(frequency),
+                          int(count_lineages_t[lineage_name])])
             genome = self.get_lineage_genome(lineage_name)
             key = tuple(sorted(genome.items()))
             if key in by_genome:
@@ -570,8 +643,10 @@ class Population:
         return pd.DataFrame(self.phylogenetic_data)
     
     def lineage_frequency_to_df(self):
-        # return lineage_frequency as data frame
-        return pd.DataFrame(self.lineage_frequency)
+        # return lineage_frequency as data frame. Rows are lists now, so the
+        # column order comes from the same constant the streamed header uses.
+        return pd.DataFrame(self.lineage_frequency,
+                            columns=LINEAGE_FREQUENCY_COLUMNS)
         
     def fitness_trajectory_to_df(self):
         return pd.DataFrame(self.fitness_trajectory)
@@ -581,9 +656,12 @@ class Population:
 # =============================================================================
 # -----------------------------------------------------------------------------  
 
-def create_population(parameters):
+def create_population(parameters, output_directory=None):
     '''
     Create population instance from parameters file and return it.
+
+    output_directory, when given, is where the append-only outputs are streamed
+    to as the run produces them instead of being accumulated in memory.
     '''
     # population parameters
     pop_size = parameters['population_size']
@@ -615,7 +693,8 @@ def create_population(parameters):
     # create population
     pop = Population(pop_size, I_0, ih_model_parameters, rng3,rng4,rng5, NSR_long,
                      long_shedders_ratio, sequence_long_shedders,
-                     susceptibility_long, write_fasta)
+                     susceptibility_long, write_fasta,
+                     output_directory=output_directory)
     return pop
         
 
