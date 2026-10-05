@@ -287,11 +287,17 @@ def read_sequencing_data_regression(seeded_simulation_output_dir):
     return df
         
 def save_simulation_trajectory(simulation_output, seeded_simulation_output_dir):
-    df = pd.DataFrame(simulation_output.trajectory, columns= 
-                      ['time','infected','diagnosed','recovered',
-                       'infectious','detectables','susceptibles','long_shedders'])
     trajectory_file_path = os.path.join(seeded_simulation_output_dir,
-                                        "simulation_trajectory.csv")
+                                        simulation_output.TRAJECTORY_FILE)
+    # Streamed run: the rows are already on disk under ".partial". The rename
+    # is what publishes them, so the file appearing under its real name still
+    # means the simulation reached the end.
+    partial = simulation_output.finalize_stream(simulation_output.TRAJECTORY_FILE)
+    if partial is not None:
+        os.replace(partial, trajectory_file_path)
+        return
+    df = pd.DataFrame(simulation_output.trajectory,
+                      columns=simulation_output.TRAJECTORY_COLUMNS)
     df.to_csv(trajectory_file_path, index=False)
 
 def read_simulation_trajectory(seeded_simulation_output_dir):
@@ -301,9 +307,13 @@ def read_simulation_trajectory(seeded_simulation_output_dir):
     return df
     
 def save_lineage_frequency(simulation_output, seeded_simulation_output_dir):
-    df = simulation_output.lineage_frequency_to_df()
     lineage_frequency_file_path = os.path.join(seeded_simulation_output_dir,
-                                               "lineage_frequency.csv")
+                                               simulation_output.LINEAGE_FREQUENCY_FILE)
+    partial = simulation_output.finalize_stream(simulation_output.LINEAGE_FREQUENCY_FILE)
+    if partial is not None:
+        os.replace(partial, lineage_frequency_file_path)
+        return
+    df = simulation_output.lineage_frequency_to_df()
     df.to_csv(lineage_frequency_file_path, index=False)
 
 def read_lineage_frequency(seeded_simulation_output_dir):

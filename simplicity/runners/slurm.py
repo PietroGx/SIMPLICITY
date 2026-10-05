@@ -89,6 +89,17 @@ SLURM_TERMINAL_FAILURE_STATES = {
     "DEADLINE", "PREEMPTED", "BOOT_FAIL",
 }
 
+# The other way a task can be finished-but-unresolved. Slurm reports COMPLETED
+# only once the job script has exited 0, and job() touches .completed before
+# returning -- so COMPLETED with no .completed signal means the touch did not
+# land or is not yet visible on the shared filesystem, NOT that the simulation
+# failed. Seen on profile_grid_#910: 116 .completed signals for 120 tasks, all
+# 120 reported COMPLETED by sacct and all 120 having written a full profile.
+# Nothing matched these, so `left` never reached 0 and the polling loop ran for
+# hours against a stale progress snapshot. Reconciled as .completed rather than
+# .failed: marking an exit-0 simulation failed would under-report the run.
+SLURM_TERMINAL_SUCCESS_STATES = {"COMPLETED"}
+
 # Launch-failure retry/reconciliation -- distinct from reconcile_terminated_tasks
 # above: applies to tasks that never reached job() at all (Slurm failed to
 # launch them on their assigned node and auto-requeued them into a held
@@ -376,6 +387,11 @@ def reconcile_terminated_tasks(experiment_name):
     Any task confirmed terminated by Slurm gets .failed touched on its
     behalf, with a note explaining it was an externally-detected kill (not a
     Python-level failure) -- this is what actually unblocks the polling loop.
+
+    A task Slurm reports as COMPLETED gets .completed instead: the job script
+    exited 0, so the simulation ran and its output is on disk, and only the
+    signal write is missing. That case blocks the loop exactly as hard as a
+    kill does, and used to match nothing here at all.
     """
     seeded_simulation_parameters = sm.get_seeded_simulation_parameters_paths(experiment_name)
     stuck_paths = []
@@ -430,11 +446,27 @@ def reconcile_terminated_tasks(experiment_name):
                 continue
             # sacct states can carry a suffix, e.g. "CANCELLED by 12345".
             state = state.strip().split()[0] if state.strip() else state.strip()
-            if state in SLURM_TERMINAL_FAILURE_STATES:
-                pathlib.Path(path + ".failed").touch()
-                name = os.path.basename(path)
+            if state not in SLURM_TERMINAL_FAILURE_STATES \
+                    and state not in SLURM_TERMINAL_SUCCESS_STATES:
+                continue
+            # Re-check immediately before writing: stuck_paths was built at the
+            # top of this function, which on a large grid is thousands of stats
+            # ago, and on a shared filesystem the task's own signal may have
+            # become visible in between. Without this a finished task could be
+            # recorded twice, under both signals.
+            if pathlib.Path(path + ".completed").exists() \
+                    or pathlib.Path(path + ".failed").exists():
+                continue
+            name = os.path.basename(path)
+            if state in SLURM_TERMINAL_SUCCESS_STATES:
+                pathlib.Path(path + ".completed").touch()
                 print(f"[reconciled] {name}: Slurm reports {state} -- "
-                     f"marking .failed (task never signaled itself)")
+                      f"marking .completed (task finished but never signaled "
+                      f"itself; its output is on disk)")
+            else:
+                pathlib.Path(path + ".failed").touch()
+                print(f"[reconciled] {name}: Slurm reports {state} -- "
+                      f"marking .failed (task never signaled itself)")
 
 
 def reconcile_launch_failures(experiment_name):
