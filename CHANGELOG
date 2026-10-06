@@ -5,6 +5,132 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.61 — 2026-10-06 — pietro gerletti
+
+Tests for everything that has to be settled before recalibrating, and a
+correction to a claim one of them was asserting.
+
+`test_consensus_wiring` used to ASSERT the epidemic byte-identical across the
+v2.4.57 accumulator, reasoning that propensities depend on counts and not on
+fitness. The propensities do; the counts do not. Re-running 6f5c185 against
+037e427 with PYTHONHASHSEED pinned — controlled against the same commit on both
+sides, which gives 42/42 identical — leaves 4 of 12 epidemic files differing,
+argmax included. The assertion passed by configuration luck. It now reports
+rather than asserts, and the docstring carries the correction.
+
+The mechanism is still open. Traced to the first divergent event of a 5,815-event
+run: an infection where both sides pick the SAME recipient and a different
+parent. That is the fitness-weighted draw behaving exactly as it should, since
+`Generator.choice(p=w)` and `integers(0, n)` were both measured to consume a
+fixed amount of stream regardless of the weights or the bound — so fitness
+cannot displace rng4, and an rng6 split for the parent draw was implemented,
+tested, found to fix nothing, and reverted. How a parent swap becomes an extra
+recovery thirty events later is not known. The `DISTANCE_TOL` clamp is ruled
+out: reverting it alone reproduces the divergence exactly.
+
+`test_pre_recalibration` runs the one untested configuration point (2% seeding
+at N=5000) and the consensus re-check in throwaway git worktrees.
+`test_fitness_epidemic_invariance` perturbs fitness by one ulp and requires the
+epidemic unmoved; it passes, and its docstring states plainly that it does not
+yet discriminate — it passes on the pre-fix code too, for the stream-neutrality
+reason above. It is kept as a guard against a draw whose consumption later
+becomes fitness-dependent.
+
+`BACKLOG.md` was pruned to its two open technical-debt items, from 840 lines
+and 70 entries. Everything that predates this session is recoverable with
+`git show <pre-2.4.61>:BACKLOG.md`; the blocker entries written in this session
+— the reproducibility fix, the unexplained v2.4.57 epidemic shift, the three
+hardcoded values, the untested NSR-independence assumption, the chosen
+configuration and the profiler bias — were never committed and are preserved
+only in this entry and the 2.4.60 one above.
+
+`test_calibrated_grid` runs each configuration cell's OWN cal_1 -> cal_2 ->
+production instead of measuring every cell against one frozen table. 18 cells
+(1000/3000/5000 x 1%/3% x R = R_long = 1.05/1.06/1.07), 250 tasks each, 4,500
+total, counted from the pipeline's own builders. The pipeline hardcodes the
+configuration the grid is choosing — population 1000, R_long 1.1, a 365-day
+cal_2 window that ends before phi=1 at these configurations — so
+`tests/cellconfig/sitecustomize.py` overrides them in every stage subprocess
+via the import hook. Nothing in `scripts/` is modified.
+
+------------------------------------------------------------------------
+
+## Version 2.4.60 — 2026-10-05 — pietro gerletti
+
+The same seed now reproduces; a task Slurm calls COMPLETED no longer hangs the
+monitor; the progress bar is off; two append-only outputs stream to disk.
+
+**Reproducibility.** Two runs of identical code on the same seed disagreed, every
+time, in `individuals_data.csv` (a last-bit fitness value) and
+`lineage_frequency.csv` (row order). `population.py` built `set(IH_lineages)`
+from lineage NAMES, and Python randomises string hashing per process, so the
+set's iteration order set the insertion order of `share_lineages_t` — hence the
+row order written out and the summation order for fitness. Now
+`sorted(set(...))`, matching `population_model.py:189`, which already did this.
+Verified on a full 1095-day run with PYTHONHASHSEED deliberately unset: 7 of 7
+files identical, where before the fix two differed. Cost measured at ~0.03%.
+**Recalibration required**: no run produced before this commit reproduces
+exactly on current code.
+
+**The monitor hang.** profile_grid_#910 completed 116 of 120 tasks, wrote 120
+profiles, and `sacct` reported every job COMPLETED — yet four `.completed`
+signals were missing, so `left` never reached 0 and the poll loop ran for hours
+against a frozen `.progress` snapshot with an empty queue.
+`reconcile_terminated_tasks` only matched SLURM_TERMINAL_FAILURE_STATES, and
+COMPLETED is deliberately not in that set. It is now reconciled as `.completed`,
+not `.failed` — the job script exited 0, so the simulation ran and only the
+signal write is missing; calling it failed would under-report the run. Both
+signals are re-checked immediately before writing, since `stuck_paths` is built
+thousands of stats earlier on a large grid.
+
+**tqdm.** The progress bar redrew on every extrande event — 330k times in an
+N=5000 run — and cost 18% of runtime under Slurm, writing to a log nobody reads.
+Commented out; 26.74s -> 21.37s on an N=1000 run. Output verified byte-identical
+with the hash seed pinned. The event counters it fed are kept: they are the
+run's own accounting.
+
+**Streamed outputs.** `lineage_frequency` and `simulation_trajectory` are
+append-only and nothing reads them back mid-run, so they now go to
+`<name>.csv.partial` row by row and are renamed on save. 555 MB and 47 MB
+respectively in the worst N=5000 task of #910. Benchmarked at 1.9M rows:
+accumulate-then-pandas 6.05s / 868 MB peak, streamed 4.58s / 12 MB, output
+byte-identical — streaming is faster, not slower. The rename matters:
+`check_completed_simulations.py:32` reads the presence of
+`lineage_frequency.csv` as "this simulation finished". Two traps found by test:
+pandas widens the t=0 row's integers into a float64 column and writes `0.0`,
+and `csv.writer` defaults to `\r\n`; either alone changes every line.
+`phylogenetic_data` is deliberately NOT streamed — its rows are read on the hot
+path (`get_lineage_genome`) and mutated afterwards (`Total_infections`), so a
+streamed copy would be stale, and `_phylo_name_map` holds every row anyway.
+
+------------------------------------------------------------------------
+
+## Version 2.4.59 — 2026-10-05 — pietro gerletti
+
+Per-process memory and CPU profiling for Slurm tasks, with no change to
+`simplicity/` or `scripts/`.
+
+`simplicity/runners/slurm.py:243` passes the whole environment through sbatch
+and Python imports `sitecustomize` at startup, so `tests/profiling` on
+PYTHONPATH profiles every task. Each writes RSS, VmHWM, CPU time, extrande's
+event counters and the measured bytes of all twelve growable Population
+containers every 15s, plus sampled stacks at 0.25s. Every row is fsync'd: a task
+killed for exceeding --mem dies on SIGKILL and never runs atexit, so the partial
+curve is the whole diagnosis. Verified by killing a live run — last row at day
+250, RSS 293 MB, 6,138 lineage rows.
+
+**Read section 4 of its report as candidates, not percentages.** The stack
+sampler is a Python thread calling `sys._current_frames()`, so it only samples
+while holding the GIL, which the main thread releases during numpy calls and
+I/O. It reported `consensus.py:add` at 19.5-30.7% of self time; direct timing
+puts it at 0.30% of a full run — inflated roughly 90x. The tqdm finding from the
+same report was confirmed independently against wall clock, so the bias is not
+uniform. Direct timing of a 1095-day run: `population_model.infection` 7.3%,
+`_update_states_matrix` 6.2%, `add_lineage` 5.9%, `update_lineage_frequency_t`
+0.9%.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.58 — 2026-10-04 — pietro gerletti
 
 `test_config_grid.py --analyse-only` takes the seed count from the run instead
