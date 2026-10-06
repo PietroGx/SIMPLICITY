@@ -5,6 +5,17 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.62 — 2026-10-06 — pietro gerletti
+
+`tests/run_calibrated_grid.sh` points at the session script instead of nohup.
+
+Its header told the reader to detach the run with `nohup ... &`. The repo has
+`scripts/start_simplicity_session.sh` for exactly this, and it does more than
+detach: it attaches a named tmux session with the conda env activated and
+`SBATCH_QOS=standard` exported. A nohup'd run would have had neither.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.61 — 2026-10-06 — pietro gerletti
 
 Tests for everything that has to be settled before recalibrating, and a
