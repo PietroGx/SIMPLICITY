@@ -15,9 +15,7 @@ What the comparison expects, established by measurement rather than guessed:
                           argmax flips, which it does not. Byte-identical,
                           asserted on every file.
 
-  distribution consensus  the EPIDEMIC is byte-identical -- compartment counts
-                          and final_time -- because propensities depend on
-                          counts, not fitness. The GENEALOGY is not: fitness
+  distribution consensus  the GENEALOGY diverges: fitness
                           steers rng4.choice when picking an infection's
                           parent, hundreds of hosts carry near-identical
                           fitness, and across a run a uniform draw eventually
@@ -28,8 +26,29 @@ What the comparison expects, established by measurement rather than guessed:
                           That is a property of the model, not of this change:
                           any reordering of the same sums does it, including
                           the genome keying alone or a numpy upgrade on
-                          untouched code. So the epidemic is asserted and the
-                          genealogy is reported.
+                          untouched code.
+
+                          CORRECTION (v2.4.60). This test used to ASSERT the
+                          epidemic byte-identical, on the reasoning that
+                          propensities depend on counts and not on fitness.
+                          The propensities do -- but the counts themselves do
+                          not. population_model.infection draws the parent with
+                          p=fitness and then draws the recipient from the SAME
+                          rng4 stream, so a changed weight vector moves the
+                          stream and a different susceptible is infected. Each
+                          individual's long-shedder status is fixed at creation,
+                          so that can infect a long shedder in place of a
+                          standard host, whose tau_3_long gives a different
+                          infectious duration and therefore different
+                          compartment counts.
+
+                          Measured at 6f5c185 vs 037e427 with PYTHONHASHSEED
+                          pinned: 4 of 12 epidemic files differ, argmax
+                          included. The old assertion passed by configuration
+                          luck, not by law. Both are reported now; neither is
+                          "wrong" -- the accumulator is exact to 5.47e-59
+                          relative, so these are different realisations of one
+                          stochastic process, not different answers.
 
     python tests/test_consensus_wiring.py <before_dir> <after_dir>
 
@@ -109,7 +128,9 @@ def compare_mode(before, after, mode, strict):
 
     print(f'    {identical} identical, {differing} genealogy files differing'
           + (f', {artefact_differs} {ARGMAX_ARTEFACT}' if artefact_differs else ''))
-    check(f'{mode}: the epidemic is byte-identical', epidemic_differs, 0)
+    if epidemic_differs:
+        print(f'    [expected] the epidemic differs too: fitness and the '
+              f'recipient draw share rng4 (see the correction above)')
     if strict:
         check(f'{mode}: every output byte-identical', differing, 0)
     elif differing:
