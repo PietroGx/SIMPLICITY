@@ -4,7 +4,11 @@
 #   bash tests/run_calibrated_grid.sh                 # all 18 cells, #1..#18
 #   bash tests/run_calibrated_grid.sh --cells 14      # just that one, as #14
 #   bash tests/run_calibrated_grid.sh --exp-base 20   # if #1..#18 are taken
-#   nohup bash tests/run_calibrated_grid.sh &         # survives logout
+#
+# Run it from scripts/start_simplicity_session.sh, which attaches the tmux
+# session with the conda env and SBATCH_QOS=standard already set -- this takes
+# hours and has to outlive the login. It logs to Data/pipeline_logs/ either way,
+# so detaching loses nothing.
 #
 # One cell at a time, each getting the whole Slurm release cap, so a cell runs
 # as fast as the cluster allows and only one array is ever queued. Expect this
