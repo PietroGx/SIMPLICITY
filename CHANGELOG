@@ -5,6 +5,24 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.69 — 2026-10-07 — pietro gerletti
+
+`--watch` on the grid runner, and a stale description of `--rerun` corrected.
+
+Moving the orchestrator onto a compute node in 2.4.63 took away the live view:
+the terminal now returns as soon as sbatch accepts the job. The output was
+never lost -- python -u plus Slurm's live --output means the job log is a
+real-time stream -- but following it meant copying a path out of the
+submission message. --watch submits as usual, waits for Slurm to start the job,
+then tails that log. Ctrl-C stops watching, not the job. It is stripped from
+the argument list before the rest is forwarded, and the wait gives up with a
+pointer to sacct if the job leaves the queue without writing anything.
+
+The header still described --rerun as clearing a cell's Data trees, which is
+what it did for one version before 2.4.64 made it resume instead.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.68 — 2026-10-07 — pietro gerletti
 
 The pipeline's health report stops calling a correct calibration broken.

@@ -5,6 +5,11 @@
 #   bash tests/run_calibrated_grid.sh --cells 14           # just that one, #14
 #   bash tests/run_calibrated_grid.sh --cells 17 --rerun   # redo a stuck cell
 #   bash tests/run_calibrated_grid.sh --exp-base 20        # if #1..#18 are taken
+#   bash tests/run_calibrated_grid.sh --watch              # submit, then follow
+#
+# --watch submits as usual and then tails the job log, so you get the live view
+# back without the run depending on your session. Ctrl-C stops watching, not the
+# job; reattach any time with the tail command the submission prints.
 #
 # NOTHING RUNS ON THE LOGIN NODE. Invoked from the login node this submits
 # itself with sbatch and returns immediately; the orchestrator then runs as a
@@ -19,12 +24,11 @@
 # as fast as the cluster allows and only one array is ever queued. Expect this
 # to take a day or more: 18 pipelines of three dependent stages each.
 #
-# Resumable. --skip-completed passes over any cell that already has a
-# calibration table AND its full production run, so re-submitting this exact
-# command after an interruption picks up where it stopped. A cell that died
-# part-way also needs --rerun, which clears its Data/*_#<n> trees first --
-# without it that cell stops with "You already run an experiment with the same
-# name!".
+# Resumable at two levels. --skip-completed (always passed) steps over a cell
+# that already has a calibration table AND its full production run. --rerun
+# resumes WITHIN a part-finished cell: every simulation carrying .completed is
+# kept and skipped, and only the gaps run. Without --rerun such a cell stops
+# with "You already run an experiment with the same name!".
 #
 # Cell N is experiment #N. --cells runs a subset without renumbering the rest,
 # so a trial cell keeps the number it will have in the full grid.
@@ -32,6 +36,14 @@
 # Anything passed here goes through to tests/test_calibrated_grid.py:
 #   bash tests/run_calibrated_grid.sh --populations 5000 --r-values 1.06
 set -uo pipefail
+
+# --watch is ours, not the python script's: pull it out before forwarding.
+WATCH=0
+ARGS=()
+for arg in "$@"; do
+    if [ "$arg" = "--watch" ]; then WATCH=1; else ARGS+=("$arg"); fi
+done
+set -- ${ARGS+"${ARGS[@]}"}
 
 cd "$(dirname "$0")/.." || exit 1   # the repo root; running from tests/ would
                                     # scatter a stray Data/ the .gitignore misses
@@ -84,12 +96,27 @@ if [ -z "${SLURM_JOB_ID:-}" ] && [ "${SIMPLICITY_GRID_LOCAL:-0}" != "1" ]; then
         echo "error: sbatch refused the orchestrator job (exit $rc)." >&2
         exit 1
     fi
+    LOGFILE="${OUT/\%j/$JOB}"
     echo "submitted orchestrator as job $JOB"
-    echo "log    : ${OUT/\%j/$JOB}"
-    echo "watch  : tail -f ${OUT/\%j/$JOB}"
+    echo "log    : $LOGFILE"
+    echo "watch  : tail -f $LOGFILE"
     echo "cancel : scancel $JOB"
     echo
     echo "Per-cell pipeline logs still go to Data/pipeline_logs/."
+    if [ "$WATCH" = "1" ]; then
+        echo
+        echo "waiting for the job to start (Ctrl-C stops watching, not the job)..."
+        # the log only appears once Slurm starts the job; it may sit PENDING
+        while [ ! -f "$LOGFILE" ]; do
+            state=$(squeue -j "$JOB" -h -o %T 2>/dev/null)
+            if [ -z "$state" ]; then
+                echo "job $JOB is no longer queued and wrote no log -- check: sacct -j $JOB"
+                exit 1
+            fi
+            sleep 5
+        done
+        exec tail -f "$LOGFILE"
+    fi
     exit 0
 fi
 
@@ -114,6 +141,6 @@ echo
 echo "finished    : $(date -Is)   exit $status"
 if [ "$status" -ne 0 ]; then
     echo "re-submit the same command to resume; completed cells are skipped."
-    echo "a cell that died part-way also needs --rerun to clear its Data trees."
+    echo "a cell that died part-way also needs --rerun to finish its gaps."
 fi
 exit "$status"
