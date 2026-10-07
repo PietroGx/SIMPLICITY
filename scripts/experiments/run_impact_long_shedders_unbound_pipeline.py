@@ -50,6 +50,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from impact_long_shedders_unbound_config import (
     LONG_NSR_EXP_NAME, STD_NSR_EXP_NAME, PROD_EXP_NAME, SETUP_DIR_TEMPLATE,
+    CALIBRATION_SKIPPED_OUTPUTS,
     TABLE_FILENAME, SCENARIOS, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
     add_slurm_resource_args, CONSENSUS_MODES, prod_exp_name,
 )
@@ -94,15 +95,25 @@ def run_stage(cmd, log_fh):
         raise SystemExit(f"[FAILED] stage exited {proc.returncode}: {' '.join(cmd)}")
 
 
-def report_simulation_health(exp_names, log_fh, label):
+def report_simulation_health(exp_names, log_fh, label, skip_outputs=()):
     """Per-grid-point completeness and an extinction/saturation autopsy of
-    anything that ended early. Reporting only -- never aborts the run."""
+    anything that ended early. Reporting only -- never aborts the run.
+
+    skip_outputs names outputs the stage was told not to write. The checker
+    requires a fixed list of files, so without this a calibration stage -- which
+    writes four of them on purpose since v2.4.65 -- is reported as every
+    simulation incomplete. The run would be fine and the report would say
+    otherwise, which is the failure mode this pipeline can least afford.
+    """
     _log(log_fh, f"\n===== simulation health: {label} =====")
     for name in exp_names:
         cmd = [sys.executable, CHECK_SCRIPT, name]
         _log(log_fh, f"\n$ {' '.join(cmd)}")
+        env = dict(os.environ)
+        if skip_outputs:
+            env["SIMPLICITY_SKIP_OUTPUTS"] = ",".join(skip_outputs)
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
         except Exception as exc:
             _log(log_fh, f"  [skip] health report failed to run: {exc}")
             continue
@@ -297,7 +308,8 @@ def main():
                       *slurm_res_args], log_fh)
 
         report_simulation_health([f"{LONG_NSR_EXP_NAME}_#{args.exp_num}"],
-                                 log_fh, "stage 1 (long shedders alone)")
+                                 log_fh, "stage 1 (long shedders alone)",
+                                 skip_outputs=CALIBRATION_SKIPPED_OUTPUTS)
 
         run_stage([py, cal2_path,
                   "--exp-num", str(args.exp_num),
@@ -311,7 +323,8 @@ def main():
                   "--slurm-time", args.slurm_time], log_fh)
 
         report_simulation_health([f"{STD_NSR_EXP_NAME}_#{args.exp_num}"],
-                                 log_fh, "stage 2 (standard alone)")
+                                 log_fh, "stage 2 (standard alone)",
+                                 skip_outputs=CALIBRATION_SKIPPED_OUTPUTS)
 
         # Both pipelines read the SAME frozen table, so the only thing that
         # differs between them is the consensus distance.
