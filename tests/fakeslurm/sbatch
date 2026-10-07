@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""Fake sbatch. See _fakeslurm.py."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _fakeslurm
+raise SystemExit(_fakeslurm.main("sbatch"))

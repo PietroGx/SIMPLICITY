@@ -5,6 +5,135 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.71 — 2026-10-07 — pietro gerletti
+
+### The settings data flow
+
+An experiment is groups of simulations of repeats, and each level now has an
+identity it was previously given and then discarded.
+
+`read_settings_and_write_simulation_parameters` used to receive a deterministic,
+ordered list of parameter combinations, `enumerate` it, never use the index, and
+re-identify each combination by encoding its content into a filename at two
+significant figures. Everything downstream decoded that filename back into
+parameters. So the directory name was the database, and it was a lossy encoding
+of it: two swept values that rounded together produced ONE filename and the
+second write silently overwrote the first, running half the sweep under a folder
+whose name claimed a value it did not hold. Demonstrated, not inferred -- a
+2-point sweep produced 1 output directory. The grid's own R values collide:
+1.05, 1.06 and 1.07 all encode as `R_1p1`. It never bit only because R varies
+per cell, and each cell is its own experiment.
+
+What replaces it:
+
+    01_Settings/settings.json       n_seeds, groups, simulations, in order
+    02_Simulations/<stem>.json      one simulation's complete parameters
+    03_Repeats/<group>/repeats.json ordered [{index, simulation, stem, seed}]
+    03_Repeats/<group>/state/       one state file per repeat
+    03_Repeats/<group>/progress/    separate, so a 30s snapshot cannot clobber
+                                    a terminal state
+    03_Repeats/submissions/NNN.json array position -> (group, index)
+    04_Output/<group>/<stem>/parameters.json   what the resolver reads
+    04_Output/<group>/<stem>/seed_NNNN/
+
+`get_parameter_value_from_simulation_output_dir` keeps its exact signature, so
+its 43 call sites did not move, and reads `parameters.json` from beside the
+output instead of rebuilding a filename from `parts[-3]`. A simulation's
+directory carries its id (`sim_000__<label>`), so colliding labels can no longer
+mean colliding simulations, and the label's float precision went from 2 to 6
+significant figures -- it is read off `ls` by people even though nothing
+resolves through it, and at 2 figures a folder named `R_1p1` held R=1.06.
+
+Groups survive to disk. `generate_experiment_settings` expanded each
+`_scenario_groups` entry and then flattened the grouping away, which is why
+anything needing it afterwards either re-invoked the config (cal_1 called its
+own settings function a second time, purely to print) or re-invented a label at
+the plot call site. Both configs now name their groups where the groups are
+defined -- cal_1 `['SOT', 'HIV_low+HIV_high']` and the unbound pipeline's
+`['SOT', 'HIV_low+HIV_high', 'edge_case']`, cal_2 the scenario names,
+`standard_only` for the unbound standard sweep, and production after its
+scenario. `long_nsr_calibration_plot` reads the recorded name rather than
+matching (tau_3_long, R_long) against a scenario list passed in by its caller;
+that default was the bound pipeline's, so the unbound `edge_case` fell through
+to a raw `tau=350.23,R_long=1.1` in unbound run #1 and that string landed in the
+saved fit-results filename.
+
+The runner contract is `(experiment_name, group, index)`, not a filesystem path.
+Repeat order is recorded once in `repeats.json` and read by everyone; it used to
+come from an unsorted `os.walk`, performed separately by the submitting process
+and by each task, over a directory that gains files while the run is in flight.
+`slurm.job()` is simpler for it: one lookup in the submission's recorded map, no
+walk and no filtering. A submission deliberately spans groups, because cal_2
+submits all of its (cell, scenario) groups as one array and this function
+blocks.
+
+Gone: `03_Seeded_simulation_parameters` and the up-to-seven files per repeat it
+held -- a copy of the simulation's parameters with `seed` overwritten, plus
+`.submitted/.released/.started/.completed|.failed/.progress/.launch_retries`,
+each carrying one bit by existing. Also `write_seeded_simulation_parameters`,
+`get_seeded_simulation_parameters_paths`, `read_seeded_simulation_parameters`,
+`get_simulation_parameters_filepath_of_simulation_output_dir`,
+`get_n_seeds_from_experiment_settings` and `get_n_seeds_file_path`.
+`write_simulation_parameters` takes a dict where it took 23 positional
+arguments. `simplicity/` is 149 lines shorter.
+
+`n_seeds` is per group, with the experiment value as the default. Forced rather
+than chosen: both pipeline drivers already carry `--cal-seeds` and `--exp-seeds`
+as separate knobs, which only worked while each stage was its own experiment.
+
+Two silent breakages fixed on the way. `get_experiment_foldername_from_SSOD`
+counted back to `path_parts[-4]`, which returns `"04_Output"` as the experiment
+name once the tree gains the group level; it locates the output component
+instead. `dm.set_data_dir` only half worked, because `settings_manager._data_dir`
+is a copy taken at import.
+
+Not done, and deliberately: ~60 `get_simulation_output_dirs` call sites still
+pass no group. The listing API takes one (`group=None` returns everything, which
+is what they all get), so they can migrate one at a time -- but the safety
+argument for that was "verify each against real output", and there is none yet.
+The analysis and figure path has not run against real output in this layout at
+all. See BACKLOG.
+
+### A fake Slurm controller, and the backwards state transition it found
+
+`tests/fakeslurm/` is sbatch/squeue/scontrol/sacct/scancel as shims over a json
+state file. Put the directory first on PATH and the real control plane runs
+unmodified: it submits, polls, releases, resolves and reconciles for real, and
+the tasks really run as subprocesses and really resolve their own repeat. Only
+the controller is fake. `tests/test_slurm_lifecycle.py` drives it, 17 checks.
+
+A fake rather than a local controller because the branches that have cost
+production runs are the ones a real Slurm will not produce on request: an OOM or
+walltime kill, a task requeued held after a launch failure, and a task that
+exits 0 with its terminal state write lost -- profile_grid_#910, 120 tasks
+COMPLETED in sacct and 116 states on disk. Each is one word in a plan file here.
+
+It found a real bug on its first run. `release_simulations` records RELEASED for
+a batch after `scontrol release` returns. Under the signal files that was
+harmless: `.released` and `.completed` were separate, so touching one beside the
+other changed nothing. With one state field per repeat, a task that started AND
+finished inside that window had its COMPLETED overwritten by RELEASED, and the
+polling loop then waited on it forever with the output already on disk.
+Milliseconds wide in production, indistinguishable from the monitor hangs fixed
+in 2.4.60 and 2.4.63, and certain under a synchronous fake.
+
+Fixed here, in the same version: `jobs.set_state` refuses to move a repeat backwards (`jobs.STATE_RANK`,
+which `slurm.py` shares instead of keeping a second copy). Collapsing five
+signal files into one state field was therefore not a pure win: the old
+redundancy made backwards transitions harmless by construction, and the guard
+restores that deliberately rather than accidentally.
+
+Not installing Slurm locally. This cluster runs 26.05.4; the newest packaged for
+Ubuntu 24.04 is 23.11.4, five releases behind, and the only thing a real
+controller adds over the fake is confirmation that output FORMAT parses as
+assumed. `tests/check_slurm_interface.py` does that check where the version is
+the one that matters: three no-op tasks, about a minute, non-zero exit if any
+parsing assumption in `runners/slurm.py` no longer holds, `--raw` to see the
+replies. `tests/slurm_local_setup.md` is kept for the other reason to want a
+local controller -- iterating without queue waits -- not for correctness.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.69 — 2026-10-07 — pietro gerletti
 
 The grid runner follows its own log by default, and a stale description of

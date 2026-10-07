@@ -124,6 +124,27 @@ def derive_scenario_params(scenario, sp):
     }
 
 
+def group_name_for_pair(pair, sp, scenarios=None):
+    """The name of the cal_1 group covering one (tau_3_long, R_long) pair.
+
+    Every scenario sharing the pair, joined with '+' -- not '/', which
+    write_fit_results_csv's file-saving reads as a directory separator.
+
+    Computed HERE, where SCENARIOS is defined, and recorded on the group so
+    nothing downstream has to map a pair back to a name against a scenario list
+    it may not own. long_nsr_calibration_plot used to do exactly that, and the
+    unbound pipeline's edge_case -- absent from the bound list -- fell through
+    to a raw 'tau=350.23,R_long=1.1' fallback in unbound run #1, which landed in
+    the saved fit-results filename.
+    """
+    names = [scenario["name"]
+             for scenario in (SCENARIOS if scenarios is None else scenarios)
+             if scenario["long_shedders_ratio"] > 0.0
+             and (round(derive_tau_3_long(scenario, sp), TAU_ROUND),
+                  round(float(scenario["R_long"]), TAU_ROUND)) == pair]
+    return "+".join(names) if names else f'tau_{pair[0]}_Rl_{pair[1]}'
+
+
 def unique_long_tau_r_long_pairs(sp):
     """Sorted unique (tau_3_long, R_long) pairs across long-shedder
     scenarios -- grouped by the PAIR, not tau alone, since two scenarios
@@ -181,6 +202,7 @@ def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
         nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
         scenario_groups = [
             {
+                'name': group_name_for_pair((tau, r_long), sp),
                 'nucleotide_substitution_rate_long': nsr_values,
                 'tau_3_long': tau,
                 'R_long': r_long,
@@ -267,6 +289,7 @@ def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_group):
         nsr_list = np.logspace(np.log10(r['min']), np.log10(r['max']), r['steps']).tolist()
 
         group = {
+            "name": name,
             "long_shedders_ratio": frozen["long_shedders_ratio"],
             "susceptibility_long": frozen["susceptibility_long"],
             "tau_3_long": frozen["tau_3_long"],
@@ -347,7 +370,12 @@ def build_exp_scenario_settings(row, n_seeds):
         fixed["nucleotide_substitution_rate_long"] = float(long_nsr)
 
     def make_settings():
-        return ({}, fixed.copy(), n_seeds)
+        # One named group, so the production output says which scenario it is
+        # and the fit-results filename cannot disagree with the output tree.
+        # An empty group dict is still one group: generate_experiment_settings
+        # expands it to combinations = [()], exactly as empty varying_params did.
+        return ({'_scenario_groups': [{'name': row['scenario_name']}]},
+                fixed.copy(), n_seeds)
 
     return make_settings
 

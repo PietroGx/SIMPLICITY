@@ -68,8 +68,7 @@ def run_long_calibration(exp_num, runner, seeds, target_osr_long, R,
     # pipeline's list, which has no edge_case
     plot_and_fit_long_nsr_calibration(numbered, target_osr_long,
                                       model_type=model_type,
-                                      min_seq=min_seq, min_len=min_len,
-                                      scenarios=SCENARIOS)
+                                      min_seq=min_seq, min_len=min_len)
 
 
 def main():

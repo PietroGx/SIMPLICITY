@@ -14,38 +14,41 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-def run_seeded_simulation(seeded_simulation_parameters_path: str, 
-                          experiment_name: str) -> None:
-    """runs one seeded simulation. This function isolates how to run one simulation 
-    from the looping over all seeded simulation parameters of one experiment.
-    
-    Support for running Slurm requires this function to be importable from its 
+def run_seeded_simulation(experiment_name: str, group: str, index: int) -> None:
+    """Runs one repeat. This isolates how to run one repeat from the looping
+    over all of an experiment's repeats.
+
+    Support for running Slurm requires this function to be importable from its
     name as reference (simplicity.runners.unit_run.run_seeded_simulation).
-    Also this function's arguments are passed by reference (achieved to 
-    serializing/deserializing the reference to the simulation parameters 
-    that are resolved via the settings_manager.read_seeded_simulation_parameters function).
+    Its arguments are passed by value through the environment, which is why a
+    repeat is now (group, index) rather than a path: the task resolves both
+    through simplicity.jobs instead of reconstructing a filesystem location.
     """
     # <settings and output managers>
+    import simplicity.jobs            as jobs
     import simplicity.settings_manager as sm
     import simplicity.output_manager   as om
-    parameters       = sm.read_seeded_simulation_parameters(experiment_name, seeded_simulation_parameters_path)
-    output_directory = om.setup_output_directory           (experiment_name, seeded_simulation_parameters_path)
-    # create simulation id
-    seed = parameters['seed']
-    sim_name = sm.generate_filename_from_params(parameters)
-    sim_id = f'{experiment_name}: {sim_name}: {seed}'
-    
+
+    repeat = jobs.get_repeat(experiment_name, group, index)
+    # the repeat's only contribution to its own parameters is the seed
+    parameters = sm.read_simulation_parameters(experiment_name, repeat['stem'])
+    parameters['seed'] = repeat['seed']
+
+    output_directory = om.setup_output_directory(experiment_name, group, repeat)
+    # create simulation id. The stem, not generate_filename_from_params over the
+    # complete parameter set -- that printed ~250 characters of every parameter
+    # on every line, and the stem already names the simulation and its id.
+    sim_id = f'{experiment_name}: {group}/{repeat["stem"]}: {repeat["seed"]}'
+
     # </settings and output managers>
 
     ## <simplicity core>
     import simplicity.simulation       as sim
-    # Same "<seeded params path>.xyz" convention as the .started/.completed/
-    # .failed signal files touched by simplicity.runners.slurm's job(), so an
-    # external monitor can find a running simulation's progress snapshot from
-    # the same path it already uses to find its status signals.
-    progress_file_path = seeded_simulation_parameters_path + ".progress"
+    # Its own file, not the state record: a running simulation rewrites this
+    # every 30s, and a read-modify-write of the state could land after a
+    # terminal COMPLETED and put STARTED back.
+    progress_file_path = jobs.progress_path(experiment_name, group, index)
     simulation = sim.Simplicity       (parameters, output_directory, sim_id,
                                        progress_file_path=progress_file_path)
     simulation.run()
     ## </simplicity core>
-    

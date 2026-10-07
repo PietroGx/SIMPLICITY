@@ -20,8 +20,13 @@
 @author: jbescudie
 
 
-Abstract functions for running the seeded simulations of an experiment given its name.
-Each seeded simulation is run by a run_seeded_simulation function passed as argument.
+Abstract functions for running the repeats of an experiment given its name.
+Each repeat is run by a run_seeded_simulation function passed as argument.
+
+A repeat is identified by (group, index), not by a filesystem path. The order is
+recorded once in simplicity.jobs' repeats.json and every reader uses it; it used
+to come from an unsorted os.walk performed separately by the submitting process
+and by each task.
 
 Current implementations:                Target         Description
 
@@ -32,22 +37,30 @@ Current implementations:                Target         Description
 import typing
 
 
-def run_seeded_simulations(self, experiment_name: str, run_seeded_simulation: typing.Callable[[str,str],None]):
-    """Abstract function for running the seeded simulations of an experiment given its name.
+def run_seeded_simulations(self, experiment_name: str,
+                           run_seeded_simulation: typing.Callable[[str, str, int], None],
+                           groups: typing.Optional[typing.Sequence[str]] = None):
+    """Abstract function for running the repeats of an experiment given its name.
 
     experiment_name: str             reference to the experiment for other simplicity component like simplicity.settings_manager and simplicity.output_manager
-    run_seeded_simulation: Callable  function with signature (seeded_simulation_parameters_path: str, experiment_name: str) -> None
+    run_seeded_simulation: Callable  function with signature (experiment_name: str, group: str, index: int) -> None
+    groups: sequence of str or None  which groups to run; None means all of them.
+                                     Dispatch is deliberately not per-group: one
+                                     submission may span several, since cal_2
+                                     runs all of its (cell, scenario) groups as
+                                     a single Slurm array.
     """
     import simplicuty.runners
     help(simplicuty.runners)
     raise NotImplementedError("hint: call an implementation instead.")
 
 
-def run_seeded_simulation(seeded_simulation_parameters_path: str, experiment_name: str) -> None:
-    """Abstract function for running a single seeded simulation of an experiment.
+def run_seeded_simulation(experiment_name: str, group: str, index: int) -> None:
+    """Abstract function for running a single repeat of an experiment.
 
-    seeded_simulation_parameters_path: str    path to the file containing the simulation's parameters incl. seed
-    experiment_name: str                      reference to the experiment for other simplicity component like simplicity.settings_manager and simplicity.output_manager
+    experiment_name: str   reference to the experiment for other simplicity component like simplicity.settings_manager and simplicity.output_manager
+    group: str             which group of the experiment this repeat belongs to
+    index: int             the repeat's position in that group's repeats.json, from 0
     """
     import simplicuty.runners
     help(simplicuty.runners)

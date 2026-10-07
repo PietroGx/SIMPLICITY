@@ -46,6 +46,7 @@ Output is a plain-text report; copy the whole block.
 import argparse
 import csv
 import glob
+import simplicity.jobs as jobs
 import os
 import statistics
 import sys
@@ -230,16 +231,10 @@ def task_seconds(name, exp_num):
     cost of one task, which is what a longer run scales by -- the sweep's own
     wall clock also carries queue wait and the concurrency cap.'''
     out = []
-    pattern = (f'Data/{name}_#{exp_num}/03_Seeded_simulation_parameters/'
-               f'*/*.started')
-    for started in glob.glob(pattern):
-        done = started[:-len('.started')] + '.completed'
-        if os.path.exists(done):
-            try:
-                out.append(os.path.getmtime(done) - os.path.getmtime(started))
-            except OSError:
-                pass
-    return [s for s in out if s >= 0]
+    experiment = f'{name}_#{exp_num}'
+    for seconds in repeat_wall_seconds(experiment).values():
+        out.extend(seconds)
+    return out
 
 
 def by_r_seconds(r_values, exp_num, pop):
