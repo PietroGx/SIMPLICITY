@@ -76,8 +76,20 @@ def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
                               seed_file_name)
     try:
         os.makedirs(output_dir)
-    except:
-        raise RuntimeError('You already run an experiment with the same name!')
+    except FileExistsError:
+        # Resuming: only simulations WITHOUT a .completed signal reach this
+        # point (slurm.job skips the finished ones), so an existing directory
+        # here holds a partial run. Clear it -- leaving it would mix the
+        # abandoned attempt's files with the new ones, and nothing downstream
+        # could tell which was which.
+        if os.environ.get('SIMPLICITY_RESUME') == '1':
+            shutil.rmtree(output_dir, ignore_errors=True)
+            os.makedirs(output_dir)
+        else:
+            raise RuntimeError('You already run an experiment with the same '
+                               'name! (set SIMPLICITY_RESUME=1, or pass '
+                               '--rerun, to keep what finished and re-run '
+                               'the rest)')
     # Return the output directory path
     return output_dir
 
