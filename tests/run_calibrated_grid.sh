@@ -5,11 +5,13 @@
 #   bash tests/run_calibrated_grid.sh --cells 14           # just that one, #14
 #   bash tests/run_calibrated_grid.sh --cells 17 --rerun   # redo a stuck cell
 #   bash tests/run_calibrated_grid.sh --exp-base 20        # if #1..#18 are taken
-#   bash tests/run_calibrated_grid.sh --watch              # submit, then follow
+#   bash tests/run_calibrated_grid.sh --no-watch           # submit and return
 #
-# --watch submits as usual and then tails the job log, so you get the live view
-# back without the run depending on your session. Ctrl-C stops watching, not the
-# job; reattach any time with the tail command the submission prints.
+# Run from a terminal, it submits and then follows the job log, so you keep the
+# live view while the run itself belongs to Slurm. Ctrl-C stops watching, not
+# the job; reattach any time with the tail command the submission prints.
+# --no-watch submits and returns instead, which is also what happens when
+# stdout is not a terminal (a script, a pipe, a cron job).
 #
 # NOTHING RUNS ON THE LOGIN NODE. Invoked from the login node this submits
 # itself with sbatch and returns immediately; the orchestrator then runs as a
@@ -37,11 +39,19 @@
 #   bash tests/run_calibrated_grid.sh --populations 5000 --r-values 1.06
 set -uo pipefail
 
-# --watch is ours, not the python script's: pull it out before forwarding.
-WATCH=0
+# Follow the log by default when there is someone to read it. Submitting and
+# returning silently is right for a script and wrong for a person: the whole
+# reason the orchestrator moved to a compute node was that it no longer needs
+# the session, not that you stopped wanting to see it.
+if [ -t 1 ]; then WATCH=1; else WATCH=0; fi
+# --watch/--no-watch are ours, not the python script's: strip before forwarding.
 ARGS=()
 for arg in "$@"; do
-    if [ "$arg" = "--watch" ]; then WATCH=1; else ARGS+=("$arg"); fi
+    case "$arg" in
+        --watch)    WATCH=1 ;;
+        --no-watch) WATCH=0 ;;
+        *)          ARGS+=("$arg") ;;
+    esac
 done
 set -- ${ARGS+"${ARGS[@]}"}
 

@@ -7,16 +7,24 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ## Version 2.4.69 — 2026-10-07 — pietro gerletti
 
-`--watch` on the grid runner, and a stale description of `--rerun` corrected.
+The grid runner follows its own log by default, and a stale description of
+`--rerun` corrected.
 
 Moving the orchestrator onto a compute node in 2.4.63 took away the live view:
-the terminal now returns as soon as sbatch accepts the job. The output was
-never lost -- python -u plus Slurm's live --output means the job log is a
-real-time stream -- but following it meant copying a path out of the
-submission message. --watch submits as usual, waits for Slurm to start the job,
-then tails that log. Ctrl-C stops watching, not the job. It is stripped from
-the argument list before the rest is forwarded, and the wait gives up with a
-pointer to sacct if the job leaves the queue without writing anything.
+the terminal returned as soon as sbatch accepted the job. The output was never
+lost -- python -u plus Slurm's live --output means the job log is a real-time
+stream -- but following it meant copying a path out of the submission message.
+
+Run from a terminal it now submits, waits for Slurm to start the job, and tails
+that log; Ctrl-C stops watching, not the job. With stdout redirected -- a
+script, a pipe, cron -- it submits and returns as before, and --watch/--no-watch
+force either way. Submitting silently is right for a script and wrong for a
+person: the point of moving the orchestrator off the login node was that the run
+no longer needs the session, not that you stopped wanting to watch it.
+
+Both flags are stripped before the remaining arguments are forwarded, and the
+wait gives up with a pointer to sacct if the job leaves the queue without
+writing anything.
 
 The header still described --rerun as clearing a cell's Data trees, which is
 what it did for one version before 2.4.64 made it resume instead.
