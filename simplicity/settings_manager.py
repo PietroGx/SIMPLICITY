@@ -145,17 +145,18 @@ def read_user_set_parameters_file(filename):
         write_standard_parameters_values()
         return read_standard_parameters_values()
     
-def get_experiment_settings_file_path(experiment_name):
-    return os.path.join(_data_dir,
-                        f'{experiment_name}',
-                        '01_Experiments_settings', 
-                        f'{experiment_name}_settings.json')
+# A _scenario_groups entry may name itself with this key; unnamed groups get a
+# positional name. A plain experiment is one group, DEFAULT_GROUP.
+GROUP_NAME_KEY = 'name'
+DEFAULT_GROUP = 'main'
 
-def get_n_seeds_file_path(experiment_name):
-    return os.path.join(_data_dir,
-                        f'{experiment_name}',
-                        '01_Experiments_settings', 
-                        f'{experiment_name}_n_seeds.json')
+
+def get_experiment_settings_file_path(experiment_name):
+    """The experiment record: n_seeds, its groups, and its ordered simulations.
+    One file -- it used to be two, written together and read apart, with n_seeds
+    read by two separate functions that did the same thing."""
+    return os.path.join(dm.get_experiment_settings_dir(experiment_name),
+                        'settings.json')
 
 def check_parameters_names(parameters_dic):
     STANDARD_VALUES = read_standard_parameters_values()
@@ -163,17 +164,39 @@ def check_parameters_names(parameters_dic):
         if key not in STANDARD_VALUES.keys():
             raise ValueError(f'Parameter {key} is not a valid parameter')
 
+def read_experiment_settings_file(experiment_name):
+    """{'n_seeds', 'groups', 'simulations'} -- the whole record."""
+    with open(get_experiment_settings_file_path(experiment_name)) as json_file:
+        return json.load(json_file)
+
+
+def read_simulations(experiment_name):
+    """The ordered simulation records: {'id', 'group', 'parameters'}."""
+    return read_experiment_settings_file(experiment_name)['simulations']
+
+
+def read_groups(experiment_name):
+    """The ordered group records: {'name', 'n_seeds'}."""
+    return read_experiment_settings_file(experiment_name)['groups']
+
+
 def read_experiment_settings(experiment_name):
-    experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
-    with open(experiment_settings_file_path, 'r') as json_file:
-        experiment_settings = json.load(json_file)
-    return experiment_settings
+    """Just the parameter dicts, in order -- the pre-groups contract."""
+    return [record['parameters'] for record in read_simulations(experiment_name)]
+
 
 def read_n_seeds_file(experiment_name):
-    n_seeds_file_path = get_n_seeds_file_path(experiment_name)
-    with open(n_seeds_file_path, 'r') as json_file:
-        n_seeds_dic = json.load(json_file)
-    return n_seeds_dic
+    """Returns a dict, so the existing ['n_seeds'] callers are unchanged."""
+    return {'n_seeds': read_experiment_settings_file(experiment_name)['n_seeds']}
+
+
+def _as_simulations(tagged):
+    """Attach the identity. The id is the position in a deterministic order
+    (itertools.product over declared keys, groups in declared order), so it is
+    reproducible and cannot collide. It stays OUTSIDE 'parameters':
+    check_parameters_names rejects any key that is not a real parameter."""
+    return [{'id': index, 'group': group, 'parameters': parameters}
+            for index, (group, parameters) in enumerate(tagged)]
 
 
 def generate_experiment_settings(varying_params: dict, fixed_params: dict = None):
@@ -190,11 +213,15 @@ def generate_experiment_settings(varying_params: dict, fixed_params: dict = None
                         that group only. This lets correlated parameter sets (e.g.
                         different NSR sweep ranges per scenario) be submitted as a
                         single combined experiment instead of one experiment per
-                        group.
+                        group. A group may carry a 'name' key to name itself;
+                        unnamed groups are named by position.
         fixed (dict): Parameters that should have the same value across all combinations.
 
     Returns:
-        List[dict]: A list of dictionaries with combined parameter sets.
+        List[dict]: ordered simulation records {'id', 'group', 'parameters'}.
+                    The grouping used to be flattened away here, which is why
+                    anything needing it downstream either re-invoked the config
+                    or re-invented a label at the plot call site.
     """
     fixed_params = fixed_params or {}
     varying_params = dict(varying_params or {})
@@ -208,16 +235,19 @@ def generate_experiment_settings(varying_params: dict, fixed_params: dict = None
         for combo in combinations:
             setting = dict(zip(keys, combo))
             setting.update(copy.deepcopy(fixed_params))  # Avoid mutation
-            experiment_settings.append(setting)
+            experiment_settings.append((DEFAULT_GROUP, setting))
 
-        return experiment_settings
+        return _as_simulations(experiment_settings)
 
     # Grouped path: each group expands its own list-valued keys independently,
     # so different groups can vary different parameters over different ranges.
     experiment_settings = []
-    for group in scenario_groups:
-        group_varying = {k: v for k, v in group.items() if isinstance(v, (list, tuple))}
-        group_fixed = {k: v for k, v in group.items() if not isinstance(v, (list, tuple))}
+    for group_index, group in enumerate(scenario_groups):
+        group_name = group.get(GROUP_NAME_KEY) or f'group_{group_index:02d}'
+        # the name is identity, not a parameter: keep it out of the spec
+        group_spec = {k: v for k, v in group.items() if k != GROUP_NAME_KEY}
+        group_varying = {k: v for k, v in group_spec.items() if isinstance(v, (list, tuple))}
+        group_fixed = {k: v for k, v in group_spec.items() if not isinstance(v, (list, tuple))}
 
         keys, values = zip(*group_varying.items()) if group_varying else ([], [])
         combinations = list(itertools.product(*values)) if values else [()]
@@ -226,9 +256,9 @@ def generate_experiment_settings(varying_params: dict, fixed_params: dict = None
             setting = dict(zip(keys, combo))
             setting.update(copy.deepcopy(fixed_params))
             setting.update(copy.deepcopy(group_fixed))
-            experiment_settings.append(setting)
+            experiment_settings.append((group_name, setting))
 
-    return experiment_settings
+    return _as_simulations(experiment_settings)
 
 def write_experiment_settings(experiment_name: str, experiment_settings: list, n_seeds: int):
     """
@@ -240,77 +270,34 @@ def write_experiment_settings(experiment_name: str, experiment_settings: list, n
         n_seeds (int): Number of random seeds to be stored separately.
     """
     # check parameter names validity
-    for param_set in experiment_settings:
-        check_parameters_names(param_set)
+    for record in experiment_settings:
+        check_parameters_names(record['parameters'])
 
-    # Write settings to JSON
+    # One group record per distinct group, in first-seen order. n_seeds is per
+    # group: the pipeline drivers already carry --cal-seeds and --exp-seeds as
+    # separate knobs, which only worked while each stage was its own experiment.
+    groups = [{'name': name, 'n_seeds': n_seeds}
+              for name in dict.fromkeys(r['group'] for r in experiment_settings)]
+
     experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
-    n_seeds_file_path = get_n_seeds_file_path(experiment_name)
-
     with open(experiment_settings_file_path, 'w') as settings_file:
-        json.dump(experiment_settings, settings_file, indent=4)
-
-    with open(n_seeds_file_path, 'w') as n_seeds_file:
-        json.dump({'n_seeds': n_seeds}, n_seeds_file, indent=4)
+        json.dump({'n_seeds': n_seeds,
+                   'groups': groups,
+                   'simulations': experiment_settings}, settings_file, indent=4)
 
     print(f"Experiment settings file written to {experiment_settings_file_path}")
 
-def write_simulation_parameters(file_path,
-                                population_size,
-                                long_shedders_ratio,
-                                tau_1,
-                                tau_2,
-                                tau_3,
-                                tau_3_long,
-                                tau_4,
-                                infected_individuals_at_start, 
-                                R,
-                                R_long,
-                                nucleotide_substitution_rate_long,
-                                diagnosis_rate_standard,
-                                diagnosis_rate_long,
-                                IH_virus_emergence_rate,
-                                nucleotide_substitution_rate,
-                                final_time, 
-                                max_runtime, 
-                                phenotype_model,
-                                sequence_long_shedders,
-                                susceptibility_long,
-                                write_fasta,
-                                seed,
-                                consensus='argmax'
-                                ):
-    settings = {
-        "population_size": population_size,
-        "long_shedders_ratio": long_shedders_ratio,
-        "tau_1": tau_1,
-        "tau_2": tau_2,
-        "tau_3": tau_3,
-        "tau_3_long": tau_3_long,
-        "tau_4": tau_4,
-        "infected_individuals_at_start": infected_individuals_at_start,
-        "R": R,
-        "R_long": R_long,
-        "nucleotide_substitution_rate_long": nucleotide_substitution_rate_long,
-        "diagnosis_rate_standard": diagnosis_rate_standard, 
-        "diagnosis_rate_long":diagnosis_rate_long,
-        "IH_virus_emergence_rate" : IH_virus_emergence_rate,
-        "nucleotide_substitution_rate": nucleotide_substitution_rate,
-        "t_0": 0,
-        "final_time": final_time,
-        "max_runtime": max_runtime,
-        "phenotype_model": phenotype_model,
-        "consensus": consensus,
-        "sequence_long_shedders":sequence_long_shedders,
-        "susceptibility_long": susceptibility_long,
-        "write_fasta": write_fasta,
-        "seed": seed
-    }
-    
-    # Serialize the dictionary to a JSON-formatted string and write it to a file
+def write_simulation_parameters(file_path, settings):
+    """One simulation's complete parameters.
+
+    Takes a dict. This was 23 positional arguments threaded from a dict at the
+    only call site, where a transposed pair of same-typed values was silent and
+    every new parameter meant editing a signature, a call and a dict in step.
+    """
     with open(file_path, "w") as json_file:
-        json.dump(settings, json_file, indent=4)
-        
+        json.dump({**settings, "t_0": 0}, json_file, indent=4)
+
+
 def generate_filename_from_params(params: dict):
     
     abbreviations = {
@@ -336,7 +323,11 @@ def generate_filename_from_params(params: dict):
             continue
         abbrev = abbreviations.get(key, key)
         if isinstance(value, float):
-            value_str = f"{value:.2g}".replace('.', 'p')  # e.g., 0.01 → 1p0
+            # 6 significant figures, not 2. Nothing resolves through this string
+            # any more -- simulation_stem's id prefix carries identity and
+            # parameters.json carries the values -- but people still read it off
+            # `ls`, and at 2 figures a folder named R_1p1 held R=1.06.
+            value_str = f"{value:.6g}".replace('.', 'p')
         elif isinstance(value, int):
             value_str = str(value)
         elif isinstance(value, str):
@@ -347,6 +338,33 @@ def generate_filename_from_params(params: dict):
     
     file_name = "_".join(parts) + ".json"
     return file_name
+
+
+# One simulation's parameters, written beside the output they describe. This is
+# what get_parameter_value_from_simulation_output_dir reads, so nothing has to
+# rebuild a filename to find them.
+PARAMETERS_FILE = 'parameters.json'
+
+# Keep a stem well inside the 255-byte filename limit; the id makes it unique,
+# so the label is what gets cut.
+MAX_STEM = 180
+
+
+def simulation_stem(record, standard_values=None):
+    """Directory and file stem for one simulation: its id, then a label.
+
+    The id is the identity -- assigned, dense, reproducible, and impossible to
+    collide. The label is for humans. Two parameter sets whose labels coincide
+    used to share one filename and silently overwrite each other; now they
+    cannot, because the stems differ in the id.
+    """
+    standard_values = standard_values or read_standard_parameters_values()
+    modified = {key: value for key, value in record['parameters'].items()
+                if key in standard_values and value != standard_values[key]}
+    label = generate_filename_from_params(modified)[:-len('.json')] if modified \
+        else 'standard_values'
+    prefix = f"sim_{record['id']:03d}__"
+    return prefix + label[:MAX_STEM - len(prefix)]
 
 
 def read_settings_and_write_simulation_parameters(experiment_name):
@@ -363,195 +381,56 @@ def read_settings_and_write_simulation_parameters(experiment_name):
 
     """
     
-    # Define the path to the experiment settings file
-    experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
     STANDARD_VALUES = read_standard_parameters_values()
-    # Read the experiment settings file
-    with open(experiment_settings_file_path, 'r') as settings_file:
-        all_experiment_settings = json.load(settings_file)
-  
-    # Loop over each set of experiment settings and create a simulation parameters file
-    for i, experiment_settings in enumerate(all_experiment_settings):
-        # Only include parameters that differ from standard
-        modified_params = {
-            key: value for key, value in experiment_settings.items()
-            if key in STANDARD_VALUES and value != STANDARD_VALUES[key]
-        }
-        # Fallback: if all params match standard, name it by index
-        if not modified_params:
-            file_name = 'standard_values.json'
-        else:
-            file_name = generate_filename_from_params(modified_params)
+    parameters_dir = dm.get_simulation_parameters_dir(experiment_name)
+    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
 
-        simulation_parameters_file_path = os.path.join(
-                       dm.get_simulation_parameters_dir(experiment_name),
-                                                 file_name)
+    for record in read_simulations(experiment_name):
+        stem = simulation_stem(record, STANDARD_VALUES)
+        settings = {**STANDARD_VALUES, **record['parameters']}
 
-        # Merge the standard values with the current experiment settings
-        settings = {**STANDARD_VALUES, **experiment_settings}
+        write_simulation_parameters(
+            os.path.join(parameters_dir, f'{stem}.json'), settings)
 
-        # Write the simulation parameters to a JSON file
-        write_simulation_parameters(simulation_parameters_file_path, 
-                                    settings["population_size"],
-                                    settings['long_shedders_ratio'],
-                                    settings["tau_1"],
-                                    settings["tau_2"],
-                                    settings["tau_3"],
-                                    settings["tau_3_long"],
-                                    settings["tau_4"],
-                                    settings["infected_individuals_at_start"],
-                                    settings["R"],
-                                    settings["R_long"],
-                                    settings["nucleotide_substitution_rate_long"],
-                                    settings["diagnosis_rate_standard"],
-                                    settings["diagnosis_rate_long"],
-                                    settings["IH_virus_emergence_rate"],
-                                    settings["nucleotide_substitution_rate"],
-                                    settings["final_time"],
-                                    settings["max_runtime"],
-                                    settings["phenotype_model"],
-                                    settings["sequence_long_shedders"],
-                                    settings["susceptibility_long"],
-                                    settings["write_fasta"],
-                                    settings["seed"],
-                                    consensus=settings["consensus"]
-                                    )
+        # The reader-facing copy, written here at setup rather than by the task:
+        # every repeat of this simulation would otherwise race to write it.
+        # Under the group, so a group's output subtree is self-contained.
+        simulation_output_dir = os.path.join(experiment_output_dir,
+                                             record['group'], stem)
+        os.makedirs(simulation_output_dir, exist_ok=True)
+        write_simulation_parameters(
+            os.path.join(simulation_output_dir, PARAMETERS_FILE), settings)
 
-    print(f"Simulation parameters written to directory: {simulation_parameters_file_path}")
+    print(f"Simulation parameters written to directory: {parameters_dir}")
 
-def write_seeded_simulation_parameters(experiment_name: str):
+def read_simulation_parameters(experiment_name, stem):
+    """One simulation's complete parameters, by the stem repeats.json records.
+
+    One small file, which is why 02_Simulations is kept: a task would otherwise
+    parse settings.json, holding every group's parameters, to find its own.
     """
-    Generates multiple JSON files with different seeds for each simulation parameter file 
-    within a specified experiment. The function reads the original simulation parameter 
-    files, adds a 'seed' field, and writes the modified files to subdirectories named 
-    after the original files.
-
-    Parameters:
-    -----------
-    experiment_name : str
-        The name of the experiment. 
-    
-    n_seeds : int
-        The number of seeded JSON files to generate for each simulation parameter file. 
-
-    Directory Structure:
-    --------------------
-    
-    Data/
-    └── experiment_name/
-        ├── 02_Simulation_parameters/
-        │   ├── param_file_1.json
-        │   ├── param_file_2.json
-        │   └── ...
-        └── 03_Seeded_simulation_parameters/
-            ├── param_file_1/
-            │   ├── seed_0.json
-            │   ├── seed_1.json
-            │   └── ...
-            ├── param_file_2/
-            │   ├── seed_0.json
-            │   ├── seed_1.json
-            │   └── ...
-            └── ...
-    """
-    simulation_parameters_dir = dm.get_simulation_parameters_dir(experiment_name)
-    seeded_simulation_parameters_dir = dm.get_seeded_simulation_parameters_dir(experiment_name)
-
-    # Iterate over all files in the simulation parameters directory
-    for filename in os.listdir(simulation_parameters_dir):
-        filepath = os.path.join(simulation_parameters_dir, filename)
-        
-        # Read the original JSON file
-        with open(filepath, 'r') as file:
-            simulation_parameters = json.load(file)
-        
-        # Create a subdirectory for the seeded files
-        subdir_name = filename.replace(".json", "")
-        subdir_path = os.path.join(seeded_simulation_parameters_dir, subdir_name)
-        os.makedirs(subdir_path, exist_ok=True)
-        
-        # Generate multiple files with different seeds
-        n_seeds = read_n_seeds_file(experiment_name)['n_seeds']
-        for i in range(n_seeds):
-            # seed = random.randint(0, 1000000)
-            simulation_parameters['seed'] = i
-
-            seeded_file_path = os.path.join(subdir_path, f"seed_{i:04}.json")
-            
-            # Write the new JSON file with the added seed
-            with open(seeded_file_path, 'w') as seeded_file:
-                json.dump(simulation_parameters, seeded_file, indent=4)
+    with open(os.path.join(dm.get_simulation_parameters_dir(experiment_name),
+                           f'{stem}.json')) as handle:
+        return json.load(handle)
 
 
-def get_seeded_simulation_parameters_paths(experiment_name):
-    """
-    Retrieves all seeded simulation parameter file paths for a given experiment.
+def get_simulation_parameters(simulation_output_dir):
+    """The parameters that produced this output, read from beside it."""
+    with open(os.path.join(simulation_output_dir, PARAMETERS_FILE)) as file:
+        return json.load(file)
 
-    This function searches through the directory structure of the provided
-    experiment name, looking for all JSON seeded simulation parameters files. 
-    It returns a list of full paths to these files.
-
-    Args:
-        experiment_name (str): The name of the experiment for which seeded simulation 
-                               parameter paths are to be retrieved.
-
-    Returns:
-        list of str: A list of file paths, each pointing to a JSON file containing
-                     seeded simulation parameters.
-
-    Example:
-        If `experiment_name` is 'Experiment_1', and the directory structure contains
-        multiple JSON files under:
-            '/data_dir/Experiment_1/03_Seeded_simulation_parameters',
-        the function will return a list like:
-            [
-                '/data_dir/Experiment_1/03_Seeded_simulation_parameters/subdir/file1.json',
-                '/data_dir/Experiment_1/03_Seeded_simulation_parameters/subdir/file2.json'
-            ]
-    """
-    # Define the base path for the simulation parameters
-    base_dir = os.path.join(_data_dir, experiment_name, "03_Seeded_simulation_parameters")
-    
-    # List to store all seed file paths
-    seeded_simulation_parameters_paths = []
-    
-    # Walk through the directory structure to find all .json files
-    for root, dirs, files in os.walk(base_dir):
-        for file in files:
-            if file.endswith(".json"):
-                # Construct the full path to the file and add it to the list
-                file_path = os.path.join(root, file)
-                seeded_simulation_parameters_paths.append(file_path)
-    
-    return seeded_simulation_parameters_paths
-
-def read_seeded_simulation_parameters(experiment_name, seeded_simulation_parameters_path):
-    with open(seeded_simulation_parameters_path, 'r') as seeded_file:
-        seeded_simulation_parameters = json.load(seeded_file)
-    return seeded_simulation_parameters
-
-def get_simulation_parameters_filepath_of_simulation_output_dir(simulation_output_dir):
-    # get filepath of simulation parameters file from which the simulation_output_dir was generated
-    from pathlib import Path
-    simulation_output_dir_path = Path(simulation_output_dir)
-    parts = simulation_output_dir_path.parts
-    experiment_name = parts[-3]
-    simulation_output_folder_name = parts[-1]
-    # get simulation parameters dir for that experiment
-    simulation_parameters_dir = dm.get_simulation_parameters_dir(experiment_name)
-    simulation_parameters_file_path = os.path.join(simulation_parameters_dir,
-                                              simulation_output_folder_name +'.json')
-
-    return simulation_parameters_file_path
 
 def get_parameter_value_from_simulation_output_dir(simulation_output_dir, parameter):
-    # read and return desired parameter value for specific simulation output directory
-    simulation_parameters_file_path = get_simulation_parameters_filepath_of_simulation_output_dir(
-                       simulation_output_dir)
-    with open(simulation_parameters_file_path, 'r') as file:
-        parameters_dict = json.load(file)
-    
-    return parameters_dict[parameter]
+    """Read one parameter of the simulation that produced this output.
+
+    Same signature as ever -- 43 call sites depend on it. What changed is that
+    it no longer rebuilds 02_Simulations/<folder name>.json from
+    parts[-3] and parts[-1] of the path it was handed. That string coupling made
+    the folder name a lookup key, and the folder name is a lossy encoding of the
+    parameters, so two swept values that rounded together resolved to one file.
+    """
+    return get_simulation_parameters(simulation_output_dir)[parameter]
+
 
 def read_OSR_NSR_regressor_parameters():
     file_path = os.path.join(dm.get_reference_parameters_dir(),
@@ -560,41 +439,3 @@ def read_OSR_NSR_regressor_parameters():
     best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
     return best_fit_df
     
-def get_n_seeds_from_experiment_settings(experiment_numbered_name):
-    """Reads n_seeds from the specific setting JSON file."""
-    
-    # Use the exact helper you specified
-    settings_dir = dm.get_experiment_settings_dir(experiment_numbered_name)
-    
-    # Use the exact naming convention
-    file_path = os.path.join(settings_dir, f"{experiment_numbered_name}_n_seeds.json")
-    
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Missing seeds setting file: {file_path}")
-        
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-        
-    return int(data['n_seeds'])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

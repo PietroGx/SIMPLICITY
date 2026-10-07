@@ -72,6 +72,8 @@ sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 import pandas as pd
 
 from experiment_script_runner import run_experiment_script
+import simplicity.dir_manager as dm
+import simplicity.jobs as jobs
 import simplicity.settings_manager as sm
 from impact_long_shedders_unbound_config import (
     SETUP_DIR_TEMPLATE, TABLE_FILENAME, build_exp_scenario_settings,
@@ -272,9 +274,9 @@ def grid_params_files(exp_num):
     '''Every parameter file across the grid's parts. The grid may have been
     submitted as several arrays, each its own experiment.'''
     return glob.glob(f'Data/{GRID_EXP_NAME}_#{exp_num}/'
-                     f'02_Simulation_parameters/*.json') + \
+                     f'{dm.SIMULATIONS_DIRNAME}/*.json') + \
            glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{exp_num}/'
-                     f'02_Simulation_parameters/*.json')
+                     f'{dm.SIMULATIONS_DIRNAME}/*.json')
 
 
 def merge(a, b):
@@ -324,54 +326,47 @@ def collect(rows, cells, exp_num, table_exp_num):
             continue
         cell = (float(params['R']), int(params['population_size']),
                 int(params['infected_individuals_at_start']))
-        root = os.path.dirname(os.path.dirname(params_file))
-        name = os.path.splitext(os.path.basename(params_file))[0]
-        paths = sorted(glob.glob(
-            f'{root}/04_Output/{name}/seed_*/simulation_trajectory.csv'))
-        if paths:
-            per = out.setdefault(cell, {}).get(scenario)
-            got = measure(paths, cell[1])
-            out[cell][scenario] = merge(per, got) if per else got
-    return out
-
-
-def task_seconds_by_cell(rows, exp_num):
-    '''Per-simulation seconds, grouped by cell, from the .started/.completed
-    signal mtimes next to each seeded params file.'''
-    lookup = scenario_lookup(rows)
-    by_cell = {}
-    for params_file in sorted(grid_params_files(exp_num)):
-        try:
-            with open(params_file) as fh:
-                params = json.load(fh)
-        except (OSError, ValueError):
-            continue
-        key = (round(float(params.get('long_shedders_ratio', 0.0)), 6),
-               round(float(params.get('tau_3_long', 0.0)), 2))
-        if lookup.get(key) is None:
-            continue
-        cell = (float(params['R']), int(params['population_size']),
-                int(params['infected_individuals_at_start']))
-        root = os.path.dirname(os.path.dirname(params_file))
-        name = os.path.splitext(os.path.basename(params_file))[0]
-        for started in glob.glob(
-                f'{root}/03_Seeded_simulation_parameters/{name}/*.started'):
-            done = started[:-len('.started')] + '.completed'
-            if os.path.exists(done):
-                try:
-                    dt = os.path.getmtime(done) - os.path.getmtime(started)
-                except OSError:
-                    continue
-                if dt >= 0:
-                    by_cell.setdefault(cell, []).append(dt)
+        experiment = os.path.basename(
+            os.path.dirname(os.path.dirname(params_file)))
+        stem = os.path.splitext(os.path.basename(params_file))[0]
+        for seconds in repeat_wall_seconds(experiment).get(stem, []):
+            by_cell.setdefault(cell, []).append(seconds)
     return by_cell
 
 
+def repeat_wall_seconds(experiment):
+    """{simulation stem: [seconds, ...]} for every finished repeat.
+
+    From the repeat's own state record (updated - started), which is what the
+    .started/.completed file mtimes used to give before one state file per
+    repeat replaced the signal files.
+    """
+    out = {}
+    try:
+        repeats = jobs.all_repeats(experiment)
+    except (OSError, ValueError, KeyError, TypeError):
+        return out                      # not an experiment we can read
+    for group, record in repeats:
+        seconds = jobs.wall_seconds(experiment, group, record['index'])
+        if seconds is not None:
+            out.setdefault(record['stem'], []).append(seconds)
+    return out
+
+
+def repeat_state_counts(experiment):
+    """{state: count} for one experiment, empty if it cannot be read."""
+    try:
+        return jobs.count_states(experiment)
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
 def failed_count(exp_num):
-    return len(glob.glob(f'Data/{GRID_EXP_NAME}_#{exp_num}/'
-                         f'03_Seeded_simulation_parameters/*/*.failed')) + \
-           len(glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{exp_num}/'
-                         f'03_Seeded_simulation_parameters/*/*.failed'))
+    total = 0
+    for path in (glob.glob(f'Data/{GRID_EXP_NAME}_#{exp_num}') +
+                 glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{exp_num}')):
+        total += repeat_state_counts(os.path.basename(path)).get(jobs.FAILED, 0)
+    return total
 
 
 # ---------------------------------------------------------------- helpers

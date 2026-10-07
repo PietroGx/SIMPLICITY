@@ -62,14 +62,22 @@ def get_reference_parameters_dir():
     os.makedirs(reference_parameters_dir, exist_ok=True)
     return reference_parameters_dir
 
+# The numbered subdirectories, named once. They were spelled as literals in
+# eleven places, so a rename meant finding all eleven.
+SETTINGS_DIRNAME    = "01_Settings"
+SIMULATIONS_DIRNAME = "02_Simulations"
+REPEATS_DIRNAME     = "03_Repeats"
+OUTPUT_DIRNAME      = "04_Output"
+
+
 def create_directories(experiment_name):
     """Create necessary subdirectories within the data directory."""
     
     experiment_dir = os.path.join(_data_dir,experiment_name)
-    subdirectories = ["01_Experiments_settings",
-                      "02_Simulation_parameters", 
-                      "03_Seeded_simulation_parameters",
-                      "04_Output", 
+    subdirectories = [SETTINGS_DIRNAME,
+                      SIMULATIONS_DIRNAME,
+                      REPEATS_DIRNAME,
+                      OUTPUT_DIRNAME,
                       ]
     
     for subdir in subdirectories:
@@ -88,7 +96,7 @@ def get_experiment_settings_dir(experiment_name):
     """Get the experiment_name simulation parameters directory path."""
     experiment_dir = os.path.join(_data_dir,experiment_name)
     if os.path.isdir(experiment_dir):
-        return os.path.join(experiment_dir, '01_Experiments_settings')
+        return os.path.join(experiment_dir, SETTINGS_DIRNAME)
     else:
          raise ValueError('No experiment with that name!')
 
@@ -96,23 +104,26 @@ def get_simulation_parameters_dir(experiment_name):
     """Get the experiment_name simulation parameters directory path."""
     experiment_dir = os.path.join(_data_dir,experiment_name)
     if os.path.isdir(experiment_dir):
-        return os.path.join(experiment_dir, '02_Simulation_parameters')
+        return os.path.join(experiment_dir, SIMULATIONS_DIRNAME)
     else:
          raise ValueError('No experiment with that name!')
          
-def get_seeded_simulation_parameters_dir(experiment_name):
-    """Get the experiment_name seeded simulation parameters directory path."""
-    experiment_dir = os.path.join(_data_dir,experiment_name)
-    if os.path.isdir(experiment_dir):
-        return os.path.join(experiment_dir, '03_Seeded_simulation_parameters')
-    else:
-         raise ValueError('No experiment with that name!')
-         
+def get_repeats_dir(experiment_name, group=None):
+    """The repeats directory: one ordered repeat list per group, plus that
+    group's state and progress. Replaces 03_Seeded_simulation_parameters, which
+    held a copy of the combination's parameters per seed plus five signal files
+    that carried one bit each by existing."""
+    base = os.path.join(get_experiment_dir(experiment_name), REPEATS_DIRNAME)
+    path = base if group is None else os.path.join(base, group)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 def get_experiment_output_dir(experiment_name):
     """Get the experiment_name output directory path."""
     experiment_dir = os.path.join(_data_dir,experiment_name)
     if os.path.isdir(experiment_dir):
-        return os.path.join(experiment_dir, '04_Output')
+        return os.path.join(experiment_dir, OUTPUT_DIRNAME)
     else:
          raise ValueError('No experiment with that name!')
          
@@ -161,22 +172,57 @@ def get_slurm_id_map_dir(experiment_name):
     os.makedirs(slurm_id_map_dir , exist_ok=True)
     return slurm_id_map_dir
 
-def get_simulation_output_dirs(experiment_name):
-    simulation_output_dirs = []
+def get_simulation_output_dirs(experiment_name, group=None):
+    """Every simulation's output directory, or only one group's.
+
+    group=None returns all of them, which is what every existing caller gets.
+    Passing a group is how a read says which part of a heterogeneous experiment
+    it means: an experiment already holds several independent sweeps (one
+    _scenario_groups entry each), and a listing that mixes them feeds a plot
+    series sorting by parameter value across sweeps it should not compare.
+
+    Ordered: groups as declared, then simulations by id (the sim_NNN prefix
+    makes the string sort an id sort, up to 999 simulations).
+    """
     experiment_output_dir = get_experiment_output_dir(experiment_name)
-    for folder in os.listdir(experiment_output_dir):
-        simulation_output_dir = os.path.join(experiment_output_dir,folder)
-        if os.path.isdir(simulation_output_dir):
-            simulation_output_dirs.append(simulation_output_dir)
+    if group is None:
+        groups = get_groups(experiment_name)
+    else:
+        if group not in get_groups(experiment_name):
+            raise ValueError(f'{experiment_name} has no group {group!r}; it '
+                             f'has {get_groups(experiment_name)}')
+        groups = [group]
+
+    simulation_output_dirs = []
+    for name in groups:
+        group_dir = os.path.join(experiment_output_dir, name)
+        if not os.path.isdir(group_dir):
+            continue
+        simulation_output_dirs.extend(sorted(
+            os.path.join(group_dir, folder)
+            for folder in os.listdir(group_dir)
+            if os.path.isdir(os.path.join(group_dir, folder))))
     return simulation_output_dirs
 
+
+def get_group_from_SSOD(seeded_simulation_output_dir):
+    """The group of Data/<exp>/04_Output/<group>/<simulation>/<seed>."""
+    return os.path.basename(os.path.dirname(
+        os.path.dirname(seeded_simulation_output_dir)))
+
+
+def get_groups(experiment_name):
+    """The experiment's group names, in declared order."""
+    import simplicity.settings_manager as sm
+    return [g['name'] for g in sm.read_groups(experiment_name)]
+
+
 def get_seeded_simulation_output_dirs(simulation_output_dir):
-    seeded_simulation_output_dirs = []
-    for subfolder in os.listdir(simulation_output_dir):
-        seeded_simulation_output_dir = os.path.join(simulation_output_dir,subfolder)
-        if os.path.isdir(seeded_simulation_output_dir):
-            seeded_simulation_output_dirs.append(seeded_simulation_output_dir)
-    return seeded_simulation_output_dirs
+    """This simulation's repeats, sorted -- so seed_0000 is always first."""
+    return sorted(
+        os.path.join(simulation_output_dir, subfolder)
+        for subfolder in os.listdir(simulation_output_dir)
+        if os.path.isdir(os.path.join(simulation_output_dir, subfolder)))
 
 # SSOD = seeded_simulation_output_dir
 def get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir):
@@ -185,11 +231,20 @@ def get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir):
     return simulation_output_foldername
 
 def get_experiment_foldername_from_SSOD(seeded_simulation_output_dir):
-    # Split the path into parts
+    """The experiment folder name, found by locating the output directory
+    component rather than counting back a fixed number of parts.
+
+    It was path_parts[-4], which is only right while the tree is exactly
+    <experiment>/04_Output/<simulation>/<seed>. Add or remove one level and it
+    silently returns a different component -- "04_Output" as the experiment
+    name, say -- with nothing to signal it.
+    """
     path_parts = os.path.normpath(seeded_simulation_output_dir).split(os.sep)
-    # Extract the experiment folder name
-    experiment_foldername = path_parts[-4]
-    return experiment_foldername
+    for index in range(len(path_parts) - 1, 0, -1):     # last match wins
+        if path_parts[index] == OUTPUT_DIRNAME:
+            return path_parts[index - 1]
+    raise ValueError(f'Not a path under {OUTPUT_DIRNAME}/: '
+                     f'{seeded_simulation_output_dir}')
 
 def get_experiment_tree_simulation_dir(experiment_name,
                                        seeded_simulation_output_dir):

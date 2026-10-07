@@ -20,14 +20,11 @@
 @author: jbescudie
 
 """
-import simplicity.settings_manager as sm
 from tqdm import tqdm
 
-def run_seeded_simulations(experiment_name, run_seeded_simulation):
-    seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
-    # run a Simplicity simulation for each seeded parameters
-    # for seeded_simulation_parameters_path in seeded_simulation_parameters_paths:
-    #     run_seeded_simulation(seeded_simulation_parameters_path, experiment_name, plot_trajectory)
-
-    for path in tqdm(seeded_simulation_parameters_paths, desc="Running seeded simulations", unit="sim", position=0):
-        run_seeded_simulation(path, experiment_name)
+def run_seeded_simulations(experiment_name, run_seeded_simulation, groups=None):
+    import simplicity.jobs as jobs
+    repeats = jobs.all_repeats(experiment_name, groups)
+    for group, record in tqdm(repeats, desc="Running repeats", unit="sim",
+                              position=0):
+        run_seeded_simulation(experiment_name, group, record['index'])

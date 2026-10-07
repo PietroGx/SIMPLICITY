@@ -120,29 +120,38 @@ def add_worktree(root, commit, label, slot):
 
 def seed_worktree(worktree, template, experiment, seeds, consensus, horizon,
                   population):
-    '''Write seeded parameter files into a worktree's own Data/, built from an
-    existing parameters file so nothing here re-derives a parameter set.'''
+    """Write the parameter set this comparison runs, as a plain json file.
+
+    Deliberately NOT an on-disk experiment tree: this test runs one side inside
+    a worktree at an older commit, and the two checkouts do not necessarily lay
+    Data/ out the same way. Each side builds its own tree with its own code (see
+    run_in_worktree), from this one file.
+    """
     import json
-    with open(template) as handle:
-        params = json.load(handle)
+    if template:
+        with open(template) as handle:
+            params = json.load(handle)
+    else:
+        import simplicity.settings_manager as sm
+        params = dict(sm.read_standard_parameters_values())
     params['final_time'] = horizon
     params['population_size'] = population
     params['infected_individuals_at_start'] = max(1, population // 20)
     params['consensus'] = consensus
-    cell = os.path.join(worktree, 'Data', experiment,
-                        '03_Seeded_simulation_parameters', 'cell')
-    os.makedirs(cell, exist_ok=True)
-    paths = []
-    for seed in range(seeds):
-        params['seed'] = seed
-        path = os.path.join(cell, f'seed_{seed:04d}.json')
-        with open(path, 'w') as handle:
-            json.dump(params, handle, indent=1)
-        paths.append(os.path.relpath(path, worktree))
-    return paths
+    params.pop('seed', None)            # the repeat supplies it
+    path = os.path.join(worktree, 'comparison_parameters.json')
+    with open(path, 'w') as handle:
+        json.dump(params, handle, indent=1)
+    return path
 
 
-def run_in_worktree(worktree, experiment, params_paths):
+def run_in_worktree(worktree, experiment, params_path, seeds):
+    """Build and run the experiment with the WORKTREE's own code.
+
+    Through run_experiment, so this works on either side of a commit that
+    changed how an experiment is laid out or how a repeat is addressed. The test
+    compares outputs; it does not need to know either shape.
+    """
     env = dict(os.environ)
     # pin the hash seed: without it two runs of IDENTICAL code disagree, which
     # is what made the original comparison unreadable. Drop anything that would
@@ -150,17 +159,20 @@ def run_in_worktree(worktree, experiment, params_paths):
     env['PYTHONHASHSEED'] = '0'
     env.pop('PYTHONPATH', None)
     env.pop('SIMPLICITY_PROFILE_DIR', None)
-    for path in params_paths:
-        code = subprocess.call(
-            [sys.executable, '-c',
-             'import sys; import simplicity.runners.unit_run as u; '
-             'u.run_seeded_simulation(sys.argv[1], sys.argv[2])',
-             path, experiment],
-            cwd=worktree, env=env,
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-        if code != 0:
-            return False, path
-    return True, None
+    code = subprocess.call(
+        [sys.executable, '-c',
+         'import json, sys\n'
+         'import simplicity.runme as runme\n'
+         'import simplicity.runners.serial as serial\n'
+         'name, path, seeds = sys.argv[1], sys.argv[2], int(sys.argv[3])\n'
+         'fixed = json.load(open(path))\n'
+         'runme.run_experiment(name, lambda: ({}, fixed, seeds),\n'
+         '                     simplicity_runner=serial,\n'
+         '                     archive_experiment=False)\n',
+         experiment, os.path.relpath(params_path, worktree), str(seeds)],
+        cwd=worktree, env=env,
+        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    return code == 0, None if code == 0 else params_path
 
 
 def output_dirs(worktree, experiment):
@@ -216,11 +228,13 @@ def stage_consensus(args):
         print()
         for commit, label, worktree in worktrees:
             for mode in CONSENSUS_MODES:
-                paths = seed_worktree(worktree, args.params, mode, args.cseeds,
-                                      mode, args.chorizon, args.cpopulation)
+                params_path = seed_worktree(
+                    worktree, args.params, mode, args.cseeds, mode,
+                    args.chorizon, args.cpopulation)
                 print(f'  running {commit} {mode:<13} '
-                      f'{len(paths)} seeds ...', end='', flush=True)
-                ok, failed = run_in_worktree(worktree, mode, paths)
+                      f'{args.cseeds} seeds ...', end='', flush=True)
+                ok, failed = run_in_worktree(worktree, mode, params_path,
+                                             args.cseeds)
                 print(' ok' if ok else f' FAILED on {failed}')
                 if not ok:
                     print('    (a simulation failed in this worktree; the '
@@ -280,13 +294,9 @@ def main():
                         choices=['serial', 'multiprocessing', 'slurm'])
     parser.add_argument('--slurm-mem', default=None)
     parser.add_argument('--slurm-time', default=None)
-    parser.add_argument('--params', default=os.path.join(
-        REPO, 'Data', 'impact_long_shedders_unbound_dist_SOT_#1',
-        '03_Seeded_simulation_parameters',
-        'init_50_R_1_T_1095_kv_0p1_long_shedders_ratio_0p01_tau_3_long_48_'
-        'Rl_1p1_NSR_0p00014_cdist_distribution_NSR_long_0p00054',
-        'seed_0000.json'),
-        help='template parameters file for the consensus stage')
+    parser.add_argument('--params', default=None,
+        help='template parameters file for the consensus stage; '
+             'omitted means standard values plus the overrides below')
     parser.add_argument('--cseeds', type=int, default=3,
                         help='seeds per consensus mode (default %(default)s)')
     parser.add_argument('--chorizon', type=float, default=400.0)

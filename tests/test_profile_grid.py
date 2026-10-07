@@ -63,6 +63,7 @@ sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 import pandas as pd
 
 from experiment_script_runner import run_experiment_script
+import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
 from impact_long_shedders_unbound_config import (
     SETUP_DIR_TEMPLATE, TABLE_FILENAME, CONSENSUS_MODES,
@@ -281,29 +282,25 @@ def seeds_on_disk(exp_num, fallback):
     return fallback
 
 
-def path_key(path):
-    """The last two components of a seeded-params path, e.g.
-    "<param stem>/seed_0009.json".
+def repeat_key(group, record):
+    """The join key between a profile row and its cell: group/stem/seed_NNNN.
 
-    The slurm id map records an ABSOLUTE path, written on the cluster
-    (/scratch/.../Data/...), so keying on it only ever matches when the report
-    runs on the same machine under the same root. Downloading a run and
-    reporting on it locally would silently lose every cell. The tail is unique
-    within an experiment -- each group is a distinct parameter combination, so
-    each has its own stem -- and it travels.
+    Was path_key, the last two components of an absolute seeded-params path --
+    a workaround for the slurm id map recording a cluster path that did not
+    survive being downloaded. The map now records (group, index), so the key is
+    built from the repeat record itself.
     """
-    return os.path.join(os.path.basename(os.path.dirname(path)),
-                        os.path.basename(path))
+    return f"{group}/{record['stem']}/seed_{record['seed']:04d}"
 
 
 def task_cells(exp_num, rows):
-    '''path_key -> (cell, scenario), from the parameters file each simulation
+    '''repeat_key -> (cell, scenario), from the parameters file each simulation
     actually wrote.'''
     lookup = scenario_lookup(rows)
     out = {}
     for name in experiment_names(exp_num):
         for params_file in glob.glob(
-                f'Data/{name}/02_Simulation_parameters/*.json'):
+                f'Data/{name}/{dm.SIMULATIONS_DIRNAME}/*.json'):
             try:
                 with open(params_file) as handle:
                     params = json.load(handle)
@@ -318,40 +315,44 @@ def task_cells(exp_num, rows):
                     str(params.get('consensus', '?')),
                     float(params['final_time']))
             stem = os.path.splitext(os.path.basename(params_file))[0]
-            seeded_dir = f'Data/{name}/03_Seeded_simulation_parameters/{stem}'
-            for seeded in glob.glob(f'{seeded_dir}/*.json'):
-                out[path_key(seeded)] = (cell, scenario)
+            for group, record in _repeats(name):
+                if record['stem'] == stem:
+                    out[repeat_key(group, record)] = (cell, scenario)
     return out
 
 
+def _repeats(experiment):
+    try:
+        return jobs.all_repeats(experiment)
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+
+
 def task_wall_seconds(exp_num):
-    '''Per-simulation seconds from the .started/.completed signal mtimes.
-    Covers tasks whose profile is missing, so completion and cost can be
-    reported even where the profiler wrote nothing.'''
+    '''Per-repeat seconds, from its state record (updated - started). Covers
+    repeats whose profile is missing, so completion and cost can be reported
+    even where the profiler wrote nothing.'''
     out = {}
     for name in experiment_names(exp_num):
-        for started in glob.glob(
-                f'Data/{name}/03_Seeded_simulation_parameters/*/*.started'):
-            done = started[:-len('.started')] + '.completed'
-            if not os.path.exists(done):
-                continue
-            try:
-                delta = os.path.getmtime(done) - os.path.getmtime(started)
-            except OSError:
-                continue
-            if delta >= 0:
-                out[path_key(started[:-len('.started')])] = delta
+        for group, record in _repeats(name):
+            seconds = jobs.wall_seconds(name, group, record['index'])
+            if seconds is not None:
+                out[repeat_key(group, record)] = seconds
     return out
 
 
 def signal_counts(exp_num):
     started = completed = failed = total = 0
     for name in experiment_names(exp_num):
-        base = f'Data/{name}/03_Seeded_simulation_parameters'
-        total += len(glob.glob(f'{base}/*/*.json'))
-        started += len(glob.glob(f'{base}/*/*.started'))
-        completed += len(glob.glob(f'{base}/*/*.completed'))
-        failed += len(glob.glob(f'{base}/*/*.failed'))
+        repeats = _repeats(name)
+        total += len(repeats)
+        counts = jobs.count_states(name) if repeats else {}
+        completed += counts.get(jobs.COMPLETED, 0)
+        failed += counts.get(jobs.FAILED, 0)
+        # "started" meant "has reached at least started", which the signal files
+        # answered by still existing alongside the terminal one
+        started += (counts.get(jobs.STARTED, 0) + counts.get(jobs.COMPLETED, 0)
+                    + counts.get(jobs.FAILED, 0))
     return {'total': total, 'started': started, 'completed': completed,
             'failed': failed}
 
@@ -376,10 +377,17 @@ def attach_cells(tasks, exp_num, rows):
             continue
         try:
             with open(found) as handle:
-                params_path = handle.read().strip()
+                content = handle.read().strip()     # "<group>/<index>"
         except OSError:
             continue
-        key = path_key(params_path)
+        group, _, index = content.rpartition('/')
+        if not group:
+            continue
+        try:
+            record = jobs.get_repeat(name, group, int(index))
+        except (OSError, ValueError, IndexError, KeyError, TypeError):
+            continue
+        key = repeat_key(group, record)
         entry = mapping.get(key)
         if entry:
             task['cell'], task['scenario'] = entry

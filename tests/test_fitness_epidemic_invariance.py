@@ -43,11 +43,9 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 
 EPIDEMIC_FILES = ('final_time.csv', 'simulation_trajectory.csv')
-DEFAULT_PARAMS = os.path.join(
-    REPO, 'Data', 'impact_long_shedders_unbound_dist_SOT_#1',
-    '03_Seeded_simulation_parameters',
-    'init_50_R_1_T_1095_kv_0p1_long_shedders_ratio_0p01_tau_3_long_48_'
-    'Rl_1p1_NSR_0p00014_cdist_distribution_NSR_long_0p00054', 'seed_0000.json')
+# A parameters file to start from. None means "standard values plus the
+# overrides below", which is what makes this runnable without a Data/ tree.
+DEFAULT_PARAMS = None
 
 # Patches fitness_from_distance -- the single chokepoint every phenotype model
 # routes through -- to return the next representable double. math.nextafter is
@@ -61,8 +59,17 @@ if "{perturb}" == "yes":
     def nudged(population, distance):
         return math.nextafter(original(population, distance), math.inf)
     U.fitness_from_distance = nudged
-import simplicity.runners.unit_run as u
-u.run_seeded_simulation(sys.argv[1], sys.argv[2])
+# Through the public entry point, so this test does not encode any on-disk
+# layout: run_experiment writes whatever shape this checkout uses and the
+# serial runner invokes it with whatever contract this checkout has.
+import json
+import simplicity.runme as runme
+import simplicity.runners.serial as serial
+name, params_path, seeds = sys.argv[1], sys.argv[2], int(sys.argv[3])
+with open(params_path) as handle:
+    fixed = json.load(handle)
+runme.run_experiment(name, lambda: ({{}}, fixed, seeds),
+                     simplicity_runner=serial, archive_experiment=False)
 '''
 
 failures = []
@@ -77,32 +84,37 @@ def check(label, got, want):
 
 def run(experiment, params_template, seeds, horizon, population, perturb,
         consensus):
+    """Build and run the experiment in one subprocess, through run_experiment."""
     import json
-    cell = os.path.join(REPO, 'Data', experiment,
-                        '03_Seeded_simulation_parameters', 'cell')
-    os.makedirs(cell, exist_ok=True)
-    with open(params_template) as handle:
-        params = json.load(handle)
+    import tempfile
+    if params_template:
+        with open(params_template) as handle:
+            params = json.load(handle)
+    else:
+        import simplicity.settings_manager as sm
+        params = dict(sm.read_standard_parameters_values())
     params['final_time'] = horizon
     params['population_size'] = population
     params['infected_individuals_at_start'] = max(1, population // 20)
     params['consensus'] = consensus
+    params.pop('seed', None)        # the repeat supplies it, 0..seeds-1
+
     env = dict(os.environ)
     env['PYTHONHASHSEED'] = '0'
     env.pop('SIMPLICITY_PROFILE_DIR', None)
-    for seed in range(seeds):
-        params['seed'] = seed
-        path = os.path.join(cell, f'seed_{seed:04d}.json')
-        with open(path, 'w') as handle:
-            json.dump(params, handle, indent=1)
+
+    handle, path = tempfile.mkstemp(suffix='.json')
+    with os.fdopen(handle, 'w') as fh:
+        json.dump(params, fh, indent=1)
+    try:
         code = subprocess.call(
             [sys.executable, '-c', RUNNER.format(perturb=perturb),
-             os.path.relpath(path, REPO), experiment],
+             experiment, path, str(seeds)],
             cwd=REPO, env=env,
             stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-        if code != 0:
-            return False
-    return True
+    finally:
+        os.unlink(path)
+    return code == 0
 
 
 def outputs(experiment):
@@ -126,7 +138,7 @@ def main():
                         choices=['argmax', 'distribution'])
     args = parser.parse_args()
 
-    if not os.path.isfile(args.params):
+    if args.params and not os.path.isfile(args.params):
         sys.exit(f'no template parameters file at {args.params}')
 
     plain = 'zz_fitness_invariance_plain_#99'

@@ -223,7 +223,7 @@ def main():
             exp_numbered_name = f"long_shedders_exp_M{float(current_m)}_lsr{float(args.ratio)}_tau{float(args.tau)}_R{float(args.R)}_#{int(args.exp_num)}"
             print(exp_numbered_name)
             try:
-                total_seeds = int(sm.get_n_seeds_from_experiment_settings(exp_numbered_name))
+                total_seeds = int(sm.read_n_seeds_file(exp_numbered_name)['n_seeds'])
             except Exception as e:
                 print(f"[Warning] Could not read 'seeds' from settings: {e}. Falling back to default (100).")
                 total_seeds = 100

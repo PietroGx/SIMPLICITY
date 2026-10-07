@@ -152,18 +152,47 @@ def join_scenarios(tasks, data_dir):
             continue
         try:
             with open(mapping) as handle:
-                params_path = handle.read().strip()
+                content = handle.read().strip()
         except OSError:
             continue
-        task['scenario'] = os.path.basename(os.path.dirname(params_path))
-        task['seed'] = os.path.basename(params_path).replace('.json', '')
-        params_path = relocate(params_path, data_dir)
+        resolved = resolve_repeat(data_dir, task['experiment'], content)
+        if resolved is None:
+            continue
+        group, record = resolved
+        task['group'] = group
+        task['scenario'] = record['stem']
+        task['seed'] = f"seed_{record['seed']:04d}"
+        task['repeat'] = f"{group}/{record['stem']}/{task['seed']}"
+        params_path = os.path.join(data_dir, task['experiment'],
+                                   '02_Simulations', f"{record['stem']}.json")
         if os.path.isfile(params_path):
             try:
                 with open(params_path) as handle:
                     task['final_time'] = json.load(handle).get('final_time')
             except (OSError, ValueError):
                 pass
+
+
+def resolve_repeat(data_dir, experiment, content):
+    """(group, repeat record) from a slurm id map file's "<group>/<index>".
+
+    The map used to hold an ABSOLUTE seeded-params path written on the cluster
+    (/scratch/.../Data/...), which is why relocate() below had to exist: keying
+    on it only matched when the report ran on the same machine under the same
+    root, so downloading a run and reporting on it locally silently lost every
+    cell. A group and an index travel.
+    """
+    group, _, index = content.rpartition('/')
+    if not group:
+        return None
+    path = os.path.join(data_dir, experiment, '03_Repeats', group,
+                        'repeats.json')
+    try:
+        with open(path) as handle:
+            records = json.load(handle)
+        return group, records[int(index)]
+    except (OSError, ValueError, IndexError, KeyError):
+        return None
 
 
 def relocate(path, data_dir):

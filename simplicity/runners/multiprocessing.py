@@ -24,7 +24,7 @@ import simplicity.settings_manager as sm
 import concurrent.futures
 
 
-def run_seeded_simulations(experiment_name, run_seeded_simulation):
+def run_seeded_simulations(experiment_name, run_seeded_simulation, groups=None):
     """Implements run_seeded_simulations (see simplicity.runners).
 
     Uses CPython built-in concurrent.futures.ProcessPoolExecutor.
@@ -32,7 +32,8 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
     import os
     SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS = int(os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"])
     
-    seeded_simulation_parameters_paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
+    import simplicity.jobs as jobs
+    repeats = jobs.all_repeats(experiment_name, groups)
     # run a Simplicity simulation for each seeded parameters
     with concurrent.futures.ProcessPoolExecutor(max_workers=SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS) as pool:
         # track status
@@ -43,8 +44,8 @@ def run_seeded_simulations(experiment_name, run_seeded_simulation):
         submitted = completed = failed = 0
 
         # submit
-        for seeded_simulation_parameters_path in seeded_simulation_parameters_paths:
-            args = (run_seeded_simulation, seeded_simulation_parameters_path, experiment_name)
+        for group, record in repeats:
+            args = (run_seeded_simulation, experiment_name, group, record['index'])
             futures_to_args[pool.submit(*args)] = args
             submitted += 1
         

@@ -55,31 +55,32 @@ from impact_long_shedders_config import (
 )
 
 
-def _tau_r_long_labels_and_colors(sp, scenarios=None):
-    """Map each (tau_3_long, R_long) pair back to a label and color. When
-    multiple scenarios share a (tau, R_long) pair (e.g. HIV_low/HIV_high --
-    same duration and R_long, only ratio differs, which Stage 1's isolated
-    context doesn't use), the label combines every scenario name sharing it,
-    joined with '+' -- not '/', which write_fit_results_csv's file-saving
-    reads as a directory separator.
+def _tau_r_long_labels_and_colors(experiment_name):
+    """Map each (tau_3_long, R_long) pair to its group's RECORDED name and a
+    colour.
 
-    `scenarios` defaults to the bound pipeline's SCENARIOS. A caller with its
-    own scenario list must pass it: the unbound pipeline's edge_case is not in
-    the bound list, so its group fell through to the raw
-    'tau=350.23,R_long=1.1' fallback in unbound run #1 -- cosmetic in the
-    legend, but it also lands in the saved fit-results filename."""
-    names_by_key = {}
-    for scenario in (SCENARIOS if scenarios is None else scenarios):
-        if scenario["long_shedders_ratio"] <= 0.0:
-            continue
-        key = (round(derive_tau_3_long(scenario, sp), TAU_ROUND),
-               round(float(scenario["R_long"]), TAU_ROUND))
-        names_by_key.setdefault(key, []).append(scenario["name"])
+    The name is read from the experiment's own settings, where the config that
+    defined the group wrote it. It used to be re-derived here by matching the
+    pair against a scenario list passed in by the caller -- defaulting to the
+    BOUND pipeline's SCENARIOS. The unbound pipeline's edge_case is not in that
+    list, so its group fell through to a raw 'tau=350.23,R_long=1.1' fallback in
+    unbound run #1: cosmetic in the legend, but it also landed in the saved
+    fit-results filename.
 
+    Names are joined with '+' by the config, never '/', which
+    write_fit_results_csv's file-saving reads as a directory separator.
+    """
     labels, colors = {}, {}
     color_cycle = iter(DEFAULT_COLORS)
-    for key, names in names_by_key.items():
-        labels[key] = "+".join(names)
+    seen = {}
+    for record in sm.read_simulations(experiment_name):
+        params = record['parameters']
+        key = (round(float(params['tau_3_long']), TAU_ROUND),
+               round(float(params['R_long']), TAU_ROUND))
+        if key in seen:
+            continue
+        seen[key] = record['group']
+        labels[key] = record['group']
         colors[key] = next(color_cycle, "black")
     return labels, colors
 
@@ -144,7 +145,7 @@ def read_calibrated_long_nsr(experiment_name, target_osr_long):
 
 def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
                                       model_type='exp', min_seq=30, min_len=100,
-                                      scenarios=None):
+                                      ):
     """
     Extracts per-seed OSR for every (tau_3_long, R_long, NSR) grid point of
     `experiment_name`, outlier-filters per grid point, fits a regressor per
@@ -153,14 +154,16 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
     inverts at `target_osr_long`, and saves a multi-curve calibration
     figure into the experiment's 05_Plots folder.
 
-    `scenarios` names the groups in the legend and in the saved fit-results
-    filename; it defaults to the bound pipeline's SCENARIOS. A pipeline with a
-    different scenario list must pass its own.
+    Group names for the legend and the saved fit-results filename come from the
+    experiment's own settings, where the config that defined the group wrote
+    them. There used to be a `scenarios` argument here for the caller to say
+    which scenario list to match pairs against -- needed only because this
+    module re-derived the names instead of reading them.
 
     Returns {(tau_3_long, R_long): calibrated_nsr}.
     """
     sp = sm.read_standard_parameters_values()
-    labels, colors = _tau_r_long_labels_and_colors(sp, scenarios)
+    labels, colors = _tau_r_long_labels_and_colors(experiment_name)
 
     print(f"--- Analyzing long-shedder NSR calibration: {experiment_name} ---")
 

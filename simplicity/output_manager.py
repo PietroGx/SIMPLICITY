@@ -23,6 +23,7 @@ Created on Thu Aug 29 13:56:20 2024
 """
 
 import simplicity.dir_manager as dm
+import simplicity.jobs as jobs
 import simplicity.settings_manager as sm
 import os
 import shutil
@@ -40,48 +41,29 @@ from tqdm import tqdm
 import warnings
 from pathlib import Path
 
-def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
+def setup_output_directory(experiment_name, group, repeat):
+    """This repeat's output directory: 04_Output/<group>/<stem>/seed_NNNN.
+
+    Composed from the repeat record. It used to be sliced out of the seeded
+    parameters path -- os.path.split twice, then splitext -- which is a large
+    part of why a seeded parameters path had to exist at all. The group could
+    not be recovered from that path, so the group component could not be added
+    until the runner carried it.
+
+    The simulation's own parameters.json already sits one level up, written at
+    setup: every repeat of a simulation would otherwise race to write it.
     """
-    Sets up the output directory structure for a simulation.
-
-    This function constructs the output directory path based on the provided
-    seeded simulation parameters file path and the experiment name.
-
-    Args:
-        seeded_simulation_parameters_path (str): The file path to the seeded simulation
-                                                 parameters.
-        experiment_name (str): The name of the experiment for which the output
-                               directory is being set up.
-
-    Returns:
-        str: The path to the main output directory created for this experiment.
-
-    Example:
-        If the `seeded_simulation_parameters_path` is 
-        '/path/to/seed/files/seed_file.txt' and the `experiment_name` is 
-        'Experiment_1', the function will create and return the path:
-        '/data_dir/Experiment_1/04_Output/files/seed_file'
-    """
-    # Split the path into components
-    path_components = os.path.split(seeded_simulation_parameters_path)
-    
-    # Extract the necessary components
-    root_folder_of_seed_file = os.path.split(path_components[0])[-1]
-    
-    # Get the seed file name without the extension
-    seed_file_name = os.path.splitext(path_components[-1])[0]  
-    # Construct the output directory path
-    output_dir = os.path.join(dm.get_experiment_output_dir(experiment_name), 
-                              root_folder_of_seed_file, 
-                              seed_file_name)
+    output_dir = os.path.join(dm.get_experiment_output_dir(experiment_name),
+                              group, repeat['stem'],
+                              jobs.repeat_label(repeat))
     try:
         os.makedirs(output_dir)
     except FileExistsError:
-        # Resuming: only simulations WITHOUT a .completed signal reach this
-        # point (slurm.job skips the finished ones), so an existing directory
-        # here holds a partial run. Clear it -- leaving it would mix the
-        # abandoned attempt's files with the new ones, and nothing downstream
-        # could tell which was which.
+        # Resuming: only repeats NOT already completed reach this point
+        # (slurm.job skips the finished ones), so an existing directory here
+        # holds a partial run. Clear it -- leaving it would mix the abandoned
+        # attempt's files with the new ones, and nothing downstream could tell
+        # which was which.
         if os.environ.get('SIMPLICITY_RESUME') == '1':
             shutil.rmtree(output_dir, ignore_errors=True)
             os.makedirs(output_dir)
@@ -90,7 +72,6 @@ def setup_output_directory(experiment_name, seeded_simulation_parameters_path):
                                'name! (set SIMPLICITY_RESUME=1, or pass '
                                '--rerun, to keep what finished and re-run '
                                'the rest)')
-    # Return the output directory path
     return output_dir
 
 def archive_experiment(experiment_name):

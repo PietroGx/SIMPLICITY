@@ -47,6 +47,7 @@ Each simulation will be repeated n_seeds time with a different random seed.
 The set of all simulations is what we call an experiment.
 """
 import simplicity.dir_manager as dm
+import simplicity.jobs            as jobs
 import simplicity.settings_manager as sm
 import simplicity.output_manager as om
 import simplicity.runners.serial 
@@ -79,8 +80,9 @@ def run_experiment(experiment_name: str,
     sm.write_experiment_settings(experiment_name, experiment_settings, n_seeds)
     # write simulation parameters files
     sm.read_settings_and_write_simulation_parameters(experiment_name)
-    # write seeded simulation parameters files
-    sm.write_seeded_simulation_parameters(experiment_name)
+    # write the ordered repeat list: one entry per (simulation, seed), which is
+    # what the runners address and what the Slurm array maps onto
+    jobs.write_repeats(experiment_name)
     print('')
     print('-------------------------------------------------------------------')
     # let one of simplicity.runners run each seeded simulation
