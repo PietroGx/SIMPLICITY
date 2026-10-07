@@ -30,6 +30,7 @@ from impact_long_shedders_unbound_config import (
     SCENARIOS, LONG_NSR_EXP_NAME, NSR_RANGES, UNBOUND_CAL1_FINAL_TIME,
     CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
     build_cal1_settings, add_slurm_resource_args, set_slurm_resource_env,
+    set_calibration_output_env,
     print_fixed_params,
 )
 from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
@@ -91,6 +92,8 @@ def main():
     args = parser.parse_args()
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
+    # calibration reads four files; do not write the other three
+    set_calibration_output_env()
     run_long_calibration(args.exp_num, args.runner, args.seeds,
                          args.target_osr_long, args.R,
                          args.ih_virus_emergence_rate, args.model,

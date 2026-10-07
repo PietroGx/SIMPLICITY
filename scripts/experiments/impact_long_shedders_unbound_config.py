@@ -37,9 +37,12 @@
 # does. Parameter construction lives here, in the config, as it does there.
 # ============================================================================
 
+import os
+
 import numpy as np
 import pandas as pd
 
+import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
 
 # Shared with the bound pipeline on purpose. The tau math must agree, and the
@@ -226,6 +229,30 @@ CONSENSUS_MODES = ("argmax", "distribution")
 # The distribution pipeline's experiments carry this suffix so the two cannot
 # collide in Data/ at the same --exp-num.
 CONSENSUS_SUFFIX = {"argmax": "", "distribution": "_dist"}
+
+
+# Outputs a calibration run does not need. cal_1's fit and cal_2's fit both
+# read only final_time.csv and sequencing_data_regression.csv, and cal_1's plot
+# and the sanity regressions additionally go through
+# evolutionary_rate.extract_ih_regression_data, which reads individuals_data.csv
+# and phylogenetic_data.csv. Nothing in either path opens the other three.
+#
+# lineage_frequency.csv alone reached 100.6 GB on the calibrated grid -- a
+# single simulation of the top NSR_long sweep point weighed 1.1 GB, and that
+# point exists only to bracket the fit from above.
+CALIBRATION_SKIPPED_OUTPUTS = ("lineage_frequency", "simulation_trajectory",
+                               "sequencing_data")
+
+
+def set_calibration_output_env():
+    """Tell the calibration simulations which outputs to leave unwritten.
+
+    An env var rather than a parameter because parameter_specs.json and
+    standard_values.json are machine-local and gitignored, so a new parameter
+    would not travel with the code. simplicity.runners.slurm forwards the whole
+    environment through sbatch, so this reaches every task.
+    """
+    os.environ[dm.SKIP_OUTPUTS_ENV] = ",".join(CALIBRATION_SKIPPED_OUTPUTS)
 
 
 def prod_exp_name(consensus):

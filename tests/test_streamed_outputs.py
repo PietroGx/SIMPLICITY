@@ -56,6 +56,9 @@ def make(output_directory):
     rows and would make this test minutes long.
     """
     population = object.__new__(pop.Population)
+    # __init__ is bypassed, so set what the write path reads: an empty skip set
+    # means "write everything", which is what this test is about.
+    population._skip = frozenset()
     population._streams = {}
     population.lineage_frequency = []
     population.trajectory = []

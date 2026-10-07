@@ -241,10 +241,27 @@ def get_seed_from_SSOD(seeded_simulation_output_dir):
         raise ValueError(f"Could not find 'seed_####' at the end of: {seeded_simulation_output_dir}")
     return m.group(1)
 
-    
+# Outputs a run may be told not to write, by base name without ".csv". Set
+# SIMPLICITY_SKIP_OUTPUTS to a comma-separated list. Lives here because both
+# population (which streams two of them) and output_manager (which saves them)
+# need it, and importing one from the other closes a cycle.
+#
+# Why this exists: a calibration run reads only final_time.csv,
+# sequencing_data_regression.csv, individuals_data.csv and
+# phylogenetic_data.csv -- the first two for the OSR fit, the other two through
+# evolutionary_rate.extract_ih_regression_data for the intra-host clock. It
+# wrote three more files that nothing in the calibration or sanity path ever
+# opened. Measured on the calibrated grid: lineage_frequency.csv alone reached
+# 100.6 GB, one simulation of the top NSR_long sweep point weighing 1.1 GB --
+# a grid point that exists to be rejected by the fit.
+SKIP_OUTPUTS_ENV = "SIMPLICITY_SKIP_OUTPUTS"
 
 
+def skipped_outputs():
+    """Base names of the outputs this run must not write."""
+    raw = os.environ.get(SKIP_OUTPUTS_ENV, "")
+    return frozenset(name.strip() for name in raw.split(",") if name.strip())
 
 
-
-
+def skipping(name):
+    return name in skipped_outputs()
