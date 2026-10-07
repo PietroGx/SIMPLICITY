@@ -5,6 +5,43 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.63 — 2026-10-07 — pietro gerletti
+
+Every Slurm query from the polling loop has a timeout; the calibrated grid
+gained `--rerun` and runs its orchestrator on a compute node.
+
+**The loop could block forever on an unresponsive Slurm.** `sacct`, `squeue`
+and `scontrol` were all called with no timeout — five sites, `max_array_size`
+being the only one that already had one. If any hangs, `subprocess.run` never
+returns and the whole polling loop stops: no status line, no `[long-running]`
+report, no reconciliation, just silence. Observed on the calibrated grid: cell
+#17 went quiet at 01:46 with 95 started, 61 completed, 0 failed, 34 unresolved
+and an empty queue, and was still frozen 6.5 hours later. All five now use
+`SLURM_QUERY_TIMEOUT_S` (120s) and treat a timeout exactly as they already
+treated a non-zero exit — report it and retry next pass. The two on the release
+path leave their tasks held rather than half-releasing them. `sbatch` on the
+submit path is deliberately left blocking: a hang there produces no output at
+all and is visible immediately, rather than as a silent freeze hours in.
+
+**`--rerun`** clears a cell's `Data/*_#<n>` trees before running it. Without it
+a cell that already started stops with "You already run an experiment with the
+same name!", which is what a resumed grid hits on the cell that died. It
+deletes rather than reusing on purpose — a half-finished experiment left in
+place mixes stale output with new, and nothing downstream can tell the
+difference. The `#<n>` suffix anchors the match, so `--cells 997` does not
+touch `#9970`.
+
+**Nothing runs on the login node any more.** `tests/run_calibrated_grid.sh`
+invoked from a login node now submits itself with sbatch and returns; the
+orchestrator runs as a Slurm job and submits the per-stage arrays from there.
+This is not just tidiness: the pipeline does real compute between stages, since
+`run_isolated_calibration` calls `plot_and_fit_long_nsr_calibration` inline and
+cal_2 fits inline too. `SIMPLICITY_GRID_LOCAL=1` keeps the old foreground
+behaviour for debugging. The orchestrator's own walltime has to cover the whole
+grid (default 3 days) because every cell runs inside that one job.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.62 — 2026-10-06 — pietro gerletti
 
 `tests/run_calibrated_grid.sh` points at the session script instead of nohup.
