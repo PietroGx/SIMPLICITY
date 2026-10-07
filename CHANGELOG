@@ -5,6 +5,74 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.65 — 2026-10-07 — pietro gerletti
+
+Calibration writes the four files it reads, and not the three it does not.
+
+`/home` hit its quota mid-grid and `git pull` began failing with "Disk quota
+exceeded". Totalling Data/ by filename: lineage_frequency.csv 100.63 GB,
+individuals_data.csv 50.82, phylogenetic_data.csv 34.53,
+simulation_trajectory.csv 16.33, sequencing_data.csv 1.76,
+sequencing_data_regression.csv 0.42.
+
+The five largest lineage_frequency.csv files were all the same cal_1 grid point
+-- NSR_long_0p01, long_shedders_ratio_1, N_5000, tau_3_long_3p5e+02, T_1095 --
+at 0.8-1.1 GB each. One row per circulating lineage per sampling day, so ~23
+million rows in one simulation: about 21,000 distinct lineages alive at once,
+which is what a 100% long-shedder population does at the top of a sweep that
+reaches 1e-2 substitutions per site per year. That point exists only to bracket
+the fit from above and be rejected.
+
+What calibration reads, established by reading the stages rather than assuming:
+cal_1's fit and cal_2's fit open final_time.csv and
+sequencing_data_regression.csv; cal_1's plot and the sanity regressions also go
+through evolutionary_rate.extract_ih_regression_data, which opens
+individuals_data.csv and phylogenetic_data.csv. Nothing in either path opens
+the other three, and sequencing_data.csv has no reader anywhere in the repo --
+sequencing.py reconstructs those rows from individuals plus phylogenetic data.
+
+SIMPLICITY_SKIP_OUTPUTS (dir_manager) names outputs a run must not write;
+set_calibration_output_env in the unbound config applies the calibration set and
+both cal stages call it. A skipped stream is never opened and _record discards
+rather than buffering, so the 555 MB does not simply move back into memory.
+save_sequencing_dataset skips its raw CSV without touching the regression file
+beside it. An env var rather than a parameter because parameter_specs.json and
+standard_values.json are machine-local and gitignored, so a new parameter would
+not travel with the code.
+
+Verified on a real simulation: with the skips, exactly those four files are
+written, and all four are byte-identical to the same run with nothing skipped.
+Production sets nothing and is unchanged. check_completed_simulations no longer
+requires a file the run was told to skip, or it would mark every calibration
+simulation incomplete, and tests/test_calibration_outputs.py guards the list by
+reading the calibration scripts for a reader of each skipped file.
+
+------------------------------------------------------------------------
+
+## Version 2.4.64 — 2026-10-07 — pietro gerletti
+
+**`--rerun` resumes rather than restarts.** Re-submitting is refused twice over
+— `raise_on_stale_signals` before sbatch, `setup_output_directory` per
+simulation — and both are right by default, since which of two runs matters is
+not something the code can know. `SIMPLICITY_RESUME=1`, which the flag sets,
+says the earlier one matters: every simulation carrying `.completed` is kept
+and skipped by `slurm.job` before it touches `.started`, and everything else —
+including anything marked `.failed`, which on a resume is a job still to do —
+is cleared back to unstarted and run again. A part-finished output directory is
+emptied rather than reused, because mixing an abandoned attempt's files with
+new ones is indistinguishable downstream. An env var rather than a plumbed
+argument because the pipeline reaches this code through three layers of
+subprocess. Cell #17 stalled with 61 of 150 finished; the first version of this
+flag deleted all 61, which is why `tests/test_resume.py` exists.
+
+Cell #17 of the calibrated grid stalled with 61 of its 150 simulations
+finished. 2.4.63's --rerun deleted all 61 and started again, which is the wrong
+answer to "re-run the missing jobs". tests/test_resume.py exists because of
+that, and calls the real setup_output_directory rather than re-implementing its
+logic.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.63 — 2026-10-07 — pietro gerletti
 
 Every Slurm query from the polling loop has a timeout; the calibrated grid
@@ -23,19 +91,9 @@ path leave their tasks held rather than half-releasing them. `sbatch` on the
 submit path is deliberately left blocking: a hang there produces no output at
 all and is visible immediately, rather than as a silent freeze hours in.
 
-**`--rerun` resumes rather than restarts.** Re-submitting is refused twice over
-— `raise_on_stale_signals` before sbatch, `setup_output_directory` per
-simulation — and both are right by default, since which of two runs matters is
-not something the code can know. `SIMPLICITY_RESUME=1`, which the flag sets,
-says the earlier one matters: every simulation carrying `.completed` is kept
-and skipped by `slurm.job` before it touches `.started`, and everything else —
-including anything marked `.failed`, which on a resume is a job still to do —
-is cleared back to unstarted and run again. A part-finished output directory is
-emptied rather than reused, because mixing an abandoned attempt's files with
-new ones is indistinguishable downstream. An env var rather than a plumbed
-argument because the pipeline reaches this code through three layers of
-subprocess. Cell #17 stalled with 61 of 150 finished; the first version of this
-flag deleted all 61, which is why `tests/test_resume.py` exists.
+**`--rerun`** clears a cell's `Data/*_#<n>` trees before running it, so a
+resumed grid can get past the cell that died. Replaced one version later: see
+2.4.64.
 
 **Nothing runs on the login node any more.** `tests/run_calibrated_grid.sh`
 invoked from a login node now submits itself with sbatch and returns; the
