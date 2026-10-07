@@ -78,6 +78,15 @@ LONG_RUNNING_THRESHOLD_S = 300
 # LONG_RUNNING_REPORT above, so it runs on its own, shorter timer.
 RECONCILE_INTERVAL_S = 900
 
+# Seconds to wait on any Slurm command issued from the polling loop. Without
+# one, an unresponsive slurmdbd makes subprocess.run block forever and the loop
+# stops entirely -- no status line, no [long-running] report, no reconciliation,
+# just silence. Seen on the calibrated grid: cell #17 went quiet at 01:46 with
+# 95 started / 61 completed / 34 unresolved and an empty queue, and was still
+# frozen 6.5 hours later. Every one of these is advisory; timing out and
+# retrying on the next pass is always better than waiting forever.
+SLURM_QUERY_TIMEOUT_S = 120
+
 # sacct job states that mean "Slurm itself terminated this task" -- i.e. the
 # task's own process never got a chance to touch .completed/.failed (job()'s
 # except block only runs on a catchable Python exception, not a SIGTERM/
@@ -427,10 +436,15 @@ def reconcile_terminated_tasks(experiment_name):
         by_job_id.setdefault(job_id, {})[f"{job_id}_{task_id}"] = path
 
     for job_id, task_id_to_path in by_job_id.items():
-        sacct_process = subprocess.run([
-            "sacct" + get_platform_executable_extension(),
-                "-j", job_id, "--format=JobID,State", "--noheader", "--parsable2", "-X",
-        ], stdout=subprocess.PIPE)
+        try:
+            sacct_process = subprocess.run([
+                "sacct" + get_platform_executable_extension(),
+                    "-j", job_id, "--format=JobID,State", "--noheader", "--parsable2", "-X",
+            ], stdout=subprocess.PIPE, timeout=SLURM_QUERY_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            print(f"[reconciled] sacct timed out after {SLURM_QUERY_TIMEOUT_S}s "
+                  f"for job {job_id}; retrying on the next pass")
+            continue
         if sacct_process.returncode != 0:
             # sacct itself unreachable/erroring -- try again on the next
             # reconcile pass rather than guessing at these tasks' state now.
@@ -498,11 +512,16 @@ def reconcile_launch_failures(experiment_name):
     if not candidates:
         return
 
-    squeue_process = subprocess.run([
-        "squeue" + get_platform_executable_extension(),
-            "--name", experiment_name,
-            "--Format=ArrayJobID,ArrayTaskID,Reason", "--noheader",
-    ], stdout=subprocess.PIPE)
+    try:
+        squeue_process = subprocess.run([
+            "squeue" + get_platform_executable_extension(),
+                "--name", experiment_name,
+                "--Format=ArrayJobID,ArrayTaskID,Reason", "--noheader",
+        ], stdout=subprocess.PIPE, timeout=SLURM_QUERY_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        print(f"[reconciled] squeue timed out after {SLURM_QUERY_TIMEOUT_S}s; "
+              f"retrying on the next pass")
+        return
     if squeue_process.returncode != 0:
         # squeue itself unreachable/erroring -- try again on the next pass.
         return
@@ -539,10 +558,15 @@ def reconcile_launch_failures(experiment_name):
         return
 
     job_list = ",".join(to_release.keys())
-    scontrol_process = subprocess.run([
-        "scontrol" + get_platform_executable_extension(),
-            "release", job_list
-    ])
+    try:
+        scontrol_process = subprocess.run([
+            "scontrol" + get_platform_executable_extension(),
+                "release", job_list
+        ], timeout=SLURM_QUERY_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        print(f"[reconciled] scontrol release timed out after "
+              f"{SLURM_QUERY_TIMEOUT_S}s for {job_list}; retrying next pass")
+        return
     if scontrol_process.returncode != 0:
         print(f"[reconciled] scontrol release failed for launch-failed tasks: {job_list}")
         return
@@ -582,10 +606,17 @@ def release_simulations(experiment_name, n: int):
         return
 
     # slurm find array job id from job name
-    slurm_process = subprocess.run([
-        "squeue" + get_platform_executable_extension(),
-            "--Format=ArrayJobID", f"--name={experiment_name}" 
-    ], stdout=subprocess.PIPE)
+    try:
+        slurm_process = subprocess.run([
+            "squeue" + get_platform_executable_extension(),
+                "--Format=ArrayJobID", f"--name={experiment_name}" 
+        ], stdout=subprocess.PIPE, timeout=SLURM_QUERY_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        # unlike the reconcilers, this one is on the release path: returning
+        # leaves the tasks held, and the next poll tries again.
+        print(f"[release] squeue timed out after {SLURM_QUERY_TIMEOUT_S}s; "
+              f"leaving these tasks held for the next pass")
+        return
     assert slurm_process.returncode == 0
     array_job_id_set = set(line.strip() for line in slurm_process.stdout.decode().splitlines(keepends=False)[1:])
     if len(array_job_id_set) == 0:
@@ -599,10 +630,15 @@ def release_simulations(experiment_name, n: int):
     print(job_list)
     
     # slurm release
-    slurm_process = subprocess.run([
-        "scontrol" + get_platform_executable_extension(),
-            "release", job_list
-    ])
+    try:
+        slurm_process = subprocess.run([
+            "scontrol" + get_platform_executable_extension(),
+                "release", job_list
+        ], timeout=SLURM_QUERY_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        print(f"[release] scontrol release timed out after "
+              f"{SLURM_QUERY_TIMEOUT_S}s; leaving these tasks held")
+        return
     assert slurm_process.returncode == 0
     
     # signal as released
