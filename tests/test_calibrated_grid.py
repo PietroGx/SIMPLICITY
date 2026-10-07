@@ -91,27 +91,6 @@ def assign_numbers(cells, exp_base):
     return {cell: exp_base + index for index, cell in enumerate(cells)}
 
 
-def cell_data_dirs(exp_num):
-    """Every Data/ tree this cell's pipeline writes: the setup directory with
-    its calibration table, both calibration experiments, and production."""
-    import glob as _glob
-    # the trailing '#<n>' anchors the match: '*_#997' does not catch '#9970'
-    return sorted(p for p in _glob.glob(os.path.join('Data', f'*_#{exp_num}'))
-                  if os.path.isdir(p))
-
-
-def clear_cell(cell, exp_num):
-    """Remove a cell's experiment trees so its pipeline can start clean."""
-    import shutil
-    removed = []
-    for path in cell_data_dirs(exp_num):
-        if not os.path.isdir(path):
-            continue
-        shutil.rmtree(path, ignore_errors=True)
-        removed.append(path)
-    return removed
-
-
 def cell_is_complete(cell, exp_num, args):
     """A cell counts as done when it has a calibration table AND the full
     production run. A partial production has to be redone: pooling it with
@@ -151,6 +130,10 @@ def cell_env(cell, args, cap_per_cell):
     # cell was running normally. The pipeline's own log is flushed per line and
     # stays the authoritative one, but this should not lag either.
     env['PYTHONUNBUFFERED'] = '1'
+    if args.rerun:
+        # read by slurm.resuming() and output_manager.setup_output_directory,
+        # both several subprocesses down from here
+        env['SIMPLICITY_RESUME'] = '1'
     return env
 
 
@@ -185,11 +168,6 @@ def run_cells(cells, numbers, args):
     def worker(cell):
         exp_num = numbers[cell]
         with gate:
-            if args.rerun:
-                removed = clear_cell(cell, exp_num)
-                if removed:
-                    print(f'  [rerun] {cell_label(cell)}  #{exp_num}: removed '
-                          f'{len(removed)} existing tree(s)', flush=True)
             command = cell_command(cell, exp_num, args)
             log_path = os.path.join(log_dir, f'calibrated_grid_#{exp_num}.log')
             start = time.monotonic()
@@ -426,15 +404,13 @@ def main():
     parser.add_argument('--target-osr-long', type=float, default=0.00205)
     parser.add_argument('--analyse-only', action='store_true')
     parser.add_argument('--rerun', action='store_true',
-                        help="delete each cell's existing Data/*_#<n> trees "
-                             'before running it. Without this a cell that has '
-                             'already started stops with "You already run an '
-                             'experiment with the same name!". Deletes rather '
-                             'than reusing on purpose: a half-finished '
-                             'experiment left in place would mix stale output '
-                             'with new, and nothing downstream can tell the '
-                             'difference. Refuses to act on a cell that is '
-                             'already complete unless --skip-completed is off.')
+                        help='resume part-finished cells: every simulation '
+                             'that already carries .completed is kept and '
+                             'skipped, everything else is cleared back to '
+                             'unstarted and run again, including anything '
+                             'marked .failed. Without this a cell that already '
+                             'started stops with "You already run an '
+                             'experiment with the same name!".')
     parser.add_argument('--skip-completed', action='store_true',
                         help='skip cells that already have a calibration table '
                              'and a full production run. This is what makes a '
@@ -493,7 +469,8 @@ def main():
             print('     ' + '  '.join(
                 f'{k}={env[k]}' for k in sorted(env)
                 if k.startswith('SIMPLICITY_CELL')
-                or k == 'SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM'))
+                or k in ('SIMPLICITY_RESUME',
+                         'SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM')))
         rule('=')
         return
 

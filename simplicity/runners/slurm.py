@@ -151,6 +151,42 @@ def get_platform_executable_extension():
 
 SIGNAL_SUFFIXES = (".submitted", ".released", ".started", ".completed", ".failed")
 
+# Set to "1" to resume an experiment instead of refusing to touch it: every
+# simulation that already carries .completed is kept and skipped, and every
+# other one is cleared back to unstarted and re-run. Written by a --rerun flag
+# rather than read from one, because the pipeline reaches this code through
+# three layers of subprocess and an env var is the only thing that survives.
+RESUME_ENV = "SIMPLICITY_RESUME"
+# Everything a simulation leaves behind that has to go before it can be
+# re-run. .completed is deliberately absent: that is what marks the keepers.
+RESUME_CLEARED_SUFFIXES = (".submitted", ".released", ".started", ".failed",
+                           ".progress", ".launch_retries")
+
+
+def resuming():
+    return os.environ.get(RESUME_ENV) == "1"
+
+
+def prepare_resume(experiment_name):
+    """Keep every finished simulation, clear the rest so they run again.
+
+    A .failed task is cleared too: on a resume it is a job still to do, not a
+    settled answer. Returns (kept, to_run) for the caller to report.
+    """
+    paths = sm.get_seeded_simulation_parameters_paths(experiment_name)
+    kept = to_run = 0
+    for path in paths:
+        if pathlib.Path(path + ".completed").exists():
+            kept += 1
+            continue
+        to_run += 1
+        for suffix in RESUME_CLEARED_SUFFIXES:
+            try:
+                pathlib.Path(path + suffix).unlink()
+            except FileNotFoundError:
+                pass
+    return kept, to_run
+
 
 def find_stale_signals(experiment_name):
     """{suffix: count} of signal files already on disk for this experiment.
@@ -179,6 +215,11 @@ def raise_on_stale_signals(experiment_name):
     never deletes anything: which of the two runs matters is not something
     this code can know.
     """
+    if resuming():
+        kept, to_run = prepare_resume(experiment_name)
+        print(f"[resume] {experiment_name}: keeping {kept} completed "
+              f"simulation(s), running {to_run}")
+        return
     counts = find_stale_signals(experiment_name)
     if not counts:
         return
@@ -743,6 +784,16 @@ def job():
     with open(map_file, mode='w', newline='') as file:
         file.write(seeded_simulation_parameters_path)
         
+    # A resumed experiment submits the whole array again -- the task ids are
+    # positional, so there is no way to submit a subset -- and the simulations
+    # that already finished bail out here, before touching .started, so the
+    # counts stay right and nothing recomputes.
+    if resuming() and pathlib.Path(
+            seeded_simulation_parameters_path + ".completed").exists():
+        print(f"<skip> {os.path.basename(seeded_simulation_parameters_path)} "
+              f"already completed")
+        return
+
     # define signals 
     signal_started_path   = seeded_simulation_parameters_path + ".started"
     signal_failed_path    = seeded_simulation_parameters_path + ".failed"

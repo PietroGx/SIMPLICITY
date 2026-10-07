@@ -23,13 +23,19 @@ path leave their tasks held rather than half-releasing them. `sbatch` on the
 submit path is deliberately left blocking: a hang there produces no output at
 all and is visible immediately, rather than as a silent freeze hours in.
 
-**`--rerun`** clears a cell's `Data/*_#<n>` trees before running it. Without it
-a cell that already started stops with "You already run an experiment with the
-same name!", which is what a resumed grid hits on the cell that died. It
-deletes rather than reusing on purpose — a half-finished experiment left in
-place mixes stale output with new, and nothing downstream can tell the
-difference. The `#<n>` suffix anchors the match, so `--cells 997` does not
-touch `#9970`.
+**`--rerun` resumes rather than restarts.** Re-submitting is refused twice over
+— `raise_on_stale_signals` before sbatch, `setup_output_directory` per
+simulation — and both are right by default, since which of two runs matters is
+not something the code can know. `SIMPLICITY_RESUME=1`, which the flag sets,
+says the earlier one matters: every simulation carrying `.completed` is kept
+and skipped by `slurm.job` before it touches `.started`, and everything else —
+including anything marked `.failed`, which on a resume is a job still to do —
+is cleared back to unstarted and run again. A part-finished output directory is
+emptied rather than reused, because mixing an abandoned attempt's files with
+new ones is indistinguishable downstream. An env var rather than a plumbed
+argument because the pipeline reaches this code through three layers of
+subprocess. Cell #17 stalled with 61 of 150 finished; the first version of this
+flag deleted all 61, which is why `tests/test_resume.py` exists.
 
 **Nothing runs on the login node any more.** `tests/run_calibrated_grid.sh`
 invoked from a login node now submits itself with sbatch and returns; the
