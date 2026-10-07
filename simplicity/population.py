@@ -21,6 +21,7 @@ Created on Tue Jun  6 13:13:14 2023
 """
 import csv
 import os
+import simplicity.dir_manager        as dm
 import simplicity.intra_host_model    as h
 import simplicity.evolution.reference as ref
 import simplicity.phenotype.consensus  as c
@@ -177,12 +178,18 @@ class Population:
         # on the hot path (get_lineage_genome) and MUTATED after the fact
         # (population_model.py increments Total_infections), so a streamed
         # copy would be stale.
+        # An output this run was told to skip is never streamed AND never
+        # buffered: buffering it would put the 555 MB back in memory to write
+        # a file nobody asked for. _record drops it on the floor instead.
+        self._skip = dm.skipped_outputs()
         self._streams = {}
         if output_directory is not None:
-            self._open_stream(output_directory, LINEAGE_FREQUENCY_FILE,
-                              LINEAGE_FREQUENCY_COLUMNS)
-            self._open_stream(output_directory, TRAJECTORY_FILE,
-                              TRAJECTORY_COLUMNS)
+            if 'lineage_frequency' not in self._skip:
+                self._open_stream(output_directory, LINEAGE_FREQUENCY_FILE,
+                                  LINEAGE_FREQUENCY_COLUMNS)
+            if 'simulation_trajectory' not in self._skip:
+                self._open_stream(output_directory, TRAJECTORY_FILE,
+                                  TRAJECTORY_COLUMNS)
 
         # -------------------------------------------------------------------------   
 
@@ -246,7 +253,10 @@ class Population:
         self._streams[filename] = [handle, writer, path]
 
     def _record(self, filename, row):
-        '''Write one output row, or buffer it when there is nothing to stream to.'''
+        '''Write one output row, or buffer it when there is nothing to stream
+        to. A skipped output is discarded outright.'''
+        if filename[:-4] in self._skip:
+            return
         stream = self._streams.get(filename)
         if stream is None:
             getattr(self, _BUFFER_ATTRS[filename]).append(row)

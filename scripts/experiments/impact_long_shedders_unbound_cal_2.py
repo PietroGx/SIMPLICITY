@@ -47,6 +47,7 @@ from impact_long_shedders_unbound_config import (
     UNBOUND_CAL2_FINAL_TIME, USER_FIXED_PARAMS,
     derive_scenario_params, lookup_long_nsr, build_cal2_settings,
     add_slurm_resource_args, set_slurm_resource_env, print_fixed_params,
+    set_calibration_output_env,
 )
 from long_nsr_calibration_plot import read_calibrated_long_nsr
 
@@ -185,6 +186,8 @@ def main():
     args = parser.parse_args()
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
+    # calibration reads four files; do not write the other three
+    set_calibration_output_env()
 
     settings_func = build_cal2_settings(
         args.seeds, NSR_RANGES['cal_std'], args.R, args.ih_virus_emergence_rate)

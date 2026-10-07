@@ -218,12 +218,17 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
                 if fasta_file is not None:
                     fasta_file.close()
             
-            # Save Sequencing Metadata CSV
-            with open(data_file_path, mode='w', newline='') as file:
-                fieldnames = sequencing_data[0].keys()  
-                writer = csv.DictWriter(file, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(sequencing_data)
+            # Save Sequencing Metadata CSV. Skippable on its own: nothing in
+            # the repo reads sequencing_data.csv (sequencing.py reconstructs
+            # the same rows from individuals_data + phylogenetic_data), while
+            # sequencing_data_regression.csv right below it is what both
+            # calibration fits and the sanity plots are built on.
+            if not dm.skipping('sequencing_data'):
+                with open(data_file_path, mode='w', newline='') as file:
+                    fieldnames = sequencing_data[0].keys()
+                    writer = csv.DictWriter(file, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(sequencing_data)
 
         # ==============================================================================
         # Process All Long Shedders (Optional)
@@ -299,6 +304,8 @@ def read_sequencing_data_regression(seeded_simulation_output_dir):
     return df
         
 def save_simulation_trajectory(simulation_output, seeded_simulation_output_dir):
+    if dm.skipping('simulation_trajectory'):
+        return
     trajectory_file_path = os.path.join(seeded_simulation_output_dir,
                                         simulation_output.TRAJECTORY_FILE)
     # Streamed run: the rows are already on disk under ".partial". The rename
@@ -319,6 +326,8 @@ def read_simulation_trajectory(seeded_simulation_output_dir):
     return df
     
 def save_lineage_frequency(simulation_output, seeded_simulation_output_dir):
+    if dm.skipping('lineage_frequency'):
+        return
     lineage_frequency_file_path = os.path.join(seeded_simulation_output_dir,
                                                simulation_output.LINEAGE_FREQUENCY_FILE)
     partial = simulation_output.finalize_stream(simulation_output.LINEAGE_FREQUENCY_FILE)
