@@ -5,6 +5,42 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.67 — 2026-10-07 — pietro gerletti
+
+`tests/prune_calibration_outputs.py` applies 2.4.65 to calibration data already
+on disk.
+
+Deletes lineage_frequency.csv, simulation_trajectory.csv and
+sequencing_data.csv from calibration experiments only, leaving the four files
+the fits and sanity plots read. Dry run by default; --apply to delete.
+
+Experiment names come from LONG_NSR_EXP_NAME/STD_NSR_EXP_NAME in both pipeline
+configs rather than from a pattern invented here, and the match is anchored on
+the full name followed by "_#<number>". That anchoring is load-bearing:
+PROD_EXP_NAME ("impact_long_shedders_unbound") is a strict prefix of the
+unbound calibration names, and production's figures do read
+lineage_frequency.csv. Checked against a 52-directory Data/: 8 matched, 44
+untouched, no production directory among them.
+
+Safe on a part-finished experiment: a resumed run re-runs whatever lacks a
+.completed signal, and none of the three is read on the way there.
+
+------------------------------------------------------------------------
+
+## Version 2.4.66 — 2026-10-07 — pietro gerletti
+
+Changelog catch-up, no code.
+
+2.4.65 was committed without its entry: the script that inserts it asserted on
+a marker that no longer matched, and the git commands after it were not chained
+to that failure, so the commit went ahead anyway. Checking that also showed
+2.4.64 had never received an entry either -- its insert had replaced a
+paragraph INSIDE 2.4.63's entry instead of opening a new section, so 2.4.63
+was describing a --rerun that only behaved that way one version later. Both
+entries written, and 2.4.63's restored to what it actually shipped.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.65 — 2026-10-07 — pietro gerletti
 
 Calibration writes the four files it reads, and not the three it does not.
