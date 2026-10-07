@@ -5,6 +5,24 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.68 — 2026-10-07 — pietro gerletti
+
+The pipeline's health report stops calling a correct calibration broken.
+
+report_simulation_health shells out to check_completed_simulations from the
+DRIVER's environment, which never carries SIMPLICITY_SKIP_OUTPUTS -- cal_1 and
+cal_2 set it in their own processes. So after 2.4.65 the checker still required
+lineage_frequency.csv and simulation_trajectory.csv and would have reported
+every calibration simulation as incomplete, for a stage that is working exactly
+as designed. It never aborts, so the run would have finished while its own log
+said it had not.
+
+Both calibration health reports now pass CALIBRATION_SKIPPED_OUTPUTS through to
+the subprocess. Production passes nothing and is checked against the full list
+as before.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.67 — 2026-10-07 — pietro gerletti
 
 `tests/prune_calibration_outputs.py` applies 2.4.65 to calibration data already
