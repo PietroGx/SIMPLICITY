@@ -5,6 +5,39 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.74 — 2026-10-08 — pietro gerletti
+
+The cal_1 pipeline run end to end on the refactor, on the cluster.
+
+`--exp-num 1 --runner slurm --seeds 5`: two groups, 10 NSR_long sweep points
+each, 50 repeats per group, on slurm 26.05.4. Both fits converged on 50 data
+points each -- SOT R^2 0.960 NSR_long 0.000720, HIV_low+HIV_high R^2 0.981
+NSR_long 0.001143. 50 points is 10 sweep points x 5 seeds, so every repeat
+reached the fit and none was silently dropped.
+
+This was the first multi-group experiment ever run on the new data flow, and
+the first time a fit or a figure had been produced in the v2.4.71 layout. It
+covers what nothing else had: group-scoped reads, two independent fits in one
+experiment, the calibration plot, and calibrated_long_nsr.csv.
+
+04_Output holds exactly `SOT` and `HIV_low+HIV_high`. Each group's repeats are
+numbered 0-49 in its own subtree. And the group names reached the fit-results
+filenames -- `..._exp_fit_results_SOT.csv`,
+`..._exp_fit_results_HIV_low+HIV_high.csv` -- which is the precise place
+unbound run #1 wrote `tau=350.23,R_long=1.1`, because the plot module used to
+re-derive the name against the bound pipeline's scenario list.
+
+On whether the numbers mean anything: R^2 is not the evidence. What is, mildly:
+the magnitudes sit in the range the corrected pipeline calibrates to (~1.1e-3),
+and HIV (tau_3_long 94.23) needing a higher NSR_long than SOT (48.23) for the
+same target OSR is the direction longer-infection saturation would give. Five
+seeds, run to exercise the machinery -- not a calibration to keep.
+
+Still untested: cal_2, production, and the frozen-table handoff between stages.
+Nobody has opened the plot. Both are in BACKLOG.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.73 — 2026-10-08 — pietro gerletti
 
 The analysis path, checked against real output in the new layout.
