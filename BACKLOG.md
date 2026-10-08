@@ -6,29 +6,48 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Blockers (before next production rerun)
 
-- [ ] **The analysis and figure path has never run against real output in the
-      v2.4.71 layout.** The data flow refactor is verified end to end for
-      setup, dispatch and the resolver, and a real serial run produces correct
-      output -- but no figure has been drawn and no calibration fit has been
-      run from a `04_Output/<group>/sim_NNN__<label>/seed_NNNN/` tree. That is
-      40+ `get_parameter_value_from_simulation_output_dir` call sites, all of
-      `plots_manager`, both cal_2 fitters and the figure preprocessors. Their
-      signatures are unchanged and they compile, which is not the same thing.
-      Watch `long_nsr_calibration_plot` hardest: how it gets group names
-      changed, and that is verified only at the settings level, never through
-      an actual fit.
+- [ ] **No FIGURE has been drawn and no calibration FIT run against real
+      output in the v2.4.71 layout.** Narrowed 2026-10-08: the readers are now
+      covered. `tests/test_analysis_reads_new_layout.py` runs a real
+      experiment with the serial runner and drives the actual analysis
+      functions over its output -- every output_manager `read_*`, the SSOD
+      path helpers against the group level they gained, the resolver,
+      `evolutionary_rate.extract_ih_regression_data`, and the
+      write/read_OSR_vs_parameter_csv walk. 23 checks, all passing.
 
-- [ ] **Slurm parsing is unverified against 26.05.4.** `tests/fakeslurm/`
-      covers the control-plane logic and `tests/test_slurm_lifecycle.py`
-      passes, but the shims could be lying about output format. Run
-      `python tests/check_slurm_interface.py --raw` on the cluster -- three
-      no-op tasks, about a minute -- before trusting a real submission. Then
-      one small real experiment through the slurm runner: repeat order is now
-      settings order where it used to be readdir order, and only a real array
-      exercises that mapping.
+      What is still unproven: `plots_manager` actually rendering a panel, and
+      a calibration regression converging on data in this layout. Both need a
+      run large enough to support a fit, which the probe experiment
+      deliberately is not. The cluster's `slurm_iface_check_#1` tree is in the
+      right shape but is far too small for either.
 
-      No recalibration required for either. Nothing changes simulation output
-      for the same parameters; both are validation gaps, not corrections.
+      NOTE for whoever does this: `write_OSR_vs_parameter_csv`
+      (output_manager.py:627) wraps its per-repeat body in a bare
+      `except Exception: continue`. An empty OSR table therefore looks
+      identical whether the cause is thin data or a tree it cannot read. If a
+      fit comes back empty, do not infer anything from the table alone --
+      check the per-repeat reads directly, as that test does.
+
+- [x] **Slurm parsing verified against 26.05.4** (2026-10-08).
+      `tests/check_slurm_interface.py` passes on the cluster: squeue still
+      emits the header `release_simulations` drops, `sacct --parsable2 -X` is
+      one `<job>_<task>|STATE` row per started task, and it retains terminal
+      state after the task leaves the queue. It also FOUND a bug --
+      `reconcile_launch_failures` could never match a held task, because
+      squeue collapses pending tasks sharing a reason into one row with a
+      range in the task field (`1-3`). Fixed in v2.4.72.
+
+      A real 4-repeat array then ran end to end: four array positions resolved
+      to four distinct repeats, four distinct `main/<index>` map entries, all
+      completed, and the polling loop exited on its own. The array mapping --
+      the one thing no local test could settle -- is correct.
+
+      NOT exercised: the release cap. The run had
+      SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM=200 and only 4 repeats,
+      so everything released in one batch and the throttle never engaged.
+
+      No recalibration required. Nothing changes simulation output for the
+      same parameters; this is a validation gap, not a correction.
 
 ------------------------------------------------------------------------
 
