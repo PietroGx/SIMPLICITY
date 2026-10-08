@@ -5,6 +5,46 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.73 — 2026-10-08 — pietro gerletti
+
+The analysis path, checked against real output in the new layout.
+
+`tests/test_analysis_reads_new_layout.py` runs a real experiment through
+run_experiment with the serial runner -- actual simulations, actual output --
+and then drives the actual analysis functions over it. No stubs on the read
+side. 24 checks: every output_manager `read_*`, the SSOD path helpers against
+the group level they gained, the resolver on output a simulation really wrote,
+`evolutionary_rate.extract_ih_regression_data`, and the
+write/read_OSR_vs_parameter_csv walk.
+
+All pass. The 40+ resolver call sites, the readers and the intra-host clock
+read `04_Output/<group>/sim_NNN__<label>/seed_NNNN/` correctly.
+
+Two things the test had to get right about what "empty" means, both of which
+would otherwise have been read as refactor damage:
+
+An empty OSR table is not evidence of anything. write_OSR_vs_parameter_csv
+(output_manager.py:627) wraps its per-repeat body in a bare
+`except Exception: continue`, and tempest_regression raises on the single
+sequencing row a small run produces. Thin data and an unreadable tree look
+identical from the table, so the test asks the layout question directly --
+per repeat, exactly the reads that loop does -- instead of inferring it from a
+row count.
+
+A repeat with no sequencing file is correct, and NOT because of a sampling
+rate. There is no sequencing_rate any more: the inline draw was replaced by
+recording t_diagnosis on every diagnosed individual and writing the complete
+record, with any subsample taken post-hoc (simplicity/sequencing.py). So the
+file exists exactly when someone was diagnosed, and the test asserts that
+equivalence rather than tolerating absence -- measured, 1 diagnosis -> file,
+0 diagnoses -> no file.
+
+BACKLOG's analysis blocker is narrowed, not closed: no figure has been rendered
+and no calibration fit run in this layout. Both need a run large enough to
+support a regression.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.72 — 2026-10-08 — pietro gerletti
 
 `reconcile_launch_failures` never matched a held task.
