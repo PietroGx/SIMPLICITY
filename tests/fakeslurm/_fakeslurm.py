@@ -131,6 +131,19 @@ def sbatch(args):
 
 # -------------------------------------------------------------------- squeue
 
+def _collapse(tasks):
+    """[1,2,3,7] -> "1-3,7", the way squeue writes a pending array."""
+    parts, start, previous = [], None, None
+    for task in tasks + [None]:
+        if previous is not None and task == previous + 1:
+            previous = task
+            continue
+        if start is not None:
+            parts.append(str(start) if start == previous else f"{start}-{previous}")
+        start = previous = task
+    return ",".join(parts)
+
+
 def squeue(args):
     state = _load()
     fmt = _arg(args, "--Format", "") or ""
@@ -141,10 +154,20 @@ def squeue(args):
                                             key=lambda kv: int(kv[0]))
               if info["state"] in ("PENDING", "RUNNING")]
     if "ArrayTaskID" in fmt:
-        # launch-failure detection: job id, task id, free-text reason
+        # launch-failure detection: job id, task id(s), free-text reason.
+        #
+        # Slurm collapses pending tasks that share a state AND a reason into
+        # ONE row, with the task field as a range expression ("1-3", "1,3,5").
+        # These shims used to emit one row per task, which is precisely the
+        # kind of lie a fake can tell: test_slurm_lifecycle passed while the
+        # real parser's int() rejected every row on slurm 26.05.4, and only
+        # check_slurm_interface.py against a real controller found it.
+        by_reason = {}
         for task in queued:
             info = state["tasks"][task]
-            print(f'{state["job_id"]} {task} {info["reason"]}')
+            by_reason.setdefault((info["state"], info["reason"]), []).append(int(task))
+        for (_state, reason), tasks in by_reason.items():
+            print(f'{state["job_id"]} {_collapse(sorted(tasks))} {reason}')
         return 0
     # release path: the real code drops line 0 as a header and expects exactly
     # one distinct ArrayJobID across the rest

@@ -35,7 +35,10 @@ parser needs. This asserts SHAPE, not behaviour -- the logic is the fake's job:
   squeue --Format=ArrayJobID,ArrayTaskID,Reason --noheader   slurm.py:~510
       reconcile_launch_failures does line.split(None, 2) and needs three
       whitespace-separated fields, the third being free text. A requeued-held
-      task is only found by substring-matching that text.
+      task is only found by substring-matching that text. Field 2 is a task
+      LIST ("1-3", "1,3,5"), not an integer -- Slurm collapses pending tasks
+      sharing a state and reason into one row. This check is what found that;
+      it goes through slurm.expand_array_task_ids so it tests the real parser.
 
   sacct -j ID --format=JobID,State --noheader --parsable2 -X   slurm.py:~450
       reconcile_terminated_tasks splits on the first "|" and expects one line
@@ -158,9 +161,15 @@ def check_reason_listing():
     check('every line splits into three whitespace fields',
           all(len(parts) >= 3 for parts in parsed),
           f'first = {parsed[0]!r}')
-    check('field 2 parses as an array task id',
-          all(parts[1].isdigit() for parts in parsed if len(parts) >= 2),
-          f'{[p[1] for p in parsed if len(p) >= 2]}')
+    # through the real parser, not a re-implementation of it: a diagnostic
+    # that guesses at its stage's internals stops describing that stage
+    import simplicity.runners.slurm as slurm
+    fields = [parts[1] for parts in parsed if len(parts) >= 2]
+    expanded = {field: list(slurm.expand_array_task_ids(field))
+                for field in fields}
+    check('field 2 expands to at least one array task id',
+          all(tasks for tasks in expanded.values()),
+          '; '.join(f'{f!r} -> {t}' for f, t in expanded.items()))
     check('a held task reports a reason we could substring-match',
           any(parts[2].strip() for parts in parsed if len(parts) >= 3),
           f'reasons = {sorted({p[2].strip() for p in parsed if len(p) >= 3})}')

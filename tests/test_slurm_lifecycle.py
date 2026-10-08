@@ -209,20 +209,30 @@ def test_externally_killed_and_lost_writes_are_reconciled():
 
 
 def test_launch_failures_are_re_released():
+    """TWO tasks fail to launch, so they share a reason and squeue collapses
+    them into one row with a range in the task field.
+
+    One failing task can report a bare integer, which the old int() parse
+    happened to accept. Two make the row read "2-3", and every pending task
+    was then silently skipped -- the repeat sat held and the polling loop
+    waited on it forever. Found by check_slurm_interface.py on slurm 26.05.4,
+    not here: these shims used to emit one row per task.
+    """
     root = tempfile.mkdtemp(prefix='slurm_e2e_')
     try:
-        build(os.path.join(root, 'Data'), 'probe', n_simulations=2, n_seeds=1)
-        drive(root, 'probe', plan={'2': 'launch_fail'})
+        build(os.path.join(root, 'Data'), 'probe', n_simulations=3, n_seeds=1)
+        drive(root, 'probe', plan={'2': 'launch_fail', '3': 'launch_fail'})
 
-        print('\na task Slurm requeued held is re-released, then runs')
-        check('both repeats ended completed',
-              [jobs.state_of('probe', 'main', i) for i in range(2)],
-              [jobs.COMPLETED, jobs.COMPLETED])
-        record = jobs.get_state('probe', 'main', 1) or {}
-        check('the re-releases were counted', record.get('attempts', 0) >= 1,
-              True)
-        check('and it really did run', sorted(ran(root)),
-              ['main_000000', 'main_000001'])
+        print('\ntasks Slurm requeued held are re-released, then run')
+        check('all three repeats ended completed',
+              [jobs.state_of('probe', 'main', i) for i in range(3)],
+              [jobs.COMPLETED] * 3)
+        for index in (1, 2):
+            record = jobs.get_state('probe', 'main', index) or {}
+            check(f'repeat {index}: the re-releases were counted',
+                  record.get('attempts', 0) >= 1, True)
+        check('and they really did run', sorted(ran(root)),
+              ['main_000000', 'main_000001', 'main_000002'])
     finally:
         shutil.rmtree(root, ignore_errors=True)
 

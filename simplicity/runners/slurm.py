@@ -121,6 +121,37 @@ LAUNCH_FAILURE_MAX_RETRIES = 3
 # -- Slurm doesn't expose this as a stable enum the way job State is.
 LAUNCH_FAILURE_REASON_MARKERS = ("launch failed",)
 
+
+def expand_array_task_ids(field):
+    """Task ids from one squeue ArrayTaskID field.
+
+    Slurm collapses an array's pending tasks that share a state and a reason
+    into ONE squeue row, and writes the task field as a list expression:
+    "5", "1-3", "1,3,5", "1-3,7", sometimes with a "%" throttle suffix.
+
+    This was `int(task_id_str)` inside a try/except that skipped anything else.
+    Measured on slurm 26.05.4 (tests/check_slurm_interface.py): a three-task
+    held array reports a single row with ArrayTaskID "1-3", so every pending
+    task was silently skipped. That is the only state a launch-failed task is
+    ever in, and such a task never reaches STARTED either, so
+    reconcile_terminated_tasks never sees it -- the polling loop would wait on
+    it forever. The collapsing is not new in 26.05; the parser was written
+    against a shape Slurm only produces when exactly one task carries a given
+    reason.
+    """
+    for part in field.split(","):
+        part = part.strip().partition("%")[0]      # drop any throttle suffix
+        if not part:
+            continue
+        low, dash, high = part.partition("-")
+        try:
+            if dash:
+                yield from range(int(low), int(high) + 1)
+            else:
+                yield int(low)
+        except ValueError:
+            continue
+
 class SimulationsStatus(typing.NamedTuple):
     total    : int
     submitted: int
@@ -524,30 +555,28 @@ def reconcile_launch_failures(experiment_name, pairs):
         if len(parts) < 3:
             continue
         job_id, task_id_str, reason = parts
-        try:
-            task_id = int(task_id_str)
-        except ValueError:
-            continue
-        key = candidates.get(task_id)
-        if key is None:
-            continue
         if not any(marker in reason.lower() for marker in LAUNCH_FAILURE_REASON_MARKERS):
             continue
+        # one row can cover several tasks -- see expand_array_task_ids
+        for task_id in expand_array_task_ids(task_id_str):
+            key = candidates.get(task_id)
+            if key is None:
+                continue
 
-        group, index = key
-        record = jobs.get_state(experiment_name, group, index) or {}
-        retries = record.get("attempts", 0)
-        name = jobs.repeat_description(
-            group, jobs.get_repeat(experiment_name, group, index))
+            group, index = key
+            record = jobs.get_state(experiment_name, group, index) or {}
+            retries = record.get("attempts", 0)
+            name = jobs.repeat_description(
+                group, jobs.get_repeat(experiment_name, group, index))
 
-        if retries >= LAUNCH_FAILURE_MAX_RETRIES:
-            jobs.set_state(experiment_name, group, index, jobs.FAILED,
-                           reconciled="launch_failed")
-            print(f"[reconciled] {name}: launch failed {retries} times "
-                 f"(Slurm reason: {reason.strip()}) -- giving up, marking failed")
-            continue
+            if retries >= LAUNCH_FAILURE_MAX_RETRIES:
+                jobs.set_state(experiment_name, group, index, jobs.FAILED,
+                               reconciled="launch_failed")
+                print(f"[reconciled] {name}: launch failed {retries} times "
+                     f"(Slurm reason: {reason.strip()}) -- giving up, marking failed")
+                continue
 
-        to_release[f"{job_id}_{task_id}"] = (key, retries)
+            to_release[f"{job_id}_{task_id}"] = (key, retries)
 
     if not to_release:
         return
