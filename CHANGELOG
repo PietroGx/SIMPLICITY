@@ -5,6 +5,34 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.79 — 2026-10-09 — pietro gerletti
+
+tests/run_tests_on_compute.sh -- the suite, off the login node.
+
+Most of these tests build a real experiment and run real simulations. That is
+what makes them worth anything, and it is also why they must not run where you
+log in. Invoked from a login node this submits itself with sbatch and returns
+the log path; the tests then run as a Slurm job. Same shape as
+run_calibrated_grid.sh, including following the log by default when there is a
+terminal to follow it on. SIMPLICITY_TESTS_LOCAL=1 runs them in the foreground
+for a laptop.
+
+    bash tests/run_tests_on_compute.sh
+    bash tests/run_tests_on_compute.sh --figures 2 --slurm 90
+
+The eight self-contained tests always run. --figures adds the paper-figure
+check against a production experiment number; --slurm adds the resume and
+reconciliation check, which submits its own jobs from inside this one -- the
+same nested submission run_calibrated_grid.sh already relies on.
+
+Two cpus are requested because test_multiprocessing_runner uses a pool of two.
+It is also by far the slowest at 133s: each child precomputes its own intra-host
+matrix exponentials.
+
+Verified end to end: 8 passed, 0 failed.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.78 — 2026-10-09 — pietro gerletti
 
 Tests for the parts the refactor touched and nothing had run.
