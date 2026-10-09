@@ -5,6 +5,26 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.75 — 2026-10-09 — pietro gerletti
+
+cal_1's calibration plot gets the log x-axis cal_2 already had.
+
+The sweep is np.geomspace(1e-4, 1e-2, 10), so five of its ten points fall below
+7.8e-4. On a linear axis those pile into the leftmost ~8% of the panel -- which
+is exactly where the target OSR line is crossed and the calibrated value is read
+off. The figure was compressing the one region it exists to show. cal_2's plot
+has had plt.xscale('log') all along; the two siblings simply disagreed.
+
+Both curves are now sampled with geomspace rather than linspace: 100 linearly
+spaced points put almost none of the fitted line in the lowest decade once the
+axis is logarithmic.
+
+Nothing about the fits changes -- they were always computed from the numbers,
+not the picture. This only makes the picture readable, which matters because it
+is the figure a calibration is eyeballed from.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.74 — 2026-10-08 — pietro gerletti
 
 The cal_1 pipeline run end to end on the refactor, on the cluster.

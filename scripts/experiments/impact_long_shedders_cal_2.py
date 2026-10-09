@@ -171,8 +171,10 @@ def compute_standard_nsr_per_scenario(numbered, scenarios_frozen, target_osr_std
         std_nsr_by_scenario[name] = float(nsr_std)
         print(f"          {name}: calibrated standard NSR = {nsr_std:.8f}")
 
-        x_vals = np.linspace(group_df['nucleotide_substitution_rate'].min(),
-                            group_df['nucleotide_substitution_rate'].max(), 100)
+        # geomspace to match the log axis below: 100 linearly-spaced points
+        # put almost none of the curve in the lowest decade
+        x_vals = np.geomspace(group_df['nucleotide_substitution_rate'].min(),
+                              group_df['nucleotide_substitution_rate'].max(), 200)
         y_vals = fit_result.eval(x=x_vals)
         plt.plot(x_vals, y_vals, color=color, linewidth=2, label=f"{name} fit")
         plt.plot(nsr_std, target_osr_std, marker='*', markersize=12,
