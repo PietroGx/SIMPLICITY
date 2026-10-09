@@ -5,6 +5,30 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.80 — 2026-10-09 — pietro gerletti
+
+check_slurm_resume_and_reconcile's phase 3 passed while testing nothing.
+
+It submitted a 3000-day final_time against 200 individuals with a 1-minute
+walltime, expecting Slurm to kill the tasks. Every task completed in twelve
+seconds: final_time is SIMULATED days, and a population that small burns
+through a long horizon instantly. So nothing was killed,
+reconcile_terminated_tasks was never reached -- and the phase reported success,
+because its three assertions ("the loop exited", "no repeat left started",
+"every repeat reached a terminal state") are all trivially true when every task
+completes normally.
+
+Sized by work now: 4000 individuals over 1095 days against a 2-minute walltime.
+And if nothing is killed the phase reports INCONCLUSIVE and exits non-zero
+instead of going green, with two added assertions -- that a killed repeat was
+recorded failed, and that the RECONCILER is what recorded it (the `reconciled`
+marker), not the task itself.
+
+Resume (phases 1 and 2) did pass honestly on the cluster: four repeats, two
+cleared, exactly those two recomputed and the other two untouched.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.79 — 2026-10-09 — pietro gerletti
 
 tests/run_tests_on_compute.sh -- the suite, off the login node.
