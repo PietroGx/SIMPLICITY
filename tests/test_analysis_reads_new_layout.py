@@ -41,6 +41,14 @@ WHAT EACH GROUP OF CHECKS IS FOR
                    re-derive. If it cannot read the new tree, every calibration
                    is blocked.
 
+  group scoping    the library takes `group` now (stage 7c), so a multi-group
+                   experiment can be read one group at a time. The trap it
+                   closes: the group has to be part of the csv FILENAME, not
+                   just the query. Two groups otherwise collide on one path and
+                   write_OSR_vs_parameter_csv returns early when the file
+                   exists -- so the second group would silently reuse the
+                   first's numbers.
+
   OSR table        write_OSR_vs_parameter_csv / read_OSR_vs_parameter_csv -- the
                    table both cal stages fit on. It walks the whole experiment,
                    so it exercises the listing and the resolver together.
@@ -107,6 +115,46 @@ def build(root, name):
                   'long_shedders_ratio': 0.2,
                   'sequence_long_shedders': True}, 2),
         simplicity_runner=serial, archive_experiment=False)
+
+
+def scoped_reads(root):
+    """A multi-group experiment read one group at a time (stage 7c)."""
+    print('\ngroup-scoped reads of a multi-group experiment')
+    name = 'scoped_probe'
+    import simplicity.runme as runme
+    import simplicity.runners.serial as serial
+    groups = [{'name': 'alpha', 'R': [1.05, 1.3]},
+              {'name': 'beta', 'R': [1.6]}]
+    runme.run_experiment(
+        name,
+        lambda: ({'_scenario_groups': groups},
+                 {'population_size': 50, 'infected_individuals_at_start': 5,
+                  'final_time': 15, 'long_shedders_ratio': 0.2,
+                  'sequence_long_shedders': True}, 2),
+        simplicity_runner=serial, archive_experiment=False)
+
+    check('both groups exist', dm.get_groups(name), ['alpha', 'beta'])
+    check('unscoped lists every simulation',
+          len(dm.get_simulation_output_dirs(name)), 3)
+    per_group = {g: dm.get_simulation_output_dirs(name, group=g)
+                 for g in dm.get_groups(name)}
+    check('alpha holds its own two sweep points',
+          sorted(sm.get_parameter_value_from_simulation_output_dir(s, 'R')
+                 for s in per_group['alpha']), [1.05, 1.3])
+    check('beta holds only its own',
+          sorted(sm.get_parameter_value_from_simulation_output_dir(s, 'R')
+                 for s in per_group['beta']), [1.6])
+
+    # The trap: without the group in the FILENAME both writes land on one path,
+    # and the second returns early because the file exists -- so beta would be
+    # reading alpha's rates under beta's name.
+    for group in dm.get_groups(name):
+        om.write_OSR_vs_parameter_csv(name, 'R', group=group)
+    written = sorted(f for f in os.listdir(dm.get_experiment_output_dir(name))
+                     if f.endswith('.csv'))
+    check('each group writes its own OSR table', len(written), 2)
+    check('and the group is in the filename',
+          [f.rsplit('_', 1)[-1] for f in written], ['alpha.csv', 'beta.csv'])
 
 
 def main():
@@ -241,6 +289,7 @@ def main():
             if has_file:
                 check_runs(f'{os.path.basename(one)}: sequencing reads',
                            lambda o=one: om.read_sequencing_data_regression(o))
+        scoped_reads(root)
     finally:
         shutil.rmtree(root, ignore_errors=True)
 

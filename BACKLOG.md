@@ -69,14 +69,22 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Technical Debt
 
-- [ ] **Stage 7c of the data flow refactor: ~60 `get_simulation_output_dirs`
-      call sites still pass no group.** The listing API takes one
-      (`group=None` returns everything, which is what they all get today), so
-      they can migrate one at a time. Blocked on having real output to verify
-      each against. Until they do, a listing over an experiment with several
-      groups -- which cal_1 and cal_2 already produce -- mixes them, and
-      `plots_manager` sorts by parameter value across the lot. Making `group`
-      required is the end state.
+- [x] **Stage 7c (library)** done 2026-10-09, v2.4.77. The nine functions in
+      plots_manager and output_manager that list an experiment's simulations
+      take `group=None` and thread it, so a multi-group experiment can be read
+      one group at a time. The group is in the OSR csv filename too, or two
+      groups collide on one path and the second silently reuses the first's
+      numbers.
+
+- [ ] **Stage 7c (scripts): ~35 call sites still unscoped.** Not urgent and not
+      a regression: production experiments are single-group, and the two
+      calibration plots pool across groups on purpose. What is worth doing
+      there is different from scoping -- those two still re-derive their
+      partition from parameter VALUES (cal_1 keys on a (tau_3_long, R_long)
+      float tuple; cal_2 reads tau_3_long and long_shedders_ratio back out to
+      classify a simulation) when the record now carries the group as an exact
+      string. Changing it alters how a working calibration partitions its data,
+      so it needs its own run to verify.
 
 - [ ] **Stage 8: fold a pipeline back into one experiment**, its stages becoming
       groups. The structure now supports it -- groups are named, numbered from

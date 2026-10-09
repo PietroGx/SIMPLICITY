@@ -445,8 +445,8 @@ def get_IH_lineages_data_simulation(simulation_output_dir):
 
     return df
  
-def get_IH_lineages_data_experiment(experiment_name):
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+def get_IH_lineages_data_experiment(experiment_name, group=None):
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
     df = pd.DataFrame()
     for simulation_output_dir in simulation_output_dirs:
         new_df = get_IH_lineages_data_simulation(simulation_output_dir)
@@ -584,34 +584,46 @@ def get_combined_OSR_vs_parameter_csv_file_path(experiment_name,
                                                 parameter,
                                                 min_seq_number,
                                                 min_sim_lenght,
-                                                individual_type=None):
+                                                individual_type=None,
+                                                group=None):
+    # `group` is part of the NAME, not just the query. Two groups of one
+    # experiment write different tables; without it they collide on one path,
+    # and write_OSR_vs_parameter_csv returns early when the file exists -- so
+    # the second group would silently reuse the first group's numbers.
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     type_suffix = f"_{individual_type}" if individual_type else ""
+    group_suffix = f"_{group}" if group else ""
     csv_file_path = os.path.join(experiment_output_dir, 
-      f'{experiment_name}_combined_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}{type_suffix}.csv')
+      f'{experiment_name}_combined_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}{type_suffix}{group_suffix}.csv')
     return csv_file_path
 
 def get_OSR_vs_parameter_csv_file_path(experiment_name,
                                        parameter,
                                        min_seq_number,
                                        min_sim_lenght,
-                                       individual_type=None):
+                                       individual_type=None,
+                                       group=None):
+    # `group` is part of the NAME, not just the query. Two groups of one
+    # experiment write different tables; without it they collide on one path,
+    # and write_OSR_vs_parameter_csv returns early when the file exists -- so
+    # the second group would silently reuse the first group's numbers.
     experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
     type_suffix = f"_{individual_type}" if individual_type else ""
+    group_suffix = f"_{group}" if group else ""
     csv_file_path = os.path.join(experiment_output_dir, 
-      f'{experiment_name}_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}{type_suffix}.csv')
+      f'{experiment_name}_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}{type_suffix}{group_suffix}.csv')
     return csv_file_path
 
-def write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq_number=0, min_sim_lenght=0, individual_type=None):
+def write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq_number=0, min_sim_lenght=0, individual_type=None, group=None):
     """
     Calculates OSR for every individual seed and detects outliers per parameter set.
     """
-    csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name, parameter, min_seq_number, min_sim_lenght, individual_type)
+    csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name, parameter, min_seq_number, min_sim_lenght, individual_type, group)
     
     if os.path.exists(csv_file_path):
         return
 
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
     all_sod_dfs = []
     # Why a repeat contributed nothing, counted rather than swallowed. The loop
     # below used to `except Exception: continue`, so an empty table looked
@@ -692,13 +704,15 @@ def read_OSR_vs_parameter_csv(experiment_name,
                               min_seq_number,
                               min_sim_lenght,
                               individual_type=None,
-                              include_outliers=False): 
+                              include_outliers=False,
+                              group=None): 
     
     csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name,
                                                        parameter,
                                                        min_seq_number,
                                                        min_sim_lenght,
-                                                       individual_type)
+                                                       individual_type,
+                                                       group)
     
     if not os.path.exists(csv_file_path):
         print(f"[Warning] File not found: {csv_file_path}")
@@ -720,7 +734,7 @@ def write_combined_OSR_vs_parameter_csv(experiment_name,
                                         min_seq_number=0,
                                         min_sim_lenght=0,
                                         individual_type=None,
-                                        include_outliers=False):
+                                        include_outliers=False, group=None):
     ''' 
     Create df of observed substitution rate (tempest regression on joint data).
     Uses individual OSR results to filter out outliers before combining, unless include_outliers=True.
@@ -729,18 +743,20 @@ def write_combined_OSR_vs_parameter_csv(experiment_name,
                                                                 parameter, 
                                                                 min_seq_number,
                                                                 min_sim_lenght,
-                                                                individual_type)
+                                                                individual_type,
+                                                                group)
     
     if os.path.exists(csv_file_path):
         return
 
-    # Load individual OSR results 
+    # Load individual OSR results -- the SAME group, or this combines one
+    # group's rates against another group's outlier flags
     individual_osr_df = read_OSR_vs_parameter_csv(
         experiment_name, parameter, min_seq_number, min_sim_lenght, individual_type,
-        include_outliers=include_outliers
+        include_outliers=include_outliers, group=group
     )
 
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
     results = []
 
     for sod in simulation_output_dirs:
@@ -789,13 +805,15 @@ def read_combined_OSR_vs_parameter_csv(experiment_name,
                                        parameter,
                                        min_seq_number,
                                        min_sim_lenght,
-                                       individual_type=None):
+                                       individual_type=None,
+                                       group=None):
     # Reads the file generated by write_combined_OSR...
     csv_file_path = get_combined_OSR_vs_parameter_csv_file_path(experiment_name,
                                                                 parameter,
                                                                 min_seq_number,
                                                                 min_sim_lenght,
-                                                                individual_type)
+                                                                individual_type,
+                                                                group)
     return pd.read_csv(csv_file_path)
 
 def get_mean_std_OSR(experiment_name,
