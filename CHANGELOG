@@ -5,6 +5,47 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.78 — 2026-10-09 — pietro gerletti
+
+Tests for the parts the refactor touched and nothing had run.
+
+    tests/test_trees_clustering_archive.py      local, ~5s
+    tests/test_multiprocessing_runner.py        local, ~2min
+    tests/test_figures_on_real_output.py        cluster, needs production output
+    tests/check_slurm_resume_and_reconcile.py   cluster, submits jobs
+
+The first two are self-contained -- they build a real experiment with the
+serial runner and drive the real functions over it. Both pass:
+
+  trees, clustering, nextstrain, archiving  22 checks. Every one of these
+  derives a destination from a seeded output directory, and that directory
+  gained a level. draw_tree really builds and plots an infection tree;
+  archive_experiment really tars and deletes, and the archive is checked for
+  settings.json and repeats.json -- the two files without which an archived
+  experiment cannot be interpreted.
+
+  the multiprocessing runner  crosses a process boundary without Slurm, so a
+  repeat identified by (group, index) has to be resolvable in a fresh
+  interpreter from files alone. A path survived pickling trivially; this does
+  not, and nothing had run it since stage 5.
+
+The other two need the cluster. test_figures_on_real_output drives the paper
+figure preprocessors -- nature_plots/ and long_paper_figures/, the largest
+block of untouched call sites left -- against real production output, by name.
+It reports rather than asserts: "no data" is a legitimate outcome on a small
+run and is counted apart from a failure, because only an exception from a path
+helper, a resolver or a reader is the refactor's problem.
+
+check_slurm_resume_and_reconcile covers the two slurm.py paths that only
+tests/fakeslurm has ever exercised: a real resume (clear two repeats of four,
+re-run, and assert exactly those two were recomputed and the others untouched)
+and a real external kill (a 1-minute walltime against a 3000-day horizon, so
+the scheduler terminates the tasks and only reconcile_terminated_tasks can
+unblock the loop). Both were driven against the fake before being handed over
+-- the fake has been caught lying about the interface once already.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.77 — 2026-10-09 — pietro gerletti
 
 Stage 7c: the analysis library can be read one group at a time.
