@@ -5,6 +5,53 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.81 — 2026-10-09 — pietro gerletti
+
+test_figures_on_real_output now checks coverage, not just reachability.
+
+The first version called each preprocessor and reported whether it returned.
+Twelve did, and that said almost nothing, because the thing that actually goes
+wrong here does not raise. fig1.get_panel_a_data and get_panel_b_data loop
+scenarios with `except Exception: continue`: a scenario whose read breaks is
+dropped and the function returns a perfectly good DataFrame with one fewer
+curve. A half-read experiment and a fully-read one look identical from outside.
+
+So every check now compares what came back against what the RECORD says is
+there -- settings.json, repeats.json, and the directories on disk -- and names
+the difference. It opens with a survey putting those three side by side per
+scenario, because a disagreement at that level is a refactor problem before
+any figure code has been reached.
+
+Four defects in the test itself, found by running it against four real
+production-shaped experiments rather than shipping it:
+
+  len() of anything   a returned PATH was reported as "139 item(s)" -- the
+                      length of the string. Reporting is type-aware now:
+                      DataFrames by shape, paths by existence, tuples by part.
+
+  two wrong contracts get_model_global_clock reads CONTROL ONLY by design, and
+                      om.get_IH_lineages_data_experiment returns one row per
+                      intra-host lineage, not per simulation. Expecting every
+                      scenario from the first, and comparing row indices to
+                      simulation indices in the second, produced "incomplete"
+                      verdicts that meant nothing. A false incomplete is as
+                      bad as a false ok.
+
+  long_paper FAILED   it reads the long-paper GRID, a different experiment
+                      shape. Reporting FAILED because that grid was not run is
+                      noise dressed as signal; gated on the master log and
+                      reported n/a.
+
+And when a coverage check does come back short, it now says why. Panel B
+missing a cohort prints the usable input rows per scenario, which separates "a
+read broke" from "that scenario had nothing to contribute" in one line --
+exactly the distinction the old version could not make.
+
+Verified against four real production experiments: 9 ok, 1 incomplete (with
+its cause printed), 1 no data, 1 n/a, 0 failed.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.80 — 2026-10-09 — pietro gerletti
 
 check_slurm_resume_and_reconcile's phase 3 passed while testing nothing.

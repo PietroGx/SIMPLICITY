@@ -1,38 +1,43 @@
 #!/usr/bin/env python3
-'''Do the paper figures still read the output tree? Run this ON THE CLUSTER.
+'''Do the paper figures read the output tree, and do they read ALL of it?
 
     python tests/test_figures_on_real_output.py --exp-num 2
-    python tests/test_figures_on_real_output.py --exp-num 2 \\
-        --exp-name impact_long_shedders_unbound
+    python tests/test_figures_on_real_output.py --exp-num 2 --exp-name impact_long_shedders_unbound
+    python tests/test_figures_on_real_output.py --exp-num 2 --heavy --traceback
 
 WHY
 
-The v2.4.71 data flow refactor moved every output directory a level deeper and
-renamed all of them. The calibration and sanity figures are verified -- the
-cluster pipeline produced them. The PAPER figures are not: nature_plots/ and
-long_paper_figures/ have never run against the new layout, and between them
-they hold the largest block of untouched get_simulation_output_dirs and
-get_parameter_value_from_simulation_output_dir call sites in the repo.
+The v2.4.71 refactor moved every output directory a level deeper and renamed
+all of them. nature_plots/ and long_paper_figures/ hold the largest block of
+call sites it never touched, and they cannot be exercised against a synthetic
+tree: they read PRODUCTION experiments by name, one per scenario.
 
-They cannot be exercised against a synthetic tree: they read PRODUCTION
-experiments by name, one per scenario (impact_long_shedders_<scenario>_#<n>),
-and expect real sequence and lineage data. So this runs against whatever is
-actually on disk.
+WHY "IT RAN" IS NOT THE QUESTION
 
-WHAT IT DOES
+An earlier version of this file called each preprocessor and reported whether
+it returned. Twelve did, and that told us almost nothing, because the thing
+that would actually go wrong does not raise.
 
-Calls the real preprocessors -- the functions the figure scripts call -- and
-reports, per entry point, whether it returned, raised, or had nothing to read.
-It renders nothing and writes nothing: a preprocessor that returns its data is
-the thing in question, and plotting adds minutes without adding an answer.
+fig1.get_panel_a_data loops over scenarios with `except Exception: continue`.
+A scenario whose read breaks is silently dropped and the function returns a
+perfectly good DataFrame with one fewer curve in it. get_shared_valid_seeds
+does the same per repeat. So a half-read experiment and a fully-read one look
+identical from the outside -- which is this repo's standing failure mode, a
+measurement quietly describing less than its name claims.
 
-IT IS A REPORT, NOT A PASS/FAIL SUITE. "no data" is a legitimate outcome for a
-small or partial run and is counted separately from a failure. What matters is
-the FAILED column: an exception from a path helper, a resolver or a reader is
-the refactor's problem. An exception about too few points, an empty frame or a
-missing optional input is the data's.
+So every check here compares what came back against what the RECORD says
+should be there -- settings.json, repeats.json, and the directories on disk --
+and names the difference when they disagree.
 
-Exit code is non-zero only if something actually raised.
+HOW TO READ THE OUTPUT
+
+  FAIL        the refactor's problem. A path helper, resolver or reader is
+              wrong, or a preprocessor silently dropped something that exists.
+  incomplete  it returned, but covered less than the record says exists. The
+              missing items are named. This is the interesting column.
+  no data     returned nothing, legitimately: an input that is absent, or a
+              filter nothing passed. Counted apart.
+  n/a         that experiment shape was not run at all.
 '''
 import argparse
 import os
@@ -45,139 +50,276 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'nature_plots'))
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'long_paper_figures'))
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 
 import matplotlib
 matplotlib.use('Agg')
 
 import simplicity.dir_manager as dm
+import simplicity.jobs as jobs
+import simplicity.output_manager as om
+import simplicity.settings_manager as sm
 
-results = []          # (name, outcome, detail, seconds)
+failed, incomplete, nodata, notapplicable, fine = [], [], [], [], []
 
 
-def run(name, call):
-    """Call one preprocessor and classify what came back."""
+def describe(value):
+    """What came back, by type -- not len() of whatever it is.
+
+    The previous version printed `len(value) item(s)` for everything, so a
+    returned PATH was reported as "139 item(s)": the length of the string.
+    """
+    import pandas as pd
+    if value is None:
+        return 'None'
+    if isinstance(value, pd.DataFrame):
+        return f'DataFrame {len(value)}x{len(value.columns)}'
+    if isinstance(value, str):
+        # only path-check things shaped like paths: a plain word is a status,
+        # and reporting it as a MISSING path is noise
+        if os.sep in value:
+            return f'path {"exists" if os.path.exists(value) else "MISSING"}: ...{value[-52:]}'
+        return value
+    if isinstance(value, tuple):
+        return f'tuple of {len(value)}: ' + ', '.join(describe(v) for v in value)
+    if isinstance(value, dict):
+        return f'dict, {len(value)} key(s)'
+    if hasattr(value, '__len__'):
+        return f'{type(value).__name__}, {len(value)} item(s)'
+    return repr(value)[:60]
+
+
+def probe(name, call, coverage=None):
+    """Run one preprocessor, then ask whether it covered what exists.
+
+    `coverage` returns (got, expected) as comparable sets, or None when there
+    is nothing meaningful to compare against.
+    """
     start = time.time()
     try:
         value = call()
     except Exception as exc:
-        elapsed = time.time() - start
-        results.append((name, 'FAILED', f'{type(exc).__name__}: {exc}', elapsed))
-        print(f'  [FAILED ] {name}\n             {type(exc).__name__}: {exc}')
+        failed.append((name, f'{type(exc).__name__}: {exc}'))
+        print(f'  [FAIL      ] {name}\n                {type(exc).__name__}: {exc}')
         if os.environ.get('FIGTEST_TRACEBACK'):
             traceback.print_exc()
         return None
     elapsed = time.time() - start
-    size = len(value) if hasattr(value, '__len__') else None
-    if value is None or size == 0:
-        results.append((name, 'no data', f'returned {value!r:.40}', elapsed))
-        print(f'  [no data] {name}  ({elapsed:.1f}s)')
+    summary = describe(value)
+
+    empty = value is None or (hasattr(value, '__len__') and len(value) == 0)
+    if empty:
+        nodata.append((name, summary))
+        print(f'  [no data   ] {name}: {summary}  ({elapsed:.1f}s)')
+        return value
+
+    if coverage is not None:
+        try:
+            got, expected = coverage(value)
+        except Exception as exc:
+            failed.append((name, f'coverage check raised {type(exc).__name__}: {exc}'))
+            print(f'  [FAIL      ] {name}: coverage check raised {exc}')
+            return value
+        missing = set(expected) - set(got)
+        extra = set(got) - set(expected)
+        if missing or extra:
+            detail = (f'covered {sorted(got)}; the record says {sorted(expected)}'
+                      + (f'; MISSING {sorted(missing)}' if missing else '')
+                      + (f'; UNEXPECTED {sorted(extra)}' if extra else ''))
+            incomplete.append((name, detail))
+            print(f'  [incomplete] {name}: {summary}\n                {detail}')
+            return value
+        print(f'  [ok        ] {name}: {summary}, covering all '
+              f'{len(set(expected))}  ({elapsed:.1f}s)')
     else:
-        detail = f'{size} item(s)' if size is not None else repr(value)[:60]
-        results.append((name, 'ok', detail, elapsed))
-        print(f'  [ok     ] {name}: {detail}  ({elapsed:.1f}s)')
+        print(f'  [ok        ] {name}: {summary}  ({elapsed:.1f}s)')
+    fine.append(name)
     return value
 
 
-def which_experiments(exp_name, exp_num):
-    """What production output actually exists, via the scripts' own helper."""
-    import _scenarios
-    print(f'\nscenario discovery  ({exp_name}_#{exp_num})')
-    try:
-        names = _scenarios.scenario_names(exp_name)
-        print(f'  scenarios in the config : {names}')
-    except Exception as exc:
-        print(f'  [FAILED ] scenario_names: {type(exc).__name__}: {exc}')
-        return []
-    present = []
-    for scenario in names:
+# ----------------------------------------------------------- the record
+
+def survey(exp_name, exp_num, scenarios):
+    """What settings.json, repeats.json and the disk each say is there.
+
+    Printed first because every check below is measured against it, and
+    because a disagreement HERE is a refactor problem on its own -- the figure
+    code has not even been reached yet.
+    """
+    print('\nthe record vs the disk')
+    print(f'  {"scenario":<12}{"sims":>6}{"sods":>6}{"repeats":>9}'
+          f'{"seed dirs":>11}  groups')
+    present = {}
+    for scenario in scenarios:
         experiment = f'{exp_name}_{scenario}_#{exp_num}'
         try:
+            sims = sm.read_simulations(experiment)
+            groups = [g['name'] for g in sm.read_groups(experiment)]
             sods = dm.get_simulation_output_dirs(experiment)
-            groups = dm.get_groups(experiment)
-            print(f'  {scenario:<10} {len(sods)} simulation(s), group(s) {groups}')
-            present.append(scenario)
+            ssods = [s for sod in sods
+                     for s in dm.get_seeded_simulation_output_dirs(sod)]
+            repeats = sum(len(jobs.read_repeats(experiment, g)) for g in groups)
         except Exception as exc:
-            print(f'  {scenario:<10} -- {type(exc).__name__}: {exc}')
+            print(f'  {scenario:<12} -- {type(exc).__name__}: {exc}')
+            continue
+        print(f'  {scenario:<12}{len(sims):>6}{len(sods):>6}{repeats:>9}'
+              f'{len(ssods):>11}  {groups}')
+        if len(sims) != len(sods):
+            failed.append((f'record vs disk [{scenario}]',
+                           f'{len(sims)} simulation(s) in settings.json but '
+                           f'{len(sods)} directories in 04_Output'))
+        if repeats != len(ssods):
+            failed.append((f'record vs disk [{scenario}]',
+                           f'{repeats} repeat(s) in repeats.json but '
+                           f'{len(ssods)} seed directories on disk'))
+        present[scenario] = {'sods': sods, 'ssods': ssods, 'groups': groups,
+                             'repeats': repeats}
     return present
 
 
-def figure_1(exp_num, exp_name, scenarios):
-    print('\nfigure 1 preprocessors')
+def seed_dirs(present, scenario):
+    return {int(dm.get_seed_from_SSOD(s))
+            for s in present[scenario]['ssods']}
+
+
+# ------------------------------------------------------------- figures
+
+def figure_1(exp_num, exp_name, present):
+    print('\nfigure 1')
     import fig1_preprocess_data as f1
-    run('fig1.get_panel_a_data',
-        lambda: f1.get_panel_a_data(exp_num=exp_num, exp_name=exp_name))
-    run('fig1.get_panel_b_data',
-        lambda: f1.get_panel_b_data(exp_num=exp_num, exp_name=exp_name))
-    # panels c and d/e read Data/RealWorldData -- tracked files, and the ones
-    # that went missing in the quota cleanup
-    run('fig1.get_panel_c_data  (RealWorldData)', f1.get_panel_c_data)
-    run('fig1.get_panel_de_data (RealWorldData)', f1.get_panel_de_data)
-    run('fig1.get_model_global_clock',
-        lambda: f1.get_model_global_clock(exp_num=exp_num, exp_name=exp_name))
-    run('fig1.get_model_intrahost_clock',
-        lambda: f1.get_model_intrahost_clock(exp_num=exp_num, exp_name=exp_name))
+    # each of these loops scenarios with `except Exception: continue`, so a
+    # scenario that cannot be read vanishes instead of raising
+    expected = {f1.get_clinical_label(s) for s in present}
 
-
-def figure_2(exp_num, exp_name, scenarios, heavy):
-    print('\nfigure 2 preprocessors')
-    import fig2_preprocess_data as f2
-    seeds = run('fig2.get_shared_valid_seeds',
-                lambda: f2.get_shared_valid_seeds(exp_num, scenarios,
-                                                  exp_name=exp_name))
-    if not seeds:
-        print('        (no shared valid seed -- the per-seed panels need one)')
-        return
-    seed = sorted(seeds)[0]
-    scenario = scenarios[0]
-    print(f'        using scenario={scenario} seed={seed}')
-    run('fig2.get_target_seed_dir',
-        lambda: f2.get_target_seed_dir(exp_num, scenario, seed,
-                                       exp_name=exp_name))
-    run('fig2.get_fig2_freq_data',
-        lambda: f2.get_fig2_freq_data(exp_num, scenario, seed,
-                                      exp_name=exp_name))
-    if heavy:
-        run('fig2.get_fig2_clustered_data',
-            lambda: f2.get_fig2_clustered_data(exp_num, scenario, seed,
+    probe('fig1.get_panel_a_data',
+          lambda: f1.get_panel_a_data(exp_num=exp_num, exp_name=exp_name),
+          coverage=lambda df: (set(df['cohort']), expected))
+    # this one DOES loop every scenario, and drops any that raises, so a
+    # missing cohort is either a broken read or an empty input -- and those
+    # look identical from the outside. Count the input per scenario so an
+    # `incomplete` says which.
+    panel_b = probe('fig1.get_panel_b_data',
+                    lambda: f1.get_panel_b_data(exp_num=exp_num,
+                                                exp_name=exp_name),
+                    coverage=lambda df: (set(df['cohort']) if 'cohort' in df
+                                         else set(), expected))
+    if panel_b is not None and set(panel_b.get('cohort', [])) != expected:
+        print('        why: usable rows per scenario (it needs individuals of '
+              'the right type with a recorded end of infection)')
+        for scenario in sorted(present):
+            wanted = 'standard' if scenario == 'control' else 'long_shedder'
+            usable = 0
+            for ssod in present[scenario]['ssods']:
+                try:
+                    frame = om.read_individuals_data(ssod)
+                    rows = frame[frame['type'] == wanted]
+                    usable += int(rows['t_not_infected'].notna().sum())
+                except Exception:
+                    pass
+            print(f'          {scenario:<10} {usable:>5} {wanted} row(s) with '
+                  f't_not_infected')
+    # control only, by contract: "standard individuals in control, divergence
+    # from the outbreak root". Expecting every cohort here would be the test
+    # being wrong, not the function.
+    probe('fig1.get_model_global_clock',
+          lambda: f1.get_model_global_clock(exp_num=exp_num, exp_name=exp_name),
+          coverage=lambda df: (set(df['cohort']) if 'cohort' in df else set(),
+                               {'Control'} if 'control' in present else set()))
+    probe('fig1.get_model_intrahost_clock',
+          lambda: f1.get_model_intrahost_clock(exp_num=exp_num,
                                                exp_name=exp_name))
-        run('fig2.get_fig2_divergence_data',
-            lambda: f2.get_fig2_divergence_data(exp_num, scenario, [seed],
-                                                exp_name=exp_name))
+    # these two read Data/RealWorldData -- tracked files, and the ones that
+    # went missing in the quota cleanup
+    probe('fig1.get_panel_c_data  (RealWorldData)', f1.get_panel_c_data)
+    probe('fig1.get_panel_de_data (RealWorldData)', f1.get_panel_de_data)
 
 
-def figure_3(exp_num, exp_name, scenarios, heavy):
-    print('\nfigure 3 preprocessors')
-    import fig3_preprocess_data as f3
-    group = scenarios[0]
-    run('fig3._experiment_sod',
-        lambda: f3._experiment_sod(exp_num, group, exp_name=exp_name))
-    run('fig3.get_panel_a_data',
-        lambda: f3.get_panel_a_data(exp_num, group))
+def figure_2(exp_num, exp_name, present, heavy):
+    print('\nfigure 2')
+    import fig2_preprocess_data as f2
+    scenarios = sorted(present)
+    if 'control' not in present:
+        print('  [n/a       ] fig2 selects its seeds from `control`, which has '
+              'no output here')
+        notapplicable.append(('fig2', 'no control experiment'))
+        return
+    control_seeds = seed_dirs(present, 'control')
+
+    seeds = probe(
+        'fig2.get_shared_valid_seeds',
+        lambda: f2.get_shared_valid_seeds(exp_num, scenarios, exp_name=exp_name),
+        # it samples from control's repeats that ran long enough, so it must be
+        # a SUBSET of control's seeds -- a seed it returns that does not exist
+        # on disk means it is reading the wrong tree
+        coverage=lambda got: (set(got), set(got) & control_seeds))
+    if not seeds:
+        return
+    print(f'        control has {len(control_seeds)} seed dir(s); '
+          f'{len(seeds)} passed the run-length filter')
+
+    seed, scenario = sorted(seeds)[0], scenarios[0]
+    probe('fig2.get_target_seed_dir',
+          lambda: f2.get_target_seed_dir(exp_num, scenario, seed,
+                                         exp_name=exp_name),
+          coverage=lambda p: ({os.path.basename(str(p))},
+                              {f'seed_{seed:04d}'}))
+    probe('fig2.get_fig2_freq_data',
+          lambda: f2.get_fig2_freq_data(exp_num, scenario, seed,
+                                        exp_name=exp_name))
     if heavy:
-        # panel b and c build SNP matrices; slow, and the pair that compared
-        # 1,494 long-shedder lineages against 6 sequenced standards
-        run('fig3.get_panel_b_data',
-            lambda: f3.get_panel_b_data(exp_num, scenarios))
+        probe('fig2.get_fig2_clustered_data',
+              lambda: f2.get_fig2_clustered_data(exp_num, scenario, seed,
+                                                 exp_name=exp_name))
+        probe('fig2.get_fig2_divergence_data',
+              lambda: f2.get_fig2_divergence_data(exp_num, scenario, [seed],
+                                                  exp_name=exp_name))
+
+
+def figure_3(exp_num, exp_name, present, heavy):
+    print('\nfigure 3')
+    import fig3_preprocess_data as f3
+    scenario = sorted(present)[0]
+    known = set(present[scenario]['sods'])
+    probe('fig3._experiment_sod',
+          lambda: f3._experiment_sod(exp_num, scenario, exp_name=exp_name),
+          # it must hand back one of the simulation directories that exist,
+          # not a path it built and never checked
+          coverage=lambda p: ({str(p)}, {str(p)} & known))
+    probe('fig3.get_panel_a_data', lambda: f3.get_panel_a_data(exp_num, scenario))
+    if heavy:
+        probe('fig3.get_panel_b_data',
+              lambda: f3.get_panel_b_data(exp_num, sorted(present)))
 
 
 def long_paper(exp_num):
-    print('\nlong-paper preprocessors  (a different experiment shape)')
+    print('\nlong-paper figures  (a DIFFERENT experiment shape: the grid)')
+    master = os.path.join(dm.get_data_dir(), f'master_grid_log_#{exp_num}.csv')
+    if not os.path.isfile(master):
+        print(f'  [n/a       ] no grid at {os.path.basename(master)} -- these '
+              f'read the long-paper grid, not the impact pipeline')
+        notapplicable.append(('long_paper', f'no {os.path.basename(master)}'))
+        return
     import long_shedders_preprocess as lp
-    run('long_paper.read_master_log', lambda: lp.read_master_log(exp_num))
-    run('long_paper.get_baseline_sod', lambda: lp.get_baseline_sod(exp_num))
+    probe('long_paper.read_master_log', lambda: lp.read_master_log(exp_num))
+    probe('long_paper.get_baseline_sod', lambda: lp.get_baseline_sod(exp_num))
 
 
-def library(exp_name, exp_num, scenarios):
-    print('\nplots_manager entry points, against one production experiment')
+def library(exp_name, exp_num, present):
+    print('\nplots_manager / output_manager, against one production experiment')
     import simplicity.plots_manager as pm
-    import simplicity.output_manager as om
-    experiment = f'{exp_name}_{scenarios[0]}_#{exp_num}'
-    run('om.get_IH_lineages_data_experiment',
-        lambda: om.get_IH_lineages_data_experiment(experiment))
-    run('pm.plot_IH_lineage_distribution_grouped_by_simulation',
-        lambda: pm.plot_IH_lineage_distribution_grouped_by_simulation(experiment)
-        or 'rendered')
+    scenario = sorted(present)[0]
+    experiment = f'{exp_name}_{scenario}_#{exp_num}'
+    sods = present[scenario]['sods']
+    # no coverage check: this returns one row per intra-host LINEAGE, not per
+    # simulation, so comparing its row indices against the simulation count
+    # (which an earlier version did) compares two unrelated things and reports
+    # a difference that means nothing.
+    probe('om.get_IH_lineages_data_experiment',
+          lambda: om.get_IH_lineages_data_experiment(experiment))
+    # returns None; it is run for its side effect, so report that it did not
+    # raise rather than letting describe() read the word "rendered" as a path
+    probe('pm.plot_IH_lineage_distribution_grouped_by_simulation',
+          lambda: (pm.plot_IH_lineage_distribution_grouped_by_simulation(
+              experiment), 'no exception')[1])
 
 
 def main():
@@ -185,49 +327,58 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--exp-num', type=int, required=True)
-    parser.add_argument('--exp-name', default='impact_long_shedders',
-                        help='impact_long_shedders or impact_long_shedders_unbound')
+    parser.add_argument('--exp-name', default='impact_long_shedders')
     parser.add_argument('--heavy', action='store_true',
-                        help='also run the SNP-matrix panels (minutes)')
+                        help='also the SNP-matrix panels (minutes)')
     parser.add_argument('--traceback', action='store_true')
     args = parser.parse_args()
     if args.traceback:
         os.environ['FIGTEST_TRACEBACK'] = '1'
 
-    scenarios = which_experiments(args.exp_name, args.exp_num)
-    if not scenarios:
-        print('\nNo production output found. Nothing to test against -- run the '
-              'pipeline first, or check --exp-num / --exp-name.')
+    import _scenarios
+    scenarios = _scenarios.scenario_names(args.exp_name)
+    print(f'scenarios in the config: {scenarios}')
+    present = survey(args.exp_name, args.exp_num, scenarios)
+    if not present:
+        print('\nNo production output. Run the pipeline, or check --exp-num.')
         sys.exit(1)
 
-    for stage in (lambda: figure_1(args.exp_num, args.exp_name, scenarios),
-                  lambda: figure_2(args.exp_num, args.exp_name, scenarios, args.heavy),
-                  lambda: figure_3(args.exp_num, args.exp_name, scenarios, args.heavy),
+    for stage in (lambda: figure_1(args.exp_num, args.exp_name, present),
+                  lambda: figure_2(args.exp_num, args.exp_name, present, args.heavy),
+                  lambda: figure_3(args.exp_num, args.exp_name, present, args.heavy),
                   lambda: long_paper(args.exp_num),
-                  lambda: library(args.exp_name, args.exp_num, scenarios)):
+                  lambda: library(args.exp_name, args.exp_num, present)):
         try:
             stage()
         except Exception as exc:
-            print(f'  [FAILED ] the stage itself: {type(exc).__name__}: {exc}')
-            results.append(('<stage setup>', 'FAILED',
-                            f'{type(exc).__name__}: {exc}', 0.0))
-
-    failed = [r for r in results if r[1] == 'FAILED']
-    nodata = [r for r in results if r[1] == 'no data']
-    ok = [r for r in results if r[1] == 'ok']
+            failed.append(('<stage setup>', f'{type(exc).__name__}: {exc}'))
+            print(f'  [FAIL      ] the stage itself: {type(exc).__name__}: {exc}')
+            if args.traceback:
+                traceback.print_exc()
 
     print('\n' + '=' * 72)
-    print(f'{len(ok)} ok, {len(nodata)} returned no data, {len(failed)} FAILED')
+    print(f'{len(fine)} ok, {len(incomplete)} incomplete, {len(nodata)} no data, '
+          f'{len(notapplicable)} n/a, {len(failed)} FAILED')
+
     if nodata:
-        print('\nreturned no data (legitimate on a small or partial run):')
-        for name, _o, detail, _s in nodata:
-            print(f'  {name}')
-    if failed:
-        print('\nFAILED -- these are the ones that matter:')
-        for name, _o, detail, _s in failed:
+        print('\nno data (legitimate: an absent input, or a filter nothing passed)')
+        for name, detail in nodata:
+            print(f'  {name}: {detail}')
+    if notapplicable:
+        print('\nn/a (that experiment shape was not run)')
+        for name, detail in notapplicable:
+            print(f'  {name}: {detail}')
+    if incomplete:
+        print('\nINCOMPLETE -- returned, but covered less than exists:')
+        for name, detail in incomplete:
             print(f'  {name}\n      {detail}')
-        print('\nRe-run with --traceback for the full stack of each.')
-    sys.exit(1 if failed else 0)
+    if failed:
+        print('\nFAILED:')
+        for name, detail in failed:
+            print(f'  {name}\n      {detail}')
+        print('\n--traceback for the full stack of each.')
+
+    sys.exit(1 if (failed or incomplete) else 0)
 
 
 if __name__ == '__main__':
