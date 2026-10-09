@@ -250,8 +250,11 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
             print(f"{label:<17}: Could not compute calibration ({e})")
             continue
 
-        x_vals = np.linspace(group_df['nucleotide_substitution_rate_long'].min(),
-                            group_df['nucleotide_substitution_rate_long'].max(), 100)
+        # geomspace, not linspace: the sweep is geometric and the axis is log,
+        # so evenly-spaced-in-linear points would put almost none of the curve
+        # in the lowest decade -- which is where the target is crossed
+        x_vals = np.geomspace(group_df['nucleotide_substitution_rate_long'].min(),
+                              group_df['nucleotide_substitution_rate_long'].max(), 200)
         y_vals = fit_result.eval(x=x_vals)
         plt.plot(x_vals, y_vals, color=color, linewidth=2, label=f"{label} fit")
         plt.plot(calibrated_nsr, target_osr_long, marker='*', markersize=12,
@@ -259,6 +262,12 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
 
     plt.axhline(target_osr_long, color='black', linestyle='--', linewidth=1.5,
               label='Target OSR')
+    # Log x, matching cal_2's plot, which has had it all along. The sweep is
+    # np.geomspace(1e-4, 1e-2, 10), so on a linear axis five of the ten points
+    # fall below 7.8e-4 and pile into the leftmost ~8% of the panel -- which is
+    # exactly where the target line is crossed and the calibrated value is read
+    # off. The figure was compressing the one region it exists to show.
+    plt.xscale('log')
     plt.title('Long-Shedder OSR Calibration by Scenario')
     plt.xlabel('Input Nucleotide Substitution Rate (NSR)')
     plt.ylabel('Observed Substitution Rate (OSR)')
