@@ -613,6 +613,14 @@ def write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq_number=0, min
 
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
     all_sod_dfs = []
+    # Why a repeat contributed nothing, counted rather than swallowed. The loop
+    # below used to `except Exception: continue`, so an empty table looked
+    # identical whether the cause was thin data or a tree it could not read --
+    # and an empty table is exactly what a broken read produces. Behaviour is
+    # unchanged (a repeat that cannot be used is still skipped); it is now
+    # possible to tell which happened.
+    used = 0
+    skipped = {}
 
     for sod in simulation_output_dirs:
         parameter_value = sm.get_parameter_value_from_simulation_output_dir(sod, parameter)
@@ -644,8 +652,19 @@ def write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq_number=0, min
                         'simulation_id': os.path.basename(sod),
                         'is_outlier': 0
                     })
-            except Exception:
-                continue
+                    used += 1
+                else:
+                    reason = ('below min_seq_number' if seq_number < min_seq_number
+                              else 'below min_sim_lenght')
+                    skipped[reason] = skipped.get(reason, 0) + 1
+            except FileNotFoundError:
+                # no sequencing output: this repeat diagnosed nobody, which is
+                # normal and not a fault
+                skipped['no sequencing output'] = skipped.get(
+                    'no sequencing output', 0) + 1
+            except Exception as exc:
+                skipped[f'{type(exc).__name__}: {exc}'] = skipped.get(
+                    f'{type(exc).__name__}: {exc}', 0) + 1
         
         # Detect outliers for this SOD
         if sod_results:
@@ -653,11 +672,20 @@ def write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq_number=0, min
             sod_df = detect_sod_outliers(sod_df)
             all_sod_dfs.append(sod_df)
 
+    total = used + sum(skipped.values())
+    if skipped:
+        print(f"[OSR] {experiment_name}: {used}/{total} repeat(s) contributed; "
+              f"skipped " + ", ".join(f"{n}x {why}"
+                                      for why, n in sorted(skipped.items())))
+
     if all_sod_dfs:
         final_df = pd.concat(all_sod_dfs, ignore_index=True)
         final_df.sort_values(by=str(parameter)).to_csv(csv_file_path, index=False)
     else:
-        print("No results to write for individual OSR.")
+        print(f"No results to write for individual OSR: none of {total} "
+              f"repeat(s) in {experiment_name} produced a usable rate. "
+              f"If the skip reasons above are not about data volume, the "
+              f"output tree may not be readable.")
 
 def read_OSR_vs_parameter_csv(experiment_name, 
                               parameter,

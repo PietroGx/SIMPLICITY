@@ -5,6 +5,54 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.76 — 2026-10-09 — pietro gerletti
+
+Two ways a wrong answer could have stayed invisible.
+
+RENUMBERING REPEATS UNDER LIVE STATE IS NOW REFUSED
+
+Repeat indices are simulation-major, so changing n_seeds moves everything
+after the first simulation:
+
+    n_seeds=5     index 5 is (simulation 1, seed 0)
+    n_seeds=30    index 5 is (simulation 0, seed 5)
+
+State files are keyed by index and prepare_resume keeps whatever is marked
+completed, so re-running with a different seed count and --rerun would have
+skipped work that was never done and attributed finished output to the wrong
+parameters. Nothing compared the two: the repeat list is rewritten by
+write_repeats, the state is read by prepare_resume, and neither looked at the
+other. That is the exact failure this repo keeps hitting -- a measurement
+attached to something other than what its index claims.
+
+write_repeats now compares the new list's identity against the one on disk and
+refuses if the group already carries state, naming the fresh --exp-num or the
+state directory to clear. Rewriting an unchanged list is still fine, so an
+ordinary resume is unaffected.
+
+AN EMPTY OSR TABLE NOW SAYS WHY
+
+write_OSR_vs_parameter_csv wrapped its per-repeat body in `except Exception:
+continue`. An empty table therefore looked identical whether the cause was
+thin data or an output tree it could not read -- and an unreadable tree is
+exactly what produces an empty table. Skips are now counted by reason and
+reported:
+
+    [OSR] analysis_probe: 2/4 repeat(s) contributed; skipped 2x no sequencing output
+
+A repeat that diagnosed nobody has no sequencing file and is skipped quietly
+by name; anything else is reported with its exception type. Behaviour is
+unchanged -- an unusable repeat is still skipped -- it is now possible to tell
+which happened.
+
+While confirming that, a smaller thing surfaced and is left alone: with one
+contributing repeat per simulation, detect_sod_outliers flags the lone row
+(the statistic is degenerate on a single observation), so the default
+outlier-excluding read returns nothing from a non-empty csv. It cannot bite at
+production seed counts, and the fit is not being touched.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.75 — 2026-10-09 — pietro gerletti
 
 cal_1's calibration plot gets the log x-axis cal_2 already had.

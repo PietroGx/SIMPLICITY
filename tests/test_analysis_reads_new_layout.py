@@ -178,6 +178,21 @@ def main():
             check('the table carries the swept parameter',
                   'R' in table.columns, True)
 
+        # The default read drops outliers, and detect_sod_outliers flags a lone
+        # row (the statistic is degenerate on one observation), so with one
+        # contributing repeat per simulation the default read is empty while
+        # the csv is not. Assert the chain that is a layout question -- rows
+        # written, rows read back, values right -- not the outlier policy.
+        raw = check_runs('the csv itself has rows',
+                         lambda: om.read_OSR_vs_parameter_csv(
+                             name, 'R', 0, 0, include_outliers=True))
+        if raw is not None and len(raw):
+            check('one row per repeat that had sequencing output',
+                  len(raw), sum(1 for one in ssods if os.path.isfile(
+                      os.path.join(one, 'sequencing_data_regression.csv'))))
+            check('and the swept values came through',
+                  sorted(set(raw['R'])), [1.05, 1.3])
+
         # Row COUNT is not a layout question and must not be asserted here.
         # write_OSR_vs_parameter_csv wraps its per-repeat body in a bare
         # `except Exception: continue` (output_manager.py:627), and

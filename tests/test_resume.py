@@ -57,6 +57,7 @@ def check(label, got, want):
 
 
 def main():
+    test_renumbering_under_state_is_refused()
     try:
         with Experiment(n_simulations=4) as exp:
             # one of each: finished, failed, half-started, never touched
@@ -147,6 +148,47 @@ def main():
     print('\n' + ('FAILURES:\n  ' + '\n  '.join(failures) if failures
                   else 'all passed'))
     sys.exit(1 if failures else 0)
+
+
+def test_renumbering_under_state_is_refused():
+    '''Changing n_seeds renumbers repeats, so resuming would mis-attribute.'''
+    import simplicity.settings_manager as sm
+    print('\nwrite_repeats refuses to renumber a group that carries state')
+    with Experiment(n_simulations=3, n_seeds=2) as exp:
+        before = jobs.repeat_identity(jobs.read_repeats(exp.name, 'main'))
+        exp.set(0, jobs.COMPLETED)
+
+        # the same n_seeds is not a renumbering, so a resume still works
+        jobs.write_repeats(exp.name)
+        check('rewriting the same list is allowed',
+              jobs.repeat_identity(jobs.read_repeats(exp.name, 'main')), before)
+        check('and the completed repeat is untouched',
+              exp.state(0), jobs.COMPLETED)
+
+        # now change n_seeds, which moves everything after simulation 0
+        record = sm.read_experiment_settings_file(exp.name)
+        record['n_seeds'] = 4
+        for group in record['groups']:
+            group['n_seeds'] = 4
+        with open(sm.get_experiment_settings_file_path(exp.name), 'w') as handle:
+            import json; json.dump(record, handle)
+
+        raised = ''
+        try:
+            jobs.write_repeats(exp.name)
+        except RuntimeError as exc:
+            raised = str(exc)
+        check('renumbering under live state is refused', bool(raised), True)
+        check('and it says why', 'WRONG repeats' in raised, True)
+        check('and how to proceed', '--exp-num' in raised, True)
+        check('the repeat list on disk is unchanged',
+              jobs.repeat_identity(jobs.read_repeats(exp.name, 'main')), before)
+
+        # with the state cleared, the same change is fine
+        jobs.clear_state(exp.name, 'main', 0)
+        jobs.write_repeats(exp.name)
+        check('clearing the state allows it',
+              len(jobs.read_repeats(exp.name, 'main')), 12)
 
 
 if __name__ == '__main__':

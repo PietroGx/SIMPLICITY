@@ -135,11 +135,30 @@ def repeats_path(experiment_name, group):
                         REPEATS_FILENAME)
 
 
+def repeat_identity(records):
+    """What index i MEANS, as a list. Two repeat lists with the same identity
+    are interchangeable; two with different identities are not."""
+    return [(record["simulation"], record["seed"]) for record in records]
+
+
 def write_repeats(experiment_name):
     """Record each group's ordered repeat list, from the experiment settings.
 
     Simulations in id order, seeds 0..n_seeds-1 within each. This order IS the
     Slurm array mapping, so it is written down rather than rediscovered.
+
+    Refuses to renumber a group that already carries state. The ordering is
+    simulation-major, so changing n_seeds moves everything after the first
+    simulation:
+
+        n_seeds=5    index 5 is (simulation 1, seed 0)
+        n_seeds=30   index 5 is (simulation 0, seed 5)
+
+    State files are keyed by index, and prepare_resume keeps whatever is marked
+    completed. Renumbering under them would therefore make a resume skip work
+    that was never done, and attribute finished output to the wrong parameters
+    -- silently, because nothing compares the two. That is the failure this
+    repo exists to avoid, so it is refused rather than detected later.
     """
     import simplicity.settings_manager as sm
     simulations = sm.read_simulations(experiment_name)
@@ -156,6 +175,23 @@ def write_repeats(experiment_name):
                                 'simulation': simulation['id'],
                                 'stem': stem,
                                 'seed': seed})
+
+        previous = read_repeats(experiment_name, name)
+        if previous and repeat_identity(previous) != repeat_identity(records):
+            states = read_all_states(experiment_name, name)
+            if states:
+                raise RuntimeError(
+                    f"{experiment_name}: group {name!r} already carries state "
+                    f"for {len(states)} repeat(s), but the repeat list has "
+                    f"changed ({len(previous)} -> {len(records)}).\n"
+                    f"Repeat indices are simulation-major, so this renumbers "
+                    f"them: index i no longer means the same (simulation, "
+                    f"seed). Resuming would keep state attached to the WRONG "
+                    f"repeats.\n"
+                    f"Run at a fresh --exp-num, or delete "
+                    f"{state_dir(experiment_name, name)} to start this group "
+                    f"over.")
+
         _write_json(repeats_path(experiment_name, name), records)
         written[name] = records
     return written
