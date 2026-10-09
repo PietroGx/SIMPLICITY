@@ -31,12 +31,21 @@ WHAT IT DOES
 Phase 1  submits four trivial repeats and lets them finish.
 Phase 2  clears two of them and re-runs with SIMPLICITY_RESUME=1: the two that
          finished must be skipped, not recomputed, and the two cleared must run.
-Phase 3  submits a second experiment with a 1-minute walltime and a horizon it
-         cannot reach, so Slurm kills the tasks. The reconciler must mark them
+Phase 3  submits a second experiment whose repeats cannot finish inside a
+         2-minute walltime, so Slurm kills them. The reconciler must mark them
          failed from sacct and the loop must exit instead of hanging.
 
-Phase 3 deliberately produces FAILED repeats and a wasted minute of walltime.
---skip-kill leaves it out.
+         It is sized by WORK, not by horizon. The first version used a 3000-day
+         final_time against 200 individuals and every task completed in twelve
+         seconds -- final_time is simulated days, and a small population burns
+         through them instantly. Nothing was killed, the reconciler never ran,
+         and the phase passed anyway, because "no repeat left started" and
+         "every repeat reached a terminal state" are both trivially true when
+         everything completes. If nothing is killed this now reports
+         INCONCLUSIVE and exits non-zero rather than going green.
+
+Phase 3 deliberately produces FAILED repeats and burns a couple of minutes of
+walltime on 4000 individuals. --skip-kill leaves it out.
 
 It writes into Data/ under its own experiment names, so pick an --exp-num
 nothing else is using. Everything it creates is left on disk for inspection.
@@ -56,6 +65,7 @@ import simplicity.jobs as jobs
 import simplicity.settings_manager as sm
 
 failures = []
+inconclusive = []
 
 
 def check(label, got, want):
@@ -66,7 +76,8 @@ def check(label, got, want):
     return ok
 
 
-def submit(name, final_time, seeds=2, walltime=None):
+def submit(name, final_time, seeds=2, walltime=None,
+           population=200, infected=20):
     import simplicity.runme as runme
     import simplicity.runners.slurm as slurm
     if walltime:
@@ -74,8 +85,8 @@ def submit(name, final_time, seeds=2, walltime=None):
     runme.run_experiment(
         name,
         lambda: ({'R': [1.1, 1.4]},
-                 {'population_size': 200,
-                  'infected_individuals_at_start': 20,
+                 {'population_size': population,
+                  'infected_individuals_at_start': infected,
                   'final_time': final_time}, seeds),
         simplicity_runner=slurm, archive_experiment=False)
 
@@ -149,15 +160,20 @@ def phase_1_and_2(exp_num):
 def phase_3(exp_num):
     name = f'slurm_kill_check_#{exp_num}'
     print(f'\n=== phase 3: tasks the scheduler kills  ({name})')
-    print('    1-minute walltime against a 3000-day horizon -- Slurm will')
-    print('    terminate these, so job() never records a terminal state and')
-    print('    only reconcile_terminated_tasks can unblock the loop.')
+    print('    A 2-minute walltime against a population large enough that one')
+    print('    repeat cannot finish inside it. Slurm then terminates the task,')
+    print('    so job() never records a terminal state and only')
+    print('    reconcile_terminated_tasks can unblock the loop.')
+    print('    NOTE final_time is SIMULATED days, not wall time: a small')
+    print('    population burns through a long horizon in seconds. The kill has')
+    print('    to come from real work, which is why this one is big.')
     import simplicity.runners.slurm as slurm
     saved = slurm.RECONCILE_INTERVAL_S
     slurm.RECONCILE_INTERVAL_S = 60        # do not wait the default 15 minutes
     started = time.time()
     try:
-        submit(name, final_time=3000, seeds=1, walltime='00:01:00')
+        submit(name, final_time=1095, seeds=1, population=4000,
+               infected=200, walltime='00:02:00')
     except Exception as exc:
         print(f'  [note] the run raised: {type(exc).__name__}: {exc}')
     finally:
@@ -176,9 +192,23 @@ def phase_3(exp_num):
     reconciled = [k for k, v in final.items() if v == jobs.FAILED
                   and (jobs.get_state(name, *_split(k)) or {}).get('reconciled')]
     print(f'    reconciled from sacct: {len(reconciled)} of {len(final)}')
-    if not reconciled:
-        print('      (none carried a `reconciled` marker -- if the tasks were')
-        print('       killed, the reconciler is not seeing them; check sacct)')
+
+    # If nothing was killed, the reconciler never ran and the three checks
+    # above passed for the wrong reason -- they are all trivially true when
+    # every task completes. Say so instead of going green: a test that reports
+    # success while exercising nothing is worse than no test.
+    if all(v == jobs.COMPLETED for v in final.values()):
+        inconclusive.append(
+            'phase 3 did not kill anything: every repeat completed inside the '
+            'walltime, so reconcile_terminated_tasks was never reached. Raise '
+            'the population or lower SIMPLICITY_SLURM_TIME and run it again.')
+        print('    INCONCLUSIVE -- nothing was killed, so nothing was tested.')
+        return
+
+    check('a killed repeat was recorded failed',
+          any(v == jobs.FAILED for v in final.values()), True)
+    check('and the reconciler is what recorded it',
+          len(reconciled) > 0, True)
 
 
 def _split(key):
@@ -205,13 +235,17 @@ def main():
         phase_3(args.exp_num)
 
     print('\n' + '=' * 70)
+    if inconclusive:
+        print('INCONCLUSIVE:')
+        for line in inconclusive:
+            print(f'  {line}')
     if failures:
         print(f'{len(failures)} FAILURE(S):')
         for line in failures:
             print(f'  {line}')
-    else:
+    elif not inconclusive:
         print('resume and reconciliation work against a real Slurm')
-    sys.exit(1 if failures else 0)
+    sys.exit(1 if (failures or inconclusive) else 0)
 
 
 if __name__ == '__main__':
