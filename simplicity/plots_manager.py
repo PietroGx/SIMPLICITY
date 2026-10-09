@@ -360,7 +360,7 @@ def plot_tempest_regression(sequencing_data_df,
     
 def plot_combined_tempest_regressions(experiment_name, parameter, 
                                       min_seq_number=0, min_sim_lenght=0, individual_type=None,
-                                      y_axis_max=0.01):
+                                      y_axis_max=0.01, group=None):
     """
     Plot a grid of tempest regressions for each simulation, grouped by a parameter value.
 
@@ -385,7 +385,7 @@ def plot_combined_tempest_regressions(experiment_name, parameter,
         Maximum y-axis value for all plots (default is 0.1).
     """
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
 
     # Sort simulation directories by parameter value
     sorted_simulation_output_dirs = sorted(
@@ -439,7 +439,7 @@ def plot_combined_tempest_regressions(experiment_name, parameter,
 def plot_combined_OSR_vs_parameter(experiment_name, 
                                     parameter,  
                                     min_seq_number=0,
-                                    min_sim_lenght=0):
+                                    min_sim_lenght=0, group=None):
     """
     Plot observed substitution rate (OSR) against the desired simulation parameter.
 
@@ -466,7 +466,8 @@ def plot_combined_OSR_vs_parameter(experiment_name,
     df = om.read_OSR_vs_parameter_csv(experiment_name, 
                                       parameter,
                                       min_seq_number,
-                                      min_sim_lenght)
+                                      min_sim_lenght,
+                                      group=group)
 
     # Create figure and axis
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -503,7 +504,7 @@ def plot_combined_OSR_fit(experiment_name,
                           fit_result, 
                           model_type, 
                           min_seq_number,
-                          min_sim_lenght):
+                          min_sim_lenght, group=None):
     """
     Plot the fit of nucleotide substitution rate (NSR) vs. observed substitution rate (OSR).
 
@@ -533,7 +534,8 @@ def plot_combined_OSR_fit(experiment_name,
         experiment_name,
         'nucleotide_substitution_rate',
         min_seq_number,
-        min_sim_lenght
+        min_sim_lenght,
+        group=group
     )
     x_data = data['nucleotide_substitution_rate']
     y_data = data['observed_substitution_rate']
@@ -583,7 +585,7 @@ def plot_OSR_fit(experiment_name,
                  fit_result, 
                  model_type,
                  min_seq_number,
-                 min_sim_lenght):
+                 min_sim_lenght, group=None):
     """
     Plot nucleotide substitution rate vs. observed substitution rate (OSR)
     including three panel views (linear, semilog, and log-log).
@@ -622,10 +624,10 @@ def plot_OSR_fit(experiment_name,
     
     # import combined regression data
     combined_data = om.read_combined_OSR_vs_parameter_csv(
-        experiment_name, parameter, min_seq_number, min_sim_lenght)
+        experiment_name, parameter, min_seq_number, min_sim_lenght, group=group)
     # import single simulations regression data
     data = om.read_OSR_vs_parameter_csv(
-        experiment_name, parameter, min_seq_number, min_sim_lenght)
+        experiment_name, parameter, min_seq_number, min_sim_lenght, group=group)
     # Group by nucleotide_substitution_rate and compute mean and standard deviation for OSR
     data_mean_df = om.get_mean_std_OSR(
         experiment_name, parameter, min_seq_number, min_sim_lenght)
@@ -894,7 +896,7 @@ def plot_extrande_pop_runtime(extrande_pop_runtime_csv):
 #                          Diagnosis rate plots
 # -----------------------------------------------------------------------------
     
-def plot_effective_theoretical_diagnosis_rate(experiment_name,individual_type):
+def plot_effective_theoretical_diagnosis_rate(experiment_name,individual_type, group=None):
     """
     Plot effective vs. theoretical diagnosis rate as a scatter plot with regression fit.
 
@@ -908,7 +910,7 @@ def plot_effective_theoretical_diagnosis_rate(experiment_name,individual_type):
         Name of the experiment used to retrieve simulation outputs and save the plot.
     """
 
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
 
     diagnosis_rates_coord = []
     std_effective_rates = []
@@ -954,7 +956,7 @@ def plot_effective_theoretical_diagnosis_rate(experiment_name,individual_type):
     plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
     plt.close(fig)
 
-def plot_heatmap_R_diagnosis_rate(experiment_name):
+def plot_heatmap_R_diagnosis_rate(experiment_name, group=None):
     """
     Plot a heatmap showing the relationship between R and theoretical diagnosis rate.
 
@@ -966,7 +968,7 @@ def plot_heatmap_R_diagnosis_rate(experiment_name):
     experiment_name : str
         Name of the experiment used to retrieve simulation output and save the plot.
     """
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
 
     theoretical_diagnosis_rates = []
     R_values = []
@@ -1069,7 +1071,7 @@ def plot_IH_lineage_distribution(experiment_name):
     plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
     plt.close(fig)
 
-def plot_IH_lineage_distribution_simulation(experiment_name):
+def plot_IH_lineage_distribution_simulation(experiment_name, group=None):
     """
     Plot intra-host distinct lineage distributions for each simulation in the experiment.
 
@@ -1081,7 +1083,7 @@ def plot_IH_lineage_distribution_simulation(experiment_name):
     experiment_name : str
         Name of the experiment used to load simulation data and save the plot.
     """
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
     num_sims = len(simulation_output_dirs)
 
     ncols = 2
@@ -1129,7 +1131,7 @@ def plot_IH_lineage_distribution_simulation(experiment_name):
     plt.savefig(figure_output_path, format='tiff', dpi=300, bbox_inches='tight')
     plt.close(fig)
 
-def plot_IH_lineage_distribution_grouped_by_simulation(experiment_name):
+def plot_IH_lineage_distribution_grouped_by_simulation(experiment_name, group=None):
     """
     Plot intra-host lineage distributions grouped by tau_3 parameter across simulations.
 
@@ -1141,7 +1143,7 @@ def plot_IH_lineage_distribution_grouped_by_simulation(experiment_name):
     experiment_name : str
         Name of the experiment used to retrieve simulation data and save the plot.
     """
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
     plot_output_dir = dm.get_experiment_plots_dir(experiment_name)
 
     all_data = []
@@ -1786,17 +1788,18 @@ def plot_R_effective(experiment_name, seeded_simulation_output_dir, window_size,
 def plot_OSR_and_IH_lineages_by_parameter(experiment_name, 
                                            parameter='tau_3', 
                                            min_seq_number=0, 
-                                           min_sim_lenght=0):
+                                           min_sim_lenght=0, group=None):
     experiment_plots_dir = dm.get_experiment_plots_dir(experiment_name)
 
     # ===== LEFT: OSR vs parameter (boxplot) =====
     df_osr = om.read_OSR_vs_parameter_csv(experiment_name, 
                                            parameter,
                                            min_seq_number,
-                                           min_sim_lenght)
+                                           min_sim_lenght,
+                                           group=group)
 
     # ===== RIGHT: Normalized IH lineage barplot by simulation =====
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
     all_data = []
     for sim_dir in simulation_output_dirs:
         df = om.get_IH_lineages_data_simulation(sim_dir)[['IH_unique_lineages_number', 'ih_lineage_count']]

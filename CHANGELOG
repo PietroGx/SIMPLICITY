@@ -5,6 +5,49 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.77 — 2026-10-09 — pietro gerletti
+
+Stage 7c: the analysis library can be read one group at a time.
+
+Nine functions across plots_manager and output_manager listed an experiment's
+simulations with dm.get_simulation_output_dirs(experiment_name) and had no way
+to say which group they meant. They all take `group=None` now and pass it
+through; None is every group, which is what they all got before, so no caller
+changes and no behaviour does.
+
+This is what stage 8 needs. Once a pipeline is one experiment with its stages
+as groups, every one of those functions mixes stages unless it can be scoped,
+and plots_manager sorts simulations by parameter value -- so a mixed listing
+feeds a calibration sweep point into the same series as a production point.
+
+ONE TRAP CLOSED ON THE WAY
+
+Threading `group` into write_OSR_vs_parameter_csv is not enough on its own:
+the group has to be part of the csv FILENAME. Without it, two groups of one
+experiment compute the same path, and the function returns early when the file
+exists -- so the second group would silently reuse the first group's rates
+under its own name. get_OSR_vs_parameter_csv_file_path and its combined
+counterpart now take `group` and add a suffix, exactly as individual_type
+already did, and every reader threads it so a scoped read finds the scoped
+file. Verified: two groups of one experiment write
+g_OSR_vs_R_..._alpha.csv and g_OSR_vs_R_..._beta.csv.
+
+A mechanical check in the test sweeps for the other half of that mistake -- a
+function that lists scoped directories while reading an unscoped table. It
+found one (plot_OSR_and_IH_lineages_by_parameter) and reports zero now.
+
+NOT DONE, deliberately: the ~35 call sites in scripts/. Production experiments
+are single-group so they have nothing to scope, and the two calibration plots
+pool across groups on purpose before partitioning the data themselves. Those
+partitions are still re-derived from parameter VALUES -- cal_1 keys on a
+(tau_3_long, R_long) float tuple, cal_2 reads tau_3_long and
+long_shedders_ratio back out to decide which scenario a simulation belongs to
+-- when the record now carries the group as an exact string. Worth fixing, but
+it changes how a working calibration partitions its data, so it is its own
+change and not this one.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.76 — 2026-10-09 — pietro gerletti
 
 Two ways a wrong answer could have stayed invisible.
