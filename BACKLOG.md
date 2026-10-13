@@ -32,17 +32,30 @@ Working list of blockers, active refactors, features, and technical debt.
 
       NOT a calibration to keep: 5 seeds, run to exercise the machinery.
 
-- [ ] **Nobody has looked at the calibration plot.** A png was rendered; that
-      is not the same as it being right, and this repo's figure history is bad
-      (figure 1's panel G fitting 19 sequences, figure 3's C/D comparing 1,494
-      against 6). Open
-      05_Plots/..._long_nsr_calibration_fit.png and check: two series, legend
-      reading SOT and HIV_low+HIV_high, 50 scatter points each.
+- [x] **The calibration plot was inspected** (2026-10-08) and it found
+      something: the sweep is geometric while the x-axis was linear, so five of
+      ten points piled into the leftmost ~8% of the panel -- exactly where the
+      target is crossed and the calibrated value is read off. cal_2's plot had
+      had plt.xscale('log') all along; the two siblings simply disagreed. Fixed
+      in v2.4.75, both now sample the fitted curve with geomspace too.
 
-- [ ] **cal_2 and production have never run on this code.** cal_1 is one stage
-      of three. The frozen nsr_calibration_table.csv handoff from cal_1 to
-      cal_2, and cal_2's own fit, are untested in this layout. Same command
-      shape: scripts/experiments/impact_long_shedders_cal_2.py.
+- [x] **cal_2 and production have run on this code** (2026-10-09). The full
+      bound pipeline, --exp-num 2 --cal-seeds 10 --exp-seeds 10: cal_1 (200
+      repeats), cal_2 (400), production per scenario, the frozen-table handoffs
+      between them, sanity plots, zero failures. The release cap throttled for
+      the first time (400 repeats against a cap of 200).
+
+      It also surfaced a SCIENTIFIC finding, not a refactor one, recorded here
+      because it is the quantitative case for the design already chosen:
+      cal_2's in-context fit degrades monotonically with long-shedder burden
+      (R^2 0.884 -> 0.776 -> 0.612 -> 0.290) and for HIV_high it solved at
+      NSR 1.4e-7, seven times BELOW the lowest rate swept -- an extrapolation
+      off the end of the data, not a calibration. The realised population clock
+      then missed its own target anyway (SOT -21%, HIV_low -25%, HIV_high
+      +11%), and HIV_high's standard-individual clock was indistinguishable
+      from its mixed clock while standard individuals had a mutation rate of
+      essentially zero: they were carrying divergence inherited by
+      transmission, not generating it.
 
 - [x] **Slurm parsing verified against 26.05.4** (2026-10-08).
       `tests/check_slurm_interface.py` passes on the cluster: squeue still
