@@ -3,6 +3,7 @@
 #
 #   bash tests/run_tests_on_compute.sh                  # the local suite
 #   bash tests/run_tests_on_compute.sh --figures 2      # + figures against #2
+#   bash tests/run_tests_on_compute.sh --calib 2        # + re-fit #2, diff it
 #   bash tests/run_tests_on_compute.sh --slurm 90       # + resume/reconcile
 #   bash tests/run_tests_on_compute.sh --figures 2 --slurm 90
 #   bash tests/run_tests_on_compute.sh --no-watch       # submit and return
@@ -18,6 +19,8 @@
 set -uo pipefail
 
 FIGURES=""
+CALIB=""
+CALIB_PIPELINE="bound"
 SLURM_NUM=""
 WATCH=0
 [ -t 1 ] && WATCH=1
@@ -25,6 +28,8 @@ ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --figures)  FIGURES="$2"; shift 2 ;;
+        --calib)    CALIB="$2"; shift 2 ;;
+        --calib-pipeline) CALIB_PIPELINE="$2"; shift 2 ;;
         --slurm)    SLURM_NUM="$2"; shift 2 ;;
         --watch)    WATCH=1; shift ;;
         --no-watch) WATCH=0; shift ;;
@@ -66,6 +71,7 @@ if [ -z "${SLURM_JOB_ID:-}" ] && [ "${SIMPLICITY_TESTS_LOCAL:-0}" != "1" ]; then
     OUT="$REPO/Data/test_logs/tests_${STAMP}_%j.log"
     FORWARD=""
     [ -n "$FIGURES" ]   && FORWARD="$FORWARD --figures $FIGURES"
+    [ -n "$CALIB" ]     && FORWARD="$FORWARD --calib $CALIB --calib-pipeline $CALIB_PIPELINE"
     [ -n "$SLURM_NUM" ] && FORWARD="$FORWARD --slurm $SLURM_NUM"
     # 2 cpus because test_multiprocessing_runner uses a pool of 2
     JOB=$(sbatch --parsable \
@@ -132,8 +138,17 @@ run_test "reconcile completed"      tests/test_reconcile_completed.py
 run_test "resume"                   tests/test_resume.py
 run_test "slurm lifecycle (fake)"   tests/test_slurm_lifecycle.py
 run_test "analysis reads layout"    tests/test_analysis_reads_new_layout.py
+run_test "group partition (7c)"     tests/test_group_partition.py
+run_test "stage dispatch"           tests/test_stage_dispatch.py
 run_test "trees/clustering/archive" tests/test_trees_clustering_archive.py
 run_test "multiprocessing runner"   tests/test_multiprocessing_runner.py
+
+# re-fits a finished calibration and diffs it against what that run froze
+if [ -n "$CALIB" ]; then
+    run_test "calibration unchanged (#$CALIB, $CALIB_PIPELINE)" \
+        tests/check_calibration_unchanged.py --exp-num "$CALIB" \
+        --pipeline "$CALIB_PIPELINE"
+fi
 
 # needs real production output
 if [ -n "$FIGURES" ]; then
