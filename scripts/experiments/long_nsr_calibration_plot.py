@@ -50,39 +50,71 @@ import simplicity.tuning.evolutionary_rate as er
 # file's own directory is on sys.path regardless of the caller's cwd, so the
 # sibling import below always resolves.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from impact_long_shedders_config import (
-    SCENARIOS, TAU_ROUND, DEFAULT_COLORS, derive_tau_3_long,
-)
+# Constants only: both pipelines share this module, and the scenario list it
+# used to import from here is what put a bound-pipeline label on an unbound
+# group (see _cal1_groups).
+from impact_long_shedders_config import TAU_ROUND, DEFAULT_COLORS
 
 
-def _tau_r_long_labels_and_colors(experiment_name):
-    """Map each (tau_3_long, R_long) pair to its group's RECORDED name and a
-    colour.
+def _cal1_groups(experiment_name):
+    """Every group of a cal_1 experiment, in declared order, with the
+    (tau_3_long, R_long) cohort it covers and a plot colour.
 
-    The name is read from the experiment's own settings, where the config that
-    defined the group wrote it. It used to be re-derived here by matching the
-    pair against a scenario list passed in by the caller -- defaulting to the
-    BOUND pipeline's SCENARIOS. The unbound pipeline's edge_case is not in that
-    list, so its group fell through to a raw 'tau=350.23,R_long=1.1' fallback in
-    unbound run #1: cosmetic in the legend, but it also landed in the saved
-    fit-results filename.
+    The cohort comes from the group's OWN simulation records, and a group
+    holding more than one pair raises rather than silently taking the first:
+    a cal_1 group IS one long-shedder cohort swept over NSR_long, and anything
+    else means the config and this fit disagree about what a group is.
+
+    This used to be a {(tau, R_long) -> name} map, with the partition itself
+    done by re-reading those two floats off every simulation output directory.
+    Before that the name was re-derived by matching the pair against a scenario
+    list passed in by the caller, defaulting to the BOUND pipeline's SCENARIOS
+    -- the unbound pipeline's edge_case is not in that list, so its group fell
+    through to a raw 'tau=350.23,R_long=1.1' in unbound run #1, and that string
+    landed in the saved fit-results filename.
 
     Names are joined with '+' by the config, never '/', which
     write_fit_results_csv's file-saving reads as a directory separator.
     """
-    labels, colors = {}, {}
-    color_cycle = iter(DEFAULT_COLORS)
-    seen = {}
+    pairs = {}
     for record in sm.read_simulations(experiment_name):
         params = record['parameters']
-        key = (round(float(params['tau_3_long']), TAU_ROUND),
-               round(float(params['R_long']), TAU_ROUND))
-        if key in seen:
+        pairs.setdefault(record['group'], set()).add(
+            (round(float(params['tau_3_long']), TAU_ROUND),
+             round(float(params['R_long']), TAU_ROUND)))
+
+    color_cycle = iter(DEFAULT_COLORS)
+    groups = []
+    for name in dm.get_groups(experiment_name):
+        cohorts = pairs.get(name)
+        if not cohorts:
             continue
-        seen[key] = record['group']
-        labels[key] = record['group']
-        colors[key] = next(color_cycle, "black")
-    return labels, colors
+        if len(cohorts) > 1:
+            raise RuntimeError(
+                f"Group '{name}' of {experiment_name} covers more than one "
+                f"(tau_3_long, R_long) cohort: {sorted(cohorts)}. A cal_1 "
+                f"group is one cohort swept over NSR_long.")
+        tau, r_long = cohorts.pop()
+        groups.append({'name': name, 'tau_3_long': tau, 'R_long': r_long,
+                       'color': next(color_cycle, 'black')})
+
+    # Two groups on one cohort is a config error -- unique_long_tau_r_long_pairs
+    # returns a set, so neither pipeline can produce it -- but it has to be
+    # loud rather than silent: the frozen CSV this stage hands cal_2 is keyed
+    # on the pair, so the second group would overwrite the first and cal_2
+    # would calibrate one cohort against the other's rate.
+    by_key = {}
+    for group in groups:
+        by_key.setdefault((group['tau_3_long'], group['R_long']), []).append(
+            group['name'])
+    clashing = {key: names for key, names in by_key.items() if len(names) > 1}
+    if clashing:
+        raise RuntimeError(
+            f"{experiment_name} has groups sharing one (tau_3_long, R_long) "
+            f"cohort at {TAU_ROUND} decimals: {clashing}. cal_2 looks the "
+            f"calibrated long NSR up by that pair and could not tell them "
+            f"apart.")
+    return groups
 
 
 def _calibrated_long_nsr_path(experiment_name):
@@ -90,15 +122,25 @@ def _calibrated_long_nsr_path(experiment_name):
                         f'{experiment_name}_calibrated_long_nsr.csv')
 
 
-def write_calibrated_long_nsr(experiment_name, results, target_osr_long, model_type):
+def write_calibrated_long_nsr(experiment_name, results, target_osr_long,
+                              model_type, group_by_key=None):
     """Persist Stage 1's calibrated long NSR per (tau_3_long, R_long) group
     to a small CSV -- the single computed result, so cal_2.py can read it
     straight back instead of independently re-extracting/re-fitting from
     raw simulation output a second time (two implementations of the same
     fit is exactly what let cal_1's and cal_2's methodology drift apart
-    before; see BACKLOG)."""
+    before; see BACKLOG).
+
+    Keyed on the pair, not on the group name, and deliberately so: cal_1 and
+    cal_2 partition differently. cal_1 fits one curve per long-shedder cohort,
+    merging HIV_low and HIV_high because they share one; cal_2 then looks each
+    of its own scenarios up against that cohort. The group name rides along as
+    a column so the handoff can be audited, never matched on.
+    """
+    group_by_key = group_by_key or {}
     rows = [
-        {'tau_3_long': tau, 'R_long': r_long,
+        {'group': group_by_key.get((tau, r_long), ''),
+         'tau_3_long': tau, 'R_long': r_long,
          'nucleotide_substitution_rate_long': nsr,
          'target_osr_long': target_osr_long, 'model_type': model_type}
         for (tau, r_long), nsr in results.items()
@@ -149,10 +191,13 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
     """
     Extracts per-seed OSR for every (tau_3_long, R_long, NSR) grid point of
     `experiment_name`, outlier-filters per grid point, fits a regressor per
-    (tau_3_long, R_long) group -- two scenarios can share a duration but
-    have different R_long, so grouping by tau alone would conflate them --
-    inverts at `target_osr_long`, and saves a multi-curve calibration
-    figure into the experiment's 05_Plots folder.
+    DECLARED GROUP, inverts at `target_osr_long`, and saves a multi-curve
+    calibration figure into the experiment's 05_Plots folder.
+
+    One group is one long-shedder cohort: two scenarios can share a duration
+    but differ in R_long, so the cohort is the (tau_3_long, R_long) pair and
+    never tau alone. Which simulations belong to it is read from the record,
+    not recomputed from their parameter values -- see _cal1_groups.
 
     Group names for the legend and the saved fit-results filename come from the
     experiment's own settings, where the config that defined the group wrote
@@ -162,73 +207,76 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
 
     Returns {(tau_3_long, R_long): calibrated_nsr}.
     """
-    sp = sm.read_standard_parameters_values()
-    labels, colors = _tau_r_long_labels_and_colors(experiment_name)
+    groups = _cal1_groups(experiment_name)
 
     print(f"--- Analyzing long-shedder NSR calibration: {experiment_name} ---")
 
-    simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name)
+    # Partitioned by the group each simulation was ASSIGNED to, not by reading
+    # (tau_3_long, R_long) back off every output directory and bucketing on the
+    # float pair. The two agree while every group carries a distinct rounded
+    # pair, which is what unique_long_tau_r_long_pairs builds; they stop
+    # agreeing the moment one does not, and nothing would say so.
+    per_group = {}
+    for group in groups:
+        sod_frames = []
+        for sod in dm.get_simulation_output_dirs(experiment_name,
+                                                 group=group['name']):
+            nsr_val = sm.get_parameter_value_from_simulation_output_dir(
+                sod, 'nucleotide_substitution_rate_long')
 
-    all_sod_results = []
-    for sod in simulation_output_dirs:
-        nsr_val = sm.get_parameter_value_from_simulation_output_dir(
-            sod, 'nucleotide_substitution_rate_long')
-        tau_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'tau_3_long')
-        r_long_val = sm.get_parameter_value_from_simulation_output_dir(sod, 'R_long')
+            sod_rows = []
+            for ssod in dm.get_seeded_simulation_output_dirs(sod):
+                try:
+                    final_time = om.read_final_time(ssod)
+                    seq_data = om.read_sequencing_data_regression(ssod)
+                    # Same final_time/sequence-count gate as everywhere else that
+                    # fits an OSR regressor -- decides whether this seed ran long
+                    # enough / sequenced enough to trust at all. What actually
+                    # gets fit below is NOT seq_data (population-pooled, global-
+                    # reference, absolute-time -- see evolutionary_rate.py's
+                    # extract_ih_regression_data docstring): cal_1 is meant to
+                    # calibrate against each long shedder's OWN intra-host clock,
+                    # not the population root-to-tip rate.
+                    if final_time >= min_len and len(seq_data) >= min_seq:
+                        ih_points = er.extract_ih_regression_data(ssod)
+                        if ih_points.empty:
+                            continue
+                        osr_val = er.tempest_regression(ih_points).coef_[0]
+                        sod_rows.append({
+                            'group': group['name'],
+                            'nucleotide_substitution_rate_long': nsr_val,
+                            'observed_substitution_rate': osr_val,
+                        })
+                except Exception:
+                    continue
 
-        seeded_dirs = dm.get_seeded_simulation_output_dirs(sod)
-        sod_rows = []
-        for ssod in seeded_dirs:
-            try:
-                final_time = om.read_final_time(ssod)
-                seq_data = om.read_sequencing_data_regression(ssod)
-                # Same final_time/sequence-count gate as everywhere else that
-                # fits an OSR regressor -- decides whether this seed ran long
-                # enough / sequenced enough to trust at all. What actually
-                # gets fit below is NOT seq_data (population-pooled, global-
-                # reference, absolute-time -- see evolutionary_rate.py's
-                # extract_ih_regression_data docstring): cal_1 is meant to
-                # calibrate against each long shedder's OWN intra-host clock,
-                # not the population root-to-tip rate.
-                if final_time >= min_len and len(seq_data) >= min_seq:
-                    ih_points = er.extract_ih_regression_data(ssod)
-                    if ih_points.empty:
-                        continue
-                    osr_val = er.tempest_regression(ih_points).coef_[0]
-                    sod_rows.append({
-                        'tau_3_long': tau_val,
-                        'R_long': r_long_val,
-                        'nucleotide_substitution_rate_long': nsr_val,
-                        'observed_substitution_rate': osr_val,
-                    })
-            except Exception:
-                continue
+            if sod_rows:
+                sod_df = om.detect_sod_outliers(pd.DataFrame(sod_rows))
+                sod_frames.append(sod_df[sod_df['is_outlier'] == 0])
 
-        if sod_rows:
-            sod_df = pd.DataFrame(sod_rows)
-            sod_df = om.detect_sod_outliers(sod_df)
-            all_sod_results.append(sod_df)
+        if sod_frames:
+            per_group[group['name']] = pd.concat(sod_frames, ignore_index=True)
 
-    if not all_sod_results:
+    if not per_group:
         raise RuntimeError(
             f"No valid long-calibration data found in {experiment_name}. "
             f"Check if simulations finished and lengths/seqs meet minimums.")
 
-    master_df = pd.concat(all_sod_results, ignore_index=True)
-    clean_df = master_df[master_df['is_outlier'] == 0]
-
     plt.figure(figsize=(10, 6))
-    clean_df['_group_key'] = list(zip(clean_df['tau_3_long'], clean_df['R_long']))
-    tau_r_long_groups = sorted(clean_df['_group_key'].unique())
     results = {}
+    group_by_key = {}
 
     print(f"\n--- Calibration results (target long OSR = {target_osr_long}) ---")
 
-    for tau, r_long in tau_r_long_groups:
-        group_df = clean_df[clean_df['_group_key'] == (tau, r_long)]
-        key = (round(float(tau), TAU_ROUND), round(float(r_long), TAU_ROUND))
-        color = colors.get(key, 'black')
-        label = labels.get(key, f'tau={tau},R_long={r_long}')
+    for group in groups:
+        label = group['name']
+        group_df = per_group.get(label)
+        if group_df is None or group_df.empty:
+            print(f"{label:<17}: no usable data, skipped")
+            continue
+        key = (group['tau_3_long'], group['R_long'])
+        group_by_key[key] = label
+        color = group['color']
 
         plt.scatter(group_df['nucleotide_substitution_rate_long'],
                    group_df['observed_substitution_rate'],
@@ -281,7 +329,8 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
     plt.close()
     print(f"\nCalibration plot saved to: {plot_path}")
 
-    write_calibrated_long_nsr(experiment_name, results, target_osr_long, model_type)
+    write_calibrated_long_nsr(experiment_name, results, target_osr_long,
+                              model_type, group_by_key)
 
     return results
 

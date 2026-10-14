@@ -89,15 +89,45 @@ Working list of blockers, active refactors, features, and technical debt.
       groups collide on one path and the second silently reuses the first's
       numbers.
 
-- [ ] **Stage 7c (scripts): ~35 call sites still unscoped.** Not urgent and not
-      a regression: production experiments are single-group, and the two
-      calibration plots pool across groups on purpose. What is worth doing
-      there is different from scoping -- those two still re-derive their
-      partition from parameter VALUES (cal_1 keys on a (tau_3_long, R_long)
-      float tuple; cal_2 reads tau_3_long and long_shedders_ratio back out to
-      classify a simulation) when the record now carries the group as an exact
-      string. Changing it alters how a working calibration partitions its data,
-      so it needs its own run to verify.
+- [x] **Stage 7c (scripts)** done 2026-10-14, v2.4.83. Smaller than the "~35
+      call sites" estimate: outside the archive there are 21, and 16 of them
+      were already correct. Production experiments are one group each
+      (`impact_long_shedders_unbound_exp.py:81` dispatches one experiment per
+      scenario, `..._unbound_config.py:328` gives it one named group), so an
+      unscoped listing of one IS that group -- now asserted, not assumed, so
+      the day that stops being true a test says so instead of a figure.
+
+      The three real ones partitioned a multi-group experiment by reading
+      parameters back and bucketing on the float values:
+      `long_nsr_calibration_plot.py` on (tau_3_long, R_long);
+      `impact_long_shedders_cal_2.py` on (tau_3_long, long_shedders_ratio)
+      matched to the frozen table at 3 decimals; `nsr_sensitivity_analysis.py`
+      on (tau_3_long, k_v), with groups that had no names at all. All three now
+      list one group at a time and take the cell from the record.
+
+      **No recalibration.** tests/test_group_partition.py computes both
+      partitions on the real cal_1, cal_2 and sensitivity grids and they are
+      the same partition, so every number produced so far stands. What changes
+      is what happens when they would differ: two groups sharing a cohort used
+      to merge into one bucket and report the union's fit under one of their
+      names, and now raise naming both. The test proves it both ways -- with
+      group scoping disabled, all four cal_2 scenarios collapse onto one
+      blended value and 9 checks fail.
+
+- [x] **unbound cal_2 could never have run** -- found 2026-10-14 by
+      tests/test_stage_dispatch.py, fixed in v2.4.83.
+      `impact_long_shedders_unbound_cal_2.py` died with
+      `KeyError: 'nucleotide_substitution_rate'` four lines before its
+      dispatch: 7a moved the sweep axis inside the named group and the
+      progress banner still subscripted the old top-level key. Exactly the
+      v2.4.26 failure CLAUDE.md records, surviving only because the unbound
+      pipeline has never been run. No recalibration -- nothing downstream of
+      the banner was reached, so no number was ever wrong; the stage simply
+      stopped.
+
+      The guard is the new test: for every stage of both pipelines it stubs
+      the runner, calls `main()`, and requires the dispatch to be reached with
+      named, non-empty groups. A printout cannot be caught by reading a config.
 
 - [ ] **Stage 8: fold a pipeline back into one experiment**, its stages becoming
       groups. The structure now supports it -- groups are named, numbered from

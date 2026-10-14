@@ -51,7 +51,7 @@ import simplicity.tuning.evolutionary_rate as er
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    TAU_ROUND, DEFAULT_COLORS, LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME,
+    DEFAULT_COLORS, LONG_NSR_EXP_NAME, STD_NSR_SWEEP_NAME,
     USER_FIXED_PARAMS, NSR_RANGES, lookup_long_nsr, build_cal2_scenario_groups,
     build_cal2_settings, add_slurm_resource_args,
     set_slurm_resource_env, print_fixed_params,
@@ -85,78 +85,84 @@ EXP_NAME = "impact_long_shedders_calibration"
 def compute_standard_nsr_per_scenario(numbered, scenarios_frozen, target_osr_std,
                                       model_type='exp', min_seq=30, min_len=100):
     """
-    Reads back the ONE merged standard-NSR sweep experiment, groups rows by
-    matching (tau_3_long, long_shedders_ratio) back to each scenario, and
-    fits+inverts per scenario -- mirroring Stage 1's per-tau pattern. OSR is
-    computed from STANDARD individuals only (mixed population).
+    Reads back the ONE merged standard-NSR sweep experiment one scenario
+    GROUP at a time, and fits+inverts per scenario -- mirroring Stage 1's
+    per-cohort pattern. OSR is computed from STANDARD individuals only
+    (mixed population).
+
+    A scenario's rows are the rows of its own group, which the config named
+    when it defined the sweep. They used to be selected by matching each
+    output directory's (tau_3_long, long_shedders_ratio) back to the frozen
+    table.
 
     Returns {scenario_name: calibrated_standard_nsr}.
     """
     print(f"\n[Stage 2] Standard NSR in-context sweep: {numbered}")
 
-    simulation_output_dirs = dm.get_simulation_output_dirs(numbered)
+    # One group per scenario, named at definition by build_cal2_scenario_groups
+    # (name = frozen["scenario_name"]), so which scenario a row belongs to is
+    # READ BACK rather than inferred by matching its (tau_3_long,
+    # long_shedders_ratio) to the frozen table at TAU_ROUND decimals. Two
+    # scenarios differing only below that rounding merged into one bucket, and
+    # the fit reported for both was the fit of their union.
+    available = dm.get_groups(numbered)
+    wanted = [frozen["scenario_name"] for frozen in scenarios_frozen]
+    missing = [name for name in wanted if name not in available]
+    if missing:
+        raise RuntimeError(
+            f"[Stage 2] {numbered} has no group(s) {missing}; it has "
+            f"{available}. The frozen table and the sweep that actually ran "
+            f"disagree about which scenarios exist.")
 
-    all_rows = []
-    for sod in simulation_output_dirs:
-        nsr_val = sm.get_parameter_value_from_simulation_output_dir(
-            sod, 'nucleotide_substitution_rate')
-        tau_val = sm.get_parameter_value_from_simulation_output_dir(
-            sod, 'tau_3_long')
-        ratio_val = sm.get_parameter_value_from_simulation_output_dir(
-            sod, 'long_shedders_ratio')
+    per_scenario = {}
+    for name in wanted:
+        sod_frames = []
+        for sod in dm.get_simulation_output_dirs(numbered, group=name):
+            nsr_val = sm.get_parameter_value_from_simulation_output_dir(
+                sod, 'nucleotide_substitution_rate')
 
-        seeded_dirs = dm.get_seeded_simulation_output_dirs(sod)
-        sod_rows = []
-        for ssod in seeded_dirs:
-            try:
-                final_time = om.read_final_time(ssod)
-                seq_data = om.read_sequencing_data_regression(ssod)
-                seq_data = seq_data[seq_data['individual_type'] == 'standard']
-                if final_time >= min_len and len(seq_data) >= min_seq:
-                    osr_val = er.tempest_regression(seq_data).coef_[0]
-                    sod_rows.append({
-                        'tau_3_long': tau_val,
-                        'long_shedders_ratio': ratio_val,
-                        'nucleotide_substitution_rate': nsr_val,
-                        'observed_substitution_rate': osr_val,
-                    })
-            except Exception:
-                continue
+            sod_rows = []
+            for ssod in dm.get_seeded_simulation_output_dirs(sod):
+                try:
+                    final_time = om.read_final_time(ssod)
+                    seq_data = om.read_sequencing_data_regression(ssod)
+                    seq_data = seq_data[seq_data['individual_type'] == 'standard']
+                    if final_time >= min_len and len(seq_data) >= min_seq:
+                        sod_rows.append({
+                            'group': name,
+                            'nucleotide_substitution_rate': nsr_val,
+                            'observed_substitution_rate':
+                                er.tempest_regression(seq_data).coef_[0],
+                        })
+                except Exception:
+                    continue
 
-        if sod_rows:
-            sod_df = pd.DataFrame(sod_rows)
-            sod_df = om.detect_sod_outliers(sod_df)
-            all_rows.append(sod_df)
+            if sod_rows:
+                sod_df = om.detect_sod_outliers(pd.DataFrame(sod_rows))
+                sod_frames.append(sod_df[sod_df['is_outlier'] == 0])
 
-    if not all_rows:
+        if sod_frames:
+            per_scenario[name] = pd.concat(sod_frames, ignore_index=True)
+
+    if not per_scenario:
         raise RuntimeError(
             f"[Stage 2] No standard-individual OSR data for {numbered}. "
             f"Sweep may have produced too few standard sequences "
             f"(min_seq={min_seq}, min_len={min_len}).")
 
-    master_df = pd.concat(all_rows, ignore_index=True)
-    clean_df = master_df[master_df['is_outlier'] == 0]
-
     plt.figure(figsize=(10, 6))
-    color_by_name = {frozen["scenario_name"]: DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
-                     for i, frozen in enumerate(scenarios_frozen)}
+    color_by_name = {name: DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+                     for i, name in enumerate(wanted)}
 
     std_nsr_by_scenario = {}
-    for frozen in scenarios_frozen:
-        name = frozen["scenario_name"]
+    for name in wanted:
         color = color_by_name[name]
-        key_tau = round(frozen["tau_3_long"], TAU_ROUND)
-        key_ratio = round(frozen["long_shedders_ratio"], TAU_ROUND)
-
-        group_df = clean_df[
-            (clean_df['tau_3_long'].round(TAU_ROUND) == key_tau) &
-            (clean_df['long_shedders_ratio'].round(TAU_ROUND) == key_ratio)
-        ]
-        if group_df.empty:
+        group_df = per_scenario.get(name)
+        if group_df is None or group_df.empty:
             raise RuntimeError(
-                f"[Stage 2] No standard-individual OSR rows matched scenario "
-                f"'{name}' (tau_3_long={key_tau}, long_shedders_ratio={key_ratio}) "
-                f"in {numbered}.")
+                f"[Stage 2] Group '{name}' of {numbered} produced no "
+                f"standard-individual OSR rows (min_seq={min_seq}, "
+                f"min_len={min_len}).")
 
         plt.scatter(group_df['nucleotide_substitution_rate'],
                    group_df['observed_substitution_rate'],

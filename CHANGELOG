@@ -5,6 +5,79 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.83 — 2026-10-14 — pietro gerletti
+
+Stage 7c (scripts): a multi-group experiment is partitioned by the group each
+simulation was assigned to, not by reading its parameters back.
+
+Three readers listed a whole experiment and then rebuilt the partition from
+values. long_nsr_calibration_plot bucketed on the (tau_3_long, R_long) floats
+and looked the group NAME up on those values rounded to three decimals.
+impact_long_shedders_cal_2 selected each scenario's rows by matching
+(tau_3_long, long_shedders_ratio) against the frozen table at the same
+rounding. nsr_sensitivity_analysis rebuilt each (duration, k_v) cell from every
+output directory, with groups that carried no names at all. All three now list
+one group at a time; nsr_sensitivity's cells name themselves (d63_kv0p001).
+
+NO RECALIBRATION. On the real cal_1, cal_2 and sensitivity grids the old
+value-derived partition and the new one are the SAME partition, which the new
+test asserts directly rather than leaving to inspection -- every number
+produced so far stands. What changes is the failure mode. Two groups sharing a
+cohort used to merge into one bucket and report the union's fit under one of
+their names; cal_1 now raises naming both, because the frozen CSV it hands
+cal_2 is keyed on the pair and could not have told them apart either. That CSV
+gains a `group` column so the cal_1 -> cal_2 handoff can be audited; it stays
+keyed on the pair deliberately, since the two stages partition differently --
+cal_1 merges HIV_low and HIV_high into one cohort and cal_2 does not.
+
+long_nsr_calibration_plot no longer imports the bound pipeline's SCENARIOS at
+all. That import is what put a bound label on an unbound group in run #1.
+
+Scope was smaller than the ~35 estimate: 21 call sites outside the archive, 16
+already correct because every production experiment is one named group. That
+is now asserted by test rather than assumed, since it is what makes those 16
+safe -- and it stops being true at stage 8.
+
+FOUND AND FIXED: the unbound cal_2 stage could never have run.
+impact_long_shedders_unbound_cal_2.py died with KeyError:
+'nucleotide_substitution_rate' four lines before its dispatch -- 7a moved the
+sweep axis inside the named group and the progress banner still subscripted
+the old top-level key. The exact failure v2.4.26 hotfixed, surviving because
+the unbound pipeline has never been run. Nothing downstream of the banner was
+reached, so no result was ever wrong; the stage just stopped.
+
+tests/test_group_partition.py    44 checks. Builds the real cal_1, cal_2,
+                                 production and sensitivity grids through the
+                                 configs' own builders and the real settings
+                                 path, simulating nothing, and compares the two
+                                 partitions. The per-repeat measurement is
+                                 synthetic and group-dependent, so each group's
+                                 calibrated value IS the identity of the rows
+                                 it was fed: one leaked row moves it. Verified
+                                 by negative control -- with group scoping
+                                 disabled all four cal_2 scenarios collapse
+                                 onto 0.00114286 and 9 checks fail.
+
+tests/test_stage_dispatch.py     every stage of both pipelines, runner stubbed,
+                                 main() actually called. This is what found the
+                                 cal_2 bug, and it is the guard CLAUDE.md asks
+                                 for: a stale printout cannot be caught by
+                                 reading a config.
+
+------------------------------------------------------------------------
+
+## Version 2.4.82 — 2026-10-13 — pietro gerletti
+
+Two stale BACKLOG items closed: the calibration plot WAS inspected (2026-10-08,
+which is what found the linear axis, fixed in v2.4.75), and cal_2 and
+production HAVE run on this code (2026-10-09, the full bound pipeline at 10
+seeds, zero failures). The scientific finding from that run is recorded with
+them: cal_2's in-context fit degrades monotonically with long-shedder burden
+(R^2 0.884 -> 0.290) and HIV_high solved seven times below the lowest rate
+swept, which is an extrapolation off the end of the data, not a calibration.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.81 — 2026-10-09 — pietro gerletti
 
 test_figures_on_real_output now checks coverage, not just reachability.

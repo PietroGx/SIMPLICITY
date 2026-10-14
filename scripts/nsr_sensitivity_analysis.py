@@ -192,6 +192,53 @@ def grid_cells(durations, k_vs, sp):
             for d in durations for k in k_vs]
 
 
+def cell_group_name(inf_duration, k_v):
+    """The group name for one (duration, k_v) cell, assigned where the cell is
+    defined. Without it the groups were group_00..group_14 and extract_datasets
+    had to rebuild the cell from each output directory's parameter values."""
+    return f"d{inf_duration:g}_kv{k_v:g}".replace('.', 'p')
+
+
+# What a cell holds fixed while NSR_long sweeps.
+CELL_CONSTANTS = ('tau_3_long', 'IH_virus_emergence_rate', 'final_time')
+
+
+def cell_groups(experiment_name, sp):
+    """{group: cell} for a run, read from the experiment record.
+
+    A cell IS one (duration, k_v) swept over NSR_long, so a group in which any
+    of CELL_CONSTANTS takes two values is not a cell and raises -- the run and
+    the grid it was asked for have diverged, and every downstream plot groups
+    by inf_duration and k_v.
+    """
+    seen = {}
+    for record in sm.read_simulations(experiment_name):
+        bucket = seen.setdefault(record['group'], {})
+        for key in CELL_CONSTANTS:
+            bucket.setdefault(key, set()).add(float(record['parameters'][key]))
+
+    cells = {}
+    for group in dm.get_groups(experiment_name):
+        bucket = seen.get(group)
+        if not bucket:
+            continue
+        varied = {k: sorted(v) for k, v in bucket.items() if len(v) > 1}
+        if varied:
+            raise RuntimeError(
+                f"Group '{group}' of {experiment_name} is not one cell: "
+                f"{varied} vary inside it.")
+        fixed = {k: next(iter(v)) for k, v in bucket.items()}
+        tau = fixed['tau_3_long']
+        cells[group] = {
+            'group': group,
+            'inf_duration': round(tau + phase_offset(sp), 3),
+            'tau_3_long': round(tau, 3),
+            'k_v': fixed['IH_virus_emergence_rate'],
+            'final_time_setting': fixed['final_time'],
+        }
+    return cells
+
+
 def nsr_nodes(steps):
     return np.geomspace(NSR_MIN, NSR_MAX, steps).tolist()
 
@@ -216,13 +263,14 @@ def build_settings(durations, k_vs, nsr_values, n_seeds, population, infected_st
 
     scenario_groups = [
         {
+            'name': cell_group_name(d, k_v),
             'nucleotide_substitution_rate_long': list(nsr_values),
             'tau_3_long': tau,
             'R_long': 1.1,
             'IH_virus_emergence_rate': k_v,
             'final_time': window,
         }
-        for _, tau, k_v, window in grid_cells(durations, k_vs, sp)
+        for d, tau, k_v, window in grid_cells(durations, k_vs, sp)
     ]
 
     def make_settings():
@@ -246,18 +294,18 @@ def extract_datasets(numbered, sp, min_seq=30, min_len=100):
     point_rows, host_rows = [], []
     kept = dropped = 0
 
-    for sod in dm.get_simulation_output_dirs(numbered):
-        def p(name):
-            return sm.get_parameter_value_from_simulation_output_dir(sod, name)
+    cells = cell_groups(numbered, sp)
+    grouped_sods = [(group, sod) for group in cells
+                    for sod in dm.get_simulation_output_dirs(numbered, group=group)]
 
-        tau = float(p('tau_3_long'))
-        cell = {
-            'inf_duration': round(tau + phase_offset(sp), 3),
-            'tau_3_long': round(tau, 3),
-            'k_v': float(p('IH_virus_emergence_rate')),
-            'nsr_long': float(p('nucleotide_substitution_rate_long')),
-            'final_time_setting': float(p('final_time')),
-        }
+    for group, sod in grouped_sods:
+        # The cell comes from the group the simulation was assigned to; only
+        # NSR_long, the swept axis, is read off the simulation itself. It used
+        # to all be read back per directory and re-bucketed on (tau_3_long,
+        # k_v) floats.
+        cell = dict(cells[group], nsr_long=float(
+            sm.get_parameter_value_from_simulation_output_dir(
+                sod, 'nucleotide_substitution_rate_long')))
 
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
             seed = dm.get_seed_from_SSOD(ssod)

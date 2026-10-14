@@ -204,10 +204,14 @@ def main():
          f"final_time={UNBOUND_CAL2_FINAL_TIME})")
     varying, fixed_params, n_seeds = settings_func()
     print_fixed_params(fixed_params)
-    nsr_vals = varying['nucleotide_substitution_rate']
     print(f"Seeds per grid point: {n_seeds}")
-    print(f"NSR grid: {len(nsr_vals)} pts "
-         f"[{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
+    # Over the groups, like bound cal_2's banner: 7a moved the sweep axis
+    # inside the named group and this still read varying['nucleotide_
+    # substitution_rate'], so the stage died here, before dispatching.
+    for g in varying['_scenario_groups']:
+        nsr_vals = g['nucleotide_substitution_rate']
+        print(f"  {g['name']:14s} NSR grid: {len(nsr_vals)} pts "
+             f"[{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
 
     run_experiment_script(args.runner, args.exp_num, settings_func, STD_NSR_EXP_NAME)
     std_calib_exp = f"{STD_NSR_EXP_NAME}_#{args.exp_num}"
