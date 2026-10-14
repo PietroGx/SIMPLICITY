@@ -290,17 +290,43 @@ def figure_3(exp_num, exp_name, present, heavy):
               lambda: f3.get_panel_b_data(exp_num, sorted(present)))
 
 
+def experiment_exists(name):
+    try:
+        return bool(dm.get_groups(name))
+    except Exception:                                           # noqa: BLE001
+        return False
+
+
 def long_paper(exp_num):
+    """The long-paper figures read the GRID: a different experiment family from
+    the impact pipeline, made of a master log plus calibration_run_#N and
+    long_shedders_exp_M*_#N.
+
+    Each reader is gated on ITS OWN input, not on whichever one happens to be
+    checked first. get_baseline_sod reads calibration_run_#N and never opens the
+    master log, so gating it on the log would call a missing baseline a pass and
+    a present-log/absent-baseline run a spurious FAILED.
+    """
     print('\nlong-paper figures  (a DIFFERENT experiment shape: the grid)')
-    master = os.path.join(dm.get_data_dir(), f'master_grid_log_#{exp_num}.csv')
-    if not os.path.isfile(master):
-        print(f'  [n/a       ] no grid at {os.path.basename(master)} -- these '
-              f'read the long-paper grid, not the impact pipeline')
-        notapplicable.append(('long_paper', f'no {os.path.basename(master)}'))
-        return
     import long_shedders_preprocess as lp
-    probe('long_paper.read_master_log', lambda: lp.read_master_log(exp_num))
-    probe('long_paper.get_baseline_sod', lambda: lp.get_baseline_sod(exp_num))
+
+    master = os.path.join(dm.get_data_dir(), f'master_grid_log_#{exp_num}.csv')
+    baseline = f'calibration_run_#{exp_num}'
+
+    for label, available, why, call in (
+        ('long_paper.read_master_log', os.path.isfile(master),
+         f'no {os.path.basename(master)}',
+         lambda: lp.read_master_log(exp_num)),
+        ('long_paper.get_baseline_sod', experiment_exists(baseline),
+         f'no {baseline}',
+         lambda: lp.get_baseline_sod(exp_num)),
+    ):
+        if available:
+            probe(label, call)
+        else:
+            print(f'  [n/a       ] {label}: {why} -- reads the long-paper '
+                  f'grid, not the impact pipeline')
+            notapplicable.append((label, why))
 
 
 def library(exp_name, exp_num, present):
@@ -308,7 +334,6 @@ def library(exp_name, exp_num, present):
     import simplicity.plots_manager as pm
     scenario = sorted(present)[0]
     experiment = f'{exp_name}_{scenario}_#{exp_num}'
-    sods = present[scenario]['sods']
     # no coverage check: this returns one row per intra-host LINEAGE, not per
     # simulation, so comparing its row indices against the simulation count
     # (which an earlier version did) compares two unrelated things and reports

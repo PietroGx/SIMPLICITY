@@ -5,6 +5,27 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.84 — 2026-10-14 — pietro gerletti
+
+test_figures_on_real_output gates each long-paper reader on its OWN input.
+
+The gate added in v2.4.81 skipped both readers when the master grid log was
+missing. read_master_log does read that log; get_baseline_sod does not -- it
+reads calibration_run_#N and never opens the log. So a run with a master log
+but no baseline would report a spurious FAILED for it, and a run with a
+baseline but no log would never check it at all. Each is now gated on the file
+it actually opens, and says which one is missing.
+
+Verified both ways: with neither input present both report n/a and nothing
+fails; with the log present and the baseline absent, read_master_log runs and
+only get_baseline_sod is n/a.
+
+Also dropped a dead `sods` assignment in library(), left over from the
+coverage check removed in v2.4.81 (the comment explaining its removal was
+already there).
+
+------------------------------------------------------------------------
+
 ## Version 2.4.83 — 2026-10-14 — pietro gerletti
 
 Stage 7c (scripts): a multi-group experiment is partitioned by the group each
