@@ -35,7 +35,7 @@ ALT2 = next(b for b in 'ACGT' if b != REF[P2])
 ALT3 = next(b for b in 'ACGT' if b != REF[P3])
 
 TABLE = os.path.join(REPO, 'Data',
-                     'impact_long_shedders_unbound_setup_data_#1',
+                     'impact_long_shedders_setup_data_#1',
                      'nsr_calibration_table.csv')
 RERUN_STD_NSR = 0.00014279
 REQUIRED = ['final_time.csv', 'individuals_data.csv', 'lineage_frequency.csv',
@@ -107,7 +107,7 @@ def test_live_production_seeds(n_seeds):
     import simplicity.dir_manager as dm
     from simplicity.runme import run_experiment
     import simplicity.runners.serial as serial
-    import impact_long_shedders_unbound_config as ucfg
+    import impact_long_shedders_config as ucfg
 
     row = pd.read_csv(TABLE)
     row = row[row['scenario_name'] == 'control'].iloc[0].to_dict()

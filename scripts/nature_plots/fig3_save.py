@@ -6,7 +6,7 @@ import matplotlib.gridspec as gridspec
 
 import fig3_preprocess_data as preproc
 import fig3_plots as plots
-from _scenarios import (BOUND_EXP_NAME, figure_path, resolve_scenarios,
+from _scenarios import (EXP_NAME, figure_path, resolve_scenarios,
                         scenario_meta)
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
@@ -24,8 +24,8 @@ def parse_arguments():
                         help="Experiment number to plot. Required on purpose: the "
                             "old default of 4 pointed at one of the runs that "
                             "produced invalid science.")
-    parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
-                        help=f"Pipeline to plot (default: {BOUND_EXP_NAME}).")
+    parser.add_argument('--exp-name', type=str, default=EXP_NAME,
+                        help=f"Pipeline to plot (default: {EXP_NAME}).")
     parser.add_argument('--cluster-threshold', type=int, default=5)
     parser.add_argument('--min-days', type=int, default=100)
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png')

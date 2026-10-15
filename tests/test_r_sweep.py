@@ -61,9 +61,9 @@ sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 import pandas as pd
 
 from experiment_script_runner import run_experiment_script
-from impact_long_shedders_unbound_config import (
+from impact_long_shedders_config import (
     SETUP_DIR_TEMPLATE, TABLE_FILENAME, build_exp_scenario_settings,
-    add_slurm_resource_args, set_slurm_resource_env, prod_exp_name,
+    add_slurm_resource_args, set_slurm_resource_env, exp_name,
     USER_FIXED_PARAMS,
 )
 
@@ -301,7 +301,7 @@ def collect(r_values, exp_num, table_exp_num, pop):
     baseline ran at BASELINE_POP, the sweep at pop -- phi is normalised by
     whichever applies.'''
     out = {}
-    base_prefix = prod_exp_name(CONSENSUS)
+    base_prefix = exp_name(CONSENSUS)
     for s in SCENARIO_ORDER:
         paths = sorted(glob.glob(
             f'Data/{base_prefix}_{s}_#{table_exp_num}/04_Output/*/seed_*/'

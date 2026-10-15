@@ -65,7 +65,7 @@ import pandas as pd
 from experiment_script_runner import run_experiment_script
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
-from impact_long_shedders_unbound_config import (
+from impact_long_shedders_config import (
     SETUP_DIR_TEMPLATE, TABLE_FILENAME, CONSENSUS_MODES,
     build_exp_scenario_settings, add_slurm_resource_args,
     set_slurm_resource_env,

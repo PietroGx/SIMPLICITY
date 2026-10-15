@@ -87,7 +87,7 @@ class Dispatch:
 
 def long_nsr_table():
     '''What cal_1 would have left behind: a calibrated NSR_long per cohort.'''
-    import impact_long_shedders_unbound_config as config
+    import impact_long_shedders_config as config
     sp = sm.read_standard_parameters_values()
     return {pair: 5e-4
             for pair in config.unique_long_tau_r_long_pairs(sp)}
@@ -134,11 +134,11 @@ def stage_cal_1(module_name, config_name):
 
 def stage_cal_2():
     def run(dispatch):
-        import impact_long_shedders_unbound_cal_2 as module
+        import impact_long_shedders_cal_2 as module
         module.run_experiment_script = dispatch
         module.read_calibrated_long_nsr = lambda *a, **k: long_nsr_table()
         module.compute_standard_nsr = lambda *a, **k: 1.4e-4
-        sys.argv = ['impact_long_shedders_unbound_cal_2',
+        sys.argv = ['impact_long_shedders_cal_2',
                     '--exp-num', str(EXP_NUM), '--runner', 'serial',
                     '--seeds', '2', '--target-osr-long', '0.00205']
         module.main()
@@ -162,13 +162,13 @@ def stage_exp(module_name, config_name, extra_argv=()):
 
 
 STAGES = [
-    ('cal_1', stage_cal_1('impact_long_shedders_unbound_cal_1',
-                          'impact_long_shedders_unbound_config'), 1),
+    ('cal_1', stage_cal_1('impact_long_shedders_cal_1',
+                          'impact_long_shedders_config'), 1),
     ('cal_2', stage_cal_2(), 1),
     # --sequential: exp otherwise submits its scenarios from worker threads,
     # and a thread's exception is collected, not raised here
-    ('exp  ', stage_exp('impact_long_shedders_unbound_exp',
-                        'impact_long_shedders_unbound_config',
+    ('exp  ', stage_exp('impact_long_shedders_exp',
+                        'impact_long_shedders_config',
                         ('--sequential',)), None),
 ]
 

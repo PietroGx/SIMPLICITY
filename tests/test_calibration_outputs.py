@@ -33,7 +33,7 @@ sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 
 import simplicity.dir_manager as dm
-from impact_long_shedders_unbound_config import (
+from impact_long_shedders_config import (
     CALIBRATION_SKIPPED_OUTPUTS, set_calibration_output_env,
 )
 
@@ -55,8 +55,8 @@ READERS = {
 # The stages a calibration run actually goes through: both fits, and the sanity
 # regressions the pipeline dispatches afterwards.
 CALIBRATION_PATH = [
-    'scripts/experiments/impact_long_shedders_unbound_cal_1.py',
-    'scripts/experiments/impact_long_shedders_unbound_cal_2.py',
+    'scripts/experiments/impact_long_shedders_cal_1.py',
+    'scripts/experiments/impact_long_shedders_cal_2.py',
     'scripts/experiments/long_nsr_calibration_plot.py',
     'scripts/experiments/plot_sot_sanity_regressions.py',
     # cal_1's plot and the sanity regressions both reach the intra-host clock

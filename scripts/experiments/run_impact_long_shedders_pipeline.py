@@ -10,7 +10,7 @@
 # (at your option) any later version.
 #
 # ============================================================================
-# impact_long_shedders_unbound -- SINGLE PIPELINE ENTRY POINT
+# impact_long_shedders -- SINGLE PIPELINE ENTRY POINT
 # ----------------------------------------------------------------------------
 # The second pipeline, run alongside impact_long_shedders (untouched). Each
 # cohort is calibrated ALONE and then they are let loose together, so the
@@ -32,7 +32,7 @@
 # submitted together. They are kept sequential here for the same reason the
 # bound pipeline does: one log, one failure point, easy to follow.
 #
-# Experiment names are all prefixed impact_long_shedders_unbound_*, so this
+# Experiment names are all prefixed impact_long_shedders_*, so this
 # pipeline's Data/ output can never collide with the bound one's at the same
 # --exp-num.
 # ============================================================================
@@ -48,11 +48,11 @@ from datetime import datetime
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
-from impact_long_shedders_unbound_config import (
-    LONG_NSR_EXP_NAME, STD_NSR_EXP_NAME, PROD_EXP_NAME, SETUP_DIR_TEMPLATE,
+from impact_long_shedders_config import (
+    LONG_NSR_EXP_NAME, STD_NSR_EXP_NAME, EXP_NAME, SETUP_DIR_TEMPLATE,
     CALIBRATION_SKIPPED_OUTPUTS,
     TABLE_FILENAME, SCENARIOS, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
-    add_slurm_resource_args, CONSENSUS_MODES, prod_exp_name,
+    add_slurm_resource_args, CONSENSUS_MODES, exp_name,
 )
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
@@ -129,12 +129,12 @@ def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh,
     """One sanity grid per consensus mode. Each reads its own production
     experiments and writes into its own plots directory, both derived from that
     pipeline's experiment name."""
-    sanity_sh = os.path.join(SCRIPT_DIR, "submit_sanity_plot_unbound.sh")
+    sanity_sh = os.path.join(SCRIPT_DIR, "submit_sanity_plot.sh")
     submitted = []
     for mode in consensus_modes:
-        exp_name = prod_exp_name(mode)
+        name = exp_name(mode)
         cmd = ["sbatch", sanity_sh, str(exp_num), str(target_osr_std),
-               str(target_osr_long), exp_name]
+               str(target_osr_long), name]
         header = f"\n$ {' '.join(cmd)}"
         print(header)
         log_fh.write(header + "\n")
@@ -179,7 +179,7 @@ def wait_for_sanity_plots(submitted, log_fh, poll_interval=SANITY_PLOT_POLL_INTE
 
 def artifacts_archive_path(exp_num):
     return os.path.join("Data", "pipeline_artifacts",
-                        f"{PROD_EXP_NAME}_#{exp_num}_artifacts.zip")
+                        f"{EXP_NAME}_#{exp_num}_artifacts.zip")
 
 
 def write_artifacts_archive(archive_path, exp_num, log_file):
@@ -193,7 +193,7 @@ def write_artifacts_archive(archive_path, exp_num, log_file):
     ]
     # one sanity grid per consensus mode
     for mode in CONSENSUS_MODES:
-        sanity_exp = f"{prod_exp_name(mode)}_sanity_#{exp_num}"
+        sanity_exp = f"{exp_name(mode)}_sanity_#{exp_num}"
         candidates.append(
             os.path.join("Data", sanity_exp, "05_Plots",
                          f"{sanity_exp}_all_scenarios_global_vs_intrahost.png"))
@@ -239,7 +239,7 @@ def compress_results(exp_num, log_fh, keep_slurm_logs=True):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run the full impact_long_shedders_unbound pipeline: each "
+        description="Run the full impact_long_shedders pipeline: each "
                     "cohort calibrated alone, population clock left free.")
     parser.add_argument('--exp-num', type=int, required=True,
                         help="Experiment number, shared by every stage.")
@@ -281,18 +281,18 @@ def main():
 
     log_file = args.log_file or os.path.join(
         "Data", "pipeline_logs",
-        f"{PROD_EXP_NAME}_pipeline_#{args.exp_num}.log")
+        f"{EXP_NAME}_pipeline_#{args.exp_num}.log")
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
     py = sys.executable
-    cal1_path = os.path.join(SCRIPT_DIR, "impact_long_shedders_unbound_cal_1.py")
-    cal2_path = os.path.join(SCRIPT_DIR, "impact_long_shedders_unbound_cal_2.py")
-    exp_path = os.path.join(SCRIPT_DIR, "impact_long_shedders_unbound_exp.py")
+    cal1_path = os.path.join(SCRIPT_DIR, "impact_long_shedders_cal_1.py")
+    cal2_path = os.path.join(SCRIPT_DIR, "impact_long_shedders_cal_2.py")
+    exp_path = os.path.join(SCRIPT_DIR, "impact_long_shedders_exp.py")
 
     slurm_res_args = ["--slurm-mem", args.slurm_mem, "--slurm-time", args.slurm_time]
 
     with open(log_file, "a") as log_fh:
-        _log(log_fh, f"\n===== {PROD_EXP_NAME} pipeline: exp_num={args.exp_num} "
+        _log(log_fh, f"\n===== {EXP_NAME} pipeline: exp_num={args.exp_num} "
                     f"@ {datetime.now().isoformat(timespec='seconds')} =====")
 
         if args.skip_cal1:
@@ -337,7 +337,7 @@ def main():
                       *slurm_res_args], log_fh)
 
             report_simulation_health(
-                [f"{prod_exp_name(mode)}_{s['name']}_#{args.exp_num}"
+                [f"{exp_name(mode)}_{s['name']}_#{args.exp_num}"
                  for s in SCENARIOS],
                 log_fh, f"stage 3 (production, consensus={mode})")
 
@@ -354,7 +354,7 @@ def main():
             f"Frozen calibration table : {table_path}",
             f"Long calibration exp     : {LONG_NSR_EXP_NAME}_#{args.exp_num}",
             f"Standard calibration exp : {STD_NSR_EXP_NAME}_#{args.exp_num}",
-            *[f"Production ({m:<12}): {prod_exp_name(m)}_<scenario>_#{args.exp_num}"
+            *[f"Production ({m:<12}): {exp_name(m)}_<scenario>_#{args.exp_num}"
               for m in args.consensus],
             "Sanity plot jobs submitted:",
         ]

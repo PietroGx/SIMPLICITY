@@ -235,7 +235,7 @@ def fit_result_files(experiment_name):
 # ===========================================================================
 def section_cal_1():
     print('\n=== cal_1: partition, divergence, and what each fit was fed')
-    import impact_long_shedders_unbound_config as cfg
+    import impact_long_shedders_config as cfg
     import long_nsr_calibration_plot as plot
 
     with Scratch() as scratch:
@@ -316,7 +316,7 @@ def section_cal_1():
 def section_experiment_is_single_group():
     print('\n=== experiment phase: one experiment, one group, named after '
           'the scenario')
-    import impact_long_shedders_unbound_config as cfg
+    import impact_long_shedders_config as cfg
 
     row = {
         'scenario_name': 'HIV_high', 'tau_3_long': 100.0,
@@ -338,7 +338,7 @@ def section_experiment_is_single_group():
 
     with Scratch() as scratch:
         name = scratch.build(
-            'impact_long_shedders_unbound_HIV_high_probe',
+            'impact_long_shedders_HIV_high_probe',
             cfg.build_exp_scenario_settings(pd.Series(row), 2))
         check('and on disk it is one group', dm.get_groups(name), ['HIV_high'])
         check('so an unscoped listing is that group',
@@ -405,12 +405,12 @@ def section_calibration_checker():
     'reproduces exactly' from an untested script would look like."""
     print('\n=== the cluster checker detects a change, and only a change')
     import check_calibration_unchanged as checker
-    import impact_long_shedders_unbound_config as cfg
+    import impact_long_shedders_config as cfg
     import long_nsr_calibration_plot as plot
 
     with Scratch() as scratch:
         name = scratch.build(
-            'impact_long_shedders_unbound_cal_long_#77',
+            'impact_long_shedders_cal_long_#77',
             cfg.build_cal1_settings(2, {'min': 1e-4, 'max': 1e-2, 'steps': 3}))
 
         SLOPES.clear()
@@ -425,7 +425,7 @@ def section_calibration_checker():
             checker.failures.clear()
             checker.skipped.clear()
             checker.stage_1(
-                {'cal_1': 'impact_long_shedders_unbound_cal_long'}, 77,
+                {'cal_1': 'impact_long_shedders_cal_long'}, 77,
                 rtol=1e-9, keep=False)
             check('no differences reported', checker.failures, [])
             check('and nothing was skipped', checker.skipped, [])
@@ -439,7 +439,7 @@ def section_calibration_checker():
             checker.failures.clear()
             checker.skipped.clear()
             checker.stage_1(
-                {'cal_1': 'impact_long_shedders_unbound_cal_long'}, 77,
+                {'cal_1': 'impact_long_shedders_cal_long'}, 77,
                 rtol=1e-9, keep=False)
             check('one difference reported per cohort',
                   len(checker.failures), len(SLOPES))
@@ -459,7 +459,7 @@ def _checker_stage_2(checker, cfg):
     print('\n  stage 2: the standard-only fit, against the frozen table')
     with Scratch() as scratch:
         name = scratch.build(
-            'impact_long_shedders_unbound_cal_std_#77',
+            'impact_long_shedders_cal_std_#77',
             cfg.build_cal2_settings(2, {'min': 1e-4, 'max': 1e-2, 'steps': 3}))
 
         SLOPES.clear()
@@ -476,8 +476,8 @@ def _checker_stage_2(checker, cfg):
             table = os.path.join(setup, cfg.TABLE_FILENAME)
             pd.DataFrame(rows).to_csv(table, index=False)
 
-            names = {'cal_2': 'impact_long_shedders_unbound_cal_std',
-                     'setup': 'impact_long_shedders_unbound_setup_data'}
+            names = {'cal_2': 'impact_long_shedders_cal_std',
+                     'setup': 'impact_long_shedders_setup_data'}
             checker.failures.clear()
             checker.skipped.clear()
             checker.stage_2(names, 77, target, rtol=1e-9, keep=False)

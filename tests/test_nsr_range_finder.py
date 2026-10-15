@@ -21,12 +21,16 @@
 # NSR_RANGES in impact_long_shedders_config.py should be set to before a
 # production run.
 #
-# Runs the two stages SEQUENTIALLY under one test number, the way the
-# pipeline does: stage 1 probes NSR_long, fits and inverts its own result,
-# and hands that frozen long-side rate to stage 2 -- so stage 2 is probed in
-# the population context stage 1 actually implies, not against a hardcoded
-# or borrowed long NSR. --stage 1 or --stage 2 runs just one (stage 2 alone
-# then needs --long-calib-exp or --nsr-long).
+# Runs the two stages under one test number, the way the pipeline does:
+# INDEPENDENTLY. Stage 1 probes NSR_long in a 100% long-shedder population,
+# stage 2 probes the standard NSR in a 0% long-shedder population, and
+# neither reads the other -- that independence is the whole design of the
+# pipeline these two mirror. --stage 1 or --stage 2 runs just one.
+#
+# Until v2.4.91 stage 2 here froze stage 1's calibrated long side into a
+# mixed population and swept per scenario, because that is what the bound
+# pipeline's cal_2 did. That pipeline is gone and its cal_2 with it, so this
+# now mirrors the surviving one: a single standard-only sweep, one group.
 #
 # Coarse, wide and cheap: a few seeds over a few nodes, to locate the target
 # rather than to fit it precisely. The two existing grid tests answer "does
@@ -34,18 +38,17 @@
 # prints a ready-to-paste NSR_RANGES entry per stage.
 #
 # Both stages go through impact_long_shedders_config's own builders
-# (build_cal1_settings / build_cal2_scenario_groups + build_cal2_settings),
-# so the population context and swept parameter are cal_1's and cal_2's by
-# construction and cannot drift from them. What differs per stage is only:
+# (build_cal1_settings / build_cal2_settings), so the population context and
+# swept parameter are cal_1's and cal_2's by construction and cannot drift
+# from them. What differs per stage is only:
 #
 #   stage 1  sweeps nucleotide_substitution_rate_long in the isolated 100%
 #            long-shedder context, measures each seed's INTRA-HOST clock
 #            (er.extract_ih_regression_data), targets --target-osr-long,
 #            and groups by (tau_3_long, R_long);
-#   stage 2  sweeps nucleotide_substitution_rate in the mixed production
-#            population with the long side frozen, measures the GLOBAL clock
-#            over STANDARD individuals only, targets --target-osr-std, and
-#            groups by scenario.
+#   stage 2  sweeps nucleotide_substitution_rate in a 0% long-shedder
+#            population, measures the GLOBAL clock over STANDARD individuals
+#            only, targets --target-osr-std, and has one group.
 #
 # Three things are reported per node, and all three constrain the range:
 #
@@ -96,12 +99,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 '..', 'scripts', 'experiments'))
 from impact_long_shedders_config import (
     SCENARIOS, TAU_ROUND, USER_FIXED_PARAMS, CAL1_ISOLATED_FIXED_PARAMS,
-    CAL2_FINAL_TIME, phase_offset, derive_scenario_params,
-    unique_long_tau_r_long_pairs, build_cal1_settings,
-    build_cal2_scenario_groups, build_cal2_settings,
+    CAL2_FINAL_TIME, CAL2_GROUP_NAME, phase_offset, derive_scenario_params,
+    build_cal1_settings, build_cal2_settings,
     add_slurm_resource_args, set_slurm_resource_env,
 )
-from long_nsr_calibration_plot import read_calibrated_long_nsr
 
 EXP_NAME = "nsr_range_finder_test"
 
@@ -158,20 +159,11 @@ def build_stage1(ranges, n_seeds, overrides, k_v, scenario_name, sp):
     return lambda: ({'_scenario_groups': kept}, fixed, seeds)
 
 
-def build_stage2(ranges, n_seeds, overrides, k_v, long_nsr_by_group,
-                 scenario_name):
-    """cal_2's own builder, subset to one scenario's group."""
-    nsr_ranges = {s["name"]: ranges for s in SCENARIOS}
-    scenario_groups, scenarios_frozen = build_cal2_scenario_groups(
-        nsr_ranges, long_nsr_by_group)
-
-    kept = [g for g, f in zip(scenario_groups, scenarios_frozen)
-            if f["scenario_name"] == scenario_name]
-    if not kept:
-        raise SystemExit(f"no cal_2 group matches scenario '{scenario_name}'")
-
+def build_stage2(ranges, n_seeds, overrides, k_v):
+    """cal_2's own builder: one standard-only group, no long side to
+    freeze and nothing scenario-specific to subset."""
     varying, fixed, seeds = build_cal2_settings(
-        kept, n_seeds, USER_FIXED_PARAMS['R'], k_v)()
+        n_seeds, ranges, USER_FIXED_PARAMS['R'], k_v)()
     fixed = dict(fixed, **overrides)
     return lambda: (varying, fixed, seeds)
 
@@ -384,17 +376,16 @@ def stage_groups(stage, sp, scenario_name, final_time):
         # Intra-host divergence accumulates over one infection, not the run.
         return {scenario_name: key}, {scenario_name: key[0] + phase_offset(sp)}
 
-    scenario = next(s for s in SCENARIOS if s["name"] == scenario_name)
-    frozen = derive_scenario_params(scenario, sp)
-    key = (round(frozen["tau_3_long"], TAU_ROUND),
-           round(frozen["long_shedders_ratio"], TAU_ROUND))
-    return {scenario_name: key}, {scenario_name: float(final_time)}
+    # One group, every individual standard: the long side is absent, not
+    # frozen, so the only key that identifies it is ratio 0.
+    key = (round(float(sp["tau_3_long"]), TAU_ROUND), 0.0)
+    return {CAL2_GROUP_NAME: key}, {CAL2_GROUP_NAME: float(final_time)}
 
 
 # =============================================================================
 # ONE STAGE, END TO END
 # =============================================================================
-def run_stage(stage, args, sp, long_nsr_by_group=None):
+def run_stage(stage, args, sp):
     """Submit, measure, recommend and plot one stage. Returns a dict with
     the recap lines, the plot path, and (stage 1) the calibrated NSR_long to
     carry into stage 2."""
@@ -420,8 +411,7 @@ def run_stage(stage, args, sp, long_nsr_by_group=None):
                                      args.scenario, sp)
     else:
         settings_func = build_stage2(ranges, args.n_seeds, overrides,
-                                     args.ih_virus_emergence_rate,
-                                     long_nsr_by_group, args.scenario)
+                                     args.ih_virus_emergence_rate)
 
     groups, windows = stage_groups(stage, sp, args.scenario, final_time)
     numbered = f"{EXP_NAME}_s{stage}_#{args.test_n}"
@@ -429,7 +419,8 @@ def run_stage(stage, args, sp, long_nsr_by_group=None):
 
     print("\n=========================================================")
     print(f" STAGE {stage} -- {'cal_1, intra-host clock' if stage == 1 else 'cal_2, global clock (standard only)'}")
-    print(f" experiment: {numbered}   scenario: {args.scenario}")
+    print(f" experiment: {numbered}"
+          + (f"   scenario: {args.scenario}" if stage == 1 else ""))
     print(f" sweep {nsr_param}: {args.nsr_min:g} .. {args.nsr_max:g} "
           f"({args.steps} nodes), {args.n_seeds} seeds/node")
     for k, v in fixed_params.items():
@@ -456,13 +447,12 @@ def run_stage(stage, args, sp, long_nsr_by_group=None):
         f"gates: min_seq={args.min_seq}, min_len={args.min_len}, "
         f"min_yield={args.min_yield}, saturation at d>{SATURATION_D}",
     ]
-    if stage == 2:
-        recap.append(f"frozen long NSR: {long_nsr_by_group}")
     recap.append("")
 
     fig, ax = plt.subplots(figsize=(9, 5.5))
     result = {'recap': recap, 'plot_path': None, 'nsr_long': None,
-              'recommendations': {}}
+              'recommendations': {},
+              'range_key': 'cal_long' if stage == 1 else 'cal_std'}
 
     for label, key in groups.items():
         window = windows[label]
@@ -497,8 +487,8 @@ def run_stage(stage, args, sp, long_nsr_by_group=None):
                 numbered, group_points, nsr_param, target, rec,
                 args.model, label)
             result['nsr_long'] = nsr_long
-            recap.append(f"  calibrated NSR_long for stage 2: {nsr_long:.8f}  [{how}]")
-            print(f"{label:20s}: NSR_long for stage 2 = {nsr_long:.8f} ({how})")
+            recap.append(f"  inverts to NSR_long {nsr_long:.8f}  [{how}]")
+            print(f"{label:20s}: inverts to NSR_long {nsr_long:.8f} ({how})")
         recap.append("")
 
         plot_df = rec['table'].dropna(subset=['mean_osr'])
@@ -546,13 +536,23 @@ def write_artifacts(test_n, stage_results):
     for r in stage_results:
         recap.extend(r['recap'])
 
-    paste = [(label, rng) for r in stage_results
-             for label, rng in r['recommendations'].items()]
+    # NSR_RANGES holds ONE range per stage ("cal_long"/"cal_std"), not one
+    # per group, so several groups collapse to the bracket covering them all.
+    paste = []
+    for r in stage_results:
+        values = list(r['recommendations'].values())
+        if values:
+            paste.append((r['range_key'],
+                          min(lo for lo, _ in values),
+                          max(hi for _, hi in values),
+                          sorted(r['recommendations'])))
     if paste:
         recap.append("--- paste into impact_long_shedders_config.NSR_RANGES ---")
-        for label, (lo, hi) in paste:
-            recap.append(f'  {label}: {{"min": {lo:g}, "max": {hi:g}, '
-                         f'"steps": _NSR_STEPS}}')
+        for key, lo, hi, labels in paste:
+            recap.append(f'  "{key}": {{"min": {lo:g}, "max": {hi:g}, '
+                         f'"steps": _NSR_STEPS}}'
+                         + (f'   # covers {", ".join(labels)}'
+                            if len(labels) > 1 else ''))
         recap.append("")
 
     recap_dir = os.path.join(dm.get_data_dir(), "tests")
@@ -574,27 +574,11 @@ def write_artifacts(test_n, stage_results):
     return recap_path, zip_path
 
 
-def stage2_long_nsr(args, sp, stage1_result):
-    """Frozen long-side NSR for stage 2: stage 1's own probe when the two ran
-    together, else an explicit override or a real cal_1 experiment."""
-    if args.nsr_long is not None:
-        return {pair: args.nsr_long for pair in unique_long_tau_r_long_pairs(sp)}
-    if stage1_result is not None and stage1_result['nsr_long'] is not None:
-        return {pair: stage1_result['nsr_long']
-                for pair in unique_long_tau_r_long_pairs(sp)}
-    if args.long_calib_exp:
-        return read_calibrated_long_nsr(args.long_calib_exp, args.target_osr_long)
-    raise SystemExit(
-        "stage 2 needs a frozen long-side NSR. Run both stages together "
-        "(the default), or pass --long-calib-exp "
-        "<impact_long_shedders_calibration_lng_nsr_#N> or --nsr-long <value>.")
-
-
 def main():
     parser = argparse.ArgumentParser(
-        description="HPC test: find the NSR sweep ranges for cal_1 and cal_2. "
-                    "Runs both stages sequentially by default, stage 1's "
-                    "calibrated NSR_long feeding stage 2.")
+        description="HPC test: find the NSR sweep ranges for cal_1 and "
+                    "cal_2. Runs both stages by default. They are "
+                    "independent: neither reads the other.")
     parser.add_argument('test_n', type=int)
     parser.add_argument('--stage', type=str, default='both',
                         choices=['both', '1', '2'],
@@ -626,16 +610,10 @@ def main():
     parser.add_argument('--target-osr-long', type=float, default=0.00205)
     parser.add_argument('--model', type=str, default='exp',
                         choices=['lin', 'log', 'exp', 'tan'],
-                        help="Fit model used to invert stage 1's probe into "
-                            "the NSR_long handed to stage 2.")
+                        help="Fit model used to invert stage 1's probe "
+                            "into a calibrated NSR_long.")
     parser.add_argument('--ih-virus-emergence-rate', type=float,
                         default=USER_FIXED_PARAMS['IH_virus_emergence_rate'])
-    parser.add_argument('--long-calib-exp', type=str, default=None,
-                        help="--stage 2 only: completed cal_1 experiment to "
-                            "read the frozen long-side NSR from.")
-    parser.add_argument('--nsr-long', type=float, default=None,
-                        help="Override the frozen long-side NSR stage 2 runs "
-                            "with, instead of stage 1's own result.")
     parser.add_argument('--min-seq', type=int, default=30)
     parser.add_argument('--min-len', type=int, default=100)
     parser.add_argument('--min-yield', type=float, default=0.25,
@@ -652,19 +630,11 @@ def main():
 
     print("\n#########################################################")
     print(f" NSR range finder, test #{args.test_n} -- stages {stages}")
-    print(f" scenario {args.scenario}, {args.n_seeds} seeds/node, "
+    print(f" scenario {args.scenario} (stage 1 only), {args.n_seeds} seeds/node, "
           f"{args.steps} nodes over {args.nsr_min:g}..{args.nsr_max:g}")
     print("#########################################################")
 
-    stage_results, stage1_result = [], None
-    for stage in stages:
-        if stage == 1:
-            result = run_stage(1, args, sp)
-            stage1_result = result
-        else:
-            long_nsr = stage2_long_nsr(args, sp, stage1_result)
-            result = run_stage(2, args, sp, long_nsr_by_group=long_nsr)
-        stage_results.append(result)
+    stage_results = [run_stage(stage, args, sp) for stage in stages]
 
     write_artifacts(args.test_n, stage_results)
 

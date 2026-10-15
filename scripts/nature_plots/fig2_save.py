@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 import fig2_preprocess_data as preproc
-from _scenarios import BOUND_EXP_NAME, figure_path, resolve_scenarios
+from _scenarios import EXP_NAME, figure_path, resolve_scenarios
 import fig2_plots as plots
 
 def parse_arguments():
@@ -12,8 +12,8 @@ def parse_arguments():
                         help="Experiment number to plot. Required on purpose: the "
                             "old default of 4 pointed at one of the runs that "
                             "produced invalid science.")
-    parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
-                        help=f"Pipeline to plot (default: {BOUND_EXP_NAME}).")
+    parser.add_argument('--exp-name', type=str, default=EXP_NAME,
+                        help=f"Pipeline to plot (default: {EXP_NAME}).")
     parser.add_argument('--seed', type=str, default="1", help="Target seed for lineage frequency plots (Rows 1 & 2)")
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png', help="Output format: pdf or png (default: png)")
     return parser.parse_args()

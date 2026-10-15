@@ -1,8 +1,12 @@
 '''
-Verifies _scenarios resolves all three figure pipelines -- bound, unbound
-(argmax consensus) and unbound_dist (distributional consensus) -- and that the
-three write to distinct figure paths. The dist pipeline previously raised
-SystemExit: no config module was registered for it.
+Verifies _scenarios resolves both figure pipelines -- impact_long_shedders
+(argmax consensus) and impact_long_shedders_dist (distributional consensus)
+-- and that the two write to distinct figure paths. The dist pipeline once
+raised SystemExit: no config module was registered for it.
+
+v2.4.91 deleted the third, bound, entry with the pipeline behind it, and the
+labels stopped naming an arm ("bound"/"unbound") and started naming the only
+thing that still differs: the consensus mode.
 '''
 import os, sys, subprocess
 
@@ -14,12 +18,11 @@ sys.path.insert(0, PLOTS)
 
 import _scenarios as sc
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
-import impact_long_shedders_unbound_config as ucfg
+import impact_long_shedders_config as ucfg
 
 EXPECTED_LABELS = {
-    sc.BOUND_EXP_NAME:         'bound',
-    sc.UNBOUND_EXP_NAME:       'unbound',
-    sc.UNBOUND_DIST_EXP_NAME:  'unbound_distribution',
+    sc.EXP_NAME:       'argmax',
+    sc.DIST_EXP_NAME:  'distribution',
 }
 
 failures = []
@@ -34,20 +37,22 @@ def check(label, got, want):
 
 def test_dist_name_matches_the_pipeline_config():
     '''The figure code must not hardcode a name the pipeline doesn't produce.'''
-    built = ucfg.prod_exp_name('distribution')
+    built = ucfg.exp_name('distribution')
     check('dist experiment name agrees with the config',
-          sc.UNBOUND_DIST_EXP_NAME, built)
+          sc.DIST_EXP_NAME, built)
 
 
 def test_every_pipeline_resolves():
     for name in EXPECTED_LABELS:
         got = sc.scenario_names(name)          # raised SystemExit for dist
         check(f'{name} scenarios', bool(got), True)
-    check('both unbound pipelines define the same scenarios',
-          sc.scenario_names(sc.UNBOUND_EXP_NAME),
-          sc.scenario_names(sc.UNBOUND_DIST_EXP_NAME))
-    check('unbound includes edge_case',
-          'edge_case' in sc.scenario_names(sc.UNBOUND_EXP_NAME), True)
+    check('both consensus modes define the same scenarios',
+          sc.scenario_names(sc.EXP_NAME),
+          sc.scenario_names(sc.DIST_EXP_NAME))
+    check('and they include edge_case',
+          'edge_case' in sc.scenario_names(sc.EXP_NAME), True)
+    check('the deleted bound pipeline is not resolvable',
+          'impact_long_shedders_bound' in sc._CONFIG_MODULES, False)
 
 
 def test_labels():
@@ -61,15 +66,15 @@ def test_figure_paths_are_distinct():
     paths = {n: sc.figure_path(3, n, 2, 'pdf') for n in EXPECTED_LABELS}
     for n, p in paths.items():
         print(f'    {n} -> {os.path.basename(p)}')
-    check('three pipelines, three filenames', len(set(paths.values())), 3)
-    check('dist filename', os.path.basename(paths[sc.UNBOUND_DIST_EXP_NAME]),
-          'Figure_3_unbound_distribution_#2.pdf')
-    check('argmax filename unchanged',
-          os.path.basename(paths[sc.UNBOUND_EXP_NAME]),
-          'Figure_3_unbound_#2.pdf')
-    seeded = sc.figure_path(4, sc.UNBOUND_DIST_EXP_NAME, 2, 'png', seed='3')
+    check('two modes, two filenames', len(set(paths.values())), 2)
+    check('dist filename', os.path.basename(paths[sc.DIST_EXP_NAME]),
+          'Figure_3_distribution_#2.pdf')
+    check('argmax filename',
+          os.path.basename(paths[sc.EXP_NAME]),
+          'Figure_3_argmax_#2.pdf')
+    seeded = sc.figure_path(4, sc.DIST_EXP_NAME, 2, 'png', seed='3')
     check('seed still carried', os.path.basename(seeded),
-          'Figure_4_unbound_distribution_#2_seed3.png')
+          'Figure_4_distribution_#2_seed3.png')
 
 
 def test_save_scripts_still_parse():

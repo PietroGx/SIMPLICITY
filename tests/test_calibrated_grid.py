@@ -56,8 +56,8 @@ sys.path.insert(0, REPO)
 sys.path.insert(0, HERE)
 sys.path.insert(0, SCRIPTS)
 
-from impact_long_shedders_unbound_config import (
-    SETUP_DIR_TEMPLATE, TABLE_FILENAME, SCENARIOS, prod_exp_name,
+from impact_long_shedders_config import (
+    SETUP_DIR_TEMPLATE, TABLE_FILENAME, SCENARIOS, exp_name,
     add_slurm_resource_args,
 )
 # the configuration metrics are measured by test_config_grid's own function, so
@@ -65,7 +65,7 @@ from impact_long_shedders_unbound_config import (
 from test_config_grid import measure, hms, fmt, se_pct
 
 CELLCONFIG = os.path.join(HERE, 'cellconfig')
-PIPELINE = os.path.join(SCRIPTS, 'run_impact_long_shedders_unbound_pipeline.py')
+PIPELINE = os.path.join(SCRIPTS, 'run_impact_long_shedders_pipeline.py')
 W = 104
 
 
@@ -209,7 +209,7 @@ def read_table(exp_num):
 
 
 def production_paths(exp_num, consensus):
-    root = os.path.join('Data', f'{prod_exp_name(consensus)}_#{exp_num}',
+    root = os.path.join('Data', f'{exp_name(consensus)}_#{exp_num}',
                         '04_Output')
     found = []
     for dirpath, _, files in os.walk(root):
@@ -227,7 +227,7 @@ def production_paths_any(exp_num, consensus_modes):
         for scenario in SCENARIOS:
             root = os.path.join(
                 'Data',
-                f'{prod_exp_name(consensus)}_{scenario["name"]}_#{exp_num}',
+                f'{exp_name(consensus)}_{scenario["name"]}_#{exp_num}',
                 '04_Output')
             for dirpath, _, files in os.walk(root):
                 if 'simulation_trajectory.csv' in files:

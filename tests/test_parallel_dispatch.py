@@ -19,8 +19,8 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 
-import impact_long_shedders_unbound_exp as exp
-import run_impact_long_shedders_unbound_pipeline as pipe
+import impact_long_shedders_exp as exp
+import run_impact_long_shedders_pipeline as pipe
 
 SCENARIOS = ['control', 'SOT', 'HIV_low', 'HIV_high', 'edge_case']
 failures = []
