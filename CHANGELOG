@@ -5,6 +5,46 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.87 — 2026-10-15 — pietro gerletti
+
+test_figures_on_real_output: an empty RealWorldData panel is a FAILURE, and
+emptiness is now checked all the way down.
+
+Run #2 on the cluster reported `fig1.get_panel_c_data (RealWorldData):
+DataFrame 0x2` under "no data (legitimate: an absent input, or a filter
+nothing passed)". It is not legitimate. That reader's input,
+Data/RealWorldData/literature_long_shedders_data.csv, is TRACKED -- it has
+been in the branch since v2.4.34 and here it returns 123 patients across 9
+categories. Empty on the cluster means the file is not in that checkout, which
+is the quota-cleanup failure the call site's own comment already records. The
+figure would be published with an empty panel C.
+
+Two defects, both the "139 item(s)" family -- a check whose name does not
+match what it measures:
+
+  probe() called a result empty via `len(value) == 0`. get_panel_de_data
+  returns a TUPLE of two DataFrames, so len() is 2 when both are empty:
+  panels D and E could both be blank and be counted [ok]. is_empty() now
+  recurses through tuples and dicts; a scalar member (fig2's 1095.0, fig3's
+  10) still makes a container non-empty, as it should.
+
+  Readers whose input ships with the repo now take required_inputs=. When one
+  returns nothing, it FAILS instead of going soft, and says which: "its
+  tracked input is MISSING: <path> -- restore it from git" when the file is
+  gone, or "its input exists but yielded no rows -- wrong columns, or a filter
+  dropped everything" when it is there. Those are different repairs.
+
+Verified by exercising the real functions: 12/12 on the is_empty truth table
+including (empty, empty) which was the live bug; all four probe branches; and
+the real get_panel_c_data against the real file still classifying [ok]
+DataFrame 123x2.
+
+This does not say which case the cluster is in -- the warning fig1 already
+prints names it ("panel C: missing <path>" vs "no 'Days (Exact)' column").
+What changes is that the next run stops calling it legitimate.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.86 — 2026-10-15 — pietro gerletti
 
 run_tests_on_compute.sh: one empty squeue reply no longer counts as a dead job.
