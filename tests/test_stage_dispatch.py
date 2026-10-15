@@ -20,13 +20,12 @@ to
 
 and the progress banner four lines above the dispatch still read
 varying['nucleotide_substitution_rate']. KeyError, before submission. Nobody
-saw it because the unbound pipeline has never been run -- the bound one's
-equivalent banner iterates _scenario_groups and is fine.
+saw it because that stage had never been run.
 
 A printout cannot be caught by reading a config or by checking that the groups
 are right; it is only caught by CALLING main(). That is all this does: for
-every stage of both pipelines, stub the runner and the analysis that needs real
-output, call main(), and require that the dispatch was reached.
+every stage, stub the runner and the analysis that needs real output, call
+main(), and require that the dispatch was reached.
 
 It also checks what was dispatched -- every group named, no name repeated, and
 each group's swept axes non-empty -- because a stage that submits the wrong
@@ -88,12 +87,10 @@ class Dispatch:
 
 def long_nsr_table():
     '''What cal_1 would have left behind: a calibrated NSR_long per cohort.'''
-    import impact_long_shedders_config as bound
-    import impact_long_shedders_unbound_config as unbound
+    import impact_long_shedders_unbound_config as config
     sp = sm.read_standard_parameters_values()
-    pairs = set(bound.unique_long_tau_r_long_pairs(sp))
-    pairs |= set(unbound.unique_long_tau_r_long_pairs(sp))
-    return {pair: 5e-4 for pair in pairs}
+    return {pair: 5e-4
+            for pair in config.unique_long_tau_r_long_pairs(sp)}
 
 
 def frozen_rows(scenarios, sp, derive):
@@ -135,21 +132,7 @@ def stage_cal_1(module_name, config_name):
     return run
 
 
-def stage_bound_cal_2():
-    def run(dispatch):
-        import impact_long_shedders_cal_2 as module
-        module.run_experiment_script = dispatch
-        module.read_calibrated_long_nsr = lambda *a, **k: long_nsr_table()
-        module.compute_standard_nsr_per_scenario = lambda numbered, frozen, *a, **k: {
-            row['scenario_name']: 1.4e-4 for row in frozen}
-        sys.argv = ['impact_long_shedders_cal_2', '--exp-num', str(EXP_NUM),
-                    '--runner', 'serial', '--seeds', '2',
-                    '--target-osr-long', '0.00205']
-        module.main()
-    return run
-
-
-def stage_unbound_cal_2():
+def stage_cal_2():
     def run(dispatch):
         import impact_long_shedders_unbound_cal_2 as module
         module.run_experiment_script = dispatch
@@ -167,8 +150,7 @@ def stage_exp(module_name, config_name, extra_argv=()):
         config = __import__(config_name)
         module = __import__(module_name)
         sp = sm.read_standard_parameters_values()
-        # the bound stage defines these itself; the unbound one re-exports the
-        # config's. Take them from the module that actually reads the table.
+        # take them from the module that actually reads the table
         write_frozen_table(module.SETUP_DIR_TEMPLATE, module.TABLE_FILENAME,
                            frozen_rows(config.SCENARIOS, sp,
                                        config.derive_scenario_params))
@@ -180,19 +162,14 @@ def stage_exp(module_name, config_name, extra_argv=()):
 
 
 STAGES = [
-    ('bound   cal_1', stage_cal_1('impact_long_shedders_cal_1',
-                                  'impact_long_shedders_config'), 1),
-    ('bound   cal_2', stage_bound_cal_2(), 1),
-    ('bound   exp  ', stage_exp('impact_long_shedders_exp',
-                                'impact_long_shedders_config'), None),
-    ('unbound cal_1', stage_cal_1('impact_long_shedders_unbound_cal_1',
-                                  'impact_long_shedders_unbound_config'), 1),
-    ('unbound cal_2', stage_unbound_cal_2(), 1),
-    # --sequential: the unbound stage otherwise submits its scenarios from
-    # worker threads, and a thread's exception is collected, not raised here
-    ('unbound exp  ', stage_exp('impact_long_shedders_unbound_exp',
-                                'impact_long_shedders_unbound_config',
-                                ('--sequential',)), None),
+    ('cal_1', stage_cal_1('impact_long_shedders_unbound_cal_1',
+                          'impact_long_shedders_unbound_config'), 1),
+    ('cal_2', stage_cal_2(), 1),
+    # --sequential: exp otherwise submits its scenarios from worker threads,
+    # and a thread's exception is collected, not raised here
+    ('exp  ', stage_exp('impact_long_shedders_unbound_exp',
+                        'impact_long_shedders_unbound_config',
+                        ('--sequential',)), None),
 ]
 
 
@@ -291,8 +268,8 @@ def main():
         for line in failures:
             print(f'  {line}')
     else:
-        print('every stage of both pipelines reaches its dispatch and submits '
-              'named,\nnon-empty groups')
+        print('every stage reaches its dispatch and submits named, '
+              'non-empty groups')
     sys.exit(1 if failures else 0)
 
 

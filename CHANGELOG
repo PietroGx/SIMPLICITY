@@ -5,6 +5,63 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.90 — 2026-10-15 — pietro gerletti
+
+Stage 8b: the bound pipeline is deleted. There is one pipeline now.
+
+The bound and unbound pipelines differed in how cal_2 reached its standard
+NSR: the bound one fitted a separate rate per scenario with the long shedders
+present, the unbound one fits a single rate from a standard-only sweep. The
+unbound result is the one the paper will use, so the bound stages were dead
+weight that every refactor still had to carry. Removed:
+
+  impact_long_shedders_cal_1.py, _cal_2.py, _exp.py
+  run_impact_long_shedders_pipeline.py        its orchestrator
+  submit_sanity_plot.sh                       its sanity-plot job
+  run_kv_ab_test.sh                           launched the orchestrator twice
+                                              for the cal_2 k_v A/B
+
+impact_long_shedders_config.py is NOT a bound file and survives untouched: it
+is the shared parameter module, and the unbound config, long_nsr_calibration_
+plot and nsr_sensitivity_analysis all import from it. Its thirteen bound-only
+symbols are unused as of this commit and are folded away in 8c, together with
+the renames -- doing both here would break the tree in two places at once.
+
+Tests repointed, all in tests/:
+
+  test_stage_dispatch         three bound entries gone from STAGES, with the
+                              stage_bound_cal_2 helper. Six stages -> three,
+                              labelled cal_1/cal_2/exp now that there is
+                              nothing to disambiguate. long_nsr_table no
+                              longer unions the two configs' cohort pairs.
+  test_group_partition        section_cal_2 removed: it tested
+                              build_cal2_scenario_groups and
+                              compute_standard_nsr_per_scenario, bound-only
+                              functions with no unbound counterpart. No
+                              coverage is lost that still has code behind it
+                              -- section_cal_1 already proves equivalence,
+                              divergence and no-leakage on the shared
+                              long_nsr_calibration_plot, and the unbound cal_2
+                              has a single group, so it has no partition.
+                              section_production_is_single_group renamed to
+                              section_experiment_is_single_group and no longer
+                              loops over both configs.
+  check_calibration_unchanged PIPELINES -> a single NAMES dict; --pipeline and
+                              the bound branch of stage 2 are gone. The flag
+                              is now rejected rather than ignored, and
+                              run_tests_on_compute.sh's --calib-pipeline went
+                              with it.
+
+New local coverage, in test_group_partition's checker section: the cluster
+checker's stage 2 had only ever run on the cluster, and 8b rewrote its body.
+It is now exercised against a synthetic standard-only run -- a clean re-fit
+reproduces the frozen table exactly, and a 1.5x change in the measurement is
+caught on every row of it.
+
+Local tier: 11 passed, 0 failed.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.89 — 2026-10-15 — pietro gerletti
 
 Stage 8a: one experiment can gain a phase's groups later.

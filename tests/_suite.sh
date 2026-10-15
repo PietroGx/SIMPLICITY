@@ -9,7 +9,7 @@
 #        runs on a development machine.
 #
 # HPC    needs something only the cluster has: a real Slurm controller, or the
-#        output of a real production run. Runs on a COMPUTE node, never where
+#        output of a real finished run. Runs on a COMPUTE node, never where
 #        you log in.
 #
 # A test that drifts between tiers is a test running somewhere it proves less.
