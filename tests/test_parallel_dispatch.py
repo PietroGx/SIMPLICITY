@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 
 import impact_long_shedders_exp as exp
 import run_impact_long_shedders_pipeline as pipe
+from impact_long_shedders_config import DEFAULT_CONSENSUS
 
 SCENARIOS = ['control', 'SOT', 'HIV_low', 'HIV_high', 'edge_case']
 failures = []
@@ -44,7 +45,7 @@ def _instrumented(hold=0.25):
     live = {'now': 0, 'peak': 0}
     order, lock = [], threading.Lock()
 
-    def fake(row, exp_num, runner, n_seeds, consensus='argmax'):
+    def fake(row, exp_num, runner, n_seeds, consensus=DEFAULT_CONSENSUS):
         with lock:
             live['now'] += 1
             live['peak'] = max(live['peak'], live['now'])
@@ -60,7 +61,7 @@ def test_parallel_overlaps():
     fake, live, order = _instrumented()
     try:
         exp.dispatch_scenario = fake
-        exp.dispatch_all(rows(), 1, 'slurm', 30, 'argmax', parallel=True)
+        exp.dispatch_all(rows(), 1, 'slurm', 30, DEFAULT_CONSENSUS, parallel=True)
     finally:
         exp.dispatch_scenario = saved
     check('every scenario dispatched', sorted(order), sorted(SCENARIOS))
@@ -72,7 +73,7 @@ def test_sequential_does_not_overlap():
     fake, live, order = _instrumented(hold=0.02)
     try:
         exp.dispatch_scenario = fake
-        exp.dispatch_all(rows(), 1, 'slurm', 30, 'argmax', parallel=False)
+        exp.dispatch_all(rows(), 1, 'slurm', 30, DEFAULT_CONSENSUS, parallel=False)
     finally:
         exp.dispatch_scenario = saved
     check('--sequential keeps one at a time', live['peak'], 1)
@@ -85,7 +86,7 @@ def test_non_slurm_runners_stay_sequential():
     fake, live, _ = _instrumented(hold=0.02)
     try:
         exp.dispatch_scenario = fake
-        exp.dispatch_all(rows(), 1, 'multiprocessing', 30, 'argmax', parallel=True)
+        exp.dispatch_all(rows(), 1, 'multiprocessing', 30, DEFAULT_CONSENSUS, parallel=True)
     finally:
         exp.dispatch_scenario = saved
     check('multiprocessing runner is not threaded', live['peak'], 1)
@@ -96,13 +97,13 @@ def test_cap_is_split_not_multiplied():
     before = os.environ.get('SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM')
     seen = []
 
-    def fake(row, exp_num, runner, n_seeds, consensus='argmax'):
+    def fake(row, exp_num, runner, n_seeds, consensus=DEFAULT_CONSENSUS):
         seen.append(int(os.environ[
             'SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM']))
     try:
         exp.dispatch_scenario = fake
         os.environ['SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM'] = '200'
-        exp.dispatch_all(rows(), 1, 'slurm', 30, 'argmax', parallel=True)
+        exp.dispatch_all(rows(), 1, 'slurm', 30, DEFAULT_CONSENSUS, parallel=True)
     finally:
         exp.dispatch_scenario = saved
         if before is None:
@@ -121,13 +122,13 @@ def test_cap_is_restored_between_calls():
     before = os.environ.get('SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM')
     seen = []
 
-    def fake(row, exp_num, runner, n_seeds, consensus='argmax'):
+    def fake(row, exp_num, runner, n_seeds, consensus=DEFAULT_CONSENSUS):
         seen.append(int(os.environ[
             'SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM']))
     try:
         exp.dispatch_scenario = fake
         os.environ['SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM'] = '200'
-        exp.dispatch_all(rows(), 1, 'slurm', 30, 'argmax', parallel=True)
+        exp.dispatch_all(rows(), 1, 'slurm', 30, DEFAULT_CONSENSUS, parallel=True)
         after_first = os.environ[
             'SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM']
         exp.dispatch_all(rows(), 1, 'slurm', 30, 'distribution', parallel=True)
@@ -146,14 +147,14 @@ def test_cap_is_restored_between_calls():
 def test_failures_are_collected_and_raised():
     saved = exp.dispatch_scenario
 
-    def fake(row, exp_num, runner, n_seeds, consensus='argmax'):
+    def fake(row, exp_num, runner, n_seeds, consensus=DEFAULT_CONSENSUS):
         if row['scenario_name'] in ('SOT', 'edge_case'):
             raise RuntimeError(f"boom in {row['scenario_name']}")
     try:
         exp.dispatch_scenario = fake
         raised = None
         try:
-            exp.dispatch_all(rows(), 1, 'slurm', 30, 'argmax', parallel=True)
+            exp.dispatch_all(rows(), 1, 'slurm', 30, DEFAULT_CONSENSUS, parallel=True)
         except RuntimeError as e:
             raised = e
     finally:

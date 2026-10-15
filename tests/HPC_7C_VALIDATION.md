@@ -181,10 +181,11 @@ Watch for, in order:
 2. **stage 2** prints `standard_only  NSR grid: 10 pts [...]` and then
    dispatches. That banner is the line that was broken; it reaching the
    dispatch at all is the fix working.
-3. **stage 3** dispatches TWO production families, five scenarios each:
-   `impact_long_shedders_<scenario>_#N` (argmax) and
-   `impact_long_shedders_dist_<scenario>_#N` (distribution), with a
-   sanity-plot job per family.
+3. **stage 3** dispatches TWO experiment-phase families, five scenarios each:
+   `impact_long_shedders_<scenario>_#N` (distribution, the default) and
+   `impact_long_shedders_amx_<scenario>_#N` (argmax), with a sanity-plot job
+   per family. The default mode owns the bare name; before v2.4.92 that was
+   argmax, and the other family was `_dist`.
 4. `Fit_results/` under cal_long holds one file per group, named by the group —
    `..._exp_fit_results_edge_case.csv`, not a float tuple — and
    `..._calibrated_long_nsr.csv` now carries a `group` column naming which

@@ -303,10 +303,19 @@ def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
 # =============================================================================
 # STAGE 3 -- the experiment phase
 # =============================================================================
-CONSENSUS_MODES = ("argmax", "distribution")
-# A distribution-consensus experiment carries this suffix so the two modes
-# cannot collide in Data/ at the same --exp-num.
-CONSENSUS_SUFFIX = {"argmax": "", "distribution": "_dist"}
+# distribution first: it is the default and the mode the paper uses. argmax
+# stays available for code-level investigations.
+CONSENSUS_MODES = ("distribution", "argmax")
+DEFAULT_CONSENSUS = "distribution"
+
+# The suffix keeps the two modes from colliding in Data/ at the same
+# --exp-num. The DEFAULT mode owns the bare experiment name, so this flipped
+# with the default in v2.4.92: distribution is now "", argmax "_amx". Runs
+# made before that carry the old convention -- a bare name is argmax and a
+# "_dist" name is distribution -- so a directory's name alone does not say
+# which mode produced it across that boundary. Check the run's own
+# simulation parameters, which record `consensus` either way.
+CONSENSUS_SUFFIX = {"distribution": "", "argmax": "_amx"}
 
 
 # Outputs a calibration run does not need. cal_1's fit and cal_2's fit both
@@ -340,14 +349,14 @@ def exp_name(consensus):
     return EXP_NAME + CONSENSUS_SUFFIX[consensus]
 
 
-def build_exp_scenario_settings(row, n_seeds, consensus="argmax"):
+def build_exp_scenario_settings(row, n_seeds, consensus=DEFAULT_CONSENSUS):
     """One simulation point per frozen-table row. Both rates are applied as
     calibrated; nothing here compensates for their interaction.
 
     `consensus` selects how a lineage's distance from the population consensus
-    is measured -- 'argmax' against the consensus sequence, 'distribution'
-    against the full column distribution. Everything else is identical, which
-    is what makes the two pipelines comparable.
+    is measured -- 'distribution' (the default) against the full column
+    distribution, 'argmax' against the consensus sequence. Everything else is
+    identical, which is what makes the two comparable.
     """
     if consensus not in CONSENSUS_MODES:
         raise ValueError(f"consensus must be one of {CONSENSUS_MODES}, got {consensus!r}")

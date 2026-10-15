@@ -31,7 +31,7 @@ from impact_long_shedders_config import (
     EXP_NAME, SETUP_DIR_TEMPLATE, TABLE_FILENAME, USER_FIXED_PARAMS,
     build_exp_scenario_settings, add_slurm_resource_args,
     set_slurm_resource_env, print_fixed_params,
-    CONSENSUS_MODES, exp_name,
+    CONSENSUS_MODES, DEFAULT_CONSENSUS, exp_name,
 )
 
 REQUIRED_COLUMNS = [
@@ -59,7 +59,8 @@ def load_calibration_table(path):
     return df
 
 
-def dispatch_scenario(row, exp_num, runner, n_seeds, consensus="argmax"):
+def dispatch_scenario(row, exp_num, runner, n_seeds,
+                      consensus=DEFAULT_CONSENSUS):
     name = row["scenario_name"]
     settings_func = build_exp_scenario_settings(row, n_seeds, consensus)
     prefix = exp_name(consensus)
@@ -155,10 +156,11 @@ def main():
                         choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
     parser.add_argument('--seeds', type=int, default=30)
     parser.add_argument('--consensus', type=str, choices=list(CONSENSUS_MODES),
-                        default='argmax',
-                        help="How the consensus distance is measured. "
-                            "'distribution' writes to the _dist experiment "
-                            "names, so both pipelines can share one --exp-num.")
+                        default=DEFAULT_CONSENSUS,
+                        help=f"How the consensus distance is measured "
+                            f"(default: {DEFAULT_CONSENSUS}). 'argmax' writes "
+                            f"to the _amx experiment names, so both modes can "
+                            f"share one --exp-num.")
     parser.add_argument('--only', type=str, default=None,
                         help="Optional: run only this scenario_name.")
     parser.add_argument('--sequential', action='store_true',

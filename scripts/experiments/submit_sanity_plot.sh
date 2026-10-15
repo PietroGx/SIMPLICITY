@@ -25,7 +25,7 @@
 # Usage: sbatch submit_sanity_plot.sh <exp_num> <target_osr_std> \
 #            <target_osr_long> [exp_name]
 #
-# exp_name selects the consensus pipeline and defaults to the argmax one. The
+# exp_name selects the consensus mode and defaults to the distribution one. The
 # plotting script derives both its inputs (<exp_name>_<scenario>_#<num>) and its
 # output directory (<exp_name>_sanity_#<num>) from it, so the two pipelines
 # cannot collide.

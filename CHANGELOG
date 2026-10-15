@@ -5,6 +5,62 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.92 — 2026-10-15 — pietro gerletti
+
+Stage 8d (naming half): distribution is the default consensus mode, and the
+default mode owns the bare experiment name.
+
+Both halves flipped together, deliberately. The suffix map and the default
+are one decision: flipping the default alone would have put every default run
+under "_dist" and left the investigation mode on the bare name, and every
+reader keyed on the experiment name would have followed it.
+
+    CONSENSUS_MODES    ("distribution", "argmax")   distribution first
+    DEFAULT_CONSENSUS  "distribution"               new, one source of truth
+    CONSENSUS_SUFFIX   distribution "", argmax "_amx"
+
+So the experiment phase now writes impact_long_shedders_<scenario>_#N for
+distribution and impact_long_shedders_amx_<scenario>_#N for argmax. Before
+this, those names meant argmax and "_dist" meant distribution.
+
+A DIRECTORY NAME NO LONGER IDENTIFIES ITS MODE ACROSS THIS BOUNDARY. A bare
+name is argmax before v2.4.92 and distribution after it. Runs already on disk
+keep what they were written with. The run's own simulation parameters record
+`consensus` either way, so that is what to read -- not the path.
+
+Touched: impact_long_shedders_config (the three constants, the builder
+default, the docstring), impact_long_shedders_exp (--consensus default and
+help), the orchestrator's header and --consensus help, submit_sanity_plot.sh's
+comment, and _scenarios.py, where DIST_EXP_NAME becomes
+ARGMAX_EXP_NAME = "impact_long_shedders_amx" and the two labels swap. Figures
+are Figure_N_distribution_#M and Figure_N_argmax_#M.
+
+test_consensus_pipelines now checks the two halves against each other rather
+than against literals: the default mode owns the bare name, exactly one mode
+is unsuffixed, and every mode has a distinct name. Those hold whichever way
+the default points, so the next flip cannot half-land.
+test_parallel_dispatch stopped hardcoding 'argmax' and takes
+DEFAULT_CONSENSUS, so it exercises what actually runs.
+
+Local tier: 13 passed, 0 failed.
+
+NOT CHANGED, NEEDS A DECISION: the model-side defaults still say argmax --
+simplicity/settings_manager.py:61 (_STANDARD_VALUES_DEFAULTS, which seeds
+standard_values.json), simplicity/extrande.py:172 and
+simplicity/phenotype/update.py:58. The experiment phase is unaffected, because
+build_exp_scenario_settings writes `consensus` into fixed_params explicitly.
+The CALIBRATION stages do not: build_cal1_settings and build_cal2_settings
+never set it, so cal_1 and cal_2 run at whatever standard_values.json says,
+which is argmax. The default path is therefore calibrate-under-argmax,
+run-under-distribution. That asymmetry is not new -- the old pipeline ran both
+modes off one argmax-calibrated table -- but the flip makes it the default
+rather than one arm of a comparison. Consensus feeds the immune_waning fitness
+and so the dynamics, so whether the calibrated rates transfer is a real
+question. Deciding it either way is a behaviour change to simplicity/ and
+would be Recalibration required.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.91 — 2026-10-15 — pietro gerletti
 
 Stage 8c: one config, and the surviving pipeline takes the plain names.
