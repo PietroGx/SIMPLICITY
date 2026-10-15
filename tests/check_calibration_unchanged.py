@@ -3,8 +3,8 @@
 what that run actually produced. Run this ON THE CLUSTER, where the output is.
 
     python tests/check_calibration_unchanged.py --exp-num 2
-    python tests/check_calibration_unchanged.py --exp-num 2 --pipeline unbound
     python tests/check_calibration_unchanged.py --exp-num 2 --keep
+    python tests/check_calibration_unchanged.py --exp-num 2 --only 1
 
 WHY
 
@@ -54,17 +54,10 @@ import simplicity.dir_manager as dm
 failures = []
 skipped = []
 
-PIPELINES = {
-    'bound': {
-        'cal_1': 'impact_long_shedders_calibration_lng_nsr',
-        'cal_2': 'impact_long_shedders_calibration_std_nsr',
-        'setup': 'impact_long_shedders_calibration_setup_data',
-    },
-    'unbound': {
-        'cal_1': 'impact_long_shedders_unbound_cal_long',
-        'cal_2': 'impact_long_shedders_unbound_cal_std',
-        'setup': 'impact_long_shedders_unbound_setup_data',
-    },
+NAMES = {
+    'cal_1': 'impact_long_shedders_unbound_cal_long',
+    'cal_2': 'impact_long_shedders_unbound_cal_std',
+    'setup': 'impact_long_shedders_unbound_setup_data',
 }
 TABLE_FILENAME = 'nsr_calibration_table.csv'
 
@@ -170,7 +163,7 @@ def stage_1(names, exp_num, rtol, keep):
 
 
 # ===========================================================================
-def stage_2(names, exp_num, target_osr_std, rtol, keep, pipeline):
+def stage_2(names, exp_num, target_osr_std, rtol, keep):
     '''cal_2: the calibrated standard NSR, against the frozen table.'''
     name = f"{names['cal_2']}_#{exp_num}"
     table_path = os.path.join('Data', f"{names['setup']}_#{exp_num}",
@@ -195,18 +188,13 @@ def stage_2(names, exp_num, target_osr_std, rtol, keep, pipeline):
     preserved = Preserved(dm.get_experiment_fit_result_dir(name),
                           dm.get_experiment_plots_dir(name))
     try:
-        if pipeline == 'bound':
-            import impact_long_shedders_cal_2 as cal_2
-            recomputed = cal_2.compute_standard_nsr_per_scenario(
-                name, [row.to_dict() for _, row in table.iterrows()],
-                target_osr_std, model_type=model)
-        else:
-            import impact_long_shedders_unbound_cal_2 as cal_2
-            single = cal_2.compute_standard_nsr(name, target_osr_std,
-                                                model_type=model)
-            # one standard rate for every scenario, by construction
-            recomputed = {row['scenario_name']: single
-                          for _, row in table.iterrows()}
+        import impact_long_shedders_unbound_cal_2 as cal_2
+        single = cal_2.compute_standard_nsr(name, target_osr_std,
+                                            model_type=model)
+        # one standard rate for every scenario, by construction: the same
+        # number is printed once per row below
+        recomputed = {row['scenario_name']: single
+                      for _, row in table.iterrows()}
     except Exception as exc:                                    # noqa: BLE001
         failures.append(f'stage 2 re-fit raised {type(exc).__name__}: {exc}')
         print(f'  [FAIL] the re-fit raised {type(exc).__name__}: {exc}')
@@ -236,7 +224,6 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--exp-num', type=int, required=True)
-    parser.add_argument('--pipeline', choices=sorted(PIPELINES), default='bound')
     parser.add_argument('--target-osr-std', type=float, default=0.0013,
                         help='the pipeline default; not recorded in the table')
     parser.add_argument('--rtol', type=float, default=1e-9,
@@ -255,14 +242,12 @@ def main():
               'machine that holds the run.', file=sys.stderr)
         sys.exit(2)
 
-    names = PIPELINES[args.pipeline]
-    print(f'{args.pipeline} pipeline, run #{args.exp_num}, rtol={args.rtol:g}')
+    print(f'run #{args.exp_num}, rtol={args.rtol:g}')
 
     if args.only != '2':
-        stage_1(names, args.exp_num, args.rtol, args.keep)
+        stage_1(NAMES, args.exp_num, args.rtol, args.keep)
     if args.only != '1':
-        stage_2(names, args.exp_num, args.target_osr_std, args.rtol,
-                args.keep, args.pipeline)
+        stage_2(NAMES, args.exp_num, args.target_osr_std, args.rtol, args.keep)
 
     print('\n' + '=' * 70)
     for line in skipped:

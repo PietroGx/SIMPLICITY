@@ -7,20 +7,21 @@ on the float values.
 
 WHY
 
-Three readers listed a whole multi-group experiment and then rebuilt the
+Two readers listed a whole multi-group experiment and then rebuilt the
 partition from parameter values:
 
   long_nsr_calibration_plot  bucketed on the (tau_3_long, R_long) floats, then
                              looked the group NAME up on those values rounded
                              to 3 decimals
-  impact_long_shedders_cal_2 selected each scenario's rows by matching
-                             (tau_3_long, long_shedders_ratio) against the
-                             frozen table at 3 decimals
   nsr_sensitivity_analysis   rebuilt each (duration, k_v) cell from every
                              output directory, with groups that had no names
                              at all
 
-All three produce a healthy fit either way. That is the point: a value-derived
+A third, the bound pipeline's cal_2, matched each scenario against the frozen
+table at 3 decimals; stage 8b deleted it with the rest of that pipeline, and
+the section that covered it went too.
+
+Both produce a healthy fit either way. That is the point: a value-derived
 partition is indistinguishable from a correct one until two groups happen to
 collide, and then it silently fits their union and reports the result under one
 of their names. CLAUDE.md's standing trap -- a measurement measuring something
@@ -28,8 +29,8 @@ other than what its name claims -- with the measurement being "this group".
 
 WHAT IT ASSERTS
 
-  1 equivalence   on the real cal_1 and cal_2 grids, the old value-derived
-                  partition and the new group partition are the same partition.
+  1 equivalence   on the real cal_1 grid, the old value-derived partition
+                  and the new group partition are the same partition.
                   A refactor that changes the numbers is a different change,
                   and this is what says it did not.
   2 divergence    on a grid where two groups share a cohort, the old way merges
@@ -38,8 +39,8 @@ WHAT IT ASSERTS
                   measurement is synthetic and group-dependent, so a fit that
                   saw a neighbour's rows lands on a different number -- which
                   real, noisy data could never show.
-  4 single group  every production scenario builds exactly one group named
-                  after itself. Sixteen call sites still list production
+  4 single group  every experiment-phase scenario builds exactly one group
+                  named after itself. Sixteen call sites still list those
                   experiments unscoped; that is correct only while this holds.
   5 named cells   nsr_sensitivity's groups name themselves, one per cell, and
                   a group holding two cells raises.
@@ -309,71 +310,13 @@ def section_cal_1():
 
 
 # ===========================================================================
-# 1 + 3  cal_2: one group per scenario
+# 4  an experiment-phase scenario is one group, which is why 16 sites may
+#    list it unscoped
 # ===========================================================================
-def section_cal_2():
-    print('\n=== cal_2: one group per scenario, matched by name')
-    import impact_long_shedders_config as cfg
-    import impact_long_shedders_cal_2 as cal_2
-
-    sp = sm.read_standard_parameters_values()
-    long_nsr_by_group = {pair: 5e-4
-                         for pair in cfg.unique_long_tau_r_long_pairs(sp)}
-    ranges = {s['name']: {'min': 1e-4, 'max': 1e-2, 'steps': 3}
-              for s in cfg.SCENARIOS}
-
-    with Scratch() as scratch:
-        groups, frozen_rows = cfg.build_cal2_scenario_groups(
-            ranges, long_nsr_by_group)
-        name = scratch.build('cal2_probe',
-                             cfg.build_cal2_settings(groups, 2))
-
-        expected = [row['scenario_name'] for row in frozen_rows]
-        check('groups are the scenarios', dm.get_groups(name), expected)
-
-        print('\n  the old partition and the new one are the same partition')
-        legacy = legacy_value_partition(
-            name, ('tau_3_long', 'long_shedders_ratio'))
-        current = group_partition(name)
-        check('blocks: value-derived vs assigned', len(legacy), len(current))
-        check('and they hold the same simulations',
-              same_partition(legacy, current), True)
-
-        print('\n  each scenario fit saw only its own group')
-        SLOPES.clear()
-        restore = install_stubs('nucleotide_substitution_rate')
-        try:
-            calibrated = cal_2.compute_standard_nsr_per_scenario(
-                name, frozen_rows, target_osr_std=0.002, model_type='lin',
-                min_seq=10, min_len=10)
-        finally:
-            restore()
-
-        check('one calibrated value per scenario',
-              sorted(calibrated), sorted(expected))
-        for scenario in expected:
-            check_close(f'  {scenario} inverts to target/slope',
-                        calibrated[scenario], 0.002 / slope_for(scenario))
-
-        saved = fit_result_files(name)
-        check('one fit-results file per scenario', len(saved), len(expected))
-
-        print('\n  a frozen table the run does not match is named, not guessed')
-        stranger = list(frozen_rows) + [dict(frozen_rows[0],
-                                             scenario_name='not_run')]
-        check_raises('missing group reported by name', RuntimeError,
-                     lambda: cal_2.compute_standard_nsr_per_scenario(
-                         name, stranger, 0.002, 'lin', 10, 10),
-                     'not_run')
-
-
-# ===========================================================================
-# 4  production is one group, which is why 16 sites may list it unscoped
-# ===========================================================================
-def section_production_is_single_group():
-    print('\n=== production: one experiment, one group, named after the scenario')
-    import impact_long_shedders_unbound_config as unbound
-    import impact_long_shedders_config as bound
+def section_experiment_is_single_group():
+    print('\n=== experiment phase: one experiment, one group, named after '
+          'the scenario')
+    import impact_long_shedders_unbound_config as cfg
 
     row = {
         'scenario_name': 'HIV_high', 'tau_3_long': 100.0,
@@ -385,20 +328,18 @@ def section_production_is_single_group():
     control = dict(row, scenario_name='control', long_shedders_ratio=0.0,
                    nucleotide_substitution_rate_long=np.nan)
 
-    for label, build in (('unbound', unbound.build_exp_scenario_settings),
-                         ('bound', bound.build_exp_scenario_settings)):
-        for case in (row, control):
-            varying, _fixed, _seeds = build(pd.Series(case), 5)()
-            declared = varying['_scenario_groups']
-            check(f"{label}/{case['scenario_name']}: exactly one group",
-                  len(declared), 1)
-            check(f"{label}/{case['scenario_name']}: named after the scenario",
-                  declared[0]['name'], case['scenario_name'])
+    for case in (row, control):
+        varying, _fixed, _seeds = cfg.build_exp_scenario_settings(
+            pd.Series(case), 5)()
+        declared = varying['_scenario_groups']
+        check(f"{case['scenario_name']}: exactly one group", len(declared), 1)
+        check(f"{case['scenario_name']}: named after the scenario",
+              declared[0]['name'], case['scenario_name'])
 
     with Scratch() as scratch:
         name = scratch.build(
             'impact_long_shedders_unbound_HIV_high_probe',
-            unbound.build_exp_scenario_settings(pd.Series(row), 2))
+            cfg.build_exp_scenario_settings(pd.Series(row), 2))
         check('and on disk it is one group', dm.get_groups(name), ['HIV_high'])
         check('so an unscoped listing is that group',
               dm.get_simulation_output_dirs(name),
@@ -507,11 +448,58 @@ def section_calibration_checker():
         finally:
             restore()
 
+    _checker_stage_2(checker, cfg)
+
+
+def _checker_stage_2(checker, cfg):
+    '''Stage 8b deleted the bound branch of the checker's stage 2, leaving one
+    path. It had only ever run on the cluster, so run it here: one standard NSR
+    is fitted from the standard_only group and compared against every row of
+    the frozen table, so a wrong number has to be caught on all of them.'''
+    print('\n  stage 2: the standard-only fit, against the frozen table')
+    with Scratch() as scratch:
+        name = scratch.build(
+            'impact_long_shedders_unbound_cal_std_#77',
+            cfg.build_cal2_settings(2, {'min': 1e-4, 'max': 1e-2, 'steps': 3}))
+
+        SLOPES.clear()
+        restore = install_stubs('nucleotide_substitution_rate')
+        try:
+            target = 0.002
+            expected = target / slope_for('standard_only')
+            setup = cfg.SETUP_DIR_TEMPLATE.format(exp_num=77)
+            os.makedirs(setup, exist_ok=True)
+            rows = [{'scenario_name': s['name'] if isinstance(s, dict) else s,
+                     'nucleotide_substitution_rate': expected,
+                     'model_type': 'lin'}
+                    for s in ('SOT', 'HIV_low', 'HIV_high')]
+            table = os.path.join(setup, cfg.TABLE_FILENAME)
+            pd.DataFrame(rows).to_csv(table, index=False)
+
+            names = {'cal_2': 'impact_long_shedders_unbound_cal_std',
+                     'setup': 'impact_long_shedders_unbound_setup_data'}
+            checker.failures.clear()
+            checker.skipped.clear()
+            checker.stage_2(names, 77, target, rtol=1e-9, keep=False)
+            check('no differences reported', checker.failures, [])
+            check('and nothing was skipped', checker.skipped, [])
+
+            print('\n  and a changed measurement is caught on every row')
+            SLOPES['standard_only'] *= 1.5
+            checker.failures.clear()
+            checker.skipped.clear()
+            checker.stage_2(names, 77, target, rtol=1e-9, keep=False)
+            check('one difference reported per table row',
+                  len(checker.failures), len(rows))
+            checker.failures.clear()
+            checker.skipped.clear()
+        finally:
+            restore()
+
 
 def main():
     section_cal_1()
-    section_cal_2()
-    section_production_is_single_group()
+    section_experiment_is_single_group()
     section_nsr_sensitivity_cells()
     section_calibration_checker()
 

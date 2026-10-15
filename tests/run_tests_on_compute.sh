@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The HPC tier: the tests that need something only the cluster has -- a real
-# Slurm controller, or the output of a real production run. Submits itself with
+# Slurm controller, or the output of a real finished run. Submits itself with
 # sbatch and runs on a COMPUTE node. Nothing here touches the login node.
 #
 #   bash tests/run_tests_on_compute.sh                  # slurm interface, ~2 min
@@ -22,7 +22,6 @@ set -uo pipefail
 
 FIGURES=""
 CALIB=""
-CALIB_PIPELINE="bound"
 SLURM_NUM=""
 INTERFACE=1
 WITH_LOCAL=0
@@ -32,7 +31,6 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --figures)        FIGURES="$2"; shift 2 ;;
         --calib)          CALIB="$2"; shift 2 ;;
-        --calib-pipeline) CALIB_PIPELINE="$2"; shift 2 ;;
         --slurm)          SLURM_NUM="$2"; shift 2 ;;
         --interface)      INTERFACE=1; shift ;;
         --no-interface)   INTERFACE=0; shift ;;
@@ -69,7 +67,7 @@ if [ -z "${SLURM_JOB_ID:-}" ] && [ "${SIMPLICITY_TESTS_LOCAL:-0}" != "1" ]; then
     [ "$INTERFACE" = "0" ] && FORWARD="$FORWARD --no-interface"
     [ "$WITH_LOCAL" = "1" ] && FORWARD="$FORWARD --with-local"
     [ -n "$FIGURES" ]   && FORWARD="$FORWARD --figures $FIGURES"
-    [ -n "$CALIB" ]     && FORWARD="$FORWARD --calib $CALIB --calib-pipeline $CALIB_PIPELINE"
+    [ -n "$CALIB" ]     && FORWARD="$FORWARD --calib $CALIB"
     [ -n "$SLURM_NUM" ] && FORWARD="$FORWARD --slurm $SLURM_NUM"
     # the local tier's multiprocessing test uses a pool of 2; the HPC tier
     # itself is single-threaded and waits on Slurm
@@ -139,9 +137,8 @@ fi
 
 # re-fits a finished calibration and diffs it against what that run froze
 if [ -n "$CALIB" ]; then
-    run_test "calibration unchanged (#$CALIB, $CALIB_PIPELINE)" \
-        tests/check_calibration_unchanged.py --exp-num "$CALIB" \
-        --pipeline "$CALIB_PIPELINE"
+    run_test "calibration unchanged (#$CALIB)" \
+        tests/check_calibration_unchanged.py --exp-num "$CALIB"
 fi
 
 # needs real production output

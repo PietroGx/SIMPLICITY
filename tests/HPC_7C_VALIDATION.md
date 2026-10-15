@@ -86,8 +86,8 @@ against the numbers that run froze.
 bash tests/run_tests_on_compute.sh --no-interface --calib 2
 ```
 
-(`--calib-pipeline unbound` for an unbound run. It takes the target and model
-from the run's own saved CSV, so there is nothing to remember — except
+(It takes the target and model from the run's own saved CSV, so there is
+nothing to remember — except
 `--target-osr-std`, which the frozen table does not record; it defaults to the
 pipeline's 0.0013 and is printed. Drop `--no-interface` to re-run step 3 too.)
 
@@ -193,10 +193,10 @@ Watch for, in order:
 When it finishes, run step 4 against it:
 
 ```bash
-bash tests/run_tests_on_compute.sh --no-interface --calib <N> --calib-pipeline unbound
+bash tests/run_tests_on_compute.sh --no-interface --calib <N>
 ```
 
-Read its stage 2 for what it is. The unbound pipeline fits ONE standard NSR
+Read its stage 2 for what it is. The pipeline fits ONE standard NSR
 from the `standard_only` group and applies it to every scenario
 (`compute_standard_nsr`, impact_long_shedders_unbound_cal_2.py:55), so the five
 `[ok]` lines are one number printed five times, not five independent
