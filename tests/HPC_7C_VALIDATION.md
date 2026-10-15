@@ -1,39 +1,37 @@
-# Validating stage 7c on the cluster
+# Validating stage 7c
 
-Five steps, cheapest first. Each says what it proves and what a failure means.
-Nothing here runs on a login node.
+Cheapest first. Each step says what it proves and what a failure means.
+
+## Which tier runs where
+
+| | local tier | HPC tier |
+|---|---|---|
+| script | `tests/run_tests_local.sh` | `tests/run_tests_on_compute.sh` |
+| where | your own machine | a cluster **compute** node, via `sbatch` |
+| needs | a python env | a real Slurm, or a real run's `Data/` |
+| runners exercised | serial, multiprocessing, faked Slurm | real Slurm |
+
+The ten local tests build their own experiments and simulate for minutes. A
+compute node makes none of them truer, so they do not belong on the cluster —
+and a login node is the one place they must never run. `run_tests_local.sh`
+refuses to start if it finds `sbatch` on `PATH` and no `SLURM_JOB_ID`.
 
 Run everything from the **repo root**. A script run from inside `scripts/` or
 `tests/` leaves a stray `Data/` the root `.gitignore` does not cover.
 
 ---
 
-## 0. Get the branch
+## 1. The local tier — on your machine, ~5 min
 
 ```bash
-cd ~/SIMPLICITY                     # wherever the repo lives on the cluster
-git fetch origin
-git checkout settings_data_flow
-git pull --ff-only origin settings_data_flow
-git log --oneline -1                # expect v2.4.83
+bash tests/run_tests_local.sh
 ```
 
-`--ff-only` refuses to invent a merge commit. If it errors, the cluster copy has
-local commits — say so rather than forcing it.
+`--quick` drops the two that simulate end to end (`analysis reads layout`,
+`multiprocessing runner`) and returns in about 40 s; `--list` prints what would
+run.
 
----
-
-## 1. The suite, on a compute node — ~7 min
-
-```bash
-bash tests/run_tests_on_compute.sh
-```
-
-It submits **itself** with `sbatch` and tails the log; Ctrl-C stops the tailing,
-not the job. Ten tests, all self-contained — they build real experiments and run
-real simulations, which is why they must not run where you log in.
-
-Expect `10 passed, 0 failed`. The two new ones are:
+Expect `10 passed, 0 failed`. The two added for 7c are:
 
 - **group partition (7c)** — 50 checks. Builds the real cal_1, cal_2, production
   and sensitivity grids through the configs' own builders, and asserts the old
@@ -41,25 +39,57 @@ Expect `10 passed, 0 failed`. The two new ones are:
 - **stage dispatch** — calls `main()` on every stage of both pipelines with the
   runner stubbed. This is the one that found the unbound cal_2 bug.
 
-A failure here is a local logic problem and nothing further should be run until
+A failure here is a logic problem and nothing on the cluster should be run until
 it is understood.
 
 ---
 
-## 2. The proof that 7c changed no number — ~5 min
-
-This is the step that matters. Everything above runs on grids the test built
-itself; this one re-fits **run #2's real output** with the refactored code and
-diffs it against the numbers that run froze.
+## 2. Get the branch on the cluster
 
 ```bash
-bash tests/run_tests_on_compute.sh --calib 2
+cd ~/SIMPLICITY
+git fetch origin
+git checkout settings_data_flow
+git pull --ff-only origin settings_data_flow
+git log --oneline -1
+```
+
+`--ff-only` refuses to invent a merge commit. If it errors, the cluster copy has
+local commits — say so rather than forcing it.
+
+---
+
+## 3. Does this cluster's Slurm still parse — ~2 min
+
+```bash
+bash tests/run_tests_on_compute.sh
+```
+
+With no flags the HPC tier is just this probe. It submits itself with `sbatch`
+and tails the log; Ctrl-C stops the tailing, not the job.
+
+`tests/check_slurm_interface.py` submits a small held array and checks the three
+replies `simplicity/runners/slurm.py` parses, against the controller that
+actually runs the work. The cluster is on Slurm 26.05.4 and the newest Slurm
+packaged for Ubuntu 24.04 is 23.11.4, so `test_slurm_lifecycle`'s fake can
+confirm the *logic* and say nothing about the *format*. This is the gap it fills.
+
+---
+
+## 4. The proof that 7c changed no number — ~5 min
+
+This is the step that matters. Step 1 runs on grids the test built itself; this
+one re-fits **run #2's real output** with the refactored code and diffs it
+against the numbers that run froze.
+
+```bash
+bash tests/run_tests_on_compute.sh --no-interface --calib 2
 ```
 
 (`--calib-pipeline unbound` for an unbound run. It takes the target and model
 from the run's own saved CSV, so there is nothing to remember — except
 `--target-osr-std`, which the frozen table does not record; it defaults to the
-pipeline's 0.0013 and is printed.)
+pipeline's 0.0013 and is printed. Drop `--no-interface` to re-run step 3 too.)
 
 It copies the experiment's `Fit_results/` and `05_Plots/` aside, recomputes, and
 **puts them back** before exiting. `--keep` leaves the recomputed ones instead.
@@ -87,10 +117,10 @@ completed.
 
 ---
 
-## 3. The paper figures, against real output — ~15 min
+## 5. The paper figures, against real output — ~15 min
 
 ```bash
-bash tests/run_tests_on_compute.sh --figures 2
+bash tests/run_tests_on_compute.sh --no-interface --figures 2
 ```
 
 Never yet run on real data in its current form: it was rewritten after four
@@ -98,14 +128,17 @@ defects were found in it, including one that reported a returned path as
 "139 item(s)". It now cross-checks every preprocessor against `settings.json`,
 `repeats.json` and the directories on disk, and names the difference.
 
-`long_paper` reporting `n/a` is correct unless the long-paper grid has been run.
+The two `long_paper` entries read a **different experiment family** — the grid,
+`master_grid_log_#N.csv` and `calibration_run_#N`. Against an impact-pipeline
+run they are gated off and report `n/a`, each on the file it actually opens.
+`n/a` there is correct, not a skip hiding a failure.
 
 ---
 
-## 4. Resume and reconciliation, against real Slurm — ~20 min
+## 6. Resume and reconciliation, against real Slurm — ~20 min
 
 ```bash
-bash tests/run_tests_on_compute.sh --slurm 95       # any FREE exp-num
+bash tests/run_tests_on_compute.sh --no-interface --slurm 95    # any FREE exp-num
 ```
 
 Pick an `--exp-num` nothing else uses; it writes `slurm_resume_check_#N` and
@@ -121,7 +154,7 @@ population or lower `SIMPLICITY_SLURM_TIME` and run it again.
 
 ---
 
-## 5. The unbound pipeline, end to end — hours
+## 7. The unbound pipeline, end to end — hours
 
 The pipeline you selected, and the only thing that exercises `edge_case` naming
 all the way through. It has **never been run** — step 1's dispatch test is what
@@ -155,15 +188,28 @@ Watch for, in order:
    `..._calibrated_long_nsr.csv` now carries a `group` column naming which
    cohort each row came from.
 
-When it finishes, run step 2 against it:
+When it finishes, run step 4 against it:
 
 ```bash
-bash tests/run_tests_on_compute.sh --calib <N> --calib-pipeline unbound
+bash tests/run_tests_on_compute.sh --no-interface --calib <N> --calib-pipeline unbound
 ```
 
 ---
 
-## What is still open after all five
+## If you want the local tier on the cluster anyway
+
+```bash
+bash tests/run_tests_on_compute.sh --with-local
+```
+
+This is not part of the validation above. Its only use is confirming that the
+cluster's own python and filesystem have not broken something the development
+machine cannot see — a different numpy, a `/localscratch` quirk. It asks for 2
+CPUs because the multiprocessing test uses a pool of 2.
+
+---
+
+## What is still open after all seven
 
 - **Stage 8** — folding a pipeline back into one experiment, its stages becoming
   groups. The 16 call sites that list a production experiment unscoped are

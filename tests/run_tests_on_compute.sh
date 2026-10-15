@@ -1,84 +1,85 @@
 #!/usr/bin/env bash
-# Run the test suite ON A COMPUTE NODE. Nothing here touches the login node.
+# The HPC tier: the tests that need something only the cluster has -- a real
+# Slurm controller, or the output of a real production run. Submits itself with
+# sbatch and runs on a COMPUTE node. Nothing here touches the login node.
 #
-#   bash tests/run_tests_on_compute.sh                  # the local suite
-#   bash tests/run_tests_on_compute.sh --figures 2      # + figures against #2
-#   bash tests/run_tests_on_compute.sh --calib 2        # + re-fit #2, diff it
-#   bash tests/run_tests_on_compute.sh --slurm 90       # + resume/reconcile
-#   bash tests/run_tests_on_compute.sh --figures 2 --slurm 90
+#   bash tests/run_tests_on_compute.sh                  # slurm interface, ~2 min
+#   bash tests/run_tests_on_compute.sh --calib 2        # re-fit #2, diff it
+#   bash tests/run_tests_on_compute.sh --figures 2      # figures against #2
+#   bash tests/run_tests_on_compute.sh --slurm 90       # resume/reconcile, real jobs
+#   bash tests/run_tests_on_compute.sh --no-interface --figures 2
+#   bash tests/run_tests_on_compute.sh --with-local     # + the local tier here
 #   bash tests/run_tests_on_compute.sh --no-watch       # submit and return
 #
-# Most of these tests build a real experiment and run real simulations -- that
-# is the point of them, and it is also why they must not run where you log in.
-# Invoked from the login node this submits itself with sbatch and returns; the
-# tests then run as a Slurm job. SIMPLICITY_TESTS_LOCAL=1 runs them here
-# instead, for a laptop.
+# The local tier -- serial runner, multiprocessing runner, faked Slurm, built-
+# from-scratch experiments -- is NOT run here. It needs no cluster, so it runs
+# on a development machine: bash tests/run_tests_local.sh. --with-local forces
+# it anyway, for confirming the cluster's own python and filesystem.
 #
-# --slurm submits jobs from inside a Slurm job. That is the same thing
-# run_calibrated_grid.sh does with its per-stage arrays, so it works here.
+# --slurm and the interface probe submit jobs from inside a Slurm job. That is
+# the same thing run_calibrated_grid.sh does with its per-stage arrays.
 set -uo pipefail
 
 FIGURES=""
 CALIB=""
 CALIB_PIPELINE="bound"
 SLURM_NUM=""
+INTERFACE=1
+WITH_LOCAL=0
 WATCH=0
 [ -t 1 ] && WATCH=1
-ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
-        --figures)  FIGURES="$2"; shift 2 ;;
-        --calib)    CALIB="$2"; shift 2 ;;
+        --figures)        FIGURES="$2"; shift 2 ;;
+        --calib)          CALIB="$2"; shift 2 ;;
         --calib-pipeline) CALIB_PIPELINE="$2"; shift 2 ;;
-        --slurm)    SLURM_NUM="$2"; shift 2 ;;
-        --watch)    WATCH=1; shift ;;
-        --no-watch) WATCH=0; shift ;;
-        *)          ARGS+=("$1"); shift ;;
+        --slurm)          SLURM_NUM="$2"; shift 2 ;;
+        --interface)      INTERFACE=1; shift ;;
+        --no-interface)   INTERFACE=0; shift ;;
+        --with-local)     WITH_LOCAL=1; shift ;;
+        --watch)          WATCH=1; shift ;;
+        --no-watch)       WATCH=0; shift ;;
+        *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
 
 cd "$(dirname "$0")/.." || exit 1      # the repo root; running from tests/
 REPO="$PWD"                            # would scatter a stray Data/
+. tests/_suite.sh
 
-# The system python has no numpy. Prefer an explicit interpreter, then the
-# active conda env, then conda's own resolution.
-PY="${SIMPLICITY_PYTHON:-}"
-if [ -z "$PY" ]; then
-    if [ -n "${CONDA_PREFIX:-}" ] && [ -x "$CONDA_PREFIX/bin/python" ]; then
-        PY="$CONDA_PREFIX/bin/python"
-    elif command -v conda >/dev/null 2>&1; then
-        PY="$(conda info --base)/envs/simplicity/bin/python"
-    else
-        PY="python"
-    fi
-fi
-if ! "$PY" -c 'import numpy' >/dev/null 2>&1; then
-    echo "error: $PY cannot import numpy. Activate the simplicity env, or set" >&2
-    echo "       SIMPLICITY_PYTHON." >&2
-    exit 1
+if [ "$INTERFACE" = "0" ] && [ "$WITH_LOCAL" = "0" ] \
+   && [ -z "$CALIB$FIGURES$SLURM_NUM" ]; then
+    echo "nothing to run: --no-interface with no --calib/--figures/--slurm." >&2
+    exit 2
 fi
 
+resolve_python
 mkdir -p Data/test_logs
 
 # --------------------------------------------------------------- submit path
 if [ -z "${SLURM_JOB_ID:-}" ] && [ "${SIMPLICITY_TESTS_LOCAL:-0}" != "1" ]; then
     if ! command -v sbatch >/dev/null 2>&1; then
-        echo "error: no sbatch here. Set SIMPLICITY_TESTS_LOCAL=1 to run in the" >&2
-        echo "       foreground if you really mean to." >&2
+        echo "error: no sbatch here, so there is no HPC tier to run. The tests" >&2
+        echo "       that need no cluster are tests/run_tests_local.sh." >&2
         exit 1
     fi
     STAMP="$(date +%Y%m%d_%H%M%S)"
     OUT="$REPO/Data/test_logs/tests_${STAMP}_%j.log"
     FORWARD=""
+    [ "$INTERFACE" = "0" ] && FORWARD="$FORWARD --no-interface"
+    [ "$WITH_LOCAL" = "1" ] && FORWARD="$FORWARD --with-local"
     [ -n "$FIGURES" ]   && FORWARD="$FORWARD --figures $FIGURES"
     [ -n "$CALIB" ]     && FORWARD="$FORWARD --calib $CALIB --calib-pipeline $CALIB_PIPELINE"
     [ -n "$SLURM_NUM" ] && FORWARD="$FORWARD --slurm $SLURM_NUM"
-    # 2 cpus because test_multiprocessing_runner uses a pool of 2
+    # the local tier's multiprocessing test uses a pool of 2; the HPC tier
+    # itself is single-threaded and waits on Slurm
+    CPUS=1
+    [ "$WITH_LOCAL" = "1" ] && CPUS=2
     JOB=$(sbatch --parsable \
         --job-name=simplicity_tests \
         --time="${SIMPLICITY_TESTS_TIME:-02:00:00}" \
         --mem="${SIMPLICITY_TESTS_MEM:-8G}" \
-        --cpus-per-task=2 \
+        --cpus-per-task="$CPUS" \
         --output="$OUT" --error="$OUT" \
         --wrap "cd '$REPO' && SIMPLICITY_PYTHON='$PY' SIMPLICITY_TESTS_LOCAL=1 \
                 bash tests/run_tests_on_compute.sh$FORWARD")
@@ -111,37 +112,14 @@ fi
 # ------------------------------------------------------------------ run path
 echo "interpreter : $PY"
 echo "node        : $(hostname)"
-echo "slurm job   : ${SLURM_JOB_ID:-none (local)}"
+echo "slurm job   : ${SLURM_JOB_ID:-none (forced local)}"
+echo "tier        : HPC$([ "$WITH_LOCAL" = 1 ] && echo ' + local')"
 echo "started     : $(date -Is)"
-echo
 
-PASSED=(); FAILED=()
-
-run_test () {
-    local name="$1"; shift
-    echo
-    echo "================================================================"
-    echo "  $name"
-    echo "================================================================"
-    local start; start=$(date +%s)
-    if "$PY" -u "$@"; then
-        PASSED+=("$name ($(( $(date +%s) - start ))s)")
-    else
-        FAILED+=("$name ($(( $(date +%s) - start ))s)")
-    fi
-}
-
-# self-contained: these build a real experiment and run real simulations
-run_test "settings round trip"      tests/test_settings_roundtrip.py
-run_test "stale state guard"        tests/test_stale_state.py
-run_test "reconcile completed"      tests/test_reconcile_completed.py
-run_test "resume"                   tests/test_resume.py
-run_test "slurm lifecycle (fake)"   tests/test_slurm_lifecycle.py
-run_test "analysis reads layout"    tests/test_analysis_reads_new_layout.py
-run_test "group partition (7c)"     tests/test_group_partition.py
-run_test "stage dispatch"           tests/test_stage_dispatch.py
-run_test "trees/clustering/archive" tests/test_trees_clustering_archive.py
-run_test "multiprocessing runner"   tests/test_multiprocessing_runner.py
+# does this cluster's Slurm still reply the way the parsers assume
+if [ "$INTERFACE" = "1" ]; then
+    run_test "slurm interface" tests/check_slurm_interface.py
+fi
 
 # re-fits a finished calibration and diffs it against what that run froze
 if [ -n "$CALIB" ]; then
@@ -162,13 +140,9 @@ if [ -n "$SLURM_NUM" ]; then
         tests/check_slurm_resume_and_reconcile.py --exp-num "$SLURM_NUM"
 fi
 
-echo
-echo "================================================================"
-echo "  summary"
-echo "================================================================"
-for t in "${PASSED[@]}"; do echo "  PASS  $t"; done
-for t in "${FAILED[@]+"${FAILED[@]}"}"; do echo "  FAIL  $t"; done
-echo
-echo "finished    : $(date -Is)"
-echo "${#PASSED[@]} passed, ${#FAILED[@]} failed"
+if [ "$WITH_LOCAL" = "1" ]; then
+    run_local_tier 0
+fi
+
+summary
 exit "${#FAILED[@]}"
