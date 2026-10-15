@@ -169,7 +169,7 @@ def get_helpers(phenotype_model, parameters, rng1, rng2):
     L = len(ref.get_reference())
     max_runtime = parameters["max_runtime"]
     # for fitness update
-    consensus_mode = parameters.get("consensus", "argmax")
+    consensus_mode = parameters.get("consensus", "distribution")
     update_all_fitness = pheno.update_fitness_factory(phenotype_model, consensus_mode)
     use_consensus = phenotype_model == "immune_waning"
     # (sequence, column distributions, delta) -- see consensus.get_consensus

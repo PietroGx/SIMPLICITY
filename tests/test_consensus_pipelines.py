@@ -69,6 +69,58 @@ def test_builder():
           len(cfg.CONSENSUS_MODES))
 
 
+def test_calibration_states_its_consensus():
+    """Both calibration stages must WRITE consensus into fixed_params.
+
+    They used to inherit it from standard_values.json, which is machine-local
+    and gitignored -- and read_standard_parameters_values merges that file
+    OVER the code defaults, so the mode a calibration ran under was a
+    property of the host, not of the pipeline. Two machines could calibrate
+    the same --exp-num differently and nothing would say so.
+    """
+    ranges = {'min': 1e-4, 'max': 1e-2, 'steps': 3}
+    for label, build in (('cal_1', cfg.build_cal1_settings),
+                         ('cal_2', cfg.build_cal2_settings)):
+        _, fixed, _ = build(2, ranges)()
+        check(f"{label} states a consensus mode",
+              fixed.get("consensus"), cfg.DEFAULT_CONSENSUS)
+        _, fixed, _ = build(2, ranges, consensus="argmax")()
+        check(f"{label} honours an explicit override",
+              fixed.get("consensus"), "argmax")
+
+    # the whole point: calibration and the experiment phase agree by default
+    _, cal1, _ = cfg.build_cal1_settings(2, ranges)()
+    _, cal2, _ = cfg.build_cal2_settings(2, ranges)()
+    _, exp3, _ = cfg.build_exp_scenario_settings(pd.Series(ROW), 2)()
+    check("all three stages default to the same consensus mode",
+          {cal1["consensus"], cal2["consensus"], exp3["consensus"]},
+          {cfg.DEFAULT_CONSENSUS})
+
+
+def test_orchestrator_refuses_two_modes():
+    """One calibration cannot serve two consensus modes, so the orchestrator
+    must refuse rather than silently calibrate under one and run under both."""
+    import run_impact_long_shedders_pipeline as r
+    argv = sys.argv
+    sys.argv = ['run', '--exp-num', '999',
+                '--consensus', 'distribution', 'argmax']
+    try:
+        r.main()
+        check("two modes refused", False, True)
+    except SystemExit as exc:
+        text = str(exc)
+        check("two modes refused, naming both",
+              'argmax' in text and 'distribution' in text, True)
+    except Exception as exc:                                    # noqa: BLE001
+        check("two modes refused", f'{type(exc).__name__}: {exc}', 'SystemExit')
+    finally:
+        sys.argv = argv
+    check("no stray pipeline log was written",
+          os.path.isfile(os.path.join('Data', 'pipeline_logs',
+                                      'impact_long_shedders_pipeline_#999.log')),
+          False)
+
+
 def test_dispatch():
     """Run exp.main() for both pipelines with the dispatcher stubbed."""
     table = pd.DataFrame([CONTROL, ROW])
@@ -181,6 +233,8 @@ def test_shell_passes_exp_name():
 
 if __name__ == '__main__':
     print("-- builder --");            test_builder()
+    print("-- calibration consensus --"); test_calibration_states_its_consensus()
+    print("-- orchestrator guard --");  test_orchestrator_refuses_two_modes()
     print("-- dispatch (stubbed) --"); test_dispatch()
     print("-- sanity plots --");       test_sanity_plots()
     print("-- artifacts archive --");  test_archive_lists_both()

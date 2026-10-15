@@ -87,6 +87,20 @@ SCENARIOS = [
 
 TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
 
+# distribution first: it is the default and the mode the paper uses. argmax
+# stays available for code-level investigations.
+#
+# Declared here, above every builder, because ALL THREE stages write it into
+# fixed_params. They did not always: until v2.4.93 only the experiment phase
+# set it and the two calibration stages inherited whatever
+# standard_values.json happened to say. That file is machine-local and
+# gitignored, and read_standard_parameters_values merges it OVER the code
+# defaults, so flipping the default in simplicity/ does not reach a machine
+# that already has the file. Stating it here is what makes a calibration's
+# consensus mode a property of the pipeline instead of the host.
+CONSENSUS_MODES = ("distribution", "argmax")
+DEFAULT_CONSENSUS = "distribution"
+
 # Experiment name stems (numbered with _#{exp_num} by run_experiment_script).
 # Single source of truth, so the stages and the orchestrator can never
 # disagree on where another stage's output lives.
@@ -200,13 +214,17 @@ def cal1_final_time(tau_3_long, sp):
                    np.ceil(needed / CAL1_FINAL_TIME) * CAL1_FINAL_TIME))
 
 
-def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
+def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None,
+                        consensus=DEFAULT_CONSENSUS):
     """One group per (tau_3_long, R_long) pair, each sweeping the same
     NSR_long grid in a 100% long-shedder population, each with its own
-    simulated window (see cal1_final_time)."""
+    simulated window (see cal1_final_time). The consensus mode is stated,
+    not inherited: it must match the one the experiment phase runs, or the
+    rates calibrated here do not transfer."""
     sp = sm.read_standard_parameters_values()
     fixed_params = CAL1_ISOLATED_FIXED_PARAMS.copy()
     fixed_params["final_time"] = CAL1_FINAL_TIME
+    fixed_params["consensus"] = consensus
     if R is not None:
         fixed_params["R"] = R
     fixed_params["IH_virus_emergence_rate"] = (
@@ -275,13 +293,16 @@ CAL2_GROUP_NAME = 'standard_only'
 DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 
 
-def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
-    """Single standard-only sweep: long_shedders_ratio 0, standard NSR swept."""
+def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None,
+                        consensus=DEFAULT_CONSENSUS):
+    """Single standard-only sweep: long_shedders_ratio 0, standard NSR swept.
+    Same consensus rule as cal_1 -- stated, not inherited."""
     fixed_params = USER_FIXED_PARAMS.copy()
     fixed_params.update({
         "long_shedders_ratio": 0.0,
         "sequence_long_shedders": False,
         "final_time": CAL2_FINAL_TIME,
+        "consensus": consensus,
     })
     if R is not None:
         fixed_params["R"] = R
@@ -303,11 +324,6 @@ def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
 # =============================================================================
 # STAGE 3 -- the experiment phase
 # =============================================================================
-# distribution first: it is the default and the mode the paper uses. argmax
-# stays available for code-level investigations.
-CONSENSUS_MODES = ("distribution", "argmax")
-DEFAULT_CONSENSUS = "distribution"
-
 # The suffix keeps the two modes from colliding in Data/ at the same
 # --exp-num. The DEFAULT mode owns the bare experiment name, so this flipped
 # with the default in v2.4.92: distribution is now "", argmax "_amx". Runs

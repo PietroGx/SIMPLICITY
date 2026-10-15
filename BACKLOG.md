@@ -6,6 +6,37 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Blockers (before next production rerun)
 
+- [ ] **Consensus mode moved to `distribution` everywhere, including both
+      calibration stages — RECALIBRATION REQUIRED** (2026-10-15, v2.4.93).
+
+      Until now only the experiment phase set `consensus`. `build_cal1_settings`
+      and `build_cal2_settings` never wrote it, so cal_1 and cal_2 ran at
+      whatever `standard_values.json` said — `argmax`. The default path was
+      calibrate-under-argmax, run-under-distribution.
+
+      Consensus feeds the immune_waning fitness, so it feeds the dynamics and
+      therefore the observed substitution rate the calibration fits. Both
+      calibration stages now state `consensus` explicitly and default to
+      `distribution`, matching the experiment phase.
+
+      **Every calibration produced before this is a calibration of a different
+      model configuration.** `nsr_calibration_table.csv` and
+      `calibrated_long_nsr.csv` from unbound #8 and earlier do not carry over.
+      Recalibrate before the next run.
+
+      Note on why the explicit setting was needed and flipping the code default
+      was not enough: `read_standard_parameters_values` returns
+      `{**_STANDARD_VALUES_DEFAULTS, **from_file}` — the file wins, and
+      `standard_values.json` is machine-local and gitignored. On any machine
+      that already had the file, changing the default in `simplicity/` would
+      have changed nothing, and the mode a calibration ran under would have
+      stayed a property of the host rather than of the pipeline.
+
+      Guards: tests/test_consensus_pipelines.py checks that all three stages
+      default to the same mode and that each calibration builder honours an
+      override; run_impact_long_shedders_pipeline refuses two `--consensus`
+      modes in one run, since one calibration cannot serve both.
+
 - [x] **The analysis path, a calibration fit and a figure all verified in the
       v2.4.71 layout** (2026-10-08).
 

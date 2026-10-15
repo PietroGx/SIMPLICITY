@@ -55,7 +55,7 @@ def fitness_from_distance(population, distance_from_weighted_consensus):
 #     for i in infectious_i_list : 
 #         population.individuals[i]['fitness_score'] /= fitsum
 
-def update_fitness_factory(type, consensus_mode='argmax'):
+def update_fitness_factory(type, consensus_mode='distribution'):
     '''
     Factory of fitness update function. Returns update_fitness, depending on selected
     phenotype model. Update_fitness computes and assigns the  fitness score of every 

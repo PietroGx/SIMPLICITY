@@ -29,7 +29,8 @@ from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
     SCENARIOS, LONG_NSR_EXP_NAME, NSR_RANGES, CAL1_FINAL_TIME,
     CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
-    build_cal1_settings, add_slurm_resource_args, set_slurm_resource_env,
+    build_cal1_settings, CONSENSUS_MODES, DEFAULT_CONSENSUS,
+    add_slurm_resource_args, set_slurm_resource_env,
     set_calibration_output_env,
     print_fixed_params,
 )
@@ -38,16 +39,19 @@ from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
 def run_long_calibration(exp_num, runner, seeds, target_osr_long, R,
                          ih_virus_emergence_rate, model_type='exp',
-                         min_seq=30, min_len=100):
+                         min_seq=30, min_len=100,
+                         consensus=DEFAULT_CONSENSUS):
     print("\n=========================================================")
     print(f" STAGE 1: LONG SHEDDERS ALONE "
          f"(R={R}, R_long per SCENARIOS, 100% LS, "
-         f"k_v={ih_virus_emergence_rate}, final_time={CAL1_FINAL_TIME})")
+         f"k_v={ih_virus_emergence_rate}, final_time={CAL1_FINAL_TIME}, "
+         f"consensus={consensus})")
     print("=========================================================\n")
 
     ranges = NSR_RANGES['cal_long']
     settings_func = build_cal1_settings(
-        seeds, ranges, R=R, ih_virus_emergence_rate=ih_virus_emergence_rate)
+        seeds, ranges, R=R, ih_virus_emergence_rate=ih_virus_emergence_rate,
+        consensus=consensus)
 
     varying_params, fixed_params, n_seeds = settings_func()
     print_fixed_params(fixed_params)
@@ -87,6 +91,12 @@ def main():
                         choices=['lin', 'log', 'exp', 'tan'])
     parser.add_argument('--min-seq', type=int, default=30)
     parser.add_argument('--min-len', type=int, default=100)
+    parser.add_argument('--consensus', type=str, choices=list(CONSENSUS_MODES),
+                        default=DEFAULT_CONSENSUS,
+                        help=f"Consensus mode to CALIBRATE under (default: "
+                            f"{DEFAULT_CONSENSUS}). Must match the mode the "
+                            f"experiment phase will run, or these rates do "
+                            f"not transfer.")
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 
@@ -96,7 +106,7 @@ def main():
     run_long_calibration(args.exp_num, args.runner, args.seeds,
                          args.target_osr_long, args.R,
                          args.ih_virus_emergence_rate, args.model,
-                         args.min_seq, args.min_len)
+                         args.min_seq, args.min_len, args.consensus)
 
 
 if __name__ == "__main__":
