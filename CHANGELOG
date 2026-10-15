@@ -5,6 +5,58 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.85 — 2026-10-15 — pietro gerletti
+
+tests: the suite is split into a local tier and an HPC tier. The cluster no
+longer runs tests that need no cluster.
+
+run_tests_on_compute.sh ran all ten self-contained tests on a compute node.
+None of them touches a real Slurm or a real run's output: two drive the SERIAL
+runner through real simulations, one drives the MULTIPROCESSING runner through
+a ProcessPoolExecutor (143-237s, the longest thing in the suite), one fakes
+Slurm from tests/fakeslurm, and the rest stub the runner outright. A compute
+node makes none of them truer, so they now run on a development machine.
+
+  tests/run_tests_local.sh        the ten. --quick drops the two that simulate
+                                  end to end (~40s vs ~3.5min); --list shows
+                                  what would run. REFUSES to start when sbatch
+                                  is on PATH with no SLURM_JOB_ID -- that is a
+                                  login node, and these simulate for minutes.
+
+  tests/run_tests_on_compute.sh   the HPC tier only: --calib, --figures,
+                                  --slurm, and with no flags the Slurm
+                                  interface probe. --no-interface skips it.
+                                  --with-local forces the local tier here
+                                  anyway, for confirming the cluster's own
+                                  python and filesystem; it is the only case
+                                  that still asks for 2 CPUs (otherwise 1).
+
+With no flags the HPC tier is now tests/check_slurm_interface.py, which was
+written earlier and never wired into anything. It is the one test that cannot
+be run anywhere else: test_slurm_lifecycle's fake confirms the control-plane
+LOGIC, and this confirms the reply FORMAT the parsers in runners/slurm.py
+assume, against the controller that actually runs the work. The cluster is on
+Slurm 26.05.4 and the newest Slurm packaged for Ubuntu 24.04 is 23.11.4, so a
+local controller would confirm the wrong version's output and say nothing.
+
+Both tier lists live in tests/_suite.sh, with the interpreter resolution and
+the pass/fail reporting, so the two scripts cannot drift apart -- a test that
+drifts between tiers is a test running somewhere it proves less.
+
+Unknown flags are now rejected instead of silently collected and ignored.
+
+Verified: the local tier passes 10/10 on a development machine in 3.5 min
+(mp runner 143s, analysis 41s, everything else under 7s). Dispatch dry-run
+over six flag combinations of the compute script gives the right tests in the
+right order each time; both login-node guards, --quick, --list, the
+unknown-flag rejection and the no-sbatch path all behave.
+
+tests/HPC_7C_VALIDATION.md rewritten around the two tiers: step 1 is the local
+tier on your own machine, the cluster steps start at step 2 and step 3 is the
+new interface probe.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.84 — 2026-10-14 — pietro gerletti
 
 test_figures_on_real_output gates each long-paper reader on its OWN input.
