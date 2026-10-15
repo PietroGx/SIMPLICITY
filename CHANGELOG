@@ -5,6 +5,62 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.89 — 2026-10-15 — pietro gerletti
+
+Stage 8a: one experiment can gain a phase's groups later.
+
+Stage 8 folds the pipeline into ONE experiment whose phases are groups. The
+phases are sequential and data-dependent -- the experiment phase's parameters
+come from the calibration phase's fit -- so its groups cannot exist until the
+calibration has finished. The experiment must be APPENDED to.
+
+The state layer already allowed this and the guards are per GROUP, not per
+experiment: jobs.write_repeats writes one repeats.json per group and its
+renumbering refusal reads that group's own state; jobs.write_submission takes
+a `groups` filter and numbers submissions incrementally;
+slurm.raise_on_stale_state takes `groups`. Two things in settings_manager did
+not, and both are fixed here.
+
+_as_simulations assigned id = enumerate(...), a global position restarting at 0
+on every call, and simulation_stem puts that id in the output directory name.
+A second call reissued ids 0..n and collided with the first phase's
+directories -- the "two parameter sets sharing one filename and silently
+overwriting each other" failure its own docstring calls impossible. It now
+takes start_id, generate_experiment_settings passes it through both branches,
+and next_simulation_id() supplies it.
+
+write_experiment_settings opened 'w', truncating the previous phase away, and
+stamped one scalar n_seeds on every group. append=True keeps the earlier
+simulations and groups, and each group keeps its own n_seeds -- which is how
+--cal-seeds and --exp-seeds coexist in one experiment. It refuses a duplicate
+group name, because the group name IS the identity (it keys repeats.json, the
+state directory, 04_Output/<group>/ and every fit-results filename, so reusing
+one merges two phases into a single series), and refuses colliding ids.
+
+read_group_n_seeds added. read_n_seeds_file now RAISES on an experiment whose
+groups disagree, naming each group and its count, instead of handing back one
+phase's number for the whole experiment; unchanged when they agree, so every
+current caller is unaffected.
+
+tests/test_settings_append.py, 25 checks, in the local tier.
+
+The first draft of its negative control proved nothing: it had the two phases
+sweeping DIFFERENT parameters, so their labels differed and hid the id
+collision, and it passed against both the broken and the fixed code. Rewritten
+to the case that actually occurs -- two phases sweeping the same parameter over
+overlapping ranges -- it shows the collision directly
+(sim_000__NSR_0p0001_N_20_T_2 shared between phases).
+
+That rewrite also surfaced df8_stem_key_order, recorded and NOT fixed:
+simulation_stem builds its label by iterating parameters in INSERTION order,
+and the grouped path inserts list-valued keys before fixed_params and scalar
+keys after, so one parameter set declared as a sweep and as a scalar yields
+NSR_0p0001_N_20_T_2 and N_20_T_2_NSR_0p0001. Nothing is corrupted today and it
+is not what makes 8a safe -- the id offset is -- but the label is not a
+canonical function of the parameters. Decide at 8e.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.88 — 2026-10-15 — pietro gerletti
 
 HPC_7C_VALIDATION.md corrected against what the first real unbound run showed.

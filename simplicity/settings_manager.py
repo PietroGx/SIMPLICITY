@@ -185,21 +185,64 @@ def read_experiment_settings(experiment_name):
     return [record['parameters'] for record in read_simulations(experiment_name)]
 
 
+def read_group_n_seeds(experiment_name, group):
+    """One group's n_seeds. The correct accessor once phases differ."""
+    for record in read_groups(experiment_name):
+        if record['name'] == group:
+            return record['n_seeds']
+    raise KeyError(f"{experiment_name} has no group {group!r}. "
+                   f"Groups: {[r['name'] for r in read_groups(experiment_name)]}")
+
+
 def read_n_seeds_file(experiment_name):
-    """Returns a dict, so the existing ['n_seeds'] callers are unchanged."""
+    """Returns a dict, so the existing ['n_seeds'] callers are unchanged.
+
+    Refuses when the groups disagree. A merged experiment carries the
+    calibration phase at --cal-seeds and the experiment phase at --exp-seeds,
+    and there is no single number that answers for both: handing back either
+    one silently miscounts the other. Callers that need it per group use
+    read_group_n_seeds.
+    """
+    groups = read_groups(experiment_name)
+    distinct = {record['n_seeds'] for record in groups}
+    if len(distinct) > 1:
+        detail = ', '.join(f"{r['name']}={r['n_seeds']}" for r in groups)
+        raise ValueError(
+            f"{experiment_name} has different n_seeds per group ({detail}), so "
+            f"there is no one n_seeds for the experiment. Use "
+            f"read_group_n_seeds(experiment_name, group).")
     return {'n_seeds': read_experiment_settings_file(experiment_name)['n_seeds']}
 
 
-def _as_simulations(tagged):
+def next_simulation_id(experiment_name):
+    """The id a new simulation must start from, so an append cannot collide.
+
+    Ids are dense positions and simulation_stem puts the id in the output
+    directory name, so a second generate_experiment_settings call that
+    restarted at 0 would reuse directories the earlier phase already owns.
+    """
+    try:
+        simulations = read_simulations(experiment_name)
+    except (FileNotFoundError, KeyError):
+        return 0
+    return max((record['id'] for record in simulations), default=-1) + 1
+
+
+def _as_simulations(tagged, start_id=0):
     """Attach the identity. The id is the position in a deterministic order
     (itertools.product over declared keys, groups in declared order), so it is
     reproducible and cannot collide. It stays OUTSIDE 'parameters':
-    check_parameters_names rejects any key that is not a real parameter."""
+    check_parameters_names rejects any key that is not a real parameter.
+
+    `start_id` offsets that position so a later phase appended to the same
+    experiment continues the numbering instead of restarting it.
+    """
     return [{'id': index, 'group': group, 'parameters': parameters}
-            for index, (group, parameters) in enumerate(tagged)]
+            for index, (group, parameters) in enumerate(tagged, start=start_id)]
 
 
-def generate_experiment_settings(varying_params: dict, fixed_params: dict = None):
+def generate_experiment_settings(varying_params: dict, fixed_params: dict = None,
+                                 start_id: int = 0):
     """
     Generates a list of parameter combinations from varying and fixed parameters.
 
@@ -216,6 +259,11 @@ def generate_experiment_settings(varying_params: dict, fixed_params: dict = None
                         group. A group may carry a 'name' key to name itself;
                         unnamed groups are named by position.
         fixed (dict): Parameters that should have the same value across all combinations.
+        start_id (int): first simulation id. Non-zero when a later phase is
+                        appended to an experiment that already holds some, so
+                        the ids -- and therefore the output directory stems --
+                        continue instead of restarting. next_simulation_id()
+                        supplies it.
 
     Returns:
         List[dict]: ordered simulation records {'id', 'group', 'parameters'}.
@@ -237,7 +285,7 @@ def generate_experiment_settings(varying_params: dict, fixed_params: dict = None
             setting.update(copy.deepcopy(fixed_params))  # Avoid mutation
             experiment_settings.append((DEFAULT_GROUP, setting))
 
-        return _as_simulations(experiment_settings)
+        return _as_simulations(experiment_settings, start_id)
 
     # Grouped path: each group expands its own list-valued keys independently,
     # so different groups can vary different parameters over different ranges.
@@ -258,16 +306,25 @@ def generate_experiment_settings(varying_params: dict, fixed_params: dict = None
             setting.update(copy.deepcopy(group_fixed))
             experiment_settings.append((group_name, setting))
 
-    return _as_simulations(experiment_settings)
+    return _as_simulations(experiment_settings, start_id)
 
-def write_experiment_settings(experiment_name: str, experiment_settings: list, n_seeds: int):
+def write_experiment_settings(experiment_name: str, experiment_settings: list,
+                              n_seeds: int, append: bool = False):
     """
     Writes experiment settings (a list of parameter dictionaries) to a JSON file.
 
     Args:
         experiment_name (str): Name of the experiment (used for output folder).
         experiment_settings (list): List of parameter dictionaries.
-        n_seeds (int): Number of random seeds to be stored separately.
+        n_seeds (int): Number of random seeds, for the groups being written.
+        append (bool): add these groups to the experiment instead of replacing
+                       it. A pipeline's phases are sequential and
+                       data-dependent -- the experiment phase's parameters come
+                       from the calibration phase's fit -- so one experiment
+                       has to gain them over time rather than declare them all
+                       up front. Earlier groups keep their own n_seeds, which
+                       is how --cal-seeds and --exp-seeds coexist here.
+                       Callers must offset new ids with next_simulation_id().
     """
     # check parameter names validity
     for record in experiment_settings:
@@ -278,6 +335,31 @@ def write_experiment_settings(experiment_name: str, experiment_settings: list, n
     # separate knobs, which only worked while each stage was its own experiment.
     groups = [{'name': name, 'n_seeds': n_seeds}
               for name in dict.fromkeys(r['group'] for r in experiment_settings)]
+
+    if append:
+        existing = read_experiment_settings_file(experiment_name)
+        kept_groups = existing['groups']
+        clash = ({g['name'] for g in kept_groups}
+                 & {g['name'] for g in groups})
+        if clash:
+            raise ValueError(
+                f"{experiment_name} already has group(s) {sorted(clash)}. A "
+                f"group name is the identity -- it keys repeats.json, the "
+                f"state directory, 04_Output/<group>/ and every fit-results "
+                f"filename -- so reusing one would merge two phases into a "
+                f"single series. Name the new phase's groups distinctly.")
+        taken = {r['id'] for r in existing['simulations']}
+        collisions = sorted(taken & {r['id'] for r in experiment_settings})
+        if collisions:
+            raise ValueError(
+                f"{experiment_name}: simulation id(s) {collisions[:5]} are "
+                f"already used. simulation_stem puts the id in the output "
+                f"directory name, so these would overwrite earlier output. "
+                f"Pass start_id=next_simulation_id(experiment_name) to "
+                f"generate_experiment_settings.")
+        groups = kept_groups + groups
+        experiment_settings = existing['simulations'] + experiment_settings
+        n_seeds = existing['n_seeds']   # the legacy scalar: the first phase's
 
     experiment_settings_file_path = get_experiment_settings_file_path(experiment_name)
     with open(experiment_settings_file_path, 'w') as settings_file:
