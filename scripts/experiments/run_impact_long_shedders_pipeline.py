@@ -20,10 +20,10 @@
 #   2. cal_2  0% long shedders, sweep standard NSR, global clock -> ONE
 #             standard rate for every scenario, then the frozen table
 #   3. exp    production, both rates applied exactly as calibrated, run ONCE
-#             PER CONSENSUS MODE off the SAME frozen table: one production
-#             pipeline for the argmax consensus and one for the distributional
-#             consensus, differing in nothing but how the distance from the
-#             consensus is measured
+#             PER CONSENSUS MODE off the SAME frozen table: one for the
+#             distributional consensus (the default) and one for argmax,
+#             differing in nothing but how the distance from the consensus
+#             is measured
 #   4. sanity combined root-to-tip grid over real output
 #   5. artifacts zipped into one file per run
 #
@@ -253,9 +253,9 @@ def main():
                         help="Seeds per scenario, production stage.")
     parser.add_argument('--consensus', type=str, nargs='+',
                         choices=list(CONSENSUS_MODES), default=list(CONSENSUS_MODES),
-                        help="Consensus modes to run in production, one "
-                            "pipeline each, off the same calibration. "
-                            "Default: both.")
+                        help="Consensus modes to run in the experiment "
+                            "phase, one each, off the same calibration. "
+                            "Default: both, distribution first.")
     parser.add_argument('--skip-cal1', action='store_true',
                         help=f"Reuse an existing {LONG_NSR_EXP_NAME}_#{{exp_num}}.")
     parser.add_argument('--r-cal1', type=float, default=CAL1_ISOLATED_FIXED_PARAMS['R'])

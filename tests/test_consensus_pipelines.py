@@ -44,16 +44,29 @@ def test_builder():
         check(f"builder carries consensus={mode}", fixed.get("consensus"), mode)
         check(f"builder seeds ({mode})", seeds, 30)
     _, fixed, _ = cfg.build_exp_scenario_settings(pd.Series(ROW), 30)()
-    check("builder defaults to argmax", fixed.get("consensus"), "argmax")
+    check("builder defaults to distribution",
+          fixed.get("consensus"), "distribution")
+    check("and DEFAULT_CONSENSUS says so", cfg.DEFAULT_CONSENSUS,
+          "distribution")
     try:
         cfg.build_exp_scenario_settings(pd.Series(ROW), 30, "nonsense")
         check("bad consensus rejected", False, True)
     except ValueError:
         check("bad consensus rejected", True, True)
-    check("argmax keeps the existing experiment prefix",
-          cfg.exp_name("argmax"), cfg.EXP_NAME)
-    check("distribution pipeline is suffixed",
-          cfg.exp_name("distribution"), cfg.EXP_NAME + "_dist")
+    # The DEFAULT mode owns the bare name; the other one is suffixed. Tied
+    # together on purpose: flipping one without the other would silently put
+    # default runs under a suffix and the investigation mode under the bare
+    # name, and every reader keyed on the name would follow it.
+    check("the default mode owns the bare experiment name",
+          cfg.exp_name(cfg.DEFAULT_CONSENSUS), cfg.EXP_NAME)
+    check("argmax is the suffixed one",
+          cfg.exp_name("argmax"), cfg.EXP_NAME + "_amx")
+    check("exactly one mode is unsuffixed",
+          sum(1 for m in cfg.CONSENSUS_MODES
+              if cfg.exp_name(m) == cfg.EXP_NAME), 1)
+    check("every mode has a distinct name",
+          len({cfg.exp_name(m) for m in cfg.CONSENSUS_MODES}),
+          len(cfg.CONSENSUS_MODES))
 
 
 def test_dispatch():

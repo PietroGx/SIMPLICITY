@@ -15,9 +15,9 @@
 # The four figures must agree on which scenarios exist, so the list comes from
 # the pipeline's OWN config rather than being repeated in each script:
 #
-#   impact_long_shedders       -> 5 scenarios, including edge_case
-#   impact_long_shedders_dist  -> the same 5, run with distributional
-#                                 consensus instead of argmax
+#   impact_long_shedders      -> 5 scenarios, including edge_case,
+#                                distributional consensus (the default)
+#   impact_long_shedders_amx  -> the same 5, run with argmax consensus
 #
 # Both names are one pipeline and one config: the consensus mode changes the
 # model, not the scenario list, so they must stay the same five scenarios for
@@ -39,21 +39,24 @@ import simplicity.dir_manager as dm
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 os.pardir, 'experiments'))
 
+# The DEFAULT consensus mode owns the bare name. v2.4.92 made that
+# distribution; before it, a bare name meant argmax and "_dist" meant
+# distribution. Older runs on disk still carry the old convention.
 EXP_NAME = "impact_long_shedders"
-# impact_long_shedders_config.CONSENSUS_SUFFIX['distribution']
-DIST_EXP_NAME = "impact_long_shedders_dist"
+# impact_long_shedders_config.CONSENSUS_SUFFIX['argmax']
+ARGMAX_EXP_NAME = "impact_long_shedders_amx"
 
 # exp_name -> the module holding the SCENARIOS
 _CONFIG_MODULES = {
     EXP_NAME: "impact_long_shedders_config",
-    DIST_EXP_NAME: "impact_long_shedders_config",
+    ARGMAX_EXP_NAME: "impact_long_shedders_config",
 }
 
 # exp_name -> short label for output filenames. The label names the consensus
-# mode, which is the only thing that now differs between the two.
+# mode, which is the only thing that differs between the two.
 _PIPELINE_LABELS = {
-    EXP_NAME: "argmax",
-    DIST_EXP_NAME: "distribution",
+    EXP_NAME: "distribution",
+    ARGMAX_EXP_NAME: "argmax",
 }
 
 
