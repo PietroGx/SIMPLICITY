@@ -5,6 +5,41 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.88 — 2026-10-15 — pietro gerletti
+
+HPC_7C_VALIDATION.md corrected against what the first real unbound run showed.
+
+Stage 3 dispatches TWO production families, not one: argmax
+(impact_long_shedders_unbound_<scenario>_#N) and distribution
+(impact_long_shedders_unbound_dist_<scenario>_#N), five scenarios each, with a
+sanity-plot job per family. The runbook said five experiments.
+
+The closing unbound check now says how to read its stage 2. The unbound
+pipeline fits ONE standard NSR from the standard_only group and applies it to
+every scenario (compute_standard_nsr, impact_long_shedders_unbound_cal_2.py:55),
+so its five [ok] lines are one number printed five times. Left unsaid, "5 ok"
+reads as five independent comparisons when it is one.
+
+STAGE 7C IS VALIDATED ON THE CLUSTER. All seven steps, both pipelines:
+
+  local tier              10/10
+  slurm interface         every parsing assumption holds on Slurm 26.05.4
+  calibration, bound #2   control/SOT/HIV_low/HIV_high all exact at rtol 1e-9
+  paper figures #2        0 FAILED; the two long-paper readers n/a as designed
+  slurm resume/reconcile  a real TIMEOUT reconciled from sacct, 1 of 2
+  unbound pipeline #8     ran end to end for the first time
+  calibration, unbound #8 exact; cal_1's three cohorts and the single std rate
+
+No recalibration is owed: on run #2's real output the refactored partition
+reproduces every frozen number bit for bit. The unbound run also confirms
+groups naming themselves end to end -- edge_case appears as `edge_case` in
+04_Output/, in ..._exp_fit_results_edge_case.csv and in the new `group` column
+of ..._calibrated_long_nsr.csv, never as a float tuple -- and that stage 2's
+banner (line 475: `standard_only  NSR grid: 10 pts [0.000010 .. 0.001000]`)
+now reaches dispatch instead of dying on a stale key.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.87 — 2026-10-15 — pietro gerletti
 
 test_figures_on_real_output: an empty RealWorldData panel is a FAILURE, and

@@ -181,8 +181,10 @@ Watch for, in order:
 2. **stage 2** prints `standard_only  NSR grid: 10 pts [...]` and then
    dispatches. That banner is the line that was broken; it reaching the
    dispatch at all is the fix working.
-3. **stage 3** dispatches five experiments, one per scenario, each named
-   `impact_long_shedders_unbound_<scenario>_#N`.
+3. **stage 3** dispatches TWO production families, five scenarios each:
+   `impact_long_shedders_unbound_<scenario>_#N` (argmax) and
+   `impact_long_shedders_unbound_dist_<scenario>_#N` (distribution), with a
+   sanity-plot job per family.
 4. `Fit_results/` under cal_long holds one file per group, named by the group —
    `..._exp_fit_results_edge_case.csv`, not a float tuple — and
    `..._calibrated_long_nsr.csv` now carries a `group` column naming which
@@ -193,6 +195,13 @@ When it finishes, run step 4 against it:
 ```bash
 bash tests/run_tests_on_compute.sh --no-interface --calib <N> --calib-pipeline unbound
 ```
+
+Read its stage 2 for what it is. The unbound pipeline fits ONE standard NSR
+from the `standard_only` group and applies it to every scenario
+(`compute_standard_nsr`, impact_long_shedders_unbound_cal_2.py:55), so the five
+`[ok]` lines are one number printed five times, not five independent
+comparisons. The evidence is the single fit above them. Stage 1, with its three
+cohorts, is where that stage carries five numbers' worth of information.
 
 ---
 
