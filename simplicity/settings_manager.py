@@ -400,7 +400,10 @@ def generate_filename_from_params(params: dict):
 }
     exclude  = {"max_runtime", "seed"}
     parts = []
-    for key, value in params.items():
+    # sorted by key: the grouped path inserts a group's swept keys before
+    # fixed_params and its scalar keys after, so in insertion order the same
+    # parameter set yielded two labels depending on how it was declared.
+    for key, value in sorted(params.items()):
         if key in exclude:
             continue
         abbrev = abbreviations.get(key, key)

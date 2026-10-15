@@ -267,6 +267,61 @@ def test_negative_control():
            naming=('already used',))
 
 
+# ===========================================================================
+def test_label_is_canonical():
+    """df8_stem_key_order: the label must be a function of the PARAMETERS,
+    not of the order they happened to be inserted in.
+
+    The grouped path builds each simulation's dict as group-swept keys, then
+    fixed_params, then group-scalar keys. So one parameter set declared as a
+    one-point sweep and as a scalar produced NSR_0p0001_N_20_T_2 and
+    N_20_T_2_NSR_0p0001 -- two directories for one simulation, and a label
+    that cannot be compared between phases.
+    """
+    standard = sm.read_standard_parameters_values()
+
+    def labels(groups):
+        return [sm.simulation_stem(record, standard).split('__', 1)[1]
+                for record in sm.generate_experiment_settings(
+                    {'_scenario_groups': groups}, FIXED)]
+
+    swept = labels([{'name': 'g', 'nucleotide_substitution_rate': [1e-4]}])
+    scalar = labels([{'name': 'g', 'nucleotide_substitution_rate': 1e-4}])
+    check('a one-point sweep and a scalar give the SAME label',
+          swept == scalar, f'{swept} vs {scalar}')
+
+    # the probe is only meaningful if the two really do reach it in different
+    # insertion orders -- otherwise this passes against the unsorted code too
+    orders = [list(sm.generate_experiment_settings(
+                  {'_scenario_groups': [g]}, FIXED)[0]['parameters'])
+              for g in ({'name': 'g', 'nucleotide_substitution_rate': [1e-4]},
+                        {'name': 'g', 'nucleotide_substitution_rate': 1e-4})]
+    check('the probe is valid: the two declarations DO differ in key order',
+          orders[0] != orders[1], f'{orders[0]} vs {orders[1]}')
+
+    shuffled = sm.generate_filename_from_params(
+        {'final_time': 2, 'nucleotide_substitution_rate': 1e-4,
+         'population_size': 20})
+    declared = sm.generate_filename_from_params(
+        {'population_size': 20, 'nucleotide_substitution_rate': 1e-4,
+         'final_time': 2})
+    check('and the dict order never reaches the filename',
+          shuffled == declared, f'{shuffled} vs {declared}')
+    check('the order is the parameter names sorted, not the abbreviations',
+          declared == 'T_2_NSR_0p0001_N_20.json', declared)
+
+    # ordered BEFORE creation: the directories on disk carry it
+    name = 'canonical'
+    dm.create_directories(name)
+    write_phase(name, [{'name': 'g', 'nucleotide_substitution_rate': [1e-4]}],
+                1, append=False)
+    on_disk = [os.path.basename(sod)
+               for sod in dm.get_simulation_output_dirs(name)]
+    check('the output directory created on disk carries the sorted label',
+          on_disk == [f'sim_000__{scalar[0]}'], f'{on_disk}')
+
+
+
 def main():
     print(__doc__.strip().splitlines()[0])
     with Scratch():
@@ -281,6 +336,8 @@ def main():
         test_repeats_and_dispatch(name)
         print('\n--- negative control')
         test_negative_control()
+        print('\n--- canonical label')
+        test_label_is_canonical()
 
     print('\n' + '=' * 70)
     if failures:

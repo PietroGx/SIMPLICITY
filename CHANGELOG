@@ -5,6 +5,41 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.95 — 2026-10-15 — pietro gerletti
+
+df8_stem_key_order closed: a simulation's label is sorted before the directory
+is created, so it is a function of the parameters rather than of the order
+they were inserted in.
+
+generate_filename_from_params iterated params.items() in insertion order. The
+grouped path builds each simulation's dict as the group's SWEPT keys, then
+fixed_params, then the group's SCALAR keys, so one parameter set declared as a
+one-point sweep and as a scalar produced two labels:
+
+    NSR_0p0001_N_20_T_2
+    N_20_T_2_NSR_0p0001
+
+Two directories for one simulation, and a label that could not be compared
+between phases -- which is also what masked the id collision in the first draft
+of 8a's negative control, so that control passed while testing nothing.
+
+Sorted by the PARAMETER NAME, not the abbreviation: the abbreviation table is a
+display detail and adding an entry to it must not reshuffle existing labels.
+A 3-parameter label is now T_2_NSR_0p0001_N_20.
+
+Only simulation_stem calls it on the production path, and nothing resolves
+through the label -- the id prefix carries identity and parameters.json carries
+the values -- so this changes directory NAMES and nothing else. Existing
+Data/ trees keep their old names; a new run writes the sorted ones.
+
+tests/test_settings_append.py gained a canonical-label section (6 checks),
+including the probe that the two declarations really do reach the namer in
+different key orders, and a check that the directory created on disk carries
+the sorted label. Negative control: reverting the sort fails 4 of them and
+reproduces both labels above exactly. Local tier 14 passed, 0 failed.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.94 — 2026-10-15 — pietro gerletti
 
 Stage 8e-8g: a run is ONE experiment whose phases are named groups. The
