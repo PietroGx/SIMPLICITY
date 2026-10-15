@@ -16,6 +16,7 @@
 
 LOCAL_TESTS=(
     "settings round trip|tests/test_settings_roundtrip.py"
+    "settings append (8a)|tests/test_settings_append.py"
     "stale state guard|tests/test_stale_state.py"
     "reconcile completed|tests/test_reconcile_completed.py"
     "resume|tests/test_resume.py"
