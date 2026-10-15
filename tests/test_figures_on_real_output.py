@@ -2,7 +2,7 @@
 '''Do the paper figures read the output tree, and do they read ALL of it?
 
     python tests/test_figures_on_real_output.py --exp-num 2
-    python tests/test_figures_on_real_output.py --exp-num 2 --exp-name impact_long_shedders_unbound
+    python tests/test_figures_on_real_output.py --exp-num 2 --exp-name impact_long_shedders
     python tests/test_figures_on_real_output.py --exp-num 2 --heavy --traceback
 
 WHY

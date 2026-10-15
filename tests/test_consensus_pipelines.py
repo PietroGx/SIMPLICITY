@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verification for the two unbound consensus pipelines.
+"""Verification for the two consensus modes, argmax and distribution.
 
 Exercises the actual dispatch with run_experiment_script stubbed, per the
 repo rule that "the config is correct" is not verification.
@@ -15,8 +15,8 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 os.pardir, 'scripts', 'experiments'))
 
-import impact_long_shedders_unbound_config as cfg
-import impact_long_shedders_unbound_exp as exp
+import impact_long_shedders_config as cfg
+import impact_long_shedders_exp as exp
 
 _fails = []
 
@@ -51,9 +51,9 @@ def test_builder():
     except ValueError:
         check("bad consensus rejected", True, True)
     check("argmax keeps the existing experiment prefix",
-          cfg.prod_exp_name("argmax"), cfg.PROD_EXP_NAME)
+          cfg.exp_name("argmax"), cfg.EXP_NAME)
     check("distribution pipeline is suffixed",
-          cfg.prod_exp_name("distribution"), cfg.PROD_EXP_NAME + "_dist")
+          cfg.exp_name("distribution"), cfg.EXP_NAME + "_dist")
 
 
 def test_dispatch():
@@ -71,7 +71,7 @@ def test_dispatch():
         sys.argv = ['exp', '--exp-num', '99', '--runner', 'serial',
                     '--seeds', '30', '--consensus', mode]
         exp.main()
-        prefix = cfg.prod_exp_name(mode)
+        prefix = cfg.exp_name(mode)
         check(f"{mode}: dispatched both scenarios",
               [n for n, _, _ in seen],
               [f"{prefix}_control", f"{prefix}_HIV_high"])
@@ -81,17 +81,9 @@ def test_dispatch():
               sorted({s for _, _, s in seen}), [30])
 
     # the two pipelines must not share experiment names
-    a = {f"{cfg.prod_exp_name('argmax')}_{s}" for s in ('control', 'HIV_high')}
-    b = {f"{cfg.prod_exp_name('distribution')}_{s}" for s in ('control', 'HIV_high')}
+    a = {f"{cfg.exp_name('argmax')}_{s}" for s in ('control', 'HIV_high')}
+    b = {f"{cfg.exp_name('distribution')}_{s}" for s in ('control', 'HIV_high')}
     check("the pipelines' experiment names do not collide", bool(a & b), False)
-
-
-def test_bound_untouched():
-    import impact_long_shedders_config as bound
-    import inspect
-    sig = inspect.signature(bound.build_exp_scenario_settings)
-    check("bound pipeline's builder is unchanged",
-          list(sig.parameters), ['row', 'n_seeds'])
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +93,7 @@ import io
 import contextlib
 import subprocess as _sp
 
-import run_impact_long_shedders_unbound_pipeline as runner
+import run_impact_long_shedders_pipeline as runner
 
 
 def test_sanity_plots():
@@ -127,7 +119,7 @@ def test_sanity_plots():
     check("one sbatch per consensus pipeline", len(calls), len(cfg.CONSENSUS_MODES))
     for mode, cmd in zip(cfg.CONSENSUS_MODES, calls):
         check(f"{mode}: sbatch carries its own experiment name",
-              cmd[-1], cfg.prod_exp_name(mode))
+              cmd[-1], cfg.exp_name(mode))
         check(f"{mode}: exp_num and targets passed",
               cmd[2:5], ['7', '0.0013', '0.00205'])
     check("returned pipelines are tagged by mode",
@@ -140,13 +132,23 @@ def test_archive_lists_both():
     """write_artifacts_archive must look for a sanity plot per pipeline."""
     import tempfile
     buf = io.StringIO()
+    # In a temp cwd: the candidate paths are relative to Data/, and after the
+    # v2.4.91 rename the argmax name collides with the bound run #7 still on
+    # this machine -- a found file prints nothing, so the check would pass or
+    # fail on what happens to be on disk.
+    saved = os.getcwd()
     with tempfile.TemporaryDirectory() as tmp:
-        arc = os.path.join(tmp, 'a.zip')
-        with contextlib.redirect_stdout(buf):
-            runner.write_artifacts_archive(arc, 7, os.path.join(tmp, 'no.log'))
+        arc = os.path.join(tmp, 'out', 'a.zip')
+        os.chdir(tmp)
+        try:
+            with contextlib.redirect_stdout(buf):
+                runner.write_artifacts_archive(arc, 7,
+                                               os.path.join(tmp, 'no.log'))
+        finally:
+            os.chdir(saved)
     looked_for = buf.getvalue()
     for mode in cfg.CONSENSUS_MODES:
-        want = f"{cfg.prod_exp_name(mode)}_sanity_#7"
+        want = f"{cfg.exp_name(mode)}_sanity_#7"
         check(f"archive looks for the {mode} sanity plot",
               want in looked_for, True)
 
@@ -155,19 +157,18 @@ def test_shell_passes_exp_name():
     """The sbatch wrapper must forward a 4th argument and default it."""
     sh = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir,
                            'scripts', 'experiments',
-                           'submit_sanity_plot_unbound.sh')).read()
+                           'submit_sanity_plot.sh')).read()
     check("shell reads a 4th argument with a default",
-          'EXP_NAME="${4:-impact_long_shedders_unbound}"' in sh, True)
+          'EXP_NAME="${4:-impact_long_shedders}"' in sh, True)
     check("shell forwards it to the plotting script",
           '--exp-name "$EXP_NAME"' in sh, True)
     check("hardcoded experiment name is gone",
-          '--exp-name impact_long_shedders_unbound \\' in sh, False)
+          '--exp-name impact_long_shedders \\' in sh, False)
 
 
 if __name__ == '__main__':
     print("-- builder --");            test_builder()
     print("-- dispatch (stubbed) --"); test_dispatch()
-    print("-- bound pipeline --");     test_bound_untouched()
     print("-- sanity plots --");       test_sanity_plots()
     print("-- artifacts archive --");  test_archive_lists_both()
     print("-- sbatch wrapper --");     test_shell_passes_exp_name()

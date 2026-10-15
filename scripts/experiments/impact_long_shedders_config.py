@@ -12,16 +12,33 @@
 # ============================================================================
 # impact_long_shedders -- PIPELINE CONFIG
 # ----------------------------------------------------------------------------
-# Single place that knows HOW TO BUILD the parameter settings for every
-# pipeline stage. impact_long_shedders_cal_1.py / _cal_2.py / _exp.py only
-# RUN things: parse CLI args, call a build_*_settings() function below to get
-# a ready-to-submit settings callable, dispatch it via run_experiment_script,
-# and handle stage-specific I/O (reading calibration fits back, writing the
-# frozen table, printing). They never construct simulation parameter dicts
-# themselves -- if a parameter dict needs to change, this is the only file
-# to touch. No exceptions: SCENARIOS and NSR_RANGES below (including
-# per-scenario R_long and NSR sweep ranges) are plain code-level data, not
-# external reference files -- retuning them is a normal code edit.
+# The single place that knows HOW TO BUILD the parameter settings for every
+# stage. impact_long_shedders_cal_1.py / _cal_2.py / _exp.py only RUN things:
+# parse CLI args, call a build_*_settings() function below to get a
+# ready-to-submit settings callable, dispatch it via run_experiment_script,
+# and handle stage-specific I/O. They never construct parameter dicts
+# themselves -- if a parameter dict changes, this is the only file to touch.
+# SCENARIOS and NSR_RANGES are plain code-level data, not external reference
+# files: retuning them is a normal code edit.
+#
+# Each cohort is calibrated ALONE and they are then let loose together.
+# NSR_long comes from a 100% long-shedder population, the standard NSR from a
+# 0% long-shedder population, and the experiment phase applies both unchanged.
+# The population-level clock is an OUTPUT -- free to rise above
+# target_osr_std -- rather than a constraint, and the two calibrations are
+# independent: stage 2 does not read stage 1.
+#
+# Until v2.4.90 a second, "bound" pipeline calibrated the standard NSR IN
+# CONTEXT instead, per scenario inside the mixed population, so the standard
+# rate was pushed down however far it took to hold the population clock at
+# target. Run #7 drove HIV_high to 9.3e-7, 150x below its own control and
+# below the swept floor. That result is the argument for the design kept
+# here; the code that produced it is gone.
+#
+# Measurement code is deliberately NOT duplicated: stage 1 reuses
+# long_nsr_calibration_plot.plot_and_fit_long_nsr_calibration and therefore
+# evolutionary_rate.extract_ih_regression_data. Parameter construction lives
+# here, in the config.
 # ============================================================================
 
 import os
@@ -29,46 +46,8 @@ import os
 import numpy as np
 import pandas as pd
 
+import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
-
-# =============================================================================
-# SHARED SCENARIO DATA -- used by every stage
-# =============================================================================
-# One entry per scenario. `inf_duration_long` is the raw clinical long-shedding
-# duration (days); the model parameter tau_3_long is DERIVED from it (see
-# derive_tau_3_long) as tau_3_long = inf_duration_long - (tau_1+tau_2+tau_4).
-# `control` has no long side, so inf_duration_long/R_long are unused (None).
-# `R_long` is a plain, directly-specified value -- NOT derived from R or
-# duration by any formula. Two scenarios sharing a duration (HIV_low/
-# HIV_high) can have different R_long; cal_1 groups by the (tau_3_long,
-# R_long) pair, not tau alone, to keep that possibility correct (see
-# unique_long_tau_r_long_pairs).
-SCENARIOS = [
-    {"name": "control",   "inf_duration_long": None,  "long_shedders_ratio": 0.00, "R_long": None, "susceptibility_long": 1.0},
-    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.01, "R_long": 1.1,  "susceptibility_long": 1.0},
-    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.01, "R_long": 1.1,  "susceptibility_long": 1.0},
-    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.12, "R_long": 1.1,  "susceptibility_long": 1.0},
-    # edge_case (inf_duration_long=365.0) removed: at tau_3_long=350.23, both
-    # (a) raw-Hamming-distance saturation (expected substitutions/site by
-    # end of window reaches ~0.34, deep into multiple-hits territory) and
-    # (b) more transmission generations elapsing within cal_1's own isolated
-    # population (more time = more inherited-divergence layering) make its
-    # long-NSR calibration unreliable relative to the shorter-duration
-    # scenarios. Can be reinstated once cal_1's fit uses the same genuine
-    # intra-host methodology as plot_sot_sanity_regressions.py's
-    # load_intrahost_long_data (own founder genome, own-infection-relative
-    # time) instead of the population-pooled/absolute-time regression it
-    # uses today.
-]
-
-TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
-
-# Experiment name stems (numbered with _#{exp_num} by run_experiment_script).
-# Single source of truth so cal_1, cal_2 and the pipeline orchestrator can
-# never disagree on where Stage 1's output lives.
-LONG_NSR_EXP_NAME = "impact_long_shedders_calibration_lng_nsr"
-STD_NSR_SWEEP_NAME = "impact_long_shedders_calibration_std_nsr"
-
 
 # =============================================================================
 # SHARED MATH -- tau_3_long derivation (R_long is a plain SCENARIOS value,
@@ -87,75 +66,94 @@ def derive_tau_3_long(scenario, sp):
     return float(scenario["inf_duration_long"]) - phase_offset(sp)
 
 
-def derive_scenario_params(scenario, sp):
-    """
-    Derive the frozen long-side parameters for one production scenario.
-    R_long is read straight from SCENARIOS -- a plain, directly-specified
-    value, not derived from R or duration.
+# =============================================================================
+# SCENARIOS
+# =============================================================================
+# edge_case is back. It was dropped in v2.4.24 for raw-Hamming saturation at
+# "~0.34 substitutions/site", but that figure dates from before the intra-host
+# measurement was corrected, when the calibration was returning NSR_long ~0.116
+# -- about 100x too high. At the rate the corrected pipeline actually
+# calibrates (~1.1e-3), a 350-day infection accumulates 0.0020 subs/site, some
+# 50x below the saturation threshold. Its 0.1% prevalence puts exactly one
+# carrier in the initial 1000, which is the point: what does a single
+# super-long shedder do to an outbreak?
+SCENARIOS = [
+    {"name": "control",   "inf_duration_long": None,  "long_shedders_ratio": 0.000, "R_long": None, "susceptibility_long": 1.0},
+    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.010, "R_long": 1.1,  "susceptibility_long": 1.0},
+    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.010, "R_long": 1.1,  "susceptibility_long": 1.0},
+    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.120, "R_long": 1.1,  "susceptibility_long": 1.0},
+    {"name": "edge_case", "inf_duration_long": 365.0, "long_shedders_ratio": 0.001, "R_long": 1.1,  "susceptibility_long": 1.0},
+]
 
-    Returns a dict with: scenario_name, long_shedders_ratio, tau_3_long,
-    R_long, sequence_long_shedders, is_long.
-    """
+TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
+
+# Experiment name stems (numbered with _#{exp_num} by run_experiment_script).
+# Single source of truth, so the stages and the orchestrator can never
+# disagree on where another stage's output lives.
+LONG_NSR_EXP_NAME = "impact_long_shedders_cal_long"
+STD_NSR_EXP_NAME = "impact_long_shedders_cal_std"
+EXP_NAME = "impact_long_shedders"
+SETUP_DIR_TEMPLATE = "Data/impact_long_shedders_setup_data_#{exp_num}"
+TABLE_FILENAME = "nsr_calibration_table.csv"
+
+
+def derive_scenario_params(scenario, sp):
+    """Frozen long-side parameters for one production scenario. Mirrors the
+    bound pipeline's version -- same tau derivation, same directly-specified
+    R_long, same diagnosis-only sequencing (sequence_long_shedders False)."""
     name = scenario["name"]
     ratio = scenario["long_shedders_ratio"]
     tau_3_long = derive_tau_3_long(scenario, sp)
-
-    if ratio == 0.0:
-        # Control: no long shedders, so R_long is never actually used by the
-        # simulation -- placeholder only.
-        return {
-            "scenario_name": name,
-            "long_shedders_ratio": 0.0,
-            "susceptibility_long": float(scenario["susceptibility_long"]),
-            "tau_3_long": tau_3_long,
-            "R_long": 0.0,
-            "sequence_long_shedders": False,
-            "is_long": False,
-        }
+    is_long = ratio > 0.0
 
     return {
         "scenario_name": name,
         "long_shedders_ratio": float(ratio),
         "susceptibility_long": float(scenario["susceptibility_long"]),
         "tau_3_long": tau_3_long,
-        "R_long": float(scenario["R_long"]),
+        "R_long": float(scenario["R_long"]) if is_long else 0.0,
         "sequence_long_shedders": False,
-        "is_long": True,
+        "is_long": is_long,
     }
-
-
-def group_name_for_pair(pair, sp, scenarios=None):
-    """The name of the cal_1 group covering one (tau_3_long, R_long) pair.
-
-    Every scenario sharing the pair, joined with '+' -- not '/', which
-    write_fit_results_csv's file-saving reads as a directory separator.
-
-    Computed HERE, where SCENARIOS is defined, and recorded on the group so
-    nothing downstream has to map a pair back to a name against a scenario list
-    it may not own. long_nsr_calibration_plot used to do exactly that, and the
-    unbound pipeline's edge_case -- absent from the bound list -- fell through
-    to a raw 'tau=350.23,R_long=1.1' fallback in unbound run #1, which landed in
-    the saved fit-results filename.
-    """
-    names = [scenario["name"]
-             for scenario in (SCENARIOS if scenarios is None else scenarios)
-             if scenario["long_shedders_ratio"] > 0.0
-             and (round(derive_tau_3_long(scenario, sp), TAU_ROUND),
-                  round(float(scenario["R_long"]), TAU_ROUND)) == pair]
-    return "+".join(names) if names else f'tau_{pair[0]}_Rl_{pair[1]}'
 
 
 def unique_long_tau_r_long_pairs(sp):
-    """Sorted unique (tau_3_long, R_long) pairs across long-shedder
-    scenarios -- grouped by the PAIR, not tau alone, since two scenarios
-    can share a duration (HIV_low/HIV_high) but have different R_long."""
+    """Sorted unique (tau_3_long, R_long) pairs across long-shedder scenarios.
+    HIV_low/HIV_high share one; SOT and edge_case each add their own, so
+    stage 1 fits three groups here against the bound pipeline's two."""
     pairs = {
-        (round(derive_tau_3_long(scenario, sp), TAU_ROUND),
-         round(float(scenario["R_long"]), TAU_ROUND))
-        for scenario in SCENARIOS
-        if scenario["long_shedders_ratio"] > 0.0
+        (round(derive_tau_3_long(s, sp), TAU_ROUND),
+         round(float(s["R_long"]), TAU_ROUND))
+        for s in SCENARIOS if s["long_shedders_ratio"] > 0.0
     }
     return sorted(pairs)
+
+
+def group_name_for_pair(pair, sp):
+    """The name of the cal_1 group covering one (tau_3_long, R_long) pair,
+    over THIS pipeline's SCENARIOS -- which include edge_case.
+
+    Recorded on the group at definition. long_nsr_calibration_plot used to map a
+    pair back to a name against the BOUND pipeline's scenario list by default,
+    so edge_case fell through to a raw 'tau=350.23,R_long=1.1' fallback in
+    unbound run #1 -- and that string landed in the fit-results filename.
+    """
+    names = [s["name"] for s in SCENARIOS
+             if s["long_shedders_ratio"] > 0.0
+             and (round(derive_tau_3_long(s, sp), TAU_ROUND),
+                  round(float(s["R_long"]), TAU_ROUND)) == pair]
+    return "+".join(names) if names else f'tau_{pair[0]}_Rl_{pair[1]}'
+
+
+def lookup_long_nsr(long_nsr_by_group, tau_3_long, r_long):
+    """Exact (rounded) match on (tau_3_long, R_long). Raises on miss rather
+    than guessing."""
+    key = (round(float(tau_3_long), TAU_ROUND), round(float(r_long), TAU_ROUND))
+    if key not in long_nsr_by_group:
+        raise KeyError(
+            f"No calibrated long NSR for (tau_3_long, R_long)={key}. "
+            f"Available: {sorted(long_nsr_by_group)}.")
+    return long_nsr_by_group[key]
 
 
 # =============================================================================
@@ -177,21 +175,38 @@ CAL1_ISOLATED_FIXED_PARAMS = {
 }
 
 
+# -----------------------------------------------------------------------------
+# The simulated window is PER GROUP, not global.
+# -----------------------------------------------------------------------------
+# The window is PER GROUP, not global. A group needs room for a few complete
+# infection cycles, and infection duration ranges from 63 days (SOT) to 365
+# (edge_case). SOT and HIV fit several cycles into the standard 365-day window;
+# edge_case does not fit even one, and its census only fires on RECOVERED long
+# shedders, so a 365-day window would starve the min_seq gate -- HPC test #1 in
+# BACKLOG found exactly that and confirmed it clears at 3 years. The rule below
+# gives 365 to SOT and HIV and 3x365 to edge_case, without hardcoding a
+# scenario name: any new duration gets a window that fits it.
+CAL1_FINAL_TIME = 365
+CAL1_MIN_CYCLES = 3
+
+
+def cal1_final_time(tau_3_long, sp):
+    """Simulated window for one cal_1 group: the standard one, unless the
+    group's own infection duration needs more to complete
+    CAL1_MIN_CYCLES cycles."""
+    inf_duration = tau_3_long + phase_offset(sp)
+    needed = CAL1_MIN_CYCLES * inf_duration
+    return int(max(CAL1_FINAL_TIME,
+                   np.ceil(needed / CAL1_FINAL_TIME) * CAL1_FINAL_TIME))
+
+
 def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
-    """
-    Returns a zero-arg make_settings callable ready for run_experiment_script:
-    one group per (tau_3_long, R_long) pair (see unique_long_tau_r_long_pairs),
-    each sweeping the same NSR grid. R defaults to
-    CAL1_ISOLATED_FIXED_PARAMS['R'] if not given --
-    governs standard individuals only, unrelated to R_long.
-    ih_virus_emergence_rate (k_v) defaults to USER_FIXED_PARAMS'
-    IH_virus_emergence_rate if not given, so Stage 1 is calibrated under the
-    same k_v as Stage 2/3 instead of silently defaulting to 0 -- k_v measurably
-    inflates observed substitution rate (see BACKLOG), so calibrating Stage 1
-    without it produces NSR values that don't hold once Stage 2/3 turn it on.
-    """
+    """One group per (tau_3_long, R_long) pair, each sweeping the same
+    NSR_long grid in a 100% long-shedder population, each with its own
+    simulated window (see cal1_final_time)."""
     sp = sm.read_standard_parameters_values()
     fixed_params = CAL1_ISOLATED_FIXED_PARAMS.copy()
+    fixed_params["final_time"] = CAL1_FINAL_TIME
     if R is not None:
         fixed_params["R"] = R
     fixed_params["IH_virus_emergence_rate"] = (
@@ -206,18 +221,37 @@ def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
                 'nucleotide_substitution_rate_long': nsr_values,
                 'tau_3_long': tau,
                 'R_long': r_long,
+                # per-group scalar: generate_experiment_settings applies group
+                # overrides after fixed_params, so this wins for this group only
+                'final_time': cal1_final_time(tau, sp),
             }
             for tau, r_long in unique_long_tau_r_long_pairs(sp)
         ]
-        varying_params = {'_scenario_groups': scenario_groups}
-        return (varying_params, fixed_params, seeds)
+        return ({'_scenario_groups': scenario_groups}, fixed_params, seeds)
 
     return make_settings
 
 
 # =============================================================================
-# STAGE 2 (cal_2) -- standard NSR calibrated in-context (mixed population)
+# STAGE 2 -- standard individuals alone
 # =============================================================================
+# A 0%-long-shedder population at production settings: the same context every
+# scenario runs in, minus the long side. One sweep, one calibrated standard
+# NSR, shared by every scenario -- there is nothing scenario-specific left to
+# fit once calibration stops compensating for the long side.
+#
+# final_time 365, matching the standard cal_1 window. Production runs 1095, so
+# control will not sit exactly on target_osr_std -- but in this pipeline that
+# is not what the standard rate is for: it defines "the rate at which standard
+# individuals mutate", measured in a clean population, and the population clock
+# is deliberately an output. Worth watching control's production clock all the
+# same, since it is the reference every elevation is measured against.
+#
+# There is no sequencing_rate to set: a run writes the COMPLETE diagnosed
+# record, which is what the old rate 1.0 produced and what both calibration
+# stages always asked for (simplicity/sequencing.py). Any lower ratio is a
+# post-hoc subsample via reconstruct_sequencing_data. The CAL2_SEQUENCING_RATE
+# constant both configs carried was dead by then and is not folded in.
 # Fixed experiment overrides shared by cal_2 and exp (mirrors the population
 # context of the impact experiment). Single source of truth -- previously
 # duplicated verbatim in both scripts.
@@ -229,21 +263,11 @@ USER_FIXED_PARAMS = {
     "IH_virus_emergence_rate": 0.1,
 }
 
-# cal_2 calibrates over a shorter window than production runs on
+# cal_2 calibrates over a shorter window than the experiment phase runs on
 # (USER_FIXED_PARAMS['final_time']); build_cal2_settings applies it.
 CAL2_FINAL_TIME = 365
 
-# cal_2 sequences every diagnosed individual; production keeps the realistic
-# rate from standard_values.json. Sequencing is pure observation -- rng6 is
-# used for nothing else and recorded sequences are never read back into the
-# simulation -- so this changes the PRECISION of the standard-clock estimate
-# and nothing else: same expectation, lower variance. At the default 0.05 a
-# standard host yields ~0.007 sequences, so a seed needed thousands of
-# standard infections to clear min_seq=30 and cal_2 kept only ~12-15% of its
-# seeds (run #5: 24/30/26/7 points per scenario). It also removes the
-# survivorship bias in that gate, which previously admitted only seeds with
-# unusually large epidemics.
-CAL2_SEQUENCING_RATE = 1.0
+CAL2_GROUP_NAME = 'standard_only'
 
 # Shared color palette for the calibration-fit plots (long-NSR per tau group,
 # standard-NSR per scenario), keyed by scenario name so both plots look
@@ -251,96 +275,82 @@ CAL2_SEQUENCING_RATE = 1.0
 DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 
 
-def lookup_long_nsr(long_nsr_by_group, tau_3_long, r_long):
-    """Exact (rounded) match lookup on (tau_3_long, R_long). Raises on miss
-    -- never silently guesses."""
-    key = (round(float(tau_3_long), TAU_ROUND), round(float(r_long), TAU_ROUND))
-    if key not in long_nsr_by_group:
-        raise KeyError(
-            f"No calibrated long NSR for (tau_3_long, R_long)={key}. "
-            f"Available keys: {sorted(long_nsr_by_group.keys())}. "
-            f"Check that the scenario's tau/R_long matches the calibration experiment.")
-    return long_nsr_by_group[key]
-
-
-def build_cal2_scenario_groups(nsr_ranges, long_nsr_by_group):
-    """
-    One group dict per scenario: its own nucleotide_substitution_rate sweep
-    (list -> that group's local varying axis) plus its fixed tau_3_long/
-    long_shedders_ratio/R_long/sequence_long_shedders/long-NSR overrides.
-
-    long_nsr_by_group is Stage 1's calibration-fit result, keyed by
-    (tau_3_long, R_long) pairs (computed by cal_2.py from already-run
-    simulation output, not parameter setup -- passed in rather than
-    recomputed here).
-
-    Returns (scenario_groups, scenarios_frozen).
-    """
-    sp = sm.read_standard_parameters_values()
-    scenario_groups = []
-    scenarios_frozen = []
-
-    for scenario in SCENARIOS:
-        frozen = derive_scenario_params(scenario, sp)
-        scenarios_frozen.append(frozen)
-
-        name = frozen["scenario_name"]
-        r = nsr_ranges[name]
-        nsr_list = np.logspace(np.log10(r['min']), np.log10(r['max']), r['steps']).tolist()
-
-        group = {
-            "name": name,
-            "long_shedders_ratio": frozen["long_shedders_ratio"],
-            "susceptibility_long": frozen["susceptibility_long"],
-            "tau_3_long": frozen["tau_3_long"],
-            "R_long": frozen["R_long"],
-            "sequence_long_shedders": frozen["sequence_long_shedders"],
-            "nucleotide_substitution_rate": [float(x) for x in nsr_list],
-        }
-        if frozen["is_long"]:
-            group["nucleotide_substitution_rate_long"] = lookup_long_nsr(
-                long_nsr_by_group, frozen["tau_3_long"], frozen["R_long"])
-
-        scenario_groups.append(group)
-
-    return scenario_groups, scenarios_frozen
-
-
-def build_cal2_settings(scenario_groups, seeds, R=None, ih_virus_emergence_rate=None):
-    """Zero-arg make_settings callable ready for run_experiment_script,
-    submitting every scenario's sweep as ONE combined experiment. R
-    defaults to USER_FIXED_PARAMS['R'] if not given -- pass the SAME R used
-    to build scenario_groups (build_cal2_scenario_groups) so the frozen
-    R_long values stay consistent with what standard individuals actually
-    run with. Same for ih_virus_emergence_rate -- whatever value is used
-    here must also be recorded in the frozen table (see cal_2.py's row
-    building) so exp.py's production run matches what was calibrated."""
+def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None):
+    """Single standard-only sweep: long_shedders_ratio 0, standard NSR swept."""
     fixed_params = USER_FIXED_PARAMS.copy()
-    fixed_params["final_time"] = CAL2_FINAL_TIME
+    fixed_params.update({
+        "long_shedders_ratio": 0.0,
+        "sequence_long_shedders": False,
+        "final_time": CAL2_FINAL_TIME,
+    })
     if R is not None:
         fixed_params["R"] = R
     if ih_virus_emergence_rate is not None:
         fixed_params["IH_virus_emergence_rate"] = ih_virus_emergence_rate
 
     def make_settings():
-        varying_params = {'_scenario_groups': scenario_groups}
+        nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
+        # Named, so the group on disk and the 'standard_only' the fit used to
+        # hardcode are the same string by construction rather than by habit.
+        varying_params = {'_scenario_groups': [
+            {'name': CAL2_GROUP_NAME,
+             'nucleotide_substitution_rate': nsr_values}]}
         return (varying_params, fixed_params, seeds)
+
     return make_settings
 
 
 # =============================================================================
-# STAGE 3 (exp) -- production runs
-# ----------------------------------------------------------------------------
-# Reuses USER_FIXED_PARAMS (Stage 2, above) as-is: the production population
-# context must match the one cal_2 calibrated the standard NSR against.
+# STAGE 3 -- the experiment phase
 # =============================================================================
-def build_exp_scenario_settings(row, n_seeds):
+CONSENSUS_MODES = ("argmax", "distribution")
+# A distribution-consensus experiment carries this suffix so the two modes
+# cannot collide in Data/ at the same --exp-num.
+CONSENSUS_SUFFIX = {"argmax": "", "distribution": "_dist"}
+
+
+# Outputs a calibration run does not need. cal_1's fit and cal_2's fit both
+# read only final_time.csv and sequencing_data_regression.csv, and cal_1's plot
+# and the sanity regressions additionally go through
+# evolutionary_rate.extract_ih_regression_data, which reads individuals_data.csv
+# and phylogenetic_data.csv. Nothing in either path opens the other three.
+#
+# lineage_frequency.csv alone reached 100.6 GB on the calibrated grid -- a
+# single simulation of the top NSR_long sweep point weighed 1.1 GB, and that
+# point exists only to bracket the fit from above.
+CALIBRATION_SKIPPED_OUTPUTS = ("lineage_frequency", "simulation_trajectory",
+                               "sequencing_data")
+
+
+def set_calibration_output_env():
+    """Tell the calibration simulations which outputs to leave unwritten.
+
+    An env var rather than a parameter because parameter_specs.json and
+    standard_values.json are machine-local and gitignored, so a new parameter
+    would not travel with the code. simplicity.runners.slurm forwards the whole
+    environment through sbatch, so this reaches every task.
     """
-    Zero-arg make_settings callable for one row of the frozen calibration
-    table (a single simulation point per scenario -- empty varying_params,
-    see generate_experiment_settings: combinations = [()] when there are no
-    varying params).
+    os.environ[dm.SKIP_OUTPUTS_ENV] = ",".join(CALIBRATION_SKIPPED_OUTPUTS)
+
+
+def exp_name(consensus):
+    """Experiment-phase name prefix for one consensus mode."""
+    if consensus not in CONSENSUS_MODES:
+        raise ValueError(f"consensus must be one of {CONSENSUS_MODES}, got {consensus!r}")
+    return EXP_NAME + CONSENSUS_SUFFIX[consensus]
+
+
+def build_exp_scenario_settings(row, n_seeds, consensus="argmax"):
+    """One simulation point per frozen-table row. Both rates are applied as
+    calibrated; nothing here compensates for their interaction.
+
+    `consensus` selects how a lineage's distance from the population consensus
+    is measured -- 'argmax' against the consensus sequence, 'distribution'
+    against the full column distribution. Everything else is identical, which
+    is what makes the two pipelines comparable.
     """
+    if consensus not in CONSENSUS_MODES:
+        raise ValueError(f"consensus must be one of {CONSENSUS_MODES}, got {consensus!r}")
     is_control = float(row["long_shedders_ratio"]) == 0.0
 
     fixed = USER_FIXED_PARAMS.copy()
@@ -352,15 +362,10 @@ def build_exp_scenario_settings(row, n_seeds):
         "tau_3_long": float(row["tau_3_long"]),
         "R_long": float(row["R_long"]),
         "nucleotide_substitution_rate": float(row["nucleotide_substitution_rate"]),
-        # Off in production: long shedders are sampled only on diagnosis,
-        # at the same rate as standard individuals (see cal_1, which keeps
-        # it on -- its population is 100% long shedders, so there is no
-        # standard cohort for it to be asymmetric with).
         "sequence_long_shedders": False,
+        "consensus": consensus,
     })
 
-    # Long NSR: set only when a long side exists. For control the table value
-    # may be empty/NaN; we must not write NaN into the parameters.
     if not is_control:
         long_nsr = row["nucleotide_substitution_rate_long"]
         if pd.isna(long_nsr):
@@ -370,7 +375,7 @@ def build_exp_scenario_settings(row, n_seeds):
         fixed["nucleotide_substitution_rate_long"] = float(long_nsr)
 
     def make_settings():
-        # One named group, so the production output says which scenario it is
+        # One named group, so the output says which scenario it is
         # and the fit-results filename cannot disagree with the output tree.
         # An empty group dict is still one group: generate_experiment_settings
         # expands it to combinations = [()], exactly as empty varying_params did.
@@ -381,39 +386,26 @@ def build_exp_scenario_settings(row, n_seeds):
 
 
 # =============================================================================
-# NSR SWEEP RANGES -- plain code-level data, retuned by editing this file
-# (drives Stage 1 & Stage 2 grids)
+# NSR SWEEP RANGES
 # =============================================================================
-# Single source for the grid resolution shared by every sweep below, so
-# tuning it doesn't mean touching (and keeping in sync) six separate literals.
+# cal_long reaches a decade lower than the bound pipeline's old 1e-4..1e-2:
+# edge_case sheds for 350 days against HIV's 109, so it has far longer to
+# accumulate and should calibrate below the others.
+# cal_std brackets bound run #7's control, which landed at 1.38e-4 -- the
+# closest thing to this stage that pipeline had.
 _NSR_STEPS = 10
 
-# Widened for exp #7 after run #6 showed one decade is too narrow: R2 fell to
-# 0.39-0.85 (four decades gave 0.99 in run #5) and two of six calibrations
-# inverted OUTSIDE their swept range.
-#
-# cal1_long_nsr 1e-4..1e-2: run #6 put SOT at 5.05e-4 and HIV at 1.55e-3, the
-# latter above the old 1e-3 ceiling -- an extrapolation, and both HIV
-# scenarios then overshot the long target (121%, 117%) while SOT, calibrated
-# interior, landed at 91%. Two decades puts both answers well inside.
-#
-# cal2_standard_nsr 1e-6..1e-3: control/SOT/HIV_low calibrated to 1.7e-4,
-# 1.7e-4 and 1.1e-4, all near the old 1e-4 floor, so the range is extended
-# downward. It also reaches far enough down to settle HIV_high, whose whole
-# measured curve sat ABOVE the 0.0013 target in run #6 (0.00184 at the lowest
-# sampled NSR; production at the extrapolated 8.34e-6 measured 0.00175, so a
-# 12x cut in NSR moved the clock ~5%). Sampling to 1e-6 shows definitively
-# whether that curve ever crosses the target, which is what the decision about
-# target_osr_std in long-shedder scenarios needs.
 NSR_RANGES = {
-    "cal1_long_nsr": {"min": 1e-04, "max": 1e-02, "steps": _NSR_STEPS},
-    "cal2_standard_nsr": {
-        "control":   {"min": 1e-06, "max": 1e-03, "steps": _NSR_STEPS},
-        "SOT":       {"min": 1e-06, "max": 1e-03, "steps": _NSR_STEPS},
-        "HIV_low":   {"min": 1e-06, "max": 1e-03, "steps": _NSR_STEPS},
-        "HIV_high":  {"min": 1e-06, "max": 1e-03, "steps": _NSR_STEPS},
-    },
+    "cal_long": {"min": 1e-05, "max": 1e-02, "steps": _NSR_STEPS},
+    "cal_std":  {"min": 1e-05, "max": 1e-03, "steps": _NSR_STEPS},
 }
+
+TABLE_COLUMNS = [
+    "scenario_name", "tau_3_long", "long_shedders_ratio", "susceptibility_long",
+    "R", "IH_virus_emergence_rate", "R_long",
+    "nucleotide_substitution_rate_long", "nucleotide_substitution_rate",
+    "target_osr_long", "model_type", "long_calib_source", "std_calib_source",
+]
 
 
 def print_fixed_params(fixed_params, label="Fixed parameters"):

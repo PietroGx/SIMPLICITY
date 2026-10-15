@@ -10,7 +10,7 @@
 # (at your option) any later version.
 #
 # ============================================================================
-# impact_long_shedders_unbound -- STAGE 3: PRODUCTION
+# impact_long_shedders -- STAGE 3: PRODUCTION
 # ----------------------------------------------------------------------------
 # Reads the frozen table and runs one scenario per row. Both rates are applied
 # exactly as calibrated -- NSR_long from the 100%-long-shedder population,
@@ -27,11 +27,11 @@ import argparse
 import pandas as pd
 
 from experiment_script_runner import run_experiment_script
-from impact_long_shedders_unbound_config import (
-    PROD_EXP_NAME, SETUP_DIR_TEMPLATE, TABLE_FILENAME, USER_FIXED_PARAMS,
+from impact_long_shedders_config import (
+    EXP_NAME, SETUP_DIR_TEMPLATE, TABLE_FILENAME, USER_FIXED_PARAMS,
     build_exp_scenario_settings, add_slurm_resource_args,
     set_slurm_resource_env, print_fixed_params,
-    CONSENSUS_MODES, prod_exp_name,
+    CONSENSUS_MODES, exp_name,
 )
 
 REQUIRED_COLUMNS = [
@@ -49,7 +49,7 @@ def load_calibration_table(path):
     if not os.path.isfile(path):
         raise FileNotFoundError(
             f"Calibration table not found: {path}\n"
-            f"Run impact_long_shedders_unbound_cal_2.py first.")
+            f"Run impact_long_shedders_cal_2.py first.")
     df = pd.read_csv(path)
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing:
@@ -62,7 +62,7 @@ def load_calibration_table(path):
 def dispatch_scenario(row, exp_num, runner, n_seeds, consensus="argmax"):
     name = row["scenario_name"]
     settings_func = build_exp_scenario_settings(row, n_seeds, consensus)
-    prefix = prod_exp_name(consensus)
+    prefix = exp_name(consensus)
 
     print(f"\n{'='*60}")
     print(f"[Dispatch] {prefix}_{name}   (consensus: {consensus})")
@@ -148,7 +148,7 @@ def dispatch_all(rows, exp_num, runner, n_seeds, consensus, parallel=True):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Unbound pipeline stage 3: production runs from the frozen "
+        description="Stage 3: experiment-phase runs from the frozen "
                     "table, both rates applied as calibrated.")
     parser.add_argument('--exp-num', type=int, required=True)
     parser.add_argument('--runner', type=str,
@@ -180,7 +180,7 @@ def main():
             raise ValueError(f"Scenario '{args.only}' not found in the table.")
 
     print(f"\n[Runner] Dispatching {len(df)} scenario(s) from {table_path} "
-          f"with consensus={args.consensus} -> {prod_exp_name(args.consensus)}_<scenario>")
+          f"with consensus={args.consensus} -> {exp_name(args.consensus)}_<scenario>")
     shared = {k: v for k, v in USER_FIXED_PARAMS.items() if k != "R"}
     print_fixed_params(shared, label="Shared parameters (R shown per scenario below)")
 

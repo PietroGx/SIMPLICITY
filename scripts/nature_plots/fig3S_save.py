@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 import fig3_preprocess_data as preproc
-from _scenarios import BOUND_EXP_NAME, figure_path, resolve_scenarios
+from _scenarios import EXP_NAME, figure_path, resolve_scenarios
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 '..', 'long_paper_figures'))
@@ -41,7 +41,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Figure 3S: clade-origin pies for every scenario.")
     parser.add_argument('--exp-num', type=int, required=True)
-    parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME)
+    parser.add_argument('--exp-name', type=str, default=EXP_NAME)
     parser.add_argument('--cluster-threshold', type=int, default=5)
     parser.add_argument('--min-days', type=int, default=100)
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png')

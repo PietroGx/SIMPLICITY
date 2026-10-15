@@ -167,7 +167,7 @@ In tmux, never `nohup`:
 bash scripts/start_simplicity_session.sh
 
 # inside the session, from the repo root:
-python scripts/experiments/run_impact_long_shedders_unbound_pipeline.py \
+python scripts/experiments/run_impact_long_shedders_pipeline.py \
     --exp-num <FREE> --runner slurm --cal-seeds 10 --exp-seeds 10
 ```
 
@@ -175,15 +175,15 @@ Detach with `Ctrl-b d`, reattach with `tmux attach -t simplicity`.
 
 Watch for, in order:
 
-1. **stage 1** dispatches `impact_long_shedders_unbound_cal_long_#N` with three
+1. **stage 1** dispatches `impact_long_shedders_cal_long_#N` with three
    groups: `SOT`, `HIV_low+HIV_high`, `edge_case`. If `edge_case` appears as
    `tau_350.23_Rl_1.1`, the group is not naming itself and 7a regressed.
 2. **stage 2** prints `standard_only  NSR grid: 10 pts [...]` and then
    dispatches. That banner is the line that was broken; it reaching the
    dispatch at all is the fix working.
 3. **stage 3** dispatches TWO production families, five scenarios each:
-   `impact_long_shedders_unbound_<scenario>_#N` (argmax) and
-   `impact_long_shedders_unbound_dist_<scenario>_#N` (distribution), with a
+   `impact_long_shedders_<scenario>_#N` (argmax) and
+   `impact_long_shedders_dist_<scenario>_#N` (distribution), with a
    sanity-plot job per family.
 4. `Fit_results/` under cal_long holds one file per group, named by the group —
    `..._exp_fit_results_edge_case.csv`, not a float tuple — and
@@ -198,7 +198,7 @@ bash tests/run_tests_on_compute.sh --no-interface --calib <N>
 
 Read its stage 2 for what it is. The pipeline fits ONE standard NSR
 from the `standard_only` group and applies it to every scenario
-(`compute_standard_nsr`, impact_long_shedders_unbound_cal_2.py:55), so the five
+(`compute_standard_nsr`, impact_long_shedders_cal_2.py:55), so the five
 `[ok]` lines are one number printed five times, not five independent
 comparisons. The evidence is the single fit above them. Stage 1, with its three
 cohorts, is where that stage carries five numbers' worth of information.

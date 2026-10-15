@@ -75,9 +75,9 @@ from experiment_script_runner import run_experiment_script
 import simplicity.dir_manager as dm
 import simplicity.jobs as jobs
 import simplicity.settings_manager as sm
-from impact_long_shedders_unbound_config import (
+from impact_long_shedders_config import (
     SETUP_DIR_TEMPLATE, TABLE_FILENAME, build_exp_scenario_settings,
-    add_slurm_resource_args, set_slurm_resource_env, prod_exp_name,
+    add_slurm_resource_args, set_slurm_resource_env, exp_name,
 )
 
 CONSENSUS = 'distribution'
@@ -301,7 +301,7 @@ def collect(rows, cells, exp_num, table_exp_num):
     run #3 reference row. Each parameter combination is identified from its
     own written parameters file, not from the directory name.'''
     out = {}
-    base_prefix = prod_exp_name(CONSENSUS)
+    base_prefix = exp_name(CONSENSUS)
     base = {}
     for s in SCENARIO_ORDER:
         paths = sorted(glob.glob(

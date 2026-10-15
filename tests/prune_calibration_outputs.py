@@ -27,10 +27,12 @@ sequencing_data_regression.csv for both OSR fits, individuals_data.csv and
 phylogenetic_data.csv for the intra-host clock through
 evolutionary_rate.extract_ih_regression_data.
 
-PRODUCTION IS NEVER TOUCHED. Its figures read lineage_frequency.csv, and
-PROD_EXP_NAME is a strict prefix of the unbound calibration names
-("impact_long_shedders_unbound" vs "..._cal_long"), so the match is anchored on
-the full name followed by "_#<number>" rather than on a prefix.
+THE EXPERIMENT PHASE IS NEVER TOUCHED. Its figures read
+lineage_frequency.csv, and EXP_NAME is a strict prefix of the calibration
+names ("impact_long_shedders" vs "..._cal_long"), so the match is anchored on
+the full name followed by "_#<number>" rather than on a prefix. That prefix
+relationship is why it is anchored, and it got tighter in v2.4.91 when the
+"_unbound" infix went away.
 
 Safe to run on a part-finished experiment too: a resumed run re-runs whatever
 lacks a .completed signal, and these files are not read on the way there.
@@ -49,25 +51,24 @@ PRUNABLE = ('lineage_frequency.csv', 'simulation_trajectory.csv',
             'sequencing_data.csv')
 
 
+# Names the deleted bound pipeline wrote. Its code is gone (v2.4.90) but its
+# runs are still on disk and still prunable, so the names stay here.
+_LEGACY_BOUND_PREFIXES = (
+    'impact_long_shedders_calibration_lng_nsr',
+    'impact_long_shedders_calibration_std_nsr',
+)
+
+
 def calibration_prefixes():
-    """Experiment-name prefixes that are calibration stages, from the configs."""
-    names = set()
+    """Experiment-name prefixes that are calibration stages, from the config."""
+    names = set(_LEGACY_BOUND_PREFIXES)
     try:
-        import impact_long_shedders_unbound_config as unbound
-        names.update(filter(None, (getattr(unbound, n, None)
+        import impact_long_shedders_config as cfg
+        names.update(filter(None, (getattr(cfg, n, None)
                                    for n in ('LONG_NSR_EXP_NAME',
                                              'STD_NSR_EXP_NAME'))))
     except Exception as exc:
-        print(f'[warn] could not read the unbound config: {exc}')
-    try:
-        import impact_long_shedders_config as bound
-        names.update(filter(None, (getattr(bound, n, None)
-                                   for n in ('LONG_NSR_EXP_NAME',
-                                             'STD_NSR_EXP_NAME'))))
-    except Exception as exc:
-        print(f'[warn] could not read the bound config: {exc}')
-    # the bound pipeline's standard sweep predates that constant
-    names.add('impact_long_shedders_calibration_std_nsr')
+        print(f'[warn] could not read the config: {exc}')
     return sorted(names)
 
 

@@ -2,12 +2,12 @@
 
 The pipeline hardcodes the configuration the grid is supposed to be choosing:
 
-    impact_long_shedders_config.py:150,203   population_size 1000, I0 10 / 50
-    impact_long_shedders_unbound_config.py   SCENARIOS[*]["R_long"] = 1.1
-    impact_long_shedders_unbound_config.py   UNBOUND_CAL2_FINAL_TIME = 365
-    impact_long_shedders_unbound_config.py   NSR_RANGES[*]["steps"]
+    impact_long_shedders_config.py:166,258   population_size 1000, I0 10 / 50
+    impact_long_shedders_config.py   SCENARIOS[*]["R_long"] = 1.1
+    impact_long_shedders_config.py   CAL2_FINAL_TIME = 365
+    impact_long_shedders_config.py   NSR_RANGES[*]["steps"]
 
-run_impact_long_shedders_unbound_pipeline runs each stage as its own SUBPROCESS,
+run_impact_long_shedders_pipeline runs each stage as its own SUBPROCESS,
 so patching the config from the driver would reach nothing. Python imports
 sitecustomize at startup in every one of them, which is the one hook that does.
 
@@ -16,7 +16,7 @@ Set by tests/test_calibrated_grid.py, read here:
     SIMPLICITY_CELL_POPULATION    population_size for cal_1, cal_2 and production
     SIMPLICITY_CELL_I0            infected_individuals_at_start
     SIMPLICITY_CELL_RLONG         R_long for every long-shedder scenario
-    SIMPLICITY_CELL_CAL2_TIME     UNBOUND_CAL2_FINAL_TIME
+    SIMPLICITY_CELL_CAL2_TIME     CAL2_FINAL_TIME
     SIMPLICITY_CELL_NSR_STEPS     points in both NSR sweeps
 
 With none of them set this module does nothing at all.
@@ -31,10 +31,9 @@ import sys
 _KEYS = ('SIMPLICITY_CELL_POPULATION', 'SIMPLICITY_CELL_I0',
          'SIMPLICITY_CELL_RLONG', 'SIMPLICITY_CELL_CAL2_TIME',
          'SIMPLICITY_CELL_NSR_STEPS')
-_TARGET = 'impact_long_shedders_unbound_config'
-# Population and I0 live in the BOUND config and are imported into the unbound
-# one by reference, so patching the dicts there covers both.
-_BOUND = 'impact_long_shedders_config'
+# One config since v2.4.91. It used to be two, the unbound one importing the
+# bound one's dicts by reference, so both module names were patched.
+_TARGET = 'impact_long_shedders_config'
 
 
 def _apply_population(module):
@@ -53,7 +52,7 @@ def _apply_population(module):
             params['infected_individuals_at_start'] = int(i0)
 
 
-def _apply_unbound(module):
+def _apply_config(module):
     r_long = os.environ.get('SIMPLICITY_CELL_RLONG')
     if r_long is not None:
         for scenario in getattr(module, 'SCENARIOS', []):
@@ -63,10 +62,10 @@ def _apply_unbound(module):
                 scenario['R_long'] = float(r_long)
 
     cal2_time = os.environ.get('SIMPLICITY_CELL_CAL2_TIME')
-    if cal2_time is not None and hasattr(module, 'UNBOUND_CAL2_FINAL_TIME'):
+    if cal2_time is not None and hasattr(module, 'CAL2_FINAL_TIME'):
         # build_cal2_settings reads this as a module global at call time, so
         # rebinding the attribute is enough.
-        module.UNBOUND_CAL2_FINAL_TIME = int(float(cal2_time))
+        module.CAL2_FINAL_TIME = int(float(cal2_time))
 
     steps = os.environ.get('SIMPLICITY_CELL_NSR_STEPS')
     ranges = getattr(module, 'NSR_RANGES', None)
@@ -81,7 +80,7 @@ def _apply_unbound(module):
 def _install():
     import importlib.abc
 
-    handlers = {_TARGET: _apply_unbound, _BOUND: _apply_population}
+    handlers = {_TARGET: _apply_config}
 
     class Finder(importlib.abc.MetaPathFinder):
         def find_spec(self, fullname, path=None, target=None):

@@ -5,6 +5,103 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.91 — 2026-10-15 — pietro gerletti
+
+Stage 8c: one config, and the surviving pipeline takes the plain names.
+
+The fold and the rename had to land together. Dropping the bound-only config
+symbols without moving the stages, or moving the stages without folding,
+breaks the tree in two places at once -- which is why 8b did neither.
+
+RENAMED (git mv, history preserved)
+
+  impact_long_shedders_unbound_cal_1.py     -> impact_long_shedders_cal_1.py
+  impact_long_shedders_unbound_cal_2.py     -> impact_long_shedders_cal_2.py
+  impact_long_shedders_unbound_exp.py       -> impact_long_shedders_exp.py
+  run_impact_long_shedders_unbound_pipeline -> run_impact_long_shedders_pipeline
+  submit_sanity_plot_unbound.sh             -> submit_sanity_plot.sh
+
+FOLDED
+
+impact_long_shedders_unbound_config.py is gone; impact_long_shedders_config.py
+is now the only config, 826 lines across the two down to 464. It keeps the 9
+shared symbols the old bound file defined (TAU_ROUND, phase_offset,
+derive_tau_3_long, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
+DEFAULT_COLORS, print_fixed_params, add_slurm_resource_args,
+set_slurm_resource_env) verbatim, and everything else is the surviving
+pipeline's. The 13 bound-only symbols are dropped, SCENARIOS keeps edge_case,
+and NSR_RANGES keeps the cal_long/cal_std keys.
+
+Symbol renames that followed: PROD_EXP_NAME -> EXP_NAME, prod_exp_name() ->
+exp_name(), UNBOUND_CAL{1,2}_* -> CAL{1,2}_*. Experiment name stems lose the
+infix: impact_long_shedders_cal_long, _cal_std, and impact_long_shedders
+itself (_dist for distribution consensus).
+
+CAL2_SEQUENCING_RATE is NOT folded in. Both configs carried it at 1.0 with a
+comment about lowering the variance of the standard-clock estimate, and
+neither applied it to anything: sequencing_rate stopped being a simulation
+parameter when sequencing moved post-hoc (simplicity/sequencing.py), and a run
+now always writes the complete diagnosed record -- exactly what rate 1.0
+produced. The constant was describing a condition that is now unconditional.
+The reasoning is kept as a comment at stage 2.
+
+TWO BUGS THE RENAME CREATED, BOTH CAUGHT BY TESTS
+
+  run_impact_long_shedders_pipeline.py:135  submit_sanity_plots held a local
+    `exp_name = prod_exp_name(mode)`. Renaming the function onto the name of
+    the variable it feeds made it `exp_name = exp_name(mode)` --
+    UnboundLocalError on the first sanity-plot submission of every run.
+    Caught by test_consensus_pipelines; the local is now `name`.
+  same file, :132  the orchestrator still pointed at the pre-move
+    submit_sanity_plot_unbound.sh.
+
+Neither is reachable from a --help or an import, which is why both survived
+the smoke checks and only the stubbed-dispatch test found them.
+
+tests/cellconfig/sitecustomize.py had a third, quieter version of the same
+problem: _TARGET and _BOUND were two names for two config modules, and the
+fold made them the same string, so `{_TARGET: _apply_config, _BOUND:
+_apply_population}` collapsed to one key and silently stopped patching R_long,
+CAL2_FINAL_TIME and NSR steps. One target now, verified patching all five
+knobs.
+
+tests/test_nsr_range_finder.py REPOINTED, not just renamed. Its stage 2 built
+per-scenario groups with stage 1's calibrated long side frozen into a mixed
+population, because that is what the bound cal_2 did. The surviving cal_2 is a
+single standard-only sweep that never reads stage 1, so the tool was about to
+recommend ranges for a stage that no longer exists -- CLAUDE.md's standing
+trap, a diagnostic drifting from the stage it diagnoses. Stage 2 now goes
+through build_cal2_settings with one group, --long-calib-exp and --nsr-long
+are gone with the coupling, and the paste block emits the "cal_long"/"cal_std"
+keys NSR_RANGES actually has instead of per-scenario labels.
+
+Also: _scenarios.py collapses BOUND/UNBOUND/UNBOUND_DIST to EXP_NAME and
+DIST_EXP_NAME, and its labels stop naming an arm and name the consensus mode,
+so figures become Figure_N_argmax_#M / Figure_N_distribution_#M (the five
+fig*_save.py default --exp-name had to follow the constant rename, or they
+would not import). prune_calibration_outputs keeps the deleted pipeline's two
+calibration prefixes explicitly, since those runs are still on disk and still
+prunable.
+
+test_consensus_pipelines and test_figure_pipelines joined the local tier: both
+found a real break here and neither was in any suite.
+
+Local tier: 11 passed, 0 failed.
+
+ON-DISK NAMES NOW COLLIDE. Data/impact_long_shedders_*_#7 is the deleted bound
+pipeline's run #7, and that is exactly what the renamed pipeline writes at
+--exp-num 7. Nothing reads it by accident -- the layout changed in stage 7 and
+dir_manager raises -- but the names no longer say which pipeline produced
+them. test_consensus_pipelines' archive check was asserting against whatever
+happened to be in the local Data/ because of it, and now runs in a temp cwd.
+Deleting Data/ before the first run of the merged pipeline settles it.
+
+scripts/archive_paper_runs.sh and submit_plots.sh still name
+impact_long_shedders_unbound_*, deliberately: they address runs already on
+disk under the old names.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.90 — 2026-10-15 — pietro gerletti
 
 Stage 8b: the bound pipeline is deleted. There is one pipeline now.

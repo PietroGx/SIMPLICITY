@@ -6,7 +6,7 @@ import matplotlib.gridspec as gridspec
 
 import fig4_preprocess_data as preproc
 import fig4_plots as plots
-from _scenarios import BOUND_EXP_NAME, figure_path, resolve_scenarios
+from _scenarios import EXP_NAME, figure_path, resolve_scenarios
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
 from long_shedders_plots import add_global_pie_legend
@@ -21,8 +21,8 @@ def parse_arguments():
                         help="Experiment number to plot. Required on purpose: the "
                             "old default of 4 pointed at one of the runs that "
                             "produced invalid science.")
-    parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
-                        help=f"Pipeline to plot (default: {BOUND_EXP_NAME}).")
+    parser.add_argument('--exp-name', type=str, default=EXP_NAME,
+                        help=f"Pipeline to plot (default: {EXP_NAME}).")
     parser.add_argument('--seed', type=str, default="1",
                         help="Seed used for all 5 trees (same seed across scenarios)")
     parser.add_argument('--cluster-threshold', type=int, default=5)

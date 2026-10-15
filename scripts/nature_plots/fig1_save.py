@@ -3,7 +3,7 @@ import matplotlib.gridspec as gridspec
 import argparse
 import fig1_preprocess_data as preproc
 import fig1_plots as plots
-from _scenarios import BOUND_EXP_NAME, figure_path
+from _scenarios import EXP_NAME, figure_path
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Generate Figure 1")
@@ -11,8 +11,8 @@ def parse_arguments():
                         help="Experiment number to plot. Required on purpose: the "
                             "old default of 4 pointed at one of the runs that "
                             "produced invalid science.")
-    parser.add_argument('--exp-name', type=str, default=BOUND_EXP_NAME,
-                        help=f"Pipeline to plot (default: {BOUND_EXP_NAME}).")
+    parser.add_argument('--exp-name', type=str, default=EXP_NAME,
+                        help=f"Pipeline to plot (default: {EXP_NAME}).")
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png',
                         help='Output format for the figure (default: png)')
     parser.add_argument('--no-fit-stats', action='store_true',

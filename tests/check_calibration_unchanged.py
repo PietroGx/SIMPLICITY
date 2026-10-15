@@ -55,9 +55,9 @@ failures = []
 skipped = []
 
 NAMES = {
-    'cal_1': 'impact_long_shedders_unbound_cal_long',
-    'cal_2': 'impact_long_shedders_unbound_cal_std',
-    'setup': 'impact_long_shedders_unbound_setup_data',
+    'cal_1': 'impact_long_shedders_cal_long',
+    'cal_2': 'impact_long_shedders_cal_std',
+    'setup': 'impact_long_shedders_setup_data',
 }
 TABLE_FILENAME = 'nsr_calibration_table.csv'
 
@@ -188,7 +188,7 @@ def stage_2(names, exp_num, target_osr_std, rtol, keep):
     preserved = Preserved(dm.get_experiment_fit_result_dir(name),
                           dm.get_experiment_plots_dir(name))
     try:
-        import impact_long_shedders_unbound_cal_2 as cal_2
+        import impact_long_shedders_cal_2 as cal_2
         single = cal_2.compute_standard_nsr(name, target_osr_std,
                                             model_type=model)
         # one standard rate for every scenario, by construction: the same

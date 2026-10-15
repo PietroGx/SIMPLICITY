@@ -10,7 +10,7 @@
 # (at your option) any later version.
 #
 # ============================================================================
-# impact_long_shedders_unbound -- STAGE 1: LONG SHEDDERS ALONE
+# impact_long_shedders -- STAGE 1: LONG SHEDDERS ALONE
 # ----------------------------------------------------------------------------
 # 100% long-shedder population, sweeps NSR_long, fits each seed's intra-host
 # clock and inverts at target_osr_long. Same measurement as the bound
@@ -20,14 +20,14 @@
 # Independent of stage 2: nothing here reads or waits for the standard side.
 #
 # Runs things; builds nothing. Parameter construction lives in
-# impact_long_shedders_unbound_config.build_cal1_settings.
+# impact_long_shedders_config.build_cal1_settings.
 # ============================================================================
 
 import argparse
 
 from experiment_script_runner import run_experiment_script
-from impact_long_shedders_unbound_config import (
-    SCENARIOS, LONG_NSR_EXP_NAME, NSR_RANGES, UNBOUND_CAL1_FINAL_TIME,
+from impact_long_shedders_config import (
+    SCENARIOS, LONG_NSR_EXP_NAME, NSR_RANGES, CAL1_FINAL_TIME,
     CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
     build_cal1_settings, add_slurm_resource_args, set_slurm_resource_env,
     set_calibration_output_env,
@@ -40,9 +40,9 @@ def run_long_calibration(exp_num, runner, seeds, target_osr_long, R,
                          ih_virus_emergence_rate, model_type='exp',
                          min_seq=30, min_len=100):
     print("\n=========================================================")
-    print(f" UNBOUND STAGE 1: LONG SHEDDERS ALONE "
+    print(f" STAGE 1: LONG SHEDDERS ALONE "
          f"(R={R}, R_long per SCENARIOS, 100% LS, "
-         f"k_v={ih_virus_emergence_rate}, final_time={UNBOUND_CAL1_FINAL_TIME})")
+         f"k_v={ih_virus_emergence_rate}, final_time={CAL1_FINAL_TIME})")
     print("=========================================================\n")
 
     ranges = NSR_RANGES['cal_long']
@@ -73,7 +73,7 @@ def run_long_calibration(exp_num, runner, seeds, target_osr_long, R,
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Unbound pipeline stage 1: calibrate NSR_long in a 100% "
+        description="Stage 1: calibrate NSR_long in a 100% "
                     "long-shedder population.")
     parser.add_argument('--exp-num', type=int, required=True)
     parser.add_argument('--runner', type=str,

@@ -10,13 +10,13 @@
 # (at your option) any later version.
 #
 # ============================================================================
-# impact_long_shedders_unbound -- STAGE 2: STANDARD INDIVIDUALS ALONE
+# impact_long_shedders -- STAGE 2: STANDARD INDIVIDUALS ALONE
 # ----------------------------------------------------------------------------
 # A 0%-long-shedder population at production settings: sweeps the standard
 # NSR, fits the global root-to-tip clock, inverts at target_osr_std. ONE
 # calibrated standard rate, shared by every scenario.
 #
-# This is the whole point of the unbound pipeline. The bound one fits this
+# This is the whole point of the design. The deleted bound pipeline fit this
 # rate per scenario INSIDE the mixed population, so the rate absorbs whatever
 # divergence long shedders inject -- in run #7 that drove HIV_high to 9.3e-7,
 # 150x below control. Here the standard cohort never sees a long shedder while
@@ -41,10 +41,10 @@ import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
 
 from experiment_script_runner import run_experiment_script
-from impact_long_shedders_unbound_config import (
+from impact_long_shedders_config import (
     SCENARIOS, LONG_NSR_EXP_NAME, STD_NSR_EXP_NAME, NSR_RANGES,
     SETUP_DIR_TEMPLATE, TABLE_FILENAME, TABLE_COLUMNS,
-    UNBOUND_CAL2_FINAL_TIME, USER_FIXED_PARAMS,
+    CAL2_FINAL_TIME, USER_FIXED_PARAMS,
     derive_scenario_params, lookup_long_nsr, build_cal2_settings,
     add_slurm_resource_args, set_slurm_resource_env, print_fixed_params,
     set_calibration_output_env,
@@ -175,7 +175,7 @@ def write_frozen_table(exp_num, std_nsr, long_nsr_by_group, args,
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Unbound pipeline stage 2: calibrate the standard NSR in a "
+        description="Stage 2: calibrate the standard NSR in a "
                     "0%-long-shedder population, then freeze the table.")
     parser.add_argument('--exp-num', type=int, required=True)
     parser.add_argument('--runner', type=str,
@@ -201,7 +201,7 @@ def main():
         args.seeds, NSR_RANGES['cal_std'], args.R, args.ih_virus_emergence_rate)
 
     print(f"\n[Stage 2] Standard-only sweep (R={args.R}, no long shedders, "
-         f"final_time={UNBOUND_CAL2_FINAL_TIME})")
+         f"final_time={CAL2_FINAL_TIME})")
     varying, fixed_params, n_seeds = settings_func()
     print_fixed_params(fixed_params)
     print(f"Seeds per grid point: {n_seeds}")
@@ -225,7 +225,7 @@ def main():
 
     write_frozen_table(args.exp_num, std_nsr, long_nsr_by_group, args,
                        long_calib_exp, std_calib_exp)
-    print("Next: run impact_long_shedders_unbound_exp.py against this table.")
+    print("Next: run impact_long_shedders_exp.py against this table.")
 
 
 if __name__ == "__main__":
