@@ -21,10 +21,54 @@ Created on Mon Feb 24 17:54:52 2025
 
 @author: pietro
 """
-from simplicity.runme import run_experiment
+from simplicity.runme import run_experiment, run_experiment_phase
 import simplicity.runners.serial
 import simplicity.runners.multiprocessing
 import simplicity.runners.slurm
+
+
+def _runner_module(runner: str):
+    if runner == 'serial':
+        return simplicity.runners.serial
+    if runner == 'multiprocessing':
+        return simplicity.runners.multiprocessing
+    if runner == 'slurm':
+        return simplicity.runners.slurm
+    raise ValueError('Runner must be either "serial" or "multiprocessing" '
+                     'or "slurm"')
+
+
+def run_experiment_phase_script(runner: str,
+                                experiment_number: int,
+                                user_set_experiment_settings,
+                                experiment_name,
+                                append: bool = True):
+    """One phase of ONE experiment (stage 8). The stages call this instead of
+    run_experiment_script: every phase goes into experiment_name_#N and only
+    its own groups are run."""
+    runner_module = _runner_module(runner)
+    numbered = f'{experiment_name}_#{experiment_number}'
+    print('')
+    print('##########################################')
+    print(f'Running a phase of {numbered}')
+    print('##########################################')
+    print('')
+    try:
+        groups = run_experiment_phase(numbered,
+                                      user_set_experiment_settings,
+                                      simplicity_runner=runner_module,
+                                      append=append)
+    except Exception as e:
+        # same reasoning as run_experiment_script below: a later stage would
+        # otherwise fit against data that was never produced
+        print(f'The simulation failed to run: {e}')
+        raise
+
+    print('')
+    print(f'{numbered} groups {groups} -- COMPLETED.')
+    print('##########################################')
+    return groups
+
 
 def run_experiment_script(runner:str, 
                           experiment_number:int, 

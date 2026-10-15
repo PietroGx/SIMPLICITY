@@ -70,8 +70,16 @@ def ok(label, detail=''):
 
 # --------------------------------------------------------------- the recorder
 class Dispatch:
-    '''Stands in for experiment_script_runner.run_experiment_script and keeps
-    what the stage asked to submit.'''
+    '''Stands in for experiment_script_runner.run_experiment_phase_script and
+    keeps what the stage asked to submit.
+
+    The name matters. Until 8e the stages called run_experiment_script and
+    this stubbed that; when they moved to run_experiment_phase_script the
+    stub stopped matching and every stage RAN ITS SIMULATIONS FOR REAL --
+    the suite still passed, taking 427s instead of 2s. A stub that silently
+    stops intercepting is worse than no stub, so assert the attribute is
+    there before replacing it.
+    '''
 
     def __init__(self):
         self.calls = []
@@ -82,7 +90,18 @@ class Dispatch:
         self.calls.append({'experiment': experiment_name,
                            'varying': varying, 'fixed': fixed,
                            'n_seeds': n_seeds})
-        return None
+        # what run_experiment_phase_script returns: this phase's groups
+        return [g.get('name') for g in varying.get('_scenario_groups', [])]
+
+
+def install(module, dispatch):
+    '''Replace the module's dispatch, refusing if it does not have one.'''
+    name = 'run_experiment_phase_script'
+    if not hasattr(module, name):
+        raise AssertionError(
+            f'{module.__name__} has no {name} to stub -- the stage was '
+            f'rewired and this test would have run real simulations.')
+    setattr(module, name, dispatch)
 
 
 def long_nsr_table():
@@ -124,7 +143,7 @@ def write_frozen_table(setup_dir_template, filename, rows):
 def stage_cal_1(module_name, config_name):
     def run(dispatch):
         module = __import__(module_name)
-        module.run_experiment_script = dispatch
+        install(module, dispatch)
         module.plot_and_fit_long_nsr_calibration = lambda *a, **k: {}
         sys.argv = [module_name, '--exp-num', str(EXP_NUM),
                     '--runner', 'serial', '--seeds', '2']
@@ -135,7 +154,7 @@ def stage_cal_1(module_name, config_name):
 def stage_cal_2():
     def run(dispatch):
         import impact_long_shedders_cal_2 as module
-        module.run_experiment_script = dispatch
+        install(module, dispatch)
         module.read_calibrated_long_nsr = lambda *a, **k: long_nsr_table()
         module.compute_standard_nsr = lambda *a, **k: 1.4e-4
         sys.argv = ['impact_long_shedders_cal_2',
@@ -145,7 +164,7 @@ def stage_cal_2():
     return run
 
 
-def stage_exp(module_name, config_name, extra_argv=()):
+def stage_exp(module_name, config_name, extra_argv=()):      # noqa: ARG001
     def run(dispatch):
         config = __import__(config_name)
         module = __import__(module_name)
@@ -154,7 +173,7 @@ def stage_exp(module_name, config_name, extra_argv=()):
         write_frozen_table(module.SETUP_DIR_TEMPLATE, module.TABLE_FILENAME,
                            frozen_rows(config.SCENARIOS, sp,
                                        config.derive_scenario_params))
-        module.run_experiment_script = dispatch
+        install(module, dispatch)
         sys.argv = [module_name, '--exp-num', str(EXP_NUM),
                     '--runner', 'serial', '--seeds', '2', *extra_argv]
         module.main()
@@ -165,11 +184,10 @@ STAGES = [
     ('cal_1', stage_cal_1('impact_long_shedders_cal_1',
                           'impact_long_shedders_config'), 1),
     ('cal_2', stage_cal_2(), 1),
-    # --sequential: exp otherwise submits its scenarios from worker threads,
-    # and a thread's exception is collected, not raised here
+    # ONE dispatch since 8e, carrying all five scenarios as groups. It used
+    # to be five, one experiment each, submitted from worker threads.
     ('exp  ', stage_exp('impact_long_shedders_exp',
-                        'impact_long_shedders_config',
-                        ('--sequential',)), None),
+                        'impact_long_shedders_config'), 1),
 ]
 
 

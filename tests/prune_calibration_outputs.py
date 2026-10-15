@@ -51,43 +51,79 @@ PRUNABLE = ('lineage_frequency.csv', 'simulation_trajectory.csv',
             'sequencing_data.csv')
 
 
-# Names the deleted bound pipeline wrote. Its code is gone (v2.4.90) but its
-# runs are still on disk and still prunable, so the names stay here.
-_LEGACY_BOUND_PREFIXES = (
+# Experiment names earlier versions gave a calibration stage of its own.
+# The code that wrote them is gone -- the bound pipeline in v2.4.90, the
+# per-stage experiments in v2.4.94 -- but their runs are still on disk and
+# still prunable, so the names stay here.
+_LEGACY_CALIBRATION_PREFIXES = (
     'impact_long_shedders_calibration_lng_nsr',
     'impact_long_shedders_calibration_std_nsr',
+    'impact_long_shedders_cal_long',
+    'impact_long_shedders_cal_std',
+    'impact_long_shedders_unbound_cal_long',
+    'impact_long_shedders_unbound_cal_std',
 )
 
 
 def calibration_prefixes():
-    """Experiment-name prefixes that are calibration stages, from the config."""
-    names = set(_LEGACY_BOUND_PREFIXES)
+    """Experiment-name prefixes that were whole calibration stages."""
+    return sorted(_LEGACY_CALIBRATION_PREFIXES)
+
+
+def calibration_groups(experiment_dir):
+    """The calibration GROUPS of a merged experiment, or [] if it has none.
+
+    Since 8e a calibration is a set of groups inside the run's one
+    experiment, not an experiment of its own, so matching on the directory
+    name finds nothing. The experiment phase's groups live in the same
+    directory and must NOT be pruned -- the figures read
+    lineage_frequency.csv -- so this returns only the calib_* ones and the
+    walk below is scoped to them.
+    """
     try:
         import impact_long_shedders_config as cfg
-        names.update(filter(None, (getattr(cfg, n, None)
-                                   for n in ('LONG_NSR_EXP_NAME',
-                                             'STD_NSR_EXP_NAME'))))
-    except Exception as exc:
+    except Exception as exc:                                    # noqa: BLE001
         print(f'[warn] could not read the config: {exc}')
-    return sorted(names)
+        return []
+    output = os.path.join(experiment_dir, '04_Output')
+    if not os.path.isdir(output):
+        return []
+    return [name for name in sorted(os.listdir(output))
+            if os.path.isdir(os.path.join(output, name))
+            and cfg.phase_of(name) in ('calib_long', 'calib_std')]
 
 
-def matching_experiments(data_dir, prefixes):
-    """Directories named <calibration prefix>_#<number>, and nothing else."""
-    patterns = [re.compile(rf'^{re.escape(p)}_#\d+$') for p in prefixes]
+def matching_targets(data_dir):
+    """Every (experiment dir, groups) worth pruning.
+
+    groups is None for a legacy stand-alone calibration experiment -- all of
+    it is calibration -- and a list for a merged experiment, where only the
+    calib_* groups are.
+    """
+    patterns = [re.compile(rf'^{re.escape(p)}_#\d+$')
+                for p in calibration_prefixes()]
     found = []
     if not os.path.isdir(data_dir):
         return found
     for entry in sorted(os.listdir(data_dir)):
         path = os.path.join(data_dir, entry)
-        if os.path.isdir(path) and any(p.match(entry) for p in patterns):
-            found.append(path)
+        if not os.path.isdir(path):
+            continue
+        if any(p.match(entry) for p in patterns):
+            found.append((path, None))
+            continue
+        groups = calibration_groups(path)
+        if groups:
+            found.append((path, groups))
     return found
 
 
-def prunable_files(experiment_dir):
+def prunable_files(experiment_dir, groups=None):
     out = []
-    for dirpath, _, files in os.walk(os.path.join(experiment_dir, '04_Output')):
+    roots = ([os.path.join(experiment_dir, '04_Output', g) for g in groups]
+             if groups else [os.path.join(experiment_dir, '04_Output')])
+    for root in roots:
+      for dirpath, _, files in os.walk(root):
         for name in files:
             if name in PRUNABLE:
                 path = os.path.join(dirpath, name)
@@ -114,29 +150,33 @@ def main():
                         help='actually delete. Without it, nothing is removed.')
     args = parser.parse_args()
 
-    prefixes = calibration_prefixes()
-    print('calibration experiment names (from the pipeline config):')
-    for prefix in prefixes:
+    print('a calibration is pruned either way:')
+    print('  as a whole experiment, for the names older versions gave one:')
+    for prefix in calibration_prefixes():
         print(f'    {prefix}_#<n>')
+    print('  or as the calib_long__* / calib_std__* GROUPS of a merged '
+          'experiment.')
 
-    experiments = matching_experiments(args.data_dir, prefixes)
-    if not experiments:
-        print(f'\nNo calibration experiments under {args.data_dir}/.')
+    targets = matching_targets(args.data_dir)
+    if not targets:
+        print(f'\nNothing to prune under {args.data_dir}/.')
         return
 
-    print(f'\nmatched {len(experiments)} calibration experiment(s); '
-          f'everything else, production included, is left alone\n')
-    print(f"{'experiment':<52}{'files':>8}{'size':>12}")
+    print(f'\nmatched {len(targets)} experiment(s); every other group, the '
+          f'experiment phase included, is left alone\n')
+    print(f"{'experiment / group':<52}{'files':>8}{'size':>12}")
     total_files = total_bytes = 0
     per_experiment = []
-    for path in experiments:
-        files = prunable_files(path)
+    for path, groups in targets:
+        files = prunable_files(path, groups)
         size = sum(s for _, s in files)
         per_experiment.append((path, files))
         total_files += len(files)
         total_bytes += size
-        print(f'{os.path.basename(path)[:50]:<52}{len(files):>8}'
-              f'{human(size):>12}')
+        label = os.path.basename(path)
+        if groups:
+            label += f'  [{len(groups)} calib group(s)]'
+        print(f'{label[:50]:<52}{len(files):>8}{human(size):>12}')
 
     print(f'\n{"TOTAL":<52}{total_files:>8}{human(total_bytes):>12}')
 

@@ -23,10 +23,17 @@ from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 def main():
     parser = argparse.ArgumentParser(
         description="Rerun the long-shedder NSR calibration fit/plot for a "
-                    "past impact_long_shedders_calibration_lng_nsr_#N experiment.")
+                    "run already on disk.")
     parser.add_argument('--experiment-name', type=str, required=True,
-                        help="Numbered long-calibration experiment, e.g. "
-                            "impact_long_shedders_calibration_lng_nsr_#3.")
+                        help="Numbered experiment, e.g. "
+                            "impact_long_shedders_#3. Since the pipeline "
+                            "merged its phases into one experiment this is "
+                            "the whole run; --group picks the cohorts, and "
+                            "the default is its calib_long__* ones.")
+    parser.add_argument('--group', action='append', default=None,
+                        dest='groups',
+                        help="Fit only this group; repeatable. Default: the "
+                             "experiment's long-calibration groups.")
     parser.add_argument('--target-osr', type=float, default=0.00205)
     parser.add_argument('--model', type=str, default='exp',
                         choices=['lin', 'log', 'exp', 'tan'])
@@ -36,7 +43,8 @@ def main():
 
     try:
         plot_and_fit_long_nsr_calibration(
-            args.experiment_name, args.target_osr, args.model, args.min_seq, args.min_len)
+            args.experiment_name, args.target_osr, args.model, args.min_seq,
+            args.min_len, groups=args.groups)
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)

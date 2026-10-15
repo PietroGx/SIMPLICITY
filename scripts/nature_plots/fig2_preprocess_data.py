@@ -6,6 +6,7 @@ import os
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.clustering as cl
+from _scenarios import scenario_output_dirs, scenario_label
 import simplicity.settings_manager as sm
 from simplicity.phenotype.distance import hamming_iw
 
@@ -19,8 +20,8 @@ def get_clinical_label(scenario):
 
 def get_target_seed_dir(exp_num, scenario, target_seed, exp_name="impact_long_shedders"):
     """Uses dm.get_ssod to cleanly locate the specific Seeded Simulation Output Directory."""
-    exp_str = f"{exp_name}_{scenario}_#{exp_num}"
-    sods = dm.get_simulation_output_dirs(exp_str)
+    exp_str = scenario_label(exp_name, scenario, exp_num)
+    sods = scenario_output_dirs(exp_name, scenario, exp_num)
     
     if not sods:
         print(f"DEBUG [{scenario}]: No output directories found matching '{exp_str}'")
@@ -45,8 +46,8 @@ def get_shared_valid_seeds(exp_num, scenarios, exp_name="impact_long_shedders", 
     """Pre-scans the CONTROL group to find valid seeds, establishing a baseline for all groups."""
     print(f"\n--- Establishing baseline: Selecting {num_seeds} seeds from 'control' (run time >= {min_days} days) ---")
     
-    control_str = f"{exp_name}_control_#{exp_num}"
-    sods = dm.get_simulation_output_dirs(control_str)
+    control_str = scenario_label(exp_name, "control", exp_num)
+    sods = scenario_output_dirs(exp_name, "control", exp_num)
     
     if not sods:
         print("DEBUG [control]: No SODs found. Returning empty list.")
@@ -121,10 +122,10 @@ def get_fig2_clustered_data(exp_num, scenario, target_seed, cluster_threshold=5,
 
 def get_fig2_divergence_data(exp_num, scenario, target_seeds, exp_name="impact_long_shedders"):
     """Row 3: Aggregated Hamming Distance evaluated ONLY on the shared target_seeds."""
-    exp_str = f"{exp_name}_{scenario}_#{exp_num}"
+    exp_str = scenario_label(exp_name, scenario, exp_num)
     dists = []
-    
-    sods = dm.get_simulation_output_dirs(exp_str)
+
+    sods = scenario_output_dirs(exp_name, scenario, exp_num)
     if not sods: return []
     
     target_type = "standard" if scenario == "control" else "long_shedder"

@@ -104,13 +104,32 @@ def categorize_simulations_by_end_time(ssod_list, final_time_limit, pop_size):
 def format_seed_list(seeds, max_display=5):
     return ', '.join(seeds[:max_display]) if seeds else 'None'
 
-def count_and_analyze_simulations(experiment_name):
+def count_and_analyze_simulations(experiment_name, groups=None):
+    """Per-grid-point completeness, GROUP BY GROUP.
+
+    Stage 8e put every phase of a run into one experiment, so this had to
+    stop doing two things at once. It listed the simulations unscoped, which
+    now spans a calibration sweep and the experiment-phase scenarios; and it
+    read ONE n_seeds for the whole experiment, which raises since 8a when the
+    groups disagree -- and they do, because --cal-seeds and --exp-seeds are
+    different numbers. Each group is reported against its OWN n_seeds.
+    """
     print(f"\n{'#' * 80}")
     print(f"Experiment: {experiment_name}\n")
 
-    sim_out_dirs = dm.get_simulation_output_dirs(experiment_name)
-    n_seeds = sm.read_n_seeds_file(experiment_name)['n_seeds']
+    wanted = list(groups) if groups else dm.get_groups(experiment_name)
+    for group in wanted:
+        n_seeds = sm.read_group_n_seeds(experiment_name, group)
+        sim_out_dirs = dm.get_simulation_output_dirs(experiment_name,
+                                                     group=group)
+        print(f"\n=== group {group}   ({len(sim_out_dirs)} grid point(s), "
+              f"n_seeds={n_seeds}) ===")
+        _report_group(sim_out_dirs, n_seeds)
 
+    print(f"\n{'#' * 80}")
+
+
+def _report_group(sim_out_dirs, n_seeds):
     for sim_out_dir in sim_out_dirs:
         ssod_list = dm.get_seeded_simulation_output_dirs(sim_out_dir)
         valid_ssods = [s for s in ssod_list if check_seeded_simulation_output(s)]
@@ -162,13 +181,16 @@ def count_and_analyze_simulations(experiment_name):
         print(f"  │  Seeds ending in last third:          {format_seed_list(last_third_seeds)}")
         print(f"  └{'─' * (len(folder_name) + 2)}")
 
-    print(f"\n{'#' * 80}")
 
 def main():
     parser = argparse.ArgumentParser(description="Check simulations in experiment and get stats")
     parser.add_argument('experiment_name', type=str, help="experiment name")
+    parser.add_argument('--group', action='append', default=None,
+                        dest='groups',
+                        help="Report only this group; repeatable. Default: "
+                             "every group of the experiment.")
     args = parser.parse_args()
-    count_and_analyze_simulations(args.experiment_name)
+    count_and_analyze_simulations(args.experiment_name, args.groups)
 
 if __name__ == "__main__":
     main()

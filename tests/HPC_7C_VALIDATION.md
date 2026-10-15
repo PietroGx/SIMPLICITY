@@ -175,18 +175,19 @@ Detach with `Ctrl-b d`, reattach with `tmux attach -t simplicity`.
 
 Watch for, in order:
 
-1. **stage 1** dispatches `impact_long_shedders_cal_long_#N` with three
+1. **stage 1** dispatches the `calib_long__*` groups of
+   `impact_long_shedders_#N` -- three
    groups: `SOT`, `HIV_low+HIV_high`, `edge_case`. If `edge_case` appears as
    `tau_350.23_Rl_1.1`, the group is not naming itself and 7a regressed.
 2. **stage 2** prints `standard_only  NSR grid: 10 pts [...]` and then
    dispatches. That banner is the line that was broken; it reaching the
    dispatch at all is the fix working.
-3. **stage 3** dispatches TWO experiment-phase families, five scenarios each:
-   `impact_long_shedders_<scenario>_#N` (distribution, the default) and
-   `impact_long_shedders_amx_<scenario>_#N` (argmax), with a sanity-plot job
-   per family. The default mode owns the bare name; before v2.4.92 that was
-   argmax, and the other family was `_dist`.
-4. `Fit_results/` under cal_long holds one file per group, named by the group —
+3. **stage 3** appends five `exp__<scenario>` groups to
+   `impact_long_shedders_#N` in ONE submission -- not five experiments from
+   five threads, as before v2.4.94. The default `--consensus distribution`
+   runs one mode; `--consensus argmax` is a separate run under its own
+   `--exp-num`, writing `impact_long_shedders_amx_#N`.
+4. `Fit_results/` holds one file per group, named by the group —
    `..._exp_fit_results_edge_case.csv`, not a float tuple — and
    `..._calibrated_long_nsr.csv` now carries a `group` column naming which
    cohort each row came from.

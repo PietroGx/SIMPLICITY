@@ -53,12 +53,33 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Constants only: both pipelines share this module, and the scenario list it
 # used to import from here is what put a bound-pipeline label on an unbound
 # group (see _cal1_groups).
-from impact_long_shedders_config import TAU_ROUND, DEFAULT_COLORS
+from impact_long_shedders_config import (TAU_ROUND, DEFAULT_COLORS,
+                                         groups_of_phase)
 
 
-def _cal1_groups(experiment_name):
-    """Every group of a cal_1 experiment, in declared order, with the
+def cal1_group_names(experiment_name):
+    """The groups of `experiment_name` that belong to the long calibration.
+
+    Stage 8e put every phase into ONE experiment, so dm.get_groups now also
+    returns the standard-NSR sweep and the experiment-phase scenarios. Those
+    carry a tau_3_long and an R_long like everything else, so handing them to
+    the fit below would have it treat each of them as another long-shedder
+    cohort -- a fit over rows that never swept NSR_long, reported under a
+    cohort name. Scope by the phase prefix the config stamps on the name.
+
+    An experiment with no prefixed group at all is one that predates the
+    convention or was built outside it; all of its groups are returned, which
+    is what this function did for every caller before 8e.
+    """
+    named = groups_of_phase(dm.get_groups(experiment_name), 'calib_long')
+    return named or dm.get_groups(experiment_name)
+
+
+def _cal1_groups(experiment_name, groups=None):
+    """Every long-calibration group, in declared order, with the
     (tau_3_long, R_long) cohort it covers and a plot colour.
+
+    `groups` names them explicitly; None asks cal1_group_names.
 
     The cohort comes from the group's OWN simulation records, and a group
     holding more than one pair raises rather than silently taking the first:
@@ -83,9 +104,17 @@ def _cal1_groups(experiment_name):
             (round(float(params['tau_3_long']), TAU_ROUND),
              round(float(params['R_long']), TAU_ROUND)))
 
+    wanted = (list(groups) if groups is not None
+              else cal1_group_names(experiment_name))
+    missing = [name for name in wanted if name not in pairs]
+    if missing:
+        raise RuntimeError(
+            f"{experiment_name} has no simulations in group(s) {missing}. "
+            f"Present: {sorted(pairs)}.")
+
     color_cycle = iter(DEFAULT_COLORS)
     groups = []
-    for name in dm.get_groups(experiment_name):
+    for name in wanted:
         cohorts = pairs.get(name)
         if not cohorts:
             continue
@@ -187,7 +216,7 @@ def read_calibrated_long_nsr(experiment_name, target_osr_long):
 
 def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
                                       model_type='exp', min_seq=30, min_len=100,
-                                      ):
+                                      groups=None):
     """
     Extracts per-seed OSR for every (tau_3_long, R_long, NSR) grid point of
     `experiment_name`, outlier-filters per grid point, fits a regressor per
@@ -207,9 +236,10 @@ def plot_and_fit_long_nsr_calibration(experiment_name, target_osr_long,
 
     Returns {(tau_3_long, R_long): calibrated_nsr}.
     """
-    groups = _cal1_groups(experiment_name)
+    groups = _cal1_groups(experiment_name, groups)
 
     print(f"--- Analyzing long-shedder NSR calibration: {experiment_name} ---")
+    print(f"    groups: {[g['name'] for g in groups]}")
 
     # Partitioned by the group each simulation was ASSIGNED to, not by reading
     # (tau_3_long, R_long) back off every output directory and bucketing on the

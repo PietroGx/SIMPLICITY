@@ -66,6 +66,62 @@ def user_set_experiment_settings():
     n_seeds         = 2
     return (varying_params,fixed_params,n_seeds)
 
+def run_experiment_phase(experiment_name: str,
+                         set_experiment_parameters: types.FunctionType,
+                         simplicity_runner: types.ModuleType,
+                         append: bool = True):
+    """Add one PHASE's groups to an experiment and run only those groups.
+
+    Stage 8's model: an experiment is the whole study, and a phase -- a
+    calibration sweep, or the experiment-phase scenarios -- is a set of named
+    groups inside it. The phases are sequential and data-dependent (the
+    experiment phase's parameters come from the calibration's fit), so they
+    cannot all be declared up front; each is appended when its inputs exist.
+
+    Differs from run_experiment in exactly two ways, both of which have to
+    hold together:
+
+      the simulation ids CONTINUE from what is already there (next_simulation_id),
+      because simulation_stem puts the id in the output directory name and a
+      second phase restarting at 0 would overwrite the first one's output;
+
+      the runner is given THIS phase's groups, so appending does not re-run
+      the groups that are already finished.
+
+    append=False writes the experiment from scratch, which is what the first
+    phase of a run wants.
+    """
+    dm.create_directories(experiment_name)
+    varying_params, fixed_params, n_seeds = set_experiment_parameters()
+
+    start_id = sm.next_simulation_id(experiment_name) if append else 0
+    experiment_settings = sm.generate_experiment_settings(
+        varying_params, fixed_params, start_id=start_id)
+
+    # the groups this phase is adding, in declared order and without
+    # duplicates -- what the runner is scoped to below
+    phase_groups = list(dict.fromkeys(record['group']
+                                      for record in experiment_settings))
+
+    sm.write_experiment_settings(experiment_name, experiment_settings, n_seeds,
+                                 append=append)
+    sm.read_settings_and_write_simulation_parameters(experiment_name)
+    # per group, and it refuses to renumber a group that already carries state
+    jobs.write_repeats(experiment_name)
+
+    print('')
+    print('-------------------------------------------------------------------')
+    print(f'{experiment_name}: running phase groups {phase_groups}')
+    simplicity_runner.run_seeded_simulations(experiment_name,
+                                             run_seeded_simulation,
+                                             groups=phase_groups)
+    print('')
+    print('-------------------------------------------------------------------')
+    print(f'PHASE {phase_groups} OF {experiment_name} EXECUTED SUCCESSFULLY.')
+    print('###################################################################')
+    return phase_groups
+
+
 def run_experiment(experiment_name: str, 
                    set_experiment_parameters: types.FunctionType,
                    simplicity_runner: types.ModuleType,

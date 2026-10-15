@@ -101,14 +101,111 @@ TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
 CONSENSUS_MODES = ("distribution", "argmax")
 DEFAULT_CONSENSUS = "distribution"
 
-# Experiment name stems (numbered with _#{exp_num} by run_experiment_script).
-# Single source of truth, so the stages and the orchestrator can never
-# disagree on where another stage's output lives.
-LONG_NSR_EXP_NAME = "impact_long_shedders_cal_long"
-STD_NSR_EXP_NAME = "impact_long_shedders_cal_std"
+# ONE experiment per run (stage 8e). Every phase is a set of named GROUPS
+# inside impact_long_shedders_#N; there is no longer an experiment per
+# calibration stage or per scenario.
 EXP_NAME = "impact_long_shedders"
+
+# setup_data keeps its own directory: it holds the frozen table, which is an
+# input to the next phase rather than simulation output, and it is what the
+# experiment phase reads to know what to run.
 SETUP_DIR_TEMPLATE = "Data/impact_long_shedders_setup_data_#{exp_num}"
 TABLE_FILENAME = "nsr_calibration_table.csv"
+
+# ---------------------------------------------------------------------------
+# GROUP NAMES -- the identity of a phase's slice of the experiment
+# ---------------------------------------------------------------------------
+# The group name IS the identity, in five places at once: the `groups` list in
+# settings.json, the path in repeats.json, the state directory, 04_Output/
+# <group>/, and the fit-results filename. So it must be unique across the
+# WHOLE experiment now that phases share one, and it must be FLAT -- no "/" --
+# because the same string is both a directory component and part of a
+# filename.
+#
+# The prefix is what keeps a calibration cohort and an experiment-phase
+# scenario of the same name apart: "SOT" is a cal_1 cohort AND a scenario, and
+# before the prefixes they would have collided into one group mixing a sweep
+# with a single run.
+CAL2_GROUP_NAME = 'standard_only'
+
+CALIB_LONG_PREFIX = "calib_long__"
+CALIB_STD_PREFIX = "calib_std__"
+EXP_PREFIX = "exp__"
+
+
+def calib_long_group(cohort):
+    """cal_1's group for one (tau_3_long, R_long) cohort."""
+    return f"{CALIB_LONG_PREFIX}{cohort}"
+
+
+def calib_std_group():
+    """cal_2's single standard-only group."""
+    return f"{CALIB_STD_PREFIX}{CAL2_GROUP_NAME}"
+
+
+def exp_group(scenario_name):
+    """The experiment phase's group for one scenario."""
+    return f"{EXP_PREFIX}{scenario_name}"
+
+
+def scenario_experiment(exp_name, exp_num):
+    """The ONE experiment a run writes. Since 8e there is no experiment per
+    scenario: a scenario is a GROUP inside this."""
+    return f"{exp_name}_#{exp_num}"
+
+
+def scenario_output_dirs(exp_name, scenario, exp_num):
+    """Every simulation output directory of ONE scenario, and nothing else.
+
+    THE call every figure and sanity plot makes. Before 8e each scenario was
+    its own experiment, so "<exp_name>_<scenario>_#N" named it and an
+    unscoped listing could not reach another scenario. Now all five
+    scenarios, both calibration sweeps and every one of their grid points
+    live in one experiment, and an unscoped listing returns the lot -- a
+    panel would plot a calibration sweep as if it were its scenario. That is
+    the exact shape CLAUDE.md records as having bitten the figures twice.
+
+    Returns [] when the scenario has no group here, which is what the callers
+    already handle; resolve_scenarios is what warns about it.
+    """
+    experiment = scenario_experiment(exp_name, exp_num)
+    group = exp_group(scenario)
+    try:
+        sods = dm.get_simulation_output_dirs(experiment, group=group)
+    except Exception:                                           # noqa: BLE001
+        return []                      # no such experiment, or no such group
+    # The group is a path component of everything it scopes. If that stops
+    # holding, this series is reading another group's rows under this
+    # scenario's label -- loudly, rather than as a plausible-looking panel.
+    stray = [sod for sod in sods if group not in sod.split(os.sep)]
+    if stray:
+        raise RuntimeError(
+            f"{experiment}: group {group!r} returned directories that are not "
+            f"in it: {stray[:3]}. A panel labelled {scenario!r} would be "
+            f"plotting another group's simulations.")
+    return sods
+
+
+def scenario_label(exp_name, scenario, exp_num):
+    """What to call this series in a message: experiment AND group, because
+    the experiment name alone no longer identifies the scenario."""
+    return f"{scenario_experiment(exp_name, exp_num)}/{exp_group(scenario)}"
+
+
+def phase_of(group):
+    """Which phase a group belongs to, or None. The inverse of the three
+    helpers above, for readers that are handed a bare group name."""
+    for phase, prefix in (("calib_long", CALIB_LONG_PREFIX),
+                          ("calib_std", CALIB_STD_PREFIX),
+                          ("exp", EXP_PREFIX)):
+        if group.startswith(prefix):
+            return phase
+    return None
+
+
+def groups_of_phase(groups, phase):
+    """Every group of `groups` belonging to `phase`, order preserved."""
+    return [g for g in groups if phase_of(g) == phase]
 
 
 def derive_scenario_params(scenario, sp):
@@ -235,7 +332,7 @@ def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None,
         nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
         scenario_groups = [
             {
-                'name': group_name_for_pair((tau, r_long), sp),
+                'name': calib_long_group(group_name_for_pair((tau, r_long), sp)),
                 'nucleotide_substitution_rate_long': nsr_values,
                 'tau_3_long': tau,
                 'R_long': r_long,
@@ -285,8 +382,6 @@ USER_FIXED_PARAMS = {
 # (USER_FIXED_PARAMS['final_time']); build_cal2_settings applies it.
 CAL2_FINAL_TIME = 365
 
-CAL2_GROUP_NAME = 'standard_only'
-
 # Shared color palette for the calibration-fit plots (long-NSR per tau group,
 # standard-NSR per scenario), keyed by scenario name so both plots look
 # consistent with each other.
@@ -314,7 +409,7 @@ def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None,
         # Named, so the group on disk and the 'standard_only' the fit used to
         # hardcode are the same string by construction rather than by habit.
         varying_params = {'_scenario_groups': [
-            {'name': CAL2_GROUP_NAME,
+            {'name': calib_std_group(),
              'nucleotide_substitution_rate': nsr_values}]}
         return (varying_params, fixed_params, seeds)
 
@@ -404,8 +499,46 @@ def build_exp_scenario_settings(row, n_seeds, consensus=DEFAULT_CONSENSUS):
         # and the fit-results filename cannot disagree with the output tree.
         # An empty group dict is still one group: generate_experiment_settings
         # expands it to combinations = [()], exactly as empty varying_params did.
-        return ({'_scenario_groups': [{'name': row['scenario_name']}]},
+        return ({'_scenario_groups': [{'name': exp_group(row['scenario_name'])}]},
                 fixed.copy(), n_seeds)
+
+    return make_settings
+
+
+def build_exp_phase_settings(rows, n_seeds, consensus=DEFAULT_CONSENSUS):
+    """The WHOLE experiment phase as one phase: one named group per scenario.
+
+    Each group carries its own frozen parameters as scalar overrides, which
+    generate_experiment_settings applies after fixed_params, so a group's
+    values win for that group only. The per-scenario dict is built by
+    build_exp_scenario_settings, not rebuilt here -- the two must not be able
+    to drift.
+
+    Before 8e each scenario was its own EXPERIMENT, and the stage submitted
+    five of them from five threads with the Slurm concurrency cap divided
+    between them. One experiment means one submission: the whole phase is a
+    single array and the cap applies to it once.
+    """
+    groups = []
+    for row in rows:
+        _, fixed, _ = build_exp_scenario_settings(row, n_seeds, consensus)()
+        name = exp_group(row["scenario_name"])
+        # every value here is a scalar; a list would be read as a sweep axis
+        bad = sorted(k for k, v in fixed.items() if isinstance(v, (list, tuple)))
+        if bad:
+            raise ValueError(
+                f"{name}: frozen parameters must be scalars, got lists for "
+                f"{bad} -- those would become a sweep axis.")
+        groups.append({"name": name, **fixed})
+
+    names = [g["name"] for g in groups]
+    if len(set(names)) != len(names):
+        raise ValueError(
+            f"the frozen table names a scenario twice: {sorted(names)}")
+
+    def make_settings():
+        return ({"_scenario_groups": [dict(g) for g in groups]},
+                USER_FIXED_PARAMS.copy(), n_seeds)
 
     return make_settings
 

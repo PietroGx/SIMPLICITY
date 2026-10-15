@@ -55,6 +55,7 @@ import matplotlib.pyplot as plt
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
+from impact_long_shedders_config import scenario_output_dirs, scenario_label
 
 # Cohort styling (matches fig1 D/E colors).
 COHORT_STYLE = {
@@ -86,8 +87,8 @@ def load_regression_data(exp_name, scenario, exp_num, min_seq=30, min_len=100):
     Applies the same final_time/sequence-count gate cal_2.py's own
     calibration fits use, so this sanity check validates the same
     population of seeds the calibration was actually fit on."""
-    experiment_string = f"{exp_name}_{scenario}_#{exp_num}"
-    sods = dm.get_simulation_output_dirs(experiment_string)
+    experiment_string = scenario_label(exp_name, scenario, exp_num)
+    sods = scenario_output_dirs(exp_name, scenario, exp_num)
     if not sods:
         raise RuntimeError(
             f"No simulation output dirs for '{experiment_string}'.")
@@ -142,8 +143,8 @@ def load_intrahost_long_data(exp_name, scenario, exp_num, min_seq=30, min_len=10
     (and cal_2.py's own calibration fits) per ssod, before extracting any
     intra-host points from it -- same seed population, different columns.
     """
-    experiment_string = f"{exp_name}_{scenario}_#{exp_num}"
-    sods = dm.get_simulation_output_dirs(experiment_string)
+    experiment_string = scenario_label(exp_name, scenario, exp_num)
+    sods = scenario_output_dirs(exp_name, scenario, exp_num)
     if not sods:
         raise RuntimeError(
             f"No simulation output dirs for '{experiment_string}'.")

@@ -245,7 +245,8 @@ def section_cal_1():
 
         groups = plot._cal1_groups(name)
         check('cal_1 groups, in declared order', [g['name'] for g in groups],
-              ['SOT', 'HIV_low+HIV_high', 'edge_case'])
+              [cfg.calib_long_group(c)
+               for c in ('SOT', 'HIV_low+HIV_high', 'edge_case')])
 
         print('\n  the old partition and the new one are the same partition')
         legacy = legacy_value_partition(name, ('tau_3_long', 'R_long'))
@@ -334,16 +335,17 @@ def section_experiment_is_single_group():
         declared = varying['_scenario_groups']
         check(f"{case['scenario_name']}: exactly one group", len(declared), 1)
         check(f"{case['scenario_name']}: named after the scenario",
-              declared[0]['name'], case['scenario_name'])
+              declared[0]['name'], cfg.exp_group(case['scenario_name']))
 
     with Scratch() as scratch:
         name = scratch.build(
             'impact_long_shedders_HIV_high_probe',
             cfg.build_exp_scenario_settings(pd.Series(row), 2))
-        check('and on disk it is one group', dm.get_groups(name), ['HIV_high'])
+        group = cfg.exp_group('HIV_high')
+        check('and on disk it is one group', dm.get_groups(name), [group])
         check('so an unscoped listing is that group',
               dm.get_simulation_output_dirs(name),
-              dm.get_simulation_output_dirs(name, group='HIV_high'))
+              dm.get_simulation_output_dirs(name, group=group))
 
 
 # ===========================================================================
@@ -466,7 +468,8 @@ def _checker_stage_2(checker, cfg):
         restore = install_stubs('nucleotide_substitution_rate')
         try:
             target = 0.002
-            expected = target / slope_for('standard_only')
+            # keyed on the GROUP, which carries the phase prefix since 8e
+            expected = target / slope_for(cfg.calib_std_group())
             setup = cfg.SETUP_DIR_TEMPLATE.format(exp_num=77)
             os.makedirs(setup, exist_ok=True)
             rows = [{'scenario_name': s['name'] if isinstance(s, dict) else s,
@@ -485,7 +488,7 @@ def _checker_stage_2(checker, cfg):
             check('and nothing was skipped', checker.skipped, [])
 
             print('\n  and a changed measurement is caught on every row')
-            SLOPES['standard_only'] *= 1.5
+            SLOPES[cfg.calib_std_group()] *= 1.5
             checker.failures.clear()
             checker.skipped.clear()
             checker.stage_2(names, 77, target, rtol=1e-9, keep=False)

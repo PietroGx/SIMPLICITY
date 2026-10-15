@@ -39,6 +39,9 @@ import simplicity.dir_manager as dm
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 os.pardir, 'experiments'))
 
+from impact_long_shedders_config import (
+    exp_group, scenario_experiment, scenario_output_dirs, scenario_label)
+
 # The DEFAULT consensus mode owns the bare name. v2.4.92 made that
 # distribution; before it, a bare name meant argmax and "_dist" meant
 # distribution. Older runs on disk still carry the old convention.
@@ -85,13 +88,8 @@ def scenario_meta(exp_name):
 
 
 def has_output(exp_name, scenario, exp_num):
-    """True if this scenario's experiment produced output."""
-    try:
-        return bool(dm.get_simulation_output_dirs(
-            f"{exp_name}_{scenario}_#{exp_num}"))
-    except Exception:
-        # dir_manager raises rather than returning [] for an absent experiment
-        return False
+    """True if this scenario's group produced output."""
+    return bool(scenario_output_dirs(exp_name, scenario, exp_num))
 
 
 def resolve_scenarios(exp_name, exp_num, required=None, verbose=True):

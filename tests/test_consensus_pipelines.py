@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Verification for the two consensus modes, argmax and distribution.
 
-Exercises the actual dispatch with run_experiment_script stubbed, per the
-repo rule that "the config is correct" is not verification.
+Exercises the actual dispatch with run_experiment_phase_script stubbed,
+per the repo rule that "the config is correct" is not verification.
 
 Run from the repo root:
     python tests/test_consensus_pipelines.py
@@ -127,28 +127,41 @@ def test_dispatch():
     exp.load_calibration_table = lambda path: table
     exp.set_slurm_resource_env = lambda *a, **k: None
 
+    assert hasattr(exp, 'run_experiment_phase_script'), (
+        'the stage was rewired; this stub would not intercept and the test '
+        'would run real simulations')
+
     for mode in cfg.CONSENSUS_MODES:
         seen = []
-        exp.run_experiment_script = (
-            lambda runner, exp_num, settings_func, name, _s=seen:
-                _s.append((name, settings_func()[1].get("consensus"),
-                           settings_func()[2])))
+
+        def record(runner, exp_num, settings_func, name, append=True, _s=seen):
+            varying, fixed, n_seeds = settings_func()
+            groups = [g['name'] for g in varying['_scenario_groups']]
+            _s.append((name, groups, [g.get('consensus') for g in
+                                      varying['_scenario_groups']], n_seeds,
+                       append))
+            return groups
+
+        exp.run_experiment_phase_script = record
         sys.argv = ['exp', '--exp-num', '99', '--runner', 'serial',
                     '--seeds', '30', '--consensus', mode]
         exp.main()
-        prefix = cfg.exp_name(mode)
-        check(f"{mode}: dispatched both scenarios",
-              [n for n, _, _ in seen],
-              [f"{prefix}_control", f"{prefix}_HIV_high"])
-        check(f"{mode}: consensus reached every settings dict",
-              sorted({c for _, c, _ in seen}), [mode])
-        check(f"{mode}: seeds reached every settings dict",
-              sorted({s for _, _, s in seen}), [30])
 
-    # the two pipelines must not share experiment names
-    a = {f"{cfg.exp_name('argmax')}_{s}" for s in ('control', 'HIV_high')}
-    b = {f"{cfg.exp_name('distribution')}_{s}" for s in ('control', 'HIV_high')}
-    check("the pipelines' experiment names do not collide", bool(a & b), False)
+        # ONE dispatch for the whole phase since 8e, not one per scenario
+        check(f"{mode}: one dispatch for the phase", len(seen), 1)
+        name, groups, consensus, n_seeds, append = seen[0]
+        check(f"{mode}: into the run's experiment", name, cfg.exp_name(mode))
+        check(f"{mode}: both scenarios as groups", groups,
+              [cfg.exp_group('control'), cfg.exp_group('HIV_high')])
+        check(f"{mode}: consensus reached every group",
+              sorted(set(consensus)), [mode])
+        check(f"{mode}: seeds reached the phase", n_seeds, 30)
+        check(f"{mode}: appended, never overwriting the calibration",
+              append, True)
+
+    # the two modes must not share an experiment name
+    check("the two modes' experiment names do not collide",
+          cfg.exp_name('argmax') == cfg.exp_name('distribution'), False)
 
 
 # ---------------------------------------------------------------------------

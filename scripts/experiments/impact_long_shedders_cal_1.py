@@ -25,9 +25,9 @@
 
 import argparse
 
-from experiment_script_runner import run_experiment_script
+from experiment_script_runner import run_experiment_phase_script
 from impact_long_shedders_config import (
-    SCENARIOS, LONG_NSR_EXP_NAME, NSR_RANGES, CAL1_FINAL_TIME,
+    SCENARIOS, EXP_NAME, NSR_RANGES, CAL1_FINAL_TIME,
     CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
     build_cal1_settings, CONSENSUS_MODES, DEFAULT_CONSENSUS,
     add_slurm_resource_args, set_slurm_resource_env,
@@ -63,16 +63,23 @@ def run_long_calibration(exp_num, runner, seeds, target_osr_long, R,
              f"NSR_long grid: {len(nsr_vals)} pts "
              f"[{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
 
-    print(f"\nDispatching {LONG_NSR_EXP_NAME}_#{exp_num} to {runner}...")
-    run_experiment_script(runner, exp_num, settings_func, LONG_NSR_EXP_NAME)
+    numbered = f"{EXP_NAME}_#{exp_num}"
+    print(f"\nDispatching the long-calibration phase of {numbered} to "
+          f"{runner}...")
+    # append=False: cal_1 is the FIRST phase of a run, so it writes the
+    # experiment rather than adding to one. Re-running it against an existing
+    # experiment is what --skip-cal1 is for.
+    groups = run_experiment_phase_script(runner, exp_num, settings_func,
+                                         EXP_NAME, append=False)
 
-    numbered = f"{LONG_NSR_EXP_NAME}_#{exp_num}"
     print(f"\n[Plot] Fitting + plotting long-NSR calibration for {numbered}...")
-    # pass our own SCENARIOS: the shared plotter defaults to the bound
-    # pipeline's list, which has no edge_case
+    # the groups THIS phase just ran: the experiment also holds the other
+    # phases' groups, and every one of them carries a tau_3_long/R_long the
+    # fit would otherwise read as another cohort
     plot_and_fit_long_nsr_calibration(numbered, target_osr_long,
                                       model_type=model_type,
-                                      min_seq=min_seq, min_len=min_len)
+                                      min_seq=min_seq, min_len=min_len,
+                                      groups=groups)
 
 
 def main():
