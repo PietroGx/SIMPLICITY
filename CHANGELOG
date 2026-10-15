@@ -5,6 +5,51 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.96 — 2026-10-15 — pietro gerletti
+
+tests/run_nsr_range_finder.sh: every NSR range probe a run needs, in one job.
+
+The range finder probes ONE cal_1 cohort per invocation and there are three,
+sweeping the SAME grid -- NSR_RANGES['cal_long'] is one range for all of them
+-- over different infection durations:
+
+                       tau_3_long   infection   cal_1 sim window
+    SOT                     48.23       63 d             365 d
+    HIV_low/HIV_high        94.23      109 d             365 d
+    edge_case              350.23      365 d            1095 d
+
+Stage 1 measures the intra-host clock, so its saturation window is one
+infection (tau_3_long + phase_offset), NOT the simulated window: d = mean_osr
+* infection / 365.25. edge_case's infection is 5.8x SOT's, so it reaches the
+d>0.1 ceiling at roughly a sixth of SOT's NSR. Probing only SOT -- the range
+finder's default scenario -- recommends a max already saturated for
+edge_case, which is the case this script exists to stop happening.
+
+HIV_high is not probed: same cohort as HIV_low (identical tau and R_long).
+control has no long side, so cal_1 has no group for it. Stage 2 is the
+0%-long-shedder sweep -- one group, one standard rate shared by every
+scenario, nothing scenario-specific to probe, and --scenario does not apply.
+
+Four probes, 6 nodes x 10 seeds each, run sequentially inside ONE Slurm job:
+each probe blocks, because the Slurm runner polls its own array to completion.
+Self-submits with sbatch; nothing runs on the login node. A failing probe does
+not stop the rest.
+
+The sweep bounds are READ FROM NSR_RANGES at runtime rather than typed in, so
+each probe spans exactly what a run would currently use and the recap answers
+"is NSR_RANGES right?" instead of "is some range right?".
+
+--base/--steps/--seeds/--only/--runner/--dry-run/--no-watch, and anything
+after `--` is forwarded to test_nsr_range_finder.py unchanged.
+
+Verified: dry runs over every path, and a toy-scale shakedown through the
+serial runner where all four probes wrote recaps, covering both the
+RECOMMENDED path and the "extend the sweep up" refusal. That shakedown caught
+EXTRA=() never being declared, which under set -u made --only stage1 run zero
+probes while reporting success.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.95 — 2026-10-15 — pietro gerletti
 
 df8_stem_key_order closed: a simulation's label is sorted before the directory
