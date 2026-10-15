@@ -5,6 +5,56 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.93 — 2026-10-15 — pietro gerletti
+
+Calibration runs under distribution too. RECALIBRATION REQUIRED.
+
+v2.4.92 made distribution the default for the experiment phase only. Both
+calibration stages still inherited the mode from standard_values.json, which
+said argmax, so the default path was calibrate-under-argmax,
+run-under-distribution. Consensus feeds the immune_waning fitness, hence the
+dynamics, hence the observed substitution rate the calibration fits -- so the
+two have to agree.
+
+build_cal1_settings and build_cal2_settings now WRITE `consensus` into
+fixed_params and take a `consensus=` argument; cal_1 and cal_2 both expose
+--consensus; DEFAULT_CONSENSUS moved to the top of the config, above every
+builder, because all three stages read it now.
+
+The explicit write is the part that does the work, not the default flip.
+read_standard_parameters_values returns {**_STANDARD_VALUES_DEFAULTS,
+**from_file} -- THE FILE WINS -- and standard_values.json is machine-local and
+gitignored. On any machine that already has it, changing the default in
+simplicity/ reaches nothing. Stating the mode in the builder is what makes a
+calibration's consensus a property of the pipeline instead of of the host; two
+machines could previously calibrate the same --exp-num differently with
+nothing recording it.
+
+The code defaults moved anyway, for fresh installs and for callers that do not
+go through the pipeline: simplicity/settings_manager.py
+(_STANDARD_VALUES_DEFAULTS), simplicity/extrande.py:172 (the parameters.get
+fallback) and simplicity/phenotype/update.py:58 (update_fitness_factory).
+
+The orchestrator now takes ONE consensus mode and runs the whole pipeline
+under it -- both calibrations and the experiment phase -- defaulting to
+distribution instead of to both modes. Two modes is refused, because one
+calibration cannot serve both: that would be the mismatch this commit removes,
+reintroduced one level up. The refusal happens before the log file and the
+Data/ directories are created, so a bad invocation leaves nothing behind.
+
+New guards in test_consensus_pipelines: each calibration builder states a mode
+and honours an override, all three stages default to the SAME mode, the
+orchestrator refuses two modes naming both, and no stray pipeline log survives
+the refusal.
+
+Local tier: 13 passed, 0 failed.
+
+Every calibration produced before this ran a different model configuration.
+unbound #8's nsr_calibration_table.csv and calibrated_long_nsr.csv do not
+carry over. BACKLOG entry added.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.92 — 2026-10-15 — pietro gerletti
 
 Stage 8d (naming half): distribution is the default consensus mode, and the

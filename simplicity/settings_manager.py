@@ -58,7 +58,7 @@ _STANDARD_VALUES_DEFAULTS = {
         "final_time": 365,
         "max_runtime": 86000,
         "phenotype_model": 'immune_waning',  # or 'linear'
-        "consensus": 'argmax',  # or 'distribution' (immune_waning only)
+        "consensus": 'distribution',  # or 'argmax' (immune_waning only)
         "sequence_long_shedders": False,
         "susceptibility_long": 1.0,
         "write_fasta": False,

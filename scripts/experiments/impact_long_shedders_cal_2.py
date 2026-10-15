@@ -46,6 +46,7 @@ from impact_long_shedders_config import (
     SETUP_DIR_TEMPLATE, TABLE_FILENAME, TABLE_COLUMNS,
     CAL2_FINAL_TIME, USER_FIXED_PARAMS,
     derive_scenario_params, lookup_long_nsr, build_cal2_settings,
+    CONSENSUS_MODES, DEFAULT_CONSENSUS,
     add_slurm_resource_args, set_slurm_resource_env, print_fixed_params,
     set_calibration_output_env,
 )
@@ -184,6 +185,11 @@ def main():
     parser.add_argument('--target-osr-std', type=float, default=0.0013)
     parser.add_argument('--target-osr-long', type=float, default=0.00205)
     parser.add_argument('--R', type=float, default=USER_FIXED_PARAMS['R'])
+    parser.add_argument('--consensus', type=str, choices=list(CONSENSUS_MODES),
+                        default=DEFAULT_CONSENSUS,
+                        help=f"Consensus mode to CALIBRATE under (default: "
+                            f"{DEFAULT_CONSENSUS}). Must match the mode the "
+                            f"experiment phase will run.")
     parser.add_argument('--ih-virus-emergence-rate', type=float,
                         default=USER_FIXED_PARAMS['IH_virus_emergence_rate'])
     parser.add_argument('--model', type=str, default='exp',
@@ -198,10 +204,11 @@ def main():
     set_calibration_output_env()
 
     settings_func = build_cal2_settings(
-        args.seeds, NSR_RANGES['cal_std'], args.R, args.ih_virus_emergence_rate)
+        args.seeds, NSR_RANGES['cal_std'], args.R,
+        args.ih_virus_emergence_rate, consensus=args.consensus)
 
     print(f"\n[Stage 2] Standard-only sweep (R={args.R}, no long shedders, "
-         f"final_time={CAL2_FINAL_TIME})")
+         f"final_time={CAL2_FINAL_TIME}, consensus={args.consensus})")
     varying, fixed_params, n_seeds = settings_func()
     print_fixed_params(fixed_params)
     print(f"Seeds per grid point: {n_seeds}")

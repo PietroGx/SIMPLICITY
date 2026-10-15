@@ -52,7 +52,7 @@ from impact_long_shedders_config import (
     LONG_NSR_EXP_NAME, STD_NSR_EXP_NAME, EXP_NAME, SETUP_DIR_TEMPLATE,
     CALIBRATION_SKIPPED_OUTPUTS,
     TABLE_FILENAME, SCENARIOS, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
-    add_slurm_resource_args, CONSENSUS_MODES, exp_name,
+    add_slurm_resource_args, CONSENSUS_MODES, DEFAULT_CONSENSUS, exp_name,
 )
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
@@ -252,10 +252,13 @@ def main():
     parser.add_argument('--exp-seeds', type=int, default=30,
                         help="Seeds per scenario, production stage.")
     parser.add_argument('--consensus', type=str, nargs='+',
-                        choices=list(CONSENSUS_MODES), default=list(CONSENSUS_MODES),
-                        help="Consensus modes to run in the experiment "
-                            "phase, one each, off the same calibration. "
-                            "Default: both, distribution first.")
+                        choices=list(CONSENSUS_MODES),
+                        default=[DEFAULT_CONSENSUS],
+                        help=f"Consensus mode for the whole run -- both "
+                            f"calibration stages and the experiment phase "
+                            f"(default: {DEFAULT_CONSENSUS}). Passing two "
+                            f"modes is refused: one calibration cannot serve "
+                            f"both, so run them under separate --exp-num.")
     parser.add_argument('--skip-cal1', action='store_true',
                         help=f"Reuse an existing {LONG_NSR_EXP_NAME}_#{{exp_num}}.")
     parser.add_argument('--r-cal1', type=float, default=CAL1_ISOLATED_FIXED_PARAMS['R'])
@@ -278,6 +281,19 @@ def main():
                         help=f"Per-task SLURM memory for cal_2 only (default "
                             f"{CAL2_SLURM_MEM}).")
     args = parser.parse_args()
+
+    # One calibration, one consensus mode. Both calibration stages now state
+    # the mode they ran under, so serving two experiment modes from one table
+    # would mean calibrating under one and running under the other -- the
+    # mismatch v2.4.93 removed. Refuse rather than pick, and refuse BEFORE
+    # the log file and the Data/ directories exist.
+    if len(set(args.consensus)) > 1:
+        raise SystemExit(
+            "--consensus takes ONE mode here: both calibration stages are run "
+            "under it, and a table calibrated under one mode does not transfer "
+            f"to another. Got {sorted(set(args.consensus))}. Run each mode "
+            "under its own --exp-num.")
+    consensus = args.consensus[0]
 
     log_file = args.log_file or os.path.join(
         "Data", "pipeline_logs",
@@ -305,6 +321,7 @@ def main():
                       "--target-osr-long", str(args.target_osr_long),
                       "--R", str(args.r_cal1),
                       "--ih-virus-emergence-rate", str(args.ih_virus_emergence_rate),
+                      "--consensus", consensus,
                       *slurm_res_args], log_fh)
 
         report_simulation_health([f"{LONG_NSR_EXP_NAME}_#{args.exp_num}"],
@@ -319,6 +336,7 @@ def main():
                   "--target-osr-long", str(args.target_osr_long),
                   "--R", str(args.r_cal2),
                   "--ih-virus-emergence-rate", str(args.ih_virus_emergence_rate),
+                  "--consensus", consensus,
                   "--slurm-mem", args.slurm_mem_cal2,
                   "--slurm-time", args.slurm_time], log_fh)
 
@@ -326,8 +344,6 @@ def main():
                                  log_fh, "stage 2 (standard alone)",
                                  skip_outputs=CALIBRATION_SKIPPED_OUTPUTS)
 
-        # Both pipelines read the SAME frozen table, so the only thing that
-        # differs between them is the consensus distance.
         for mode in args.consensus:
             run_stage([py, exp_path,
                       "--exp-num", str(args.exp_num),
