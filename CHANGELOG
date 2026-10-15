@@ -5,6 +5,37 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.86 — 2026-10-15 — pietro gerletti
+
+run_tests_on_compute.sh: one empty squeue reply no longer counts as a dead job.
+
+The watcher polled `squeue -j $JOB` and, on the first empty reply, printed
+"left the queue without writing a log" and exited 1. Empty has three causes and
+only one of them is a dead job: squeue also fails transiently (its stderr is
+swallowed by 2>/dev/null), the controller can take a moment to make a
+just-submitted job visible to squeue at all, and a short job can finish inside
+one 5s poll gap before the shared filesystem shows the log its compute node
+wrote. All three reported a healthy job as dead and sent you to sacct by hand.
+
+v2.4.85 made this much more likely to bite: the default HPC-tier job is now the
+~1 min interface probe, where v2.4.84's default was ten tests over ~7 min.
+
+It now needs four consecutive empty replies, ~20s, before believing it, and
+prints the sacct line itself instead of naming the command.
+
+Verified against a fake sbatch/squeue/sacct on PATH, in three cases: a job that
+really is gone with no log (15s, sacct printed, exit 1); a job whose log lands
+at 8s with squeue empty throughout (tails it -- v2.4.85 dies at 0s here, which
+is the regression); and squeue blipping empty for 8s mid-run (no false death).
+
+The first harness for this was wrong and passed both versions: the fake sbatch
+backgrounded its log-writing subshell without detaching stdout, so
+`JOB=$(sbatch ...)` waited on that pipe and the "delayed" log always existed
+before the loop began. Both scripts were tailing a file that was already there.
+The fake now redirects the subshell, and the substitution returns in 0s.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.85 — 2026-10-15 — pietro gerletti
 
 tests: the suite is split into a local tier and an HPC tier. The cluster no

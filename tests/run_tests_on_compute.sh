@@ -96,11 +96,27 @@ if [ -z "${SLURM_JOB_ID:-}" ] && [ "${SIMPLICITY_TESTS_LOCAL:-0}" != "1" ]; then
     if [ "$WATCH" = "1" ]; then
         echo
         echo "waiting for it to start (Ctrl-C stops watching, not the job)..."
+        # An empty squeue reply is not proof the job died: squeue fails
+        # transiently, and a short job can finish inside one poll gap before
+        # the shared filesystem shows the log a compute node just wrote. Give
+        # it four tries before believing it, and say what sacct says.
+        gone=0
         while [ ! -f "$LOGFILE" ]; do
-            state=$(squeue -j "$JOB" -h -o %T 2>/dev/null)
-            if [ -z "$state" ]; then
-                echo "job $JOB left the queue without writing a log -- sacct -j $JOB"
-                exit 1
+            if [ -n "$(squeue -j "$JOB" -h -o %T 2>/dev/null)" ]; then
+                gone=0
+            else
+                gone=$((gone + 1))
+                if [ "$gone" -ge 4 ]; then
+                    echo
+                    echo "job $JOB is no longer queued and no log appeared at"
+                    echo "  $LOGFILE"
+                    if command -v sacct >/dev/null 2>&1; then
+                        echo
+                        sacct -j "$JOB" \
+                            --format=JobID,JobName%20,State,ExitCode,Reason%30,Start,End
+                    fi
+                    exit 1
+                fi
             fi
             sleep 5
         done
