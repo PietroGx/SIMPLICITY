@@ -88,11 +88,34 @@ def describe(value):
     return repr(value)[:60]
 
 
-def probe(name, call, coverage=None):
+def is_empty(value):
+    """Empty means empty all the way down.
+
+    len() of a container is not the question: get_panel_de_data returns a
+    TUPLE of two DataFrames, so len() is 2 even when both are empty, and two
+    empty panels were counted [ok]. Same family as the "139 item(s)" bug.
+    """
+    if value is None:
+        return True
+    if isinstance(value, tuple):
+        return all(is_empty(v) for v in value) if value else True
+    if isinstance(value, dict):
+        return all(is_empty(v) for v in value.values()) if value else True
+    if hasattr(value, '__len__'):
+        return len(value) == 0
+    return False
+
+
+def probe(name, call, coverage=None, required_inputs=None):
     """Run one preprocessor, then ask whether it covered what exists.
 
     `coverage` returns (got, expected) as comparable sets, or None when there
     is nothing meaningful to compare against.
+
+    `required_inputs` names files that are tracked in the repo. For a reader
+    whose input ships with the code, returning nothing is never legitimate --
+    it is a broken checkout, not an absent run -- so it FAILS and says which
+    file is gone.
     """
     start = time.time()
     try:
@@ -106,8 +129,20 @@ def probe(name, call, coverage=None):
     elapsed = time.time() - start
     summary = describe(value)
 
-    empty = value is None or (hasattr(value, '__len__') and len(value) == 0)
-    if empty:
+    if is_empty(value):
+        if required_inputs:
+            missing = [f for f in required_inputs if not os.path.exists(f)]
+            if missing:
+                detail = ('its tracked input is MISSING: ' + ', '.join(missing)
+                          + ' -- restore it from git, this panel ships with '
+                            'the code')
+            else:
+                detail = ('its input exists but yielded no rows: '
+                          + ', '.join(required_inputs)
+                          + ' -- wrong columns, or a filter dropped everything')
+            failed.append((name, detail))
+            print(f'  [FAIL      ] {name}: {summary}\n                {detail}')
+            return value
         nodata.append((name, summary))
         print(f'  [no data   ] {name}: {summary}  ({elapsed:.1f}s)')
         return value
@@ -228,9 +263,13 @@ def figure_1(exp_num, exp_name, present):
           lambda: f1.get_model_intrahost_clock(exp_num=exp_num,
                                                exp_name=exp_name))
     # these two read Data/RealWorldData -- tracked files, and the ones that
-    # went missing in the quota cleanup
-    probe('fig1.get_panel_c_data  (RealWorldData)', f1.get_panel_c_data)
-    probe('fig1.get_panel_de_data (RealWorldData)', f1.get_panel_de_data)
+    # went missing in the quota cleanup. Empty here is a missing checkout,
+    # not an absent run, so it fails and names the file.
+    rw = lambda f: os.path.normpath(os.path.join(f1.REAL_WORLD_DIR, f))
+    probe('fig1.get_panel_c_data  (RealWorldData)', f1.get_panel_c_data,
+          required_inputs=[rw('literature_long_shedders_data.csv')])
+    probe('fig1.get_panel_de_data (RealWorldData)', f1.get_panel_de_data,
+          required_inputs=[rw('data_fig1_D.csv'), rw('data_fig1_E.csv')])
 
 
 def figure_2(exp_num, exp_name, present, heavy):
