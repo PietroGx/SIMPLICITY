@@ -50,13 +50,16 @@ sys.path.insert(0, os.path.join(REPO, 'scripts'))
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 
 import simplicity.dir_manager as dm
+from impact_long_shedders_config import EXP_NAME, calib_std_group
 
 failures = []
 skipped = []
 
+# One experiment since 8e; the two calibrations are GROUPS inside it, and
+# only setup_data still has a directory of its own.
 NAMES = {
-    'cal_1': 'impact_long_shedders_cal_long',
-    'cal_2': 'impact_long_shedders_cal_std',
+    'cal_1': EXP_NAME,
+    'cal_2': EXP_NAME,
     'setup': 'impact_long_shedders_setup_data',
 }
 TABLE_FILENAME = 'nsr_calibration_table.csv'
@@ -190,7 +193,8 @@ def stage_2(names, exp_num, target_osr_std, rtol, keep):
     try:
         import impact_long_shedders_cal_2 as cal_2
         single = cal_2.compute_standard_nsr(name, target_osr_std,
-                                            model_type=model)
+                                            model_type=model,
+                                            groups=[calib_std_group()])
         # one standard rate for every scenario, by construction: the same
         # number is printed once per row below
         recomputed = {row['scenario_name']: single

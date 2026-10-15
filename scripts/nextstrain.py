@@ -241,6 +241,12 @@ def main():
     )
     mx = ap.add_mutually_exclusive_group(required=False)
     mx.add_argument("--experiment", type=str, help="Process ALL SSODs in this experiment")
+    ap.add_argument("--group", action="append", default=None, dest="groups",
+                    help="With --experiment: only this group; repeatable. "
+                         "Since the pipeline puts every phase into one "
+                         "experiment, the default spans the calibration "
+                         "sweeps as well as the scenarios -- which is a lot "
+                         "of trees, most of them of grid points.")
     mx.add_argument("--ssod", type=str, help="Process a single seeded_simulation_output_dir")
     
     # --- NEW GRID PARAMETERS ---
@@ -263,11 +269,26 @@ def main():
 
     if args.experiment:
         # process all SSODs under the experiment (no GUI)
+        #
+        # An experiment is a whole run since stage 8e: both calibration
+        # sweeps and every scenario. Unscoped means every grid point of
+        # every sweep, which is almost never what someone building trees
+        # wants -- so say what it is about to do, by group, and let --group
+        # narrow it.
+        groups = args.groups or dm.get_groups(args.experiment)
         ssods = []
-        for sod in dm.get_simulation_output_dirs(args.experiment):
-            ssods.extend(dm.get_seeded_simulation_output_dirs(sod))
+        for group in groups:
+            in_group = []
+            for sod in dm.get_simulation_output_dirs(args.experiment,
+                                                     group=group):
+                in_group.extend(dm.get_seeded_simulation_output_dirs(sod))
+            print(f"[*] {args.experiment}/{group}: {len(in_group)} seeded "
+                  f"simulation(s)")
+            ssods.extend(in_group)
         if not ssods:
             return
+        print(f"[*] {len(ssods)} tree(s) to build across {len(groups)} "
+              f"group(s)")
         for ssod in ssods:
             process_ssod(ssod, start_date, args.time_units, args.shared_mut_threshold)
         return

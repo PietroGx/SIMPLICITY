@@ -5,6 +5,105 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.94 — 2026-10-15 — pietro gerletti
+
+Stage 8e-8g: a run is ONE experiment whose phases are named groups. The
+settings/data-flow refactor is finished.
+
+A run wrote nine experiment directories -- one per calibration stage, one per
+scenario, plus setup data and sanity. It now writes impact_long_shedders_#N
+with nine GROUPS:
+
+  calib_long__SOT  calib_long__HIV_low+HIV_high  calib_long__edge_case
+  calib_std__standard_only
+  exp__control  exp__SOT  exp__HIV_low  exp__HIV_high  exp__edge_case
+
+setup_data keeps its own directory: it holds the frozen table, an INPUT to the
+next phase rather than simulation output.
+
+THE MACHINERY
+
+simplicity/runme.py gains run_experiment_phase: it continues the simulation
+ids from what is already there (restarting at 0 would make a later phase
+overwrite an earlier one's output directories, since simulation_stem puts the
+id in the name) and hands the runner only THIS phase's groups, so appending
+does not re-run what is finished. 8a built both halves; this is what calls
+them. experiment_script_runner wraps it as run_experiment_phase_script.
+
+The group name is the identity in five places at once, so the config now owns
+the convention -- calib_long_group/calib_std_group/exp_group, and phase_of/
+groups_of_phase to read it back. The prefix is load-bearing: "SOT" is both a
+cal_1 cohort and a scenario, and unprefixed they would be ONE group mixing a
+sweep with a single run.
+
+build_exp_phase_settings submits the whole experiment phase as one phase, one
+group per scenario. That removed the threading in impact_long_shedders_exp:
+five scenarios were five experiments, submitted from five threads with
+SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM divided between them. One
+experiment is one Slurm array and the cap applies to it once. --sequential is
+gone with the threads.
+
+The orchestrator takes one consensus mode end to end and reports health per
+phase, by group.
+
+SCOPING -- the part that makes the merge safe
+
+An unscoped listing now spans every phase, and every simulation in the
+experiment has a tau_3_long, an R_long and a nucleotide_substitution_rate. A
+reader that forgets to scope does not crash: it fits a calibration sweep and
+reports the number under a scenario's name, with a healthy R^2. Scoped:
+
+  _cal1_groups            took every group of the experiment. It now takes
+                          the calib_long__* ones, or an explicit list; cal_1
+                          passes the groups its own phase just ran.
+  compute_standard_nsr    listed the whole experiment; takes `groups`,
+                          defaulting to the calib_std group.
+  the 13 figure sites     fig1 x5, fig2 x3, fig3 x1, plot_sot_sanity x2 and
+                          _scenarios.has_output all composed
+                          "<exp>_<scenario>_#N" and listed it unscoped. They
+                          now go through ONE resolver,
+                          config.scenario_output_dirs, which scopes by group
+                          and RAISES if a returned directory is not in the
+                          group whose label the series carries.
+  check_completed_        listed unscoped AND read one n_seeds for the whole
+  simulations             experiment -- which raises since 8a, because
+                          --cal-seeds and --exp-seeds differ. Reports group
+                          by group against each group's own n_seeds; --group
+                          narrows it.
+  nextstrain              --experiment would have built a tree for every grid
+                          point of both sweeps. Prints what it is about to do
+                          per group; --group narrows it.
+  prune_calibration_      matched calibration EXPERIMENTS by name, so it
+  outputs                 silently stopped matching anything. It now also
+                          prunes the calib_* GROUPS of a merged experiment,
+                          and leaves the exp__* groups alone -- verified on a
+                          tree with a prunable file planted in all nine
+                          groups: 8 pruned, 0 from the experiment phase.
+
+A TEST THAT WAS SILENTLY NOT TESTING
+
+test_stage_dispatch stubs the dispatch so nothing is simulated. It stubbed
+run_experiment_script; the stages moved to run_experiment_phase_script, and
+the stub stopped intercepting -- so every stage ran its simulations for real.
+The suite still PASSED, in 427s instead of 2s. It now asserts the attribute
+exists before replacing it, as does test_consensus_pipelines.
+
+New tests/test_merged_experiment.py, in the local tier: three phases build one
+experiment of nine groups, each phase runs only its own, ids continue, every
+stem is distinct, each group keeps its own n_seeds; an unscoped listing really
+does span phases (the premise the rest depends on); each scenario resolves to
+its own group and the SOT scenario and the SOT cohort are different
+directories; and the whole-experiment readers behave. Mutation-checked: both
+unscoping the resolver and dropping the group prefix make it fail.
+
+Local tier: 14 passed, 0 failed.
+
+Stage 8 is complete. Recalibration was already required by v2.4.93; this does
+not add another reason, but the layout a new run writes is different, so start
+from a clean Data/.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.93 — 2026-10-15 — pietro gerletti
 
 Calibration runs under distribution too. RECALIBRATION REQUIRED.

@@ -23,6 +23,7 @@ LOCAL_TESTS=(
     "slurm lifecycle (fake)|tests/test_slurm_lifecycle.py"
     "group partition (7c)|tests/test_group_partition.py"
     "stage dispatch|tests/test_stage_dispatch.py"
+    "merged experiment (8e)|tests/test_merged_experiment.py"
     "consensus modes|tests/test_consensus_pipelines.py"
     "figure pipelines|tests/test_figure_pipelines.py"
     "analysis reads layout|tests/test_analysis_reads_new_layout.py"

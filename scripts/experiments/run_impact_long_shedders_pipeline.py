@@ -48,8 +48,11 @@ from datetime import datetime
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
+import simplicity.dir_manager as dm
+
 from impact_long_shedders_config import (
-    LONG_NSR_EXP_NAME, STD_NSR_EXP_NAME, EXP_NAME, SETUP_DIR_TEMPLATE,
+    EXP_NAME, SETUP_DIR_TEMPLATE, calib_std_group,
+    exp_group, groups_of_phase,
     CALIBRATION_SKIPPED_OUTPUTS,
     TABLE_FILENAME, SCENARIOS, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
     add_slurm_resource_args, CONSENSUS_MODES, DEFAULT_CONSENSUS, exp_name,
@@ -95,9 +98,15 @@ def run_stage(cmd, log_fh):
         raise SystemExit(f"[FAILED] stage exited {proc.returncode}: {' '.join(cmd)}")
 
 
-def report_simulation_health(exp_names, log_fh, label, skip_outputs=()):
+def report_simulation_health(experiment, groups, log_fh, label,
+                             skip_outputs=()):
     """Per-grid-point completeness and an extinction/saturation autopsy of
     anything that ended early. Reporting only -- never aborts the run.
+
+    Scoped to ONE phase's groups since 8e: the experiment holds every phase,
+    and each group carries its own n_seeds, so an unscoped report would mix
+    a calibration sweep with the experiment-phase scenarios and compare both
+    against a single seed count.
 
     skip_outputs names outputs the stage was told not to write. The checker
     requires a fixed list of files, so without this a calibration stage -- which
@@ -106,22 +115,23 @@ def report_simulation_health(exp_names, log_fh, label, skip_outputs=()):
     otherwise, which is the failure mode this pipeline can least afford.
     """
     _log(log_fh, f"\n===== simulation health: {label} =====")
-    for name in exp_names:
-        cmd = [sys.executable, CHECK_SCRIPT, name]
-        _log(log_fh, f"\n$ {' '.join(cmd)}")
-        env = dict(os.environ)
-        if skip_outputs:
-            env["SIMPLICITY_SKIP_OUTPUTS"] = ",".join(skip_outputs)
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
-        except Exception as exc:
-            _log(log_fh, f"  [skip] health report failed to run: {exc}")
-            continue
-        for stream in (result.stdout, result.stderr):
-            for line in stream.splitlines():
-                _log(log_fh, line)
-        if result.returncode != 0:
-            _log(log_fh, f"  [skip] health report exited {result.returncode} for {name}")
+    cmd = [sys.executable, CHECK_SCRIPT, experiment]
+    for group in groups:
+        cmd += ["--group", group]
+    _log(log_fh, f"\n$ {' '.join(cmd)}")
+    env = dict(os.environ)
+    if skip_outputs:
+        env["SIMPLICITY_SKIP_OUTPUTS"] = ",".join(skip_outputs)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    except Exception as exc:
+        _log(log_fh, f"  [skip] health report failed to run: {exc}")
+        return
+    for stream in (result.stdout, result.stderr):
+        for line in stream.splitlines():
+            _log(log_fh, line)
+    if result.returncode != 0:
+        _log(log_fh, f"  [skip] health report exited {result.returncode}")
 
 
 def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh,
@@ -186,10 +196,10 @@ def write_artifacts_archive(archive_path, exp_num, log_file):
     os.makedirs(os.path.dirname(archive_path), exist_ok=True)
     candidates = [
         log_file,
-        os.path.join("Data", f"{LONG_NSR_EXP_NAME}_#{exp_num}", "05_Plots",
-                     f"{LONG_NSR_EXP_NAME}_#{exp_num}_long_nsr_calibration_fit.png"),
-        os.path.join("Data", f"{STD_NSR_EXP_NAME}_#{exp_num}", "05_Plots",
-                     f"{STD_NSR_EXP_NAME}_#{exp_num}_std_nsr_calibration_fit.png"),
+        os.path.join("Data", f"{EXP_NAME}_#{exp_num}", "05_Plots",
+                     f"{EXP_NAME}_#{exp_num}_long_nsr_calibration_fit.png"),
+        os.path.join("Data", f"{EXP_NAME}_#{exp_num}", "05_Plots",
+                     f"{EXP_NAME}_#{exp_num}_std_nsr_calibration_fit.png"),
     ]
     # one sanity grid per consensus mode
     for mode in CONSENSUS_MODES:
@@ -209,9 +219,10 @@ def compress_results(exp_num, log_fh, keep_slurm_logs=True):
     """Pack everything this run produced into Data_Export/*.tar.xz.
 
     Hands Data/*_#<exp_num> to package_simplicity_data.sh, which globs every
-    experiment directory from this run -- both calibrations, setup data, every
-    production scenario of every consensus mode, both sanity directories --
-    with no bound/unbound assumption and no run numbers written out anywhere.
+    experiment directory from this run -- the experiment itself, setup data,
+    the other consensus mode's experiment and the sanity directories -- with
+    no run numbers written out anywhere. Since 8e that is far fewer
+    directories: the calibrations and the scenarios are groups inside one.
 
     Submitted to Slurm (16 cpus) rather than run here: pixz over several GB
     does not belong on a login node. The pipeline does not wait for it; the
@@ -260,7 +271,8 @@ def main():
                             f"modes is refused: one calibration cannot serve "
                             f"both, so run them under separate --exp-num.")
     parser.add_argument('--skip-cal1', action='store_true',
-                        help=f"Reuse an existing {LONG_NSR_EXP_NAME}_#{{exp_num}}.")
+                        help=f"Reuse the calib_long__* groups already in "
+                            f"{EXP_NAME}_#{{exp_num}}.")
     parser.add_argument('--r-cal1', type=float, default=CAL1_ISOLATED_FIXED_PARAMS['R'])
     parser.add_argument('--r-cal2', type=float, default=USER_FIXED_PARAMS['R'],
                         help="R for cal_2 and production; unrelated to R_long.")
@@ -312,7 +324,8 @@ def main():
                     f"@ {datetime.now().isoformat(timespec='seconds')} =====")
 
         if args.skip_cal1:
-            _log(log_fh, f"[skip] cal_1 skipped; reusing {LONG_NSR_EXP_NAME}_#{args.exp_num}")
+            _log(log_fh, f"[skip] cal_1 skipped; reusing the "
+                         f"calib_long__* groups of {EXP_NAME}_#{args.exp_num}")
         else:
             run_stage([py, cal1_path,
                       "--exp-num", str(args.exp_num),
@@ -324,9 +337,13 @@ def main():
                       "--consensus", consensus,
                       *slurm_res_args], log_fh)
 
-        report_simulation_health([f"{LONG_NSR_EXP_NAME}_#{args.exp_num}"],
-                                 log_fh, "stage 1 (long shedders alone)",
-                                 skip_outputs=CALIBRATION_SKIPPED_OUTPUTS)
+        numbered = f"{EXP_NAME}_#{args.exp_num}"
+        # read the groups off the experiment rather than rebuilding the names
+        # here: the phase that wrote them is the authority on what it wrote
+        report_simulation_health(
+            numbered, groups_of_phase(dm.get_groups(numbered), 'calib_long'),
+            log_fh, "stage 1 (long shedders alone)",
+            skip_outputs=CALIBRATION_SKIPPED_OUTPUTS)
 
         run_stage([py, cal2_path,
                   "--exp-num", str(args.exp_num),
@@ -340,9 +357,10 @@ def main():
                   "--slurm-mem", args.slurm_mem_cal2,
                   "--slurm-time", args.slurm_time], log_fh)
 
-        report_simulation_health([f"{STD_NSR_EXP_NAME}_#{args.exp_num}"],
-                                 log_fh, "stage 2 (standard alone)",
-                                 skip_outputs=CALIBRATION_SKIPPED_OUTPUTS)
+        report_simulation_health(
+            numbered, [calib_std_group()],
+            log_fh, "stage 2 (standard alone)",
+            skip_outputs=CALIBRATION_SKIPPED_OUTPUTS)
 
         for mode in args.consensus:
             run_stage([py, exp_path,
@@ -353,9 +371,9 @@ def main():
                       *slurm_res_args], log_fh)
 
             report_simulation_health(
-                [f"{exp_name(mode)}_{s['name']}_#{args.exp_num}"
-                 for s in SCENARIOS],
-                log_fh, f"stage 3 (production, consensus={mode})")
+                f"{exp_name(mode)}_#{args.exp_num}",
+                [exp_group(s['name']) for s in SCENARIOS],
+                log_fh, f"stage 3 (experiment phase, consensus={mode})")
 
         submitted = submit_sanity_plots(
             args.exp_num, args.target_osr_std, args.target_osr_long, log_fh,
@@ -368,10 +386,10 @@ def main():
         summary_lines = [
             "\n===== Pipeline summary =====",
             f"Frozen calibration table : {table_path}",
-            f"Long calibration exp     : {LONG_NSR_EXP_NAME}_#{args.exp_num}",
-            f"Standard calibration exp : {STD_NSR_EXP_NAME}_#{args.exp_num}",
-            *[f"Production ({m:<12}): {exp_name(m)}_<scenario>_#{args.exp_num}"
-              for m in args.consensus],
+            f"Experiment               : {EXP_NAME}_#{args.exp_num}",
+            f"  calibration groups     : calib_long__*, calib_std__*",
+            *[f"  experiment groups      : exp__* in "
+              f"{exp_name(m)}_#{args.exp_num}" for m in args.consensus],
             "Sanity plot jobs submitted:",
         ]
         for scenario, sbatch_out in submitted:

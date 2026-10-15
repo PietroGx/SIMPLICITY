@@ -40,9 +40,9 @@ import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
 
-from experiment_script_runner import run_experiment_script
+from experiment_script_runner import run_experiment_phase_script
 from impact_long_shedders_config import (
-    SCENARIOS, LONG_NSR_EXP_NAME, STD_NSR_EXP_NAME, NSR_RANGES,
+    SCENARIOS, EXP_NAME, NSR_RANGES, calib_std_group,
     SETUP_DIR_TEMPLATE, TABLE_FILENAME, TABLE_COLUMNS,
     CAL2_FINAL_TIME, USER_FIXED_PARAMS,
     derive_scenario_params, lookup_long_nsr, build_cal2_settings,
@@ -54,13 +54,28 @@ from long_nsr_calibration_plot import read_calibrated_long_nsr
 
 
 def compute_standard_nsr(numbered, target_osr_std, model_type='exp',
-                         min_seq=30, min_len=100):
+                         min_seq=30, min_len=100, groups=None):
     """Read back the standard-only sweep, fit OSR vs NSR over standard
-    individuals, invert at target. Returns the calibrated standard NSR."""
-    print(f"\n[Stage 2] Standard-only NSR sweep: {numbered}")
+    individuals, invert at target. Returns the calibrated standard NSR.
+
+    `groups` scopes the read. It matters since 8e: the experiment also holds
+    the long-calibration cohorts and the experiment-phase scenarios, and
+    every one of them has a nucleotide_substitution_rate, so an unscoped
+    listing would pool a 100%-long-shedder sweep and single-point scenario
+    runs into this fit and still produce a healthy-looking R^2. None means
+    the calib_std group the config names.
+    """
+    wanted = list(groups) if groups is not None else [calib_std_group()]
+    print(f"\n[Stage 2] Standard-only NSR sweep: {numbered}  groups={wanted}")
 
     all_rows = []
-    for sod in dm.get_simulation_output_dirs(numbered):
+    sods = [sod for group in wanted
+            for sod in dm.get_simulation_output_dirs(numbered, group=group)]
+    if not sods:
+        raise RuntimeError(
+            f"{numbered} has no simulation output in group(s) {wanted}. "
+            f"Groups on disk: {dm.get_groups(numbered)}.")
+    for sod in sods:
         nsr_val = sm.get_parameter_value_from_simulation_output_dir(
             sod, 'nucleotide_substitution_rate')
 
@@ -220,18 +235,21 @@ def main():
         print(f"  {g['name']:14s} NSR grid: {len(nsr_vals)} pts "
              f"[{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
 
-    run_experiment_script(args.runner, args.exp_num, settings_func, STD_NSR_EXP_NAME)
-    std_calib_exp = f"{STD_NSR_EXP_NAME}_#{args.exp_num}"
+    numbered = f"{EXP_NAME}_#{args.exp_num}"
+    # append: cal_1 wrote this experiment, and its groups are finished. Only
+    # the groups below are run.
+    groups = run_experiment_phase_script(args.runner, args.exp_num,
+                                         settings_func, EXP_NAME, append=True)
 
-    std_nsr = compute_standard_nsr(std_calib_exp, args.target_osr_std,
+    std_nsr = compute_standard_nsr(numbered, args.target_osr_std,
                                    model_type=args.model,
-                                   min_seq=args.min_seq, min_len=args.min_len)
+                                   min_seq=args.min_seq, min_len=args.min_len,
+                                   groups=groups)
 
-    long_calib_exp = f"{LONG_NSR_EXP_NAME}_#{args.exp_num}"
-    long_nsr_by_group = read_calibrated_long_nsr(long_calib_exp, args.target_osr_long)
+    long_nsr_by_group = read_calibrated_long_nsr(numbered, args.target_osr_long)
 
     write_frozen_table(args.exp_num, std_nsr, long_nsr_by_group, args,
-                       long_calib_exp, std_calib_exp)
+                       numbered, numbered)
     print("Next: run impact_long_shedders_exp.py against this table.")
 
 

@@ -8,7 +8,7 @@ import ast
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
 import simplicity.tuning.evolutionary_rate as er
-from _scenarios import scenario_names
+from _scenarios import scenario_names, scenario_output_dirs, scenario_label
 import simplicity.output_manager as om
 from simplicity.intra_host_model import Host 
 
@@ -47,9 +47,9 @@ def get_panel_a_data(exp_num=1, exp_name="impact_long_shedders"):
     scenarios = duration_groups(exp_name)
     df_list = []
     for scenario in scenarios:
-        experiment_string = f"{exp_name}_{scenario}_#{exp_num}"
+        experiment_string = scenario_label(exp_name, scenario, exp_num)
         try:
-            sods = dm.get_simulation_output_dirs(experiment_string)
+            sods = scenario_output_dirs(exp_name, scenario, exp_num)
             if not sods: continue
             sod = sods[0]
             tau_1 = sm.get_parameter_value_from_simulation_output_dir(sod, 'tau_1')
@@ -73,9 +73,9 @@ def get_panel_a_data(exp_num=1, exp_name="impact_long_shedders"):
 def get_panel_b_data(exp_num=1, exp_name="impact_long_shedders"):
     scenarios = duration_groups(exp_name)
     df_list = []
-    control_exp_string = f"{exp_name}_control_#{exp_num}"
+    control_exp_string = scenario_label(exp_name, "control", exp_num)
     try:
-        control_sods = dm.get_simulation_output_dirs(control_exp_string)
+        control_sods = scenario_output_dirs(exp_name, "control", exp_num)
         if not control_sods: return pd.DataFrame(columns=['duration', 'cohort'])
         control_sod = control_sods[0]
         all_control_ssods = dm.get_seeded_simulation_output_dirs(control_sod)
@@ -85,9 +85,9 @@ def get_panel_b_data(exp_num=1, exp_name="impact_long_shedders"):
     except Exception: return pd.DataFrame(columns=['duration', 'cohort'])
 
     for scenario in scenarios:
-        experiment_string = f"{exp_name}_{scenario}_#{exp_num}"
+        experiment_string = scenario_label(exp_name, scenario, exp_num)
         try:
-            sods = dm.get_simulation_output_dirs(experiment_string)
+            sods = scenario_output_dirs(exp_name, scenario, exp_num)
             if not sods: continue
             sod = sods[0]
             all_ssods_for_scenario = dm.get_seeded_simulation_output_dirs(sod)
@@ -159,10 +159,10 @@ def get_model_global_clock(exp_num=1, exp_name="impact_long_shedders"):
     """Model GLOBAL clock: standard individuals in control, divergence from the
     outbreak root against absolute sequencing time. The model counterpart of
     the real standard-cohort root-to-tip regression."""
-    control_exp = f"{exp_name}_control_#{exp_num}"
+    control_exp = scenario_label(exp_name, "control", exp_num)
     rows = []
     try:
-        sods = dm.get_simulation_output_dirs(control_exp)
+        sods = scenario_output_dirs(exp_name, "control", exp_num)
     except Exception:
         sods = []
     if not sods:
@@ -204,9 +204,9 @@ def get_model_intrahost_clock(exp_num=1, exp_name="impact_long_shedders",
     for scenario in duration_groups(exp_name):
         if scenario == "control":
             continue
-        exp_str = f"{exp_name}_{scenario}_#{exp_num}"
+        exp_str = scenario_label(exp_name, scenario, exp_num)
         try:
-            sods = dm.get_simulation_output_dirs(exp_str)
+            sods = scenario_output_dirs(exp_name, scenario, exp_num)
         except Exception:
             sods = []
         if not sods:

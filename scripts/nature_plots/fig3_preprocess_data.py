@@ -9,6 +9,7 @@ import pandas as pd
 
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
+from _scenarios import scenario_output_dirs, scenario_label
 from simplicity.phenotype.distance import hamming_iw
 
 # get_clade_metrics/get_clade_winners/summarize_sod_pies already work against
@@ -35,9 +36,9 @@ def _experiment_sod(exp_num, scenario, exp_name=EXP_NAME):
     exist, so callers looping over scenarios (e.g. get_panel_b_data) can
     still skip a not-yet-run scenario instead of crashing the whole figure.
     """
-    experiment_string = f"{exp_name}_{scenario}_#{exp_num}"
+    experiment_string = scenario_label(exp_name, scenario, exp_num)
     try:
-        sods = dm.get_simulation_output_dirs(experiment_string)
+        sods = scenario_output_dirs(exp_name, scenario, exp_num)
     except ValueError:
         return None
     return sods[0] if sods else None
