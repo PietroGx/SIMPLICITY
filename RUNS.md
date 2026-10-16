@@ -14,8 +14,8 @@ between runs whose commit and consensus mode match.
 
 | # | launched | commit | consensus | cal/exp seeds | cal_long | cal_std | status | notes |
 |---|----------|--------|-----------|---------------|----------|---------|--------|-------|
-| 1 | 2026-10-16 | v2.4.98 | distribution | 30 / 30 | 1e-4 .. 1e-2 | 1e-5 .. 1e-3 | **abandoned** | Died in cal_2's fit after all 300 of its simulations completed — `compute_standard_nsr` named the fit from `dm.get_groups`, which since 8e returns all four calibration groups. Fixed in v2.4.103. Data discarded; relaunched clean under the same number. |
-| 1 | 2026-10-16 | v2.4.103 | distribution | 30 / 30 | 1e-4 .. 1e-2 | 1e-5 .. 1e-3 | launched | Relaunch after the cal_2 fix, on a cleared `Data/`. Ranges from probes #1–#4 (`tests/run_nsr_range_finder.sh`, v2.4.97). First calibration under `distribution` — the pre-refactor long-side rates were fitted under `argmax`. Also the first run at the profiled resource defaults (1G / 5h, v2.4.100–102). |
+| 1 | 2026-10-16 | v2.4.98 | distribution | 30 / 30 | 1e-4 .. 1e-2 | 1e-5 .. 1e-3 | **abandoned** | Died in cal_2's fit after all 300 of its simulations completed — `compute_standard_nsr` named the fit from `dm.get_groups`, which since 8e returns all four calibration groups. Fixed in v2.4.103. Left on disk; rerun as #2 rather than cleared. |
+| 2 | 2026-10-16 | v2.4.104 | distribution | 30 / 30 | 1e-4 .. 1e-2 | 1e-5 .. 1e-3 | launched | Rerun after the cal_2 fix, under a fresh number rather than clearing #1. Ranges from probes #1–#4 (`tests/run_nsr_range_finder.sh`, v2.4.97). First calibration under `distribution` — the pre-refactor long-side rates were fitted under `argmax`. First run at the profiled resource defaults (1G / 5h, v2.4.100–102); `--slurm-mem-cal2` still overrides cal_2 to 5G. |
 
 ## Pre-refactor runs
 
