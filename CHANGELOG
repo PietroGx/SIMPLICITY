@@ -5,6 +5,58 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.102 — 2026-10-16 — pietro gerletti
+
+The simulation's graceful stop is now DERIVED from the Slurm walltime instead
+of being a second number kept in step by hand.
+
+    dir_manager.slurm_seconds(spec)        every form sbatch takes:
+                                           MM, MM:SS, HH:MM:SS, D-HH,
+                                           D-HH:MM, D-HH:MM:SS
+    dir_manager.graceful_max_runtime()     wall - max(600s, 5%)
+                                           at the 5h default: 17100s = 4h45m
+
+WHY IT HAD TO MOVE
+
+extrande.py:259's max_runtime ENDS THE RUN AND WRITES ITS OUTPUT; a walltime
+kill does not -- the task dies and the repeat has to be reconciled and re-run.
+The lower of the two decides, and the useful ordering is max_runtime first.
+
+It was 86000s (~24h), chosen against a 1-day wall. The wall went to 2 days,
+then in v2.4.101 to 5h -- at which point the guard sat 4.5 HOURS ABOVE the
+wall and could not fire at all. Nothing announced that: two numbers in two
+files drifted past each other silently. Derived, there is one to change.
+
+WHY STATED, NOT DEFAULTED
+
+read_standard_parameters_values returns {**defaults, **from_file} -- the FILE
+wins -- and standard_values.json is machine-local and gitignored. Changing the
+code default would not have reached an existing install, exactly as in
+v2.4.93 with the consensus mode. So build_cal1_settings, build_cal2_settings
+and build_exp_phase_settings each WRITE max_runtime into fixed_params, read at
+dispatch rather than at construction so --slurm-time reaches the guard with
+it. settings_manager's default now derives from the same helper, for a fresh
+install that never goes through a builder.
+
+tests/test_runtime_guard.py, in the local tier: the parse, the margin, that
+all three stages state it, that it follows --slurm-time down and back up
+(including for a builder constructed BEFORE the flag, which is the order
+impact_long_shedders_exp uses), and -- the check that matters -- that every
+SIMULATION RECORD out of generate_experiment_settings carries it, since
+fixed_params is not what a simulation reads.
+
+That last check is what caught the experiment phase: build_exp_phase_settings
+returned USER_FIXED_PARAMS.copy() and stated nothing. The value did reach the
+simulations through each group's scalars, so a fixed_params-only test would
+have passed while the stage banner showed no guard at all.
+
+Negative controls: cal_1 not stating it -> exit 1; the guard pinned back to
+86000, above the wall -> exit 1; clean -> exit 0.
+
+Local tier 13 passed, 0 failed.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.101 — 2026-10-16 — pietro gerletti
 
 Per-task SLURM walltime default 12h -> 5h. Memory unchanged at 1G.

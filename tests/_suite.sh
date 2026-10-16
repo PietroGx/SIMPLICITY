@@ -25,6 +25,7 @@ LOCAL_TESTS=(
     "stage dispatch|tests/test_stage_dispatch.py"
     "merged experiment (8e)|tests/test_merged_experiment.py"
     "consensus modes|tests/test_consensus_pipelines.py"
+    "runtime guard|tests/test_runtime_guard.py"
     "figure pipelines|tests/test_figure_pipelines.py"
     "analysis reads layout|tests/test_analysis_reads_new_layout.py"
     "trees/clustering/archive|tests/test_trees_clustering_archive.py"

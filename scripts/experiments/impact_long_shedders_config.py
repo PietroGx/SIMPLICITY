@@ -329,6 +329,9 @@ def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None,
         if ih_virus_emergence_rate is None else ih_virus_emergence_rate)
 
     def make_settings():
+        # read at dispatch, not at construction: --slurm-time reaches the env
+        # through set_slurm_resource_env and must reach the guard with it
+        fp = dict(fixed_params, max_runtime=dm.graceful_max_runtime())
         nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
         scenario_groups = [
             {
@@ -342,7 +345,7 @@ def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None,
             }
             for tau, r_long in unique_long_tau_r_long_pairs(sp)
         ]
-        return ({'_scenario_groups': scenario_groups}, fixed_params, seeds)
+        return ({'_scenario_groups': scenario_groups}, fp, seeds)
 
     return make_settings
 
@@ -405,13 +408,14 @@ def build_cal2_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None,
         fixed_params["IH_virus_emergence_rate"] = ih_virus_emergence_rate
 
     def make_settings():
+        fp = dict(fixed_params, max_runtime=dm.graceful_max_runtime())
         nsr_values = np.geomspace(ranges['min'], ranges['max'], ranges['steps']).tolist()
         # Named, so the group on disk and the 'standard_only' the fit used to
         # hardcode are the same string by construction rather than by habit.
         varying_params = {'_scenario_groups': [
             {'name': calib_std_group(),
              'nucleotide_substitution_rate': nsr_values}]}
-        return (varying_params, fixed_params, seeds)
+        return (varying_params, fp, seeds)
 
     return make_settings
 
@@ -500,7 +504,7 @@ def build_exp_scenario_settings(row, n_seeds, consensus=DEFAULT_CONSENSUS):
         # An empty group dict is still one group: generate_experiment_settings
         # expands it to combinations = [()], exactly as empty varying_params did.
         return ({'_scenario_groups': [{'name': exp_group(row['scenario_name'])}]},
-                fixed.copy(), n_seeds)
+                dict(fixed, max_runtime=dm.graceful_max_runtime()), n_seeds)
 
     return make_settings
 
@@ -537,8 +541,12 @@ def build_exp_phase_settings(rows, n_seeds, consensus=DEFAULT_CONSENSUS):
             f"the frozen table names a scenario twice: {sorted(names)}")
 
     def make_settings():
+        # stated here as well as on each group: the groups carry it because
+        # build_exp_scenario_settings states it, but this is the dict the
+        # stage banner prints and the one cal_1/cal_2 put it in
         return ({"_scenario_groups": [dict(g) for g in groups]},
-                USER_FIXED_PARAMS.copy(), n_seeds)
+                dict(USER_FIXED_PARAMS, max_runtime=dm.graceful_max_runtime()),
+                n_seeds)
 
     return make_settings
 

@@ -54,6 +54,42 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 os.environ["SIMPLICITY_SLURM_MEM"] = "1G"
 os.environ["SIMPLICITY_SLURM_TIME"] = "05:00:00"
 
+
+# Margin between the simulation's own stop and the Slurm wall: whatever runs
+# outside extrande's clock (interpreter start, settings reads) plus the final
+# output write. Measured writes are seconds; 10 minutes is deliberate slack.
+RUNTIME_MARGIN_S = 600
+RUNTIME_MARGIN_FRACTION = 0.05
+
+
+def slurm_seconds(spec):
+    """A Slurm walltime in seconds, in the forms sbatch accepts:
+    MM, MM:SS, HH:MM:SS, D-HH, D-HH:MM, D-HH:MM:SS."""
+    days, sep, rest = spec.partition('-')
+    if sep:
+        parts = [int(x) for x in rest.split(':')] + [0, 0]
+        return int(days) * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2]
+    parts = [int(x) for x in spec.split(':')]
+    if len(parts) == 1:
+        return parts[0] * 60                       # bare minutes
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]            # MM:SS
+    return parts[0] * 3600 + parts[1] * 60 + parts[2]
+
+
+def graceful_max_runtime(walltime=None):
+    """The simulation's own max_runtime, set just under the Slurm wall.
+
+    extrande's max_runtime is a GRACEFUL stop -- it ends the run and writes
+    its output. A walltime kill does not. Whichever is lower decides, so the
+    two cannot be set independently: 86000s (~24h) was chosen against a 1-day
+    wall and became unreachable, silently, the moment the wall came down.
+    Derived here so there is one number to change, not two to keep in step.
+    """
+    seconds = slurm_seconds(walltime or os.environ["SIMPLICITY_SLURM_TIME"])
+    return max(60, seconds - max(RUNTIME_MARGIN_S,
+                                 int(seconds * RUNTIME_MARGIN_FRACTION)))
+
 def set_data_dir(path):
     """Set the data directory path."""
     global _data_dir
