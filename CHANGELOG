@@ -5,6 +5,45 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.98 — 2026-10-16 — pietro gerletti
+
+RUNS.md: a run register. One row per --exp-num, filled at LAUNCH, carrying the
+commit, consensus mode, seed counts and NSR ranges the run was started with.
+Numbering restarts at 1 here: a run is now ONE experiment holding every phase
+as a group, so an old number does not describe the same thing as a new one.
+The pre-refactor runs are listed separately, for provenance only.
+
+Stale comments corrected. All describe code the 8c rename or the 8e merge
+changed; none of the code is touched.
+
+  submit_sanity_plot.sh        said the plotting script derives its inputs as
+                               <exp_name>_<scenario>_#<num>. Since 8e a
+                               scenario is a GROUP: it reads <exp_name>_#<num>
+                               and scopes by exp__<scenario>. Its 'set -u'
+                               note also pointed at itself, left over from the
+                               rename of submit_sanity_plot_unbound.sh.
+  runners/slurm.py             justified the experiment name on the status
+                               line by impact_long_shedders_unbound_exp.
+                               dispatch_all polling several experiments at
+                               once. That module is gone and 8e removed the
+                               threading with it; the name still earns its
+                               place because a run's phases share one log.
+  fig1_preprocess_data.py      "3 groups on the bound pipeline, 4 on the
+                               unbound one" -- there is one pipeline, and the
+                               labels are Control, SOT, HIV, Edge Case.
+  fig2_save.py                 "edge_case appears on the unbound pipeline".
+  long_nsr_calibration_plot.py two references to the bound/unbound split in
+                               the account of why the scenario list is not
+                               imported here.
+
+Left alone deliberately: scripts/archive_paper_runs.sh still names
+impact_long_shedders_unbound_*, because it addresses directories that really
+are called that on disk. Historical measurements that name a past run
+(slurm.py's 2,423s task, fig3's 14 of 243) are records, not descriptions of
+current behaviour.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.97 — 2026-10-16 — pietro gerletti
 
 NSR_RANGES retuned from HPC probes #1-#4 (tests/run_nsr_range_finder.sh, 6

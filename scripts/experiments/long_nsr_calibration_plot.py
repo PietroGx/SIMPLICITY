@@ -50,9 +50,8 @@ import simplicity.tuning.evolutionary_rate as er
 # file's own directory is on sys.path regardless of the caller's cwd, so the
 # sibling import below always resolves.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-# Constants only: both pipelines share this module, and the scenario list it
-# used to import from here is what put a bound-pipeline label on an unbound
-# group (see _cal1_groups).
+# Constants only: importing the scenario LIST from here is what once put one
+# pipeline's label on another's group (see _cal1_groups).
 from impact_long_shedders_config import (TAU_ROUND, DEFAULT_COLORS,
                                          groups_of_phase)
 
@@ -89,10 +88,10 @@ def _cal1_groups(experiment_name, groups=None):
     This used to be a {(tau, R_long) -> name} map, with the partition itself
     done by re-reading those two floats off every simulation output directory.
     Before that the name was re-derived by matching the pair against a scenario
-    list passed in by the caller, defaulting to the BOUND pipeline's SCENARIOS
-    -- the unbound pipeline's edge_case is not in that list, so its group fell
-    through to a raw 'tau=350.23,R_long=1.1' in unbound run #1, and that string
-    landed in the saved fit-results filename.
+    list passed in by the caller, defaulting to the deleted pipeline's
+    SCENARIOS -- edge_case was not in that list, so its group fell through to a
+    raw 'tau=350.23,R_long=1.1' and that string landed in the saved
+    fit-results filename.
 
     Names are joined with '+' by the config, never '/', which
     write_fit_results_csv's file-saving reads as a directory separator.

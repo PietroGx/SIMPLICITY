@@ -25,13 +25,13 @@
 # Usage: sbatch submit_sanity_plot.sh <exp_num> <target_osr_std> \
 #            <target_osr_long> [exp_name]
 #
-# exp_name selects the consensus mode and defaults to the distribution one. The
-# plotting script derives both its inputs (<exp_name>_<scenario>_#<num>) and its
-# output directory (<exp_name>_sanity_#<num>) from it, so the two pipelines
-# cannot collide.
+# exp_name selects the consensus mode and defaults to the distribution one.
+# Since 8e a scenario is a GROUP of one experiment, so the plotting script
+# reads <exp_name>_#<num> and scopes by exp__<scenario>; it derives its output
+# directory (<exp_name>_sanity_#<num>) from the same name, so two consensus
+# modes cannot collide.
 #
-# No 'set -u': conda's activate.d hooks are not nounset-safe (same reason
-# submit_sanity_plot.sh omits it).
+# No 'set -u': conda's activate.d hooks are not nounset-safe.
 # ============================================================================
 set -eo pipefail
 

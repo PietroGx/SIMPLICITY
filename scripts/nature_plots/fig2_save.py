@@ -33,7 +33,7 @@ def set_nature_rcparams():
 
 def build_figure_2(exp_num, exp_name, target_seed, fmt):
     set_nature_rcparams()
-    # from the pipeline's own config; edge_case appears on the unbound pipeline
+    # from the pipeline's own config, never a list typed here
     scenarios, _ = resolve_scenarios(exp_name, exp_num)
     if not scenarios:
         raise SystemExit(f"No scenario output found for {exp_name} #{exp_num}.")
