@@ -5,6 +5,39 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.106 — 2026-10-16 — pietro gerletti
+
+cal_2's 5G override removed: it follows --slurm-mem like every other stage,
+and --slurm-mem-cal2 now defaults to None, meaning "whatever the run asked
+for". Passing it still overrides, for the one-off case.
+
+The 5G was sized when cal_2 inherited production's 1095-day window and the
+BOUND pipeline swept it inside a mixed population -- where every OOM kill that
+pipeline ever took landed. build_cal2_settings pins CAL2_FINAL_TIME=365 and
+long_shedders_ratio=0, and the stage profiles at 301 MB, 8 MB above a bare
+interpreter and the cheapest in the pipeline. The one stage asking five times
+the default was the one needing it least.
+
+The resolution is a function, cal2_memory(slurm_mem, slurm_mem_cal2), rather
+than an inline `or` in main: it is the kind of default that goes stale
+silently, and this way it can be exercised. Checked at 1G/None -> 1G,
+2G/None -> 2G, 1G/8G -> 8G.
+
+------------------------------------------------------------------------
+
+## Version 2.4.105 — 2026-10-16 — pietro gerletti
+
+RUNS.md: the rerun goes out as #2 rather than reusing #1's number, so the
+register does not end up with one number meaning two runs.
+
+This entry was written late -- v2.4.105 and v2.4.106 were both committed
+without one, because the heredoc that writes the entry asserted on an anchor
+that the previous commit had not created and the `git add` behind it ran
+anyway. The CHANGELOG is the detail the commit messages deliberately do not
+carry, so a commit without an entry loses it.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.104 — 2026-10-16 — pietro gerletti
 
 RUNS.md: run #1 recorded as abandoned on the cal_2 fit of v2.4.103; the rerun
