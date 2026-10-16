@@ -63,8 +63,11 @@ CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.
 _SBATCH_JOB_ID_RE = re.compile(r'Submitted batch job (\d+)')
 SANITY_PLOT_POLL_INTERVAL_S = 15
 
-# cal_2 carries a full population across a 3-year window at up to NSR 1e-3;
-# every OOM kill the bound pipeline ever took was in its equivalent stage.
+# Sized when cal_2 inherited production's 1095-day window and the bound
+# pipeline swept it inside a MIXED population -- where every OOM kill that
+# pipeline ever took landed. Neither holds now: build_cal2_settings pins
+# CAL2_FINAL_TIME=365 and long_shedders_ratio=0, and the stage profiles as
+# the CHEAPEST in the pipeline (tests/profile_simulation_cost.py).
 CAL2_SLURM_MEM = "5G"
 
 

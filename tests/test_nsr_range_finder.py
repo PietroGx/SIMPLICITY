@@ -117,7 +117,7 @@ SATURATION_D = 0.1        # subs/site past which raw Hamming saturates
 # pipeline orchestrator's --slurm-mem-cal2: every OOM kill in production runs
 # #1 (284) and #4 (72) landed in cal_2 and nowhere else, and this tool's first
 # HPC run returned 0.20 yield at every stage-2 node while requesting only the
-# 4G default.
+# default per-task memory of the day (4G; 1G since v2.4.100).
 STAGE2_SLURM_MEM = "5G"
 
 RUNNERS = {
