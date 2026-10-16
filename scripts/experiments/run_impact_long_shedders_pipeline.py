@@ -63,12 +63,19 @@ CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.
 _SBATCH_JOB_ID_RE = re.compile(r'Submitted batch job (\d+)')
 SANITY_PLOT_POLL_INTERVAL_S = 15
 
-# Sized when cal_2 inherited production's 1095-day window and the bound
-# pipeline swept it inside a MIXED population -- where every OOM kill that
-# pipeline ever took landed. Neither holds now: build_cal2_settings pins
-# CAL2_FINAL_TIME=365 and long_shedders_ratio=0, and the stage profiles as
-# the CHEAPEST in the pipeline (tests/profile_simulation_cost.py).
-CAL2_SLURM_MEM = "5G"
+def cal2_memory(slurm_mem, slurm_mem_cal2=None):
+    """cal_2's per-task memory: the standard request unless overridden.
+
+    It carried a 5G override until v2.4.106. That was sized when cal_2
+    inherited production's 1095-day window and the BOUND pipeline swept it
+    inside a mixed population -- where every OOM kill that pipeline ever took
+    landed. Neither holds: build_cal2_settings pins CAL2_FINAL_TIME=365 and
+    long_shedders_ratio=0, and the stage profiles as the CHEAPEST in the
+    pipeline, 301 MB against the default 1G
+    (tests/profile_simulation_cost.py). So the one stage asking five times
+    the default was the one needing it least.
+    """
+    return slurm_mem_cal2 or slurm_mem
 
 
 
@@ -292,9 +299,10 @@ def main():
                             "default: they are the only record of why a task "
                             "failed, and the deletion is in place on Data/.")
     add_slurm_resource_args(parser)
-    parser.add_argument('--slurm-mem-cal2', type=str, default=CAL2_SLURM_MEM,
-                        help=f"Per-task SLURM memory for cal_2 only (default "
-                            f"{CAL2_SLURM_MEM}).")
+    parser.add_argument('--slurm-mem-cal2', type=str, default=None,
+                        help="Per-task SLURM memory for cal_2 only. Defaults "
+                             "to --slurm-mem: cal_2 is the cheapest stage in "
+                             "the pipeline and has no reason to ask for more.")
     args = parser.parse_args()
 
     # One calibration, one consensus mode. Both calibration stages now state
@@ -357,7 +365,8 @@ def main():
                   "--R", str(args.r_cal2),
                   "--ih-virus-emergence-rate", str(args.ih_virus_emergence_rate),
                   "--consensus", consensus,
-                  "--slurm-mem", args.slurm_mem_cal2,
+                  "--slurm-mem", cal2_memory(args.slurm_mem,
+                                             args.slurm_mem_cal2),
                   "--slurm-time", args.slurm_time], log_fh)
 
         report_simulation_health(
