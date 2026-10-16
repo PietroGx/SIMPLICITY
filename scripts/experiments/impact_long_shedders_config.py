@@ -553,8 +553,11 @@ def build_exp_phase_settings(rows, n_seeds, consensus=DEFAULT_CONSENSUS):
 # closest thing to this stage that pipeline had.
 _NSR_STEPS = 10
 
+# Probes #1-#4 (tests/run_nsr_range_finder.sh, 6 nodes x 10 seeds) put the
+# three cal_1 cohorts at NSR_long 5.7e-4 / 1.0e-3 / 1.7e-3 and the standard
+# rate near 7e-5. Rounded out from there; see CHANGELOG v2.4.97.
 NSR_RANGES = {
-    "cal_long": {"min": 1e-05, "max": 1e-02, "steps": _NSR_STEPS},
+    "cal_long": {"min": 1e-04, "max": 1e-02, "steps": _NSR_STEPS},
     "cal_std":  {"min": 1e-05, "max": 1e-03, "steps": _NSR_STEPS},
 }
 
