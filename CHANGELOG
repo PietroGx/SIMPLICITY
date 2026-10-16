@@ -5,6 +5,45 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.97 — 2026-10-16 — pietro gerletti
+
+NSR_RANGES retuned from HPC probes #1-#4 (tests/run_nsr_range_finder.sh, 6
+nodes x 10 seeds per cohort, consensus=distribution).
+
+    cal_long  1e-05 .. 1e-02   ->   1e-04 .. 1e-02
+    cal_std   1e-05 .. 1e-03        unchanged
+
+What the probes measured, as bracketing pair and inverted rate:
+
+    SOT        (infection  63 d)  1.58e-4 .. 6.31e-4   NSR_long 5.67e-4  R2 0.936
+    HIV_low    (infection 109 d)  6.31e-4 .. 2.51e-3   NSR_long 1.02e-3  R2 0.956
+    edge_case  (infection 365 d)  6.31e-4 .. 2.51e-3   NSR_long 1.68e-3  R2 0.997
+    standard_only                 6.31e-5 .. 1.58e-4
+
+cal_long is ONE range for all three cohorts, so it has to span the union. The
+three calibrated rates spread 3x on their own (5.7e-4 .. 1.7e-3), which is why
+a wide range is needed and not slack. Rounded out rather than taken verbatim
+from the union (1.58e-4 .. 2.51e-3): round decades, and headroom for the real
+calibration at 30 seeds moving the curve.
+
+Every target is now interior with nodes on both sides -- cal_long 4/6, 5/5,
+6/4 below/above; cal_std 4/6 -- where the old cal_long min of 1e-5 put the
+bottom three nodes two decades below anything the fit uses.
+
+Saturation never bound: edge_case, the longest infection and so the first to
+saturate, reached only d=0.0102 at the top node, 10x under the d>0.1 ceiling,
+and its whole sweep was reported usable.
+
+Side observation, not a result: the probes' inverted NSR_long agrees with run
+#8's frozen table to within +7.5% / -5.2% / -0.2% despite #8 being calibrated
+under argmax and these under distribution. One coarse probe at a third of the
+seeds, so it is a reason to expect the owed recalibration to confirm rather
+than overturn the long side -- not evidence that it will.
+
+Local tier (--quick) 12 passed, 0 failed.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.96 — 2026-10-15 — pietro gerletti
 
 tests/run_nsr_range_finder.sh: every NSR range probe a run needs, in one job.
