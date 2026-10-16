@@ -56,6 +56,7 @@ from impact_long_shedders_config import (
     CALIBRATION_SKIPPED_OUTPUTS,
     TABLE_FILENAME, SCENARIOS, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
     add_slurm_resource_args, CONSENSUS_MODES, DEFAULT_CONSENSUS, exp_name,
+    sanity_exp_name, run_export_dirs,
 )
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
@@ -202,7 +203,13 @@ def artifacts_archive_path(exp_num):
                         f"{EXP_NAME}_#{exp_num}_artifacts.zip")
 
 
-def write_artifacts_archive(archive_path, exp_num, log_file):
+def write_artifacts_archive(archive_path, exp_num, log_file, consensus_modes):
+    """The grids collected are the ones this run produced.
+
+    This used to walk CONSENSUS_MODES, so a distribution run always reported
+    the argmax grid missing and the other way round -- a skip line for a file
+    nothing had been asked to write.
+    """
     os.makedirs(os.path.dirname(archive_path), exist_ok=True)
     candidates = [
         log_file,
@@ -211,9 +218,8 @@ def write_artifacts_archive(archive_path, exp_num, log_file):
         os.path.join("Data", f"{EXP_NAME}_#{exp_num}", "05_Plots",
                      f"{EXP_NAME}_#{exp_num}_std_nsr_calibration_fit.png"),
     ]
-    # one sanity grid per consensus mode
-    for mode in CONSENSUS_MODES:
-        sanity_exp = f"{exp_name(mode)}_sanity_#{exp_num}"
+    for mode in consensus_modes:
+        sanity_exp = sanity_exp_name(mode, exp_num)
         candidates.append(
             os.path.join("Data", sanity_exp, "05_Plots",
                          f"{sanity_exp}_all_scenarios_global_vs_intrahost.png"))
@@ -225,21 +231,27 @@ def write_artifacts_archive(archive_path, exp_num, log_file):
                 print(f"  [skip] artifact not found: {path}")
 
 
-def compress_results(exp_num, log_fh, keep_slurm_logs=True):
+def compress_results(exp_num, log_fh, consensus, keep_slurm_logs=True):
     """Pack everything this run produced into Data_Export/*.tar.xz.
 
-    Hands Data/*_#<exp_num> to package_simplicity_data.sh, which globs every
-    experiment directory from this run -- the experiment itself, setup data,
-    the other consensus mode's experiment and the sanity directories -- with
-    no run numbers written out anywhere. Since 8e that is far fewer
-    directories: the calibrations and the scenarios are groups inside one.
+    Names the directories outright (run_export_dirs) instead of handing
+    package_simplicity_data.sh a `Data/*_#<exp_num>` match, which also picked
+    up anything else whose name ended in the same number -- a range-finder
+    probe, a scratch experiment -- and silently shipped it. Since 8e the list
+    is short: the experiment, setup data, the sanity grid.
+
+    The tag puts the experiment name and number in the archive filename, so two
+    runs packed on the same day no longer collide on part1.
 
     Submitted to Slurm (16 cpus) rather than run here: pixz over several GB
     does not belong on a login node. The pipeline does not wait for it; the
     parts appear in Data_Export/ when the packing job finishes.
     """
     script = os.path.join(SCRIPT_DIR, os.pardir, "package_simplicity_data.sh")
-    cmd = [script, "Data", f"_#{exp_num}", "--slurm"]
+    cmd = [script]
+    for d in run_export_dirs(exp_num, consensus):
+        cmd += ["--dir", d]
+    cmd += ["--tag", f"{EXP_NAME}_#{exp_num}", "--slurm"]
     env = dict(os.environ,
                SIMPLICITY_KEEP_SLURM_LOGS="1" if keep_slurm_logs else "0")
     header = f"\n$ {' '.join(cmd)}"
@@ -415,11 +427,12 @@ def main():
         for line in summary_lines:
             _log(log_fh, line)
 
-        write_artifacts_archive(archive_path, args.exp_num, log_file)
+        write_artifacts_archive(archive_path, args.exp_num, log_file,
+                                args.consensus)
 
         if not args.no_compress:
             _log(log_fh, "\n===== Packing results for download =====")
-            compress_results(args.exp_num, log_fh,
+            compress_results(args.exp_num, log_fh, consensus,
                              keep_slurm_logs=not args.drop_slurm_logs)
 
 

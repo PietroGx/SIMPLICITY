@@ -206,14 +206,14 @@ def test_sanity_plots():
           all('12345' in s for _, s in got), True)
 
 
-def test_archive_lists_both():
-    """write_artifacts_archive must look for a sanity plot per pipeline."""
+def _archive_looked_for(modes):
+    """Run write_artifacts_archive over an empty tree and return what it asked
+    for. In a temp cwd: the candidate paths are relative to Data/, and after
+    the v2.4.91 rename the argmax name collides with the bound run #7 still on
+    this machine -- a found file prints nothing, so the check would pass or
+    fail on what happens to be on disk."""
     import tempfile
     buf = io.StringIO()
-    # In a temp cwd: the candidate paths are relative to Data/, and after the
-    # v2.4.91 rename the argmax name collides with the bound run #7 still on
-    # this machine -- a found file prints nothing, so the check would pass or
-    # fail on what happens to be on disk.
     saved = os.getcwd()
     with tempfile.TemporaryDirectory() as tmp:
         arc = os.path.join(tmp, 'out', 'a.zip')
@@ -221,14 +221,33 @@ def test_archive_lists_both():
         try:
             with contextlib.redirect_stdout(buf):
                 runner.write_artifacts_archive(arc, 7,
-                                               os.path.join(tmp, 'no.log'))
+                                               os.path.join(tmp, 'no.log'),
+                                               modes)
         finally:
             os.chdir(saved)
-    looked_for = buf.getvalue()
+    return buf.getvalue()
+
+
+def test_archive_follows_the_mode_run():
+    """The archive collects a sanity plot for the mode the run used.
+
+    It used to walk CONSENSUS_MODES unconditionally, which since v2.4.93 --
+    where the orchestrator started refusing more than one mode per run -- meant
+    every run reported the other mode's grid missing. The function still takes
+    a list, because nothing stops a caller passing both; what it must not do is
+    invent one.
+    """
     for mode in cfg.CONSENSUS_MODES:
-        want = f"{cfg.exp_name(mode)}_sanity_#7"
-        check(f"archive looks for the {mode} sanity plot",
-              want in looked_for, True)
+        other = [m for m in cfg.CONSENSUS_MODES if m != mode][0]
+        looked_for = _archive_looked_for([mode])
+        check(f"{mode} run looks for its own sanity plot",
+              f"{cfg.exp_name(mode)}_sanity_#7" in looked_for, True)
+        check(f"{mode} run does NOT look for the {other} one",
+              f"{cfg.exp_name(other)}_sanity_#7" in looked_for, False)
+    both = _archive_looked_for(list(cfg.CONSENSUS_MODES))
+    for mode in cfg.CONSENSUS_MODES:
+        check(f"asked for both, it looks for {mode}",
+              f"{cfg.exp_name(mode)}_sanity_#7" in both, True)
 
 
 def test_shell_passes_exp_name():
@@ -250,7 +269,7 @@ if __name__ == '__main__':
     print("-- orchestrator guard --");  test_orchestrator_refuses_two_modes()
     print("-- dispatch (stubbed) --"); test_dispatch()
     print("-- sanity plots --");       test_sanity_plots()
-    print("-- artifacts archive --");  test_archive_lists_both()
+    print("-- artifacts archive --");  test_archive_follows_the_mode_run()
     print("-- sbatch wrapper --");     test_shell_passes_exp_name()
     print("\nCONSENSUS PIPELINES PASSED" if not _fails else f"\nFAILED: {_fails}")
     raise SystemExit(1 if _fails else 0)

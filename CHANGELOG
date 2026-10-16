@@ -5,6 +5,85 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.109 — 2026-10-16 — pietro gerletti
+
+What a run exports is now stated, not matched. Two bugs of the same shape,
+both visible in run #2's console output.
+
+THE ARTIFACTS ZIP ASKED FOR A FILE NOTHING HAD BEEN ASKED TO WRITE
+
+write_artifacts_archive walked CONSENSUS_MODES and looked for a sanity grid
+per mode, while the orchestrator has refused more than one mode per run since
+v2.4.93. Every distribution run therefore ended on
+
+    [skip] artifact not found: Data/impact_long_shedders_amx_sanity_#2/...
+
+It is cosmetic -- the zip was complete -- but a skip line is also how a
+genuinely missing figure announces itself, and one that prints on every
+healthy run teaches the eye to scroll past it. The function now takes the
+modes the run used; main() passes args.consensus, as every other site already
+did. It was the only `for mode in CONSENSUS_MODES` left outside a `choices=`
+validation.
+
+THE EXPORT PACKED A RANGE-FINDER PROBE
+
+compress_results handed package_simplicity_data.sh `Data` and `_#<n>` and let
+it glob. `Data/*_#2` also matches `nsr_range_finder_test_s1_#2`, left by
+tests/run_nsr_range_finder.sh, so a probe directory rode along inside run #2's
+tarball. Harmless there; the pattern is not. A run's directories are knowable.
+
+  - impact_long_shedders_config.run_export_dirs(exp_num, consensus) names the
+    three: the experiment, setup data, the sanity grid for the mode that ran.
+    sanity_exp_name() alongside it, so the orchestrator stops rebuilding that
+    string in two places.
+  - package_simplicity_data.sh takes `--dir D [--dir D ...] [--tag TAG]`
+    beside the existing SOURCE_DIR/SUFFIX form, which archive_paper_runs.sh
+    and nsr_sensitivity_analysis.py still use -- they pack a staging directory
+    or own their whole name, so the match is safe there. A named directory
+    that is not on disk is reported and skipped; all of them missing is an
+    error rather than an empty archive.
+  - TAG goes into the archive filename. Without it two runs packed on the same
+    day both write simplicity_export_<date>_part1.tar.xz and the second
+    overwrites the first. Names still start simplicity_export_, so
+    reconstruct_simplicity_data.sh and archive_paper_runs.sh still find them.
+  - The --slurm self-submission rebuilds its command from the real argv
+    through printf %q instead of re-spelling it, so a flag added later cannot
+    be dropped on the way to the compute node.
+
+TESTS
+
+tests/test_export_packaging.py, in the local tier. Exercises the real
+functions and the real shell script: both modes' artifact zips, the skip line
+still firing for a file that IS missing, the --dir list against
+run_export_dirs, and the packer over a tree holding the decoy -- with the old
+glob run over the same tree as the negative control, showing it sweeps the
+probe in. Both fixes mutation-tested: restoring either line fails the suite.
+
+tests/test_consensus_pipelines.py asserted the old behaviour (a sanity plot
+per pipeline, unconditionally); it now checks the archive follows the mode the
+run used, and still looks for both when handed both.
+
+tests/test_parallel_dispatch.py retired. It tested the per-scenario threaded
+dispatch that 8e removed, and had been dead since: its first function
+references impact_long_shedders_exp.dispatch_scenario, which no longer exists,
+so the file crashed on import-time use. It was in neither tier, which is why
+nothing noticed. Its one still-live check -- a packing failure is reported,
+not raised -- moved into test_export_packaging.py.
+
+RUNS.md: run #2 marked completed. It ran end to end, which makes it the first
+exercise of the experiment phase, the sanity plots and the packing step under
+the merged layout. Its export was read back and checked: nine groups, 30 seeds
+each, 45 simulations in one experiment, all four fits bracketed well inside
+their grids, and the sanity grid within 5.5% of the long-side target in every
+scenario.
+
+RUNS.md also gained a reserved-ranges section. Configuration grids run full
+pipelines, so their cells take experiment numbers from the same namespace as
+the runs in the table; #101-#136 are now reserved for the calibrated
+configuration grid so a future run cannot collide with one.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.108 — 2026-10-16 — pietro gerletti
 
 CHANGELOG entry for v2.4.107, plus this one, in a single commit -- writing
