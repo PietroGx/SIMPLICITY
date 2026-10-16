@@ -107,18 +107,21 @@ def compute_standard_nsr(numbered, target_osr_std, model_type='exp',
     clean_df = pd.concat(all_rows, ignore_index=True)
     clean_df = clean_df[clean_df['is_outlier'] == 0]
 
-    # The group name comes from the experiment record, where the config wrote
-    # it -- not a string typed here. The fit-results filename carries it, so a
-    # hand-typed one that drifted from the output tree would put the fit under a
-    # name no output has.
-    groups = dm.get_groups(numbered)
-    if len(groups) != 1:
-        raise RuntimeError(f"[Stage 2] expected one group in {numbered}, "
-                           f"found {groups}")
+    # The group name comes from the config, via `wanted` -- not a string typed
+    # here, and NOT whatever is on disk. The fit-results filename carries it.
+    #
+    # This read dm.get_groups(numbered) until v2.4.103 and required exactly
+    # one. That was true while cal_2 had an experiment to itself; since 8e the
+    # experiment also holds cal_1's cohorts, so the stage died here -- AFTER
+    # its 300 simulations had run -- on an experiment that was perfectly fine.
+    if len(wanted) != 1:
+        raise RuntimeError(
+            f"[Stage 2] one fit needs one group, got {wanted}. "
+            f"Groups on disk: {dm.get_groups(numbered)}.")
     fit_result = er.fit_observed_substitution_rate_regressor(
         numbered, clean_df, model_type,
         parameter_name='nucleotide_substitution_rate',
-        experiment_group=groups[0])
+        experiment_group=wanted[0])
     nsr_std = float(er.compute_calibrated_parameter(
         model_type, fit_result, target_osr_std))
     print(f"          calibrated standard NSR = {nsr_std:.8f}")
