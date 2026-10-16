@@ -604,6 +604,18 @@ def print_fixed_params(fixed_params, label="Fixed parameters"):
 # reconcile_terminated_tasks, which now detects and signals that case
 # regardless, but giving cheap extra headroom avoids the kill (and the
 # wasted compute) in the first place.
+#
+# v2.4.100: cut to 1G/12h, the first time either number came from a profile
+# rather than from a failure. tests/profile_simulation_cost.py puts peak RSS
+# at ~293 MB of interpreter and imports plus ~4.2 KB per intra-host lineage,
+# and the heaviest configuration this pipeline submits -- cal_1's edge_case
+# cohort, 100% long shedders over 1095 days with NSR_long at the top of the
+# sweep -- is 25,115 lineages and 401 MB. The 0.29-0.45G sacct range above
+# says the same thing from the cluster.
+# The 284 OOM kills do NOT describe these ranges: run #1 swept NSR_long up to
+# 0.5 and calibrated to 0.06-0.12, where NSR_RANGES now stops at 0.01 and
+# calibrates to 0.00057-0.0017 -- 50-100x less mutation, so 50-100x less of
+# the thing memory actually tracks.
 # =============================================================================
 def add_slurm_resource_args(parser):
     """Add --slurm-mem/--slurm-time to an argparse parser (shared wiring so

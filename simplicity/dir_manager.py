@@ -35,18 +35,22 @@ _data_dir = DEFAULT_DATA_DIR
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(10)
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(200)
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
-# Per-task SLURM resource request defaults (4G/2 days). Memory is from real
-# sacct data on the isolated long-NSR calibration grid -- see
-# impact_long_shedders_config. Time was bumped from 1 day after that same
-# grid showed some high-R_long tau groups (e.g. edge_case) still running
-# past the old 1-day walltime and getting killed mid-simulation (see
-# simplicity.runners.slurm.reconcile_terminated_tasks, which now detects and
-# signals that case regardless, but avoiding the kill in the first place is
-# still better when a day's headroom is cheap to give).
+# Per-task SLURM resource request defaults (1G/12h), cut from 4G/2 days on
+# the profile in tests/profile_simulation_cost.py. Peak RSS is ~293 MB of
+# interpreter and imports plus ~4.2 KB per intra-host lineage, and tracks
+# nothing else -- not population_size, barely the infection count. The
+# heaviest configuration the pipeline actually submits is cal_1's edge_case
+# cohort at 401 MB; 1G is reached at ~174,000 lineages, 7x that.
+# 12h is ~18x the slowest task on record (2,423s, of unbound #1's 1,400).
+# Both were sized by failures in the deleted bound pipeline rather than by
+# measurement: memory until OOM kills went 284 -> 72 -> 4 -> 0, time after
+# edge_case cohorts were killed mid-simulation past a 1-day wall.
+# NOTE the simulation's own max_runtime (86000s, ~24h) now sits ABOVE this
+# wall, so Slurm kills a long task before it can stop itself and write.
 # CLI scripts that expose --slurm-mem/--slurm-time overwrite these with the
 # user's chosen value before submitting; this is just the baseline.
-os.environ["SIMPLICITY_SLURM_MEM"] = "4G"
-os.environ["SIMPLICITY_SLURM_TIME"] = "2-00:00:00"
+os.environ["SIMPLICITY_SLURM_MEM"] = "1G"
+os.environ["SIMPLICITY_SLURM_TIME"] = "12:00:00"
 
 def set_data_dir(path):
     """Set the data directory path."""
