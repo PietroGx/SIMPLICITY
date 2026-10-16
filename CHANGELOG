@@ -5,6 +5,63 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.103 — 2026-10-16 — pietro gerletti
+
+cal_2 died on a healthy run, AFTER its 300 simulations had completed. An 8f
+miss, found on the HPC on the first post-refactor run.
+
+compute_standard_nsr reads its rows scoped -- `wanted`, from the config --
+and then has to NAME the fit for the fit-results filename. It took that name
+from the experiment instead:
+
+    groups = dm.get_groups(numbered)
+    if len(groups) != 1:
+        raise RuntimeError(f"[Stage 2] expected one group in {numbered} ...")
+
+True while cal_2 owned an experiment to itself. Since 8e the experiment also
+holds cal_1's three cohorts, so the assertion fires every time:
+
+    RuntimeError: [Stage 2] expected one group in impact_long_shedders_#1,
+    found ['calib_long__SOT', 'calib_long__HIV_low+HIV_high',
+           'calib_long__edge_case', 'calib_std__standard_only']
+
+It now names `wanted[0]`, which is what the data was read from -- still from
+the config, never a string typed here, which was the point of reading it off
+the experiment in the first place. The one-group guard stays, on the scope
+rather than on the disk, and prints both.
+
+WHY THE 8f AUDIT MISSED IT
+
+8f went through every site that READS simulation output and scoped it. This
+line reads no output: it asks the experiment for a NAME, after the scoped
+read has already happened. Scoping the reads was necessary and not
+sufficient -- anything that asks the experiment a question whose answer used
+to be unique is the same bug.
+
+Audited the remaining dm.get_groups callers: check_completed_simulations,
+nextstrain (both deliberate all-group listings with a --group narrowing),
+long_nsr_calibration_plot and the orchestrator (both scoped by phase prefix),
+nsr_sensitivity_analysis (buckets per group, never pools). This was the only
+one.
+
+tests/test_merged_experiment.py gains the section, against the nine-group
+experiment with only the per-seed readers and the regressor stubbed: the fit
+is named calib_std__standard_only and not one of the four on disk, it fits 6
+rows (calib_std's 3 grid points x 2 seeds) rather than every seed in the
+experiment, an explicit scope agrees, and two groups for one fit is refused.
+Negative control: restoring the old two lines fails it, exit 1.
+
+NOT FIXED, AND IT COSTS A STAGE
+
+cal_2 has no way to resume past its own dispatch. The 300 completed
+simulations are on disk and write_experiment_settings refuses the group as a
+duplicate, so the stage cannot simply be re-run -- any failure after dispatch
+costs the whole stage. cal_1 has --skip-cal1; cal_2 has no counterpart.
+
+Local tier 13 passed, 0 failed.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.102 — 2026-10-16 — pietro gerletti
 
 The simulation's graceful stop is now DERIVED from the Slurm walltime instead

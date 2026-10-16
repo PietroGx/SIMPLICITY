@@ -220,6 +220,76 @@ def test_readers_that_take_a_whole_experiment():
            and cfg.calib_std_group() not in only), True)
 
 
+# ===========================================================================
+def test_cal2_fit_names_the_group_it_was_scoped_to():
+    """The stage that actually broke on the HPC.
+
+    compute_standard_nsr reads its rows scoped, then has to NAME the fit for
+    the results filename. It took that name from dm.get_groups(numbered) and
+    required exactly one -- true while cal_2 owned an experiment, false since
+    8e, where cal_1's cohorts are in the same experiment. So the stage died
+    AFTER its 300 simulations had run, on an experiment that was fine.
+
+    Only the per-seed readers and the regressor are stubbed; the scoping, the
+    group listing and the naming are the real ones.
+    """
+    print('\n=== cal_2 fits under its own group, not whatever is on disk')
+    import impact_long_shedders_cal_2 as c2
+
+    class Fit:
+        def eval(self, x=None):
+            return [1.0 for _ in x]
+
+    seen = {}
+    saved = (c2.om.read_final_time, c2.om.read_sequencing_data_regression,
+             c2.er.tempest_regression,
+             c2.er.fit_observed_substitution_rate_regressor,
+             c2.er.compute_calibrated_parameter)
+
+    def record_fit(numbered, df, model, parameter_name=None,
+                   experiment_group=None):
+        seen['group'] = experiment_group
+        seen['rows'] = len(df)
+        return Fit()
+
+    c2.om.read_final_time = lambda ssod: 365.0
+    c2.om.read_sequencing_data_regression = lambda ssod: pd.DataFrame(
+        {'individual_type': ['standard'] * 40})
+    c2.er.tempest_regression = lambda df: type('R', (), {'coef_': [0.0013]})()
+    c2.er.fit_observed_substitution_rate_regressor = record_fit
+    c2.er.compute_calibrated_parameter = lambda *a, **k: 7e-5
+    try:
+        nsr = c2.compute_standard_nsr(NAME, 0.0013)
+        check('it runs at all on a merged experiment', isinstance(nsr, float),
+              True)
+        check('and names the calib_std group, not one of the four on disk',
+              seen.get('group'), cfg.calib_std_group())
+        # one row per SEED: calib_std's 3 grid points x CAL_SEEDS. Unscoped
+        # it would pull every seed of all 17 simulations in the experiment.
+        check('the rows it fitted came only from that group',
+              seen.get('rows'), 3 * CAL_SEEDS)
+
+        # and an explicit scope still wins
+        seen.clear()
+        c2.compute_standard_nsr(NAME, 0.0013, groups=[cfg.calib_std_group()])
+        check('an explicit scope names the same group',
+              seen.get('group'), cfg.calib_std_group())
+
+        # the guard that remains: a fit is one group, and it says so
+        try:
+            c2.compute_standard_nsr(NAME, 0.0013, groups=[
+                cfg.calib_std_group(), cfg.calib_long_group('SOT')])
+            check('two groups for one fit is refused', False, True)
+        except RuntimeError as exc:
+            check('two groups for one fit is refused, naming them',
+                  'one fit needs one group' in str(exc), True)
+    finally:
+        (c2.om.read_final_time, c2.om.read_sequencing_data_regression,
+         c2.er.tempest_regression,
+         c2.er.fit_observed_substitution_rate_regressor,
+         c2.er.compute_calibrated_parameter) = saved
+
+
 def main():
     print(__doc__.strip().splitlines()[0])
     root = tempfile.mkdtemp(prefix='merged_exp_')
@@ -234,7 +304,8 @@ def main():
         for section in (test_structure,
                         test_an_unscoped_listing_really_does_span_phases,
                         test_figures_read_only_their_scenario,
-                        test_readers_that_take_a_whole_experiment):
+                        test_readers_that_take_a_whole_experiment,
+                        test_cal2_fit_names_the_group_it_was_scoped_to):
             # a section that RAISES is a failure, not a crash: the scoping
             # guards raise by design, and a traceback here would end the run
             # with the later sections unreported
