@@ -168,9 +168,8 @@ def print_simulations_status(status, experiment_name=None):
     """One timestamped status line. Printed on every change of status and
     never otherwise: a fixed-interval reprint of an unchanged line buries
     the transitions that actually carry information. The experiment name is
-    on the line because several experiments can now poll concurrently (see
-    impact_long_shedders_unbound_exp.dispatch_all) and their output
-    interleaves."""
+    on the line because a run's phases all poll into the same log, and until
+    8e the experiment phase polled five experiments at once from threads."""
     tag = f" {experiment_name}" if experiment_name else ""
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]{tag} {status}")
 
