@@ -35,7 +35,7 @@ _data_dir = DEFAULT_DATA_DIR
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(10)
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(200)
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
-# Per-task SLURM resource request defaults (2G/2 days). Memory is from real
+# Per-task SLURM resource request defaults (4G/2 days). Memory is from real
 # sacct data on the isolated long-NSR calibration grid -- see
 # impact_long_shedders_config. Time was bumped from 1 day after that same
 # grid showed some high-R_long tau groups (e.g. edge_case) still running
