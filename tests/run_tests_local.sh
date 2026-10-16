@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The LOCAL tier: run these on your own machine, not on the cluster.
 #
-#   bash tests/run_tests_local.sh            # all ten, ~5 min
+#   bash tests/run_tests_local.sh            # the whole tier, ~5 min
 #   bash tests/run_tests_local.sh --quick    # skip the two slow ones, ~40 s
 #   bash tests/run_tests_local.sh --list     # what would run
 #

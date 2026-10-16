@@ -464,6 +464,27 @@ def exp_name(consensus):
     return EXP_NAME + CONSENSUS_SUFFIX[consensus]
 
 
+def sanity_exp_name(consensus, exp_num):
+    """Directory the sanity grid for one consensus mode is written into."""
+    return f"{exp_name(consensus)}_sanity_#{exp_num}"
+
+
+def run_export_dirs(exp_num, consensus=DEFAULT_CONSENSUS):
+    """Every directory one run produces, named outright.
+
+    The export used to be a `Data/*_#<exp_num>` glob, which also swept in
+    anything else whose name happened to end in the same number -- a
+    range-finder probe, a scratch experiment. A run's directories are
+    knowable, so list them instead of matching them. Rooted at Data/, like
+    SETUP_DIR_TEMPLATE.
+    """
+    return [
+        os.path.join("Data", f"{EXP_NAME}_#{exp_num}"),
+        SETUP_DIR_TEMPLATE.format(exp_num=exp_num),
+        os.path.join("Data", sanity_exp_name(consensus, exp_num)),
+    ]
+
+
 def build_exp_scenario_settings(row, n_seeds, consensus=DEFAULT_CONSENSUS):
     """One simulation point per frozen-table row. Both rates are applied as
     calibrated; nothing here compensates for their interaction.
