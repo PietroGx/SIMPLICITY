@@ -7,9 +7,9 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ## Version 2.4.104 — 2026-10-16 — pietro gerletti
 
-RUNS.md: run #1 recorded as abandoned on the cal_2 fit of v2.4.103, and
-relaunched clean under the same number. The register exists for exactly this
--- a number that means two different things is the thing it is meant to stop.
+RUNS.md: run #1 recorded as abandoned on the cal_2 fit of v2.4.103; the rerun
+goes out as #2 rather than reusing the number. The register exists for exactly
+this -- a number that means two different things is what it is meant to stop.
 
 ------------------------------------------------------------------------
 
