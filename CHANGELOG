@@ -5,6 +5,14 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.104 — 2026-10-16 — pietro gerletti
+
+RUNS.md: run #1 recorded as abandoned on the cal_2 fit of v2.4.103, and
+relaunched clean under the same number. The register exists for exactly this
+-- a number that means two different things is the thing it is meant to stop.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.103 — 2026-10-16 — pietro gerletti
 
 cal_2 died on a healthy run, AFTER its 300 simulations had completed. An 8f
