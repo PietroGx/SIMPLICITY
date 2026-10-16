@@ -5,6 +5,27 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.108 — 2026-10-16 — pietro gerletti
+
+CHANGELOG entry for v2.4.107, plus this one, in a single commit -- writing
+107's entry needs a commit of its own, and that commit needs an entry, so the
+two are landed together rather than chasing each other a version at a time.
+
+------------------------------------------------------------------------
+
+## Version 2.4.107 — 2026-10-16 — pietro gerletti
+
+Backfilled the missing v2.4.105 and v2.4.106 entries, and RUNS.md's row #2,
+which the v2.4.106 commit dropped: the heredoc writing them asserted on a
+CHANGELOG anchor the previous commit had never created, and the `git add`
+behind it was a separate command, so it staged and pushed the code while the
+entry was silently lost.
+
+Checked the last twelve commits against the file afterwards; 105, 106 and 107
+were the only gaps, and only because of that one broken chain.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.106 — 2026-10-16 — pietro gerletti
 
 cal_2's 5G override removed: it follows --slurm-mem like every other stage,
