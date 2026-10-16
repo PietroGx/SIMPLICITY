@@ -56,7 +56,9 @@ _STANDARD_VALUES_DEFAULTS = {
         "nucleotide_substitution_rate":  0.00008759,  # e in theoretical model equations
         "nucleotide_substitution_rate_long":  0.00008759,  # absolute NSR for long shedders
         "final_time": 365,
-        "max_runtime": 86000,
+        # a fallback only: the pipeline's builders write the live
+        # value, derived from the walltime they are submitting under
+        "max_runtime": dm.graceful_max_runtime(),
         "phenotype_model": 'immune_waning',  # or 'linear'
         "consensus": 'distribution',  # or 'argmax' (immune_waning only)
         "sequence_long_shedders": False,
