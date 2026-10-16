@@ -5,6 +5,13 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.99 — 2026-10-16 — pietro gerletti
+
+dir_manager's resource comment said the defaults were "2G/2 days"; the value
+below it has been 4G. Comment only.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.98 — 2026-10-16 — pietro gerletti
 
 RUNS.md: a run register. One row per --exp-num, filled at LAUNCH, carrying the
