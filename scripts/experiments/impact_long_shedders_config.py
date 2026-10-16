@@ -605,7 +605,7 @@ def print_fixed_params(fixed_params, label="Fixed parameters"):
 # regardless, but giving cheap extra headroom avoids the kill (and the
 # wasted compute) in the first place.
 #
-# v2.4.100: cut to 1G/12h, the first time either number came from a profile
+# v2.4.100/101: cut to 1G/5h, the first time either number came from a profile
 # rather than from a failure. tests/profile_simulation_cost.py puts peak RSS
 # at ~293 MB of interpreter and imports plus ~4.2 KB per intra-host lineage,
 # and the heaviest configuration this pipeline submits -- cal_1's edge_case

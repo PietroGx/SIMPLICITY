@@ -5,6 +5,33 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.101 — 2026-10-16 — pietro gerletti
+
+Per-task SLURM walltime default 12h -> 5h. Memory unchanged at 1G.
+
+5h is ~7x the slowest task on record (2,423s, the worst of unbound #1's
+1,400), and that record overstates the current pipeline twice over: it was
+measured with NSR_long swept to 0.5, where NSR_RANGES now stops at 0.01, and
+memory and runtime both track the mutation load. The heaviest configuration
+profiled locally ran 173s.
+
+Shorter is the request that actually buys throughput. A 5h job backfills into
+gaps a 12h job cannot, and the per-run concurrency is capped by SIMPLICITY's
+own SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM (200) rather than by what
+Slurm would grant, so what a smaller request buys is being SCHEDULED sooner,
+not a higher cap.
+
+A task that does overrun is detected and reconciled from sacct as TIMEOUT and
+can be resumed, so an under-request costs a re-run rather than a run.
+
+The max_runtime note from v2.4.100 gets sharper, not different: the
+simulation's own graceful stop is 86000s (~24h), now 4.8x above the wall
+instead of 2x, so it remains unreachable. Still latent -- nothing measured
+approaches either bound -- and still not fixed, because a machine-local
+standard_values.json wins over the code default.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.100 — 2026-10-16 — pietro gerletti
 
 Per-task SLURM defaults cut 4G/2 days -> 1G/12h, and tests/profile_simulation_

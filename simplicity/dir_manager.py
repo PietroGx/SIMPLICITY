@@ -35,13 +35,15 @@ _data_dir = DEFAULT_DATA_DIR
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_MULTIPROCESS"] = str(10)
 os.environ["SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM"] = str(200)
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
-# Per-task SLURM resource request defaults (1G/12h), cut from 4G/2 days on
+# Per-task SLURM resource request defaults (1G/5h), cut from 4G/2 days on
 # the profile in tests/profile_simulation_cost.py. Peak RSS is ~293 MB of
 # interpreter and imports plus ~4.2 KB per intra-host lineage, and tracks
 # nothing else -- not population_size, barely the infection count. The
 # heaviest configuration the pipeline actually submits is cal_1's edge_case
 # cohort at 401 MB; 1G is reached at ~174,000 lineages, 7x that.
-# 12h is ~18x the slowest task on record (2,423s, of unbound #1's 1,400).
+# 5h is ~7x the slowest task on record (2,423s, of unbound #1's 1,400) -- and
+# that task ran with NSR_long swept to 0.5, where the range now stops at 0.01,
+# so it is an overestimate of anything this pipeline now submits.
 # Both were sized by failures in the deleted bound pipeline rather than by
 # measurement: memory until OOM kills went 284 -> 72 -> 4 -> 0, time after
 # edge_case cohorts were killed mid-simulation past a 1-day wall.
@@ -50,7 +52,7 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 # CLI scripts that expose --slurm-mem/--slurm-time overwrite these with the
 # user's chosen value before submitting; this is just the baseline.
 os.environ["SIMPLICITY_SLURM_MEM"] = "1G"
-os.environ["SIMPLICITY_SLURM_TIME"] = "12:00:00"
+os.environ["SIMPLICITY_SLURM_TIME"] = "05:00:00"
 
 def set_data_dir(path):
     """Set the data directory path."""
