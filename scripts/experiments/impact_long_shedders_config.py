@@ -105,12 +105,16 @@ DEFAULT_CONSENSUS = "distribution"
 # inside impact_long_shedders_#N; there is no longer an experiment per
 # calibration stage or per scenario.
 EXP_NAME = "impact_long_shedders"
-
-# setup_data keeps its own directory: it holds the frozen table, which is an
-# input to the next phase rather than simulation output, and it is what the
-# experiment phase reads to know what to run.
-SETUP_DIR_TEMPLATE = "Data/impact_long_shedders_setup_data_#{exp_num}"
 TABLE_FILENAME = "nsr_calibration_table.csv"
+
+# Every path a run writes is derived from EXP_NAME at call time, by the helpers
+# at the bottom of this module -- never spelled out. A run used to leave three
+# top-level directories in Data/ (the experiment, setup_data, the sanity grid),
+# two of them holding a single file, so a 36-cell grid left 108. They are now
+# nested under the run's own directory, and because nothing spells a path
+# itself, a driver that rebinds EXP_NAME moves all of them together: that is
+# how tests/run_calibrated_grid.sh gets its own ils_grid_#N namespace instead
+# of borrowing numbers from the runs.
 
 # ---------------------------------------------------------------------------
 # GROUP NAMES -- the identity of a phase's slice of the experiment
@@ -464,25 +468,68 @@ def exp_name(consensus):
     return EXP_NAME + CONSENSUS_SUFFIX[consensus]
 
 
-def sanity_exp_name(consensus, exp_num):
-    """Directory the sanity grid for one consensus mode is written into."""
+def consensus_of(name):
+    """Inverse of exp_name(). The sanity plot is handed a name rather than a
+    mode and still has to write where the rest of the run expects it."""
+    for mode in CONSENSUS_MODES:
+        if name == exp_name(mode):
+            return mode
+    raise ValueError(f"not an experiment name for any consensus mode: {name!r}")
+
+
+def run_exp_name(exp_num, consensus=DEFAULT_CONSENSUS):
+    """The one experiment a run writes. Everything else nests inside it."""
+    return f"{exp_name(consensus)}_#{exp_num}"
+
+
+def run_dir(exp_num, consensus=DEFAULT_CONSENSUS):
+    return os.path.join("Data", run_exp_name(exp_num, consensus))
+
+
+def setup_dir(exp_num, consensus=DEFAULT_CONSENSUS):
+    """Holds the frozen table: an input to the next phase rather than
+    simulation output, which is why it is its own directory and not a group."""
+    return os.path.join(run_dir(exp_num, consensus), "setup_data")
+
+
+def table_path(exp_num, consensus=DEFAULT_CONSENSUS):
+    return os.path.join(setup_dir(exp_num, consensus), TABLE_FILENAME)
+
+
+def sanity_dir_name(exp_num, consensus=DEFAULT_CONSENSUS):
+    """What dir_manager is given as an experiment name for the sanity grid.
+    It joins this onto Data/, so a nested name resolves on its own."""
+    return os.path.join(run_exp_name(exp_num, consensus), "sanity")
+
+
+def sanity_plot_stem(exp_num, consensus=DEFAULT_CONSENSUS):
+    """Filename stem, deliberately NOT the directory name: the directory
+    nests, a filename cannot hold a separator. Keeping one string for both is
+    what forced the sanity grid to be a top-level directory."""
     return f"{exp_name(consensus)}_sanity_#{exp_num}"
 
 
+def sanity_plot_path(exp_num, consensus=DEFAULT_CONSENSUS):
+    """The sanity figure, spelled once. It used to be spelled three times --
+    here, in plot_sot_sanity_regressions and in the pipeline's artifact list
+    -- each free to drift from the others."""
+    return os.path.join(
+        "Data", sanity_dir_name(exp_num, consensus), "05_Plots",
+        f"{sanity_plot_stem(exp_num, consensus)}"
+        "_all_scenarios_global_vs_intrahost.png")
+
+
 def run_export_dirs(exp_num, consensus=DEFAULT_CONSENSUS):
-    """Every directory one run produces, named outright.
+    """Every directory one run produces -- now one, since the other two nest
+    inside it.
 
     The export used to be a `Data/*_#<exp_num>` glob, which also swept in
     anything else whose name happened to end in the same number -- a
-    range-finder probe, a scratch experiment. A run's directories are
-    knowable, so list them instead of matching them. Rooted at Data/, like
-    SETUP_DIR_TEMPLATE.
+    range-finder probe, a scratch experiment. It then listed three directories
+    but named the first with a bare EXP_NAME, so an argmax run exported a
+    distribution directory that did not exist.
     """
-    return [
-        os.path.join("Data", f"{EXP_NAME}_#{exp_num}"),
-        SETUP_DIR_TEMPLATE.format(exp_num=exp_num),
-        os.path.join("Data", sanity_exp_name(consensus, exp_num)),
-    ]
+    return [run_dir(exp_num, consensus)]
 
 
 def build_exp_scenario_settings(row, n_seeds, consensus=DEFAULT_CONSENSUS):

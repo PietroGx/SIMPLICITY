@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Run every calibrated-grid cell one after another, resumably, ON A COMPUTE NODE.
 #
-#   bash tests/run_calibrated_grid.sh                      # all 18, #1..#18
+#   bash tests/run_calibrated_grid.sh                      # all of them, #1..
 #   bash tests/run_calibrated_grid.sh --cells 14           # just that one, #14
 #   bash tests/run_calibrated_grid.sh --cells 17 --rerun   # redo a stuck cell
-#   bash tests/run_calibrated_grid.sh --exp-base 20        # if #1..#18 are taken
+#   bash tests/run_calibrated_grid.sh --exp-base 20        # start numbering at 20
 #   bash tests/run_calibrated_grid.sh --no-watch           # submit and return
+#
+# Cells are written as ils_grid_#N, their own namespace, so they number from 1
+# and never collide with a run's impact_long_shedders_#N. RUNS.md no longer
+# has to reserve a range for them.
 #
 # Run from a terminal, it submits and then follows the job log, so you keep the
 # live view while the run itself belongs to Slurm. Ctrl-C stops watching, not

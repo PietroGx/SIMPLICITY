@@ -133,8 +133,8 @@ def frozen_rows(scenarios, sp, derive):
     return rows
 
 
-def write_frozen_table(setup_dir_template, filename, rows):
-    directory = setup_dir_template.format(exp_num=EXP_NUM)
+def write_frozen_table(setup_dir_for, filename, rows):
+    directory = setup_dir_for(EXP_NUM)
     os.makedirs(directory, exist_ok=True)
     pd.DataFrame(rows).to_csv(os.path.join(directory, filename), index=False)
 
@@ -170,7 +170,7 @@ def stage_exp(module_name, config_name, extra_argv=()):      # noqa: ARG001
         module = __import__(module_name)
         sp = sm.read_standard_parameters_values()
         # take them from the module that actually reads the table
-        write_frozen_table(module.SETUP_DIR_TEMPLATE, module.TABLE_FILENAME,
+        write_frozen_table(config.setup_dir, config.TABLE_FILENAME,
                            frozen_rows(config.SCENARIOS, sp,
                                        config.derive_scenario_params))
         install(module, dispatch)

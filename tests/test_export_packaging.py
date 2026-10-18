@@ -72,15 +72,18 @@ def plant(root, name, *files):
 
 # ===========================================================================
 def test_export_dirs():
-    print('\n=== run_export_dirs names the directories outright')
-    for mode, sanity in (('distribution', 'Data/impact_long_shedders_sanity_#7'),
-                         ('argmax', 'Data/impact_long_shedders_amx_sanity_#7')):
+    print('\n=== run_export_dirs names the one directory a run writes')
+    for mode, root in (('distribution', 'Data/impact_long_shedders_#7'),
+                       ('argmax', 'Data/impact_long_shedders_amx_#7')):
         dirs = cfg.run_export_dirs(7, mode)
-        check(f'{mode}: three directories', len(dirs), 3)
-        check(f'{mode}: the experiment', dirs[0], 'Data/impact_long_shedders_#7')
-        check(f'{mode}: setup data', dirs[1],
-              cfg.SETUP_DIR_TEMPLATE.format(exp_num=7))
-        check(f'{mode}: sanity grid', dirs[2], sanity)
+        check(f'{mode}: one directory', len(dirs), 1)
+        # it used to name the experiment with a bare EXP_NAME, so an argmax
+        # run exported a distribution directory that was never written
+        check(f'{mode}: the run directory', dirs[0], root)
+        check(f'{mode}: setup data is inside it',
+              cfg.setup_dir(7, mode).startswith(root + os.sep), True)
+        check(f'{mode}: so is the sanity grid',
+              cfg.sanity_plot_path(7, mode).startswith(root + os.sep), True)
     # the whole point: nothing in the list is a pattern
     globby = [d for d in cfg.run_export_dirs(7) if set('*?[') & set(d)]
     check('no wildcards anywhere in the list', globby, [])
@@ -96,15 +99,17 @@ def test_artifacts_archive():
     try:
         os.chdir(root)
         num = 3
-        exp = f'{cfg.EXP_NAME}_#{num}'
-        plant(root, exp,
-              f'05_Plots/{exp}_long_nsr_calibration_fit.png',
-              f'05_Plots/{exp}_std_nsr_calibration_fit.png')
-        # BOTH sanity directories on disk, so the mode asked for is the only
-        # thing that can decide which grid is picked up.
+        exp = cfg.run_exp_name(num)
+        # BOTH modes fully on disk, so the mode asked for is the only thing
+        # that can decide which artifacts are picked up. Each mode's sanity
+        # grid now nests inside that mode's own run directory.
         for mode in cfg.CONSENSUS_MODES:
-            s = cfg.sanity_exp_name(mode, num)
-            plant(root, s, f'05_Plots/{s}_all_scenarios_global_vs_intrahost.png')
+            run = cfg.run_exp_name(num, mode)
+            plant(root, run,
+                  f'05_Plots/{run}_long_nsr_calibration_fit.png',
+                  f'05_Plots/{run}_std_nsr_calibration_fit.png')
+            rel = os.path.relpath(cfg.sanity_plot_path(num, mode), 'Data')
+            plant(root, os.path.dirname(rel), os.path.basename(rel))
         log = os.path.join(root, 'pipeline.log')
         with open(log, 'w') as fh:
             fh.write('log')
@@ -116,11 +121,11 @@ def test_artifacts_archive():
             names = sorted(zipfile.ZipFile(zpath).namelist())
             check(f'{mode}: four artifacts', len(names), 4)
             check(f'{mode}: its own grid is in',
-                  f'{cfg.sanity_exp_name(mode, num)}'
-                  '_all_scenarios_global_vs_intrahost.png' in names, True)
+                  os.path.basename(cfg.sanity_plot_path(num, mode)) in names,
+                  True)
             check(f'{mode}: the other grid is NOT in',
-                  f'{cfg.sanity_exp_name(other, num)}'
-                  '_all_scenarios_global_vs_intrahost.png' in names, False)
+                  os.path.basename(cfg.sanity_plot_path(num, other)) in names,
+                  False)
             check(f'{mode}: both calibration fits are in',
                   sum(1 for n in names if n.endswith('_calibration_fit.png')), 2)
 

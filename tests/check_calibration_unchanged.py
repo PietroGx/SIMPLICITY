@@ -50,17 +50,18 @@ sys.path.insert(0, os.path.join(REPO, 'scripts'))
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 
 import simplicity.dir_manager as dm
-from impact_long_shedders_config import EXP_NAME, calib_std_group
+from impact_long_shedders_config import (
+    EXP_NAME, calib_std_group, table_path as frozen_table_path)
 
 failures = []
 skipped = []
 
-# One experiment since 8e; the two calibrations are GROUPS inside it, and
-# only setup_data still has a directory of its own.
+# One experiment since 8e; the two calibrations are GROUPS inside it. Where
+# the frozen table lives is NOT spelled here -- the config's table_path owns
+# that, and since v2.4.111 it nests inside the run's own directory.
 NAMES = {
     'cal_1': EXP_NAME,
     'cal_2': EXP_NAME,
-    'setup': 'impact_long_shedders_setup_data',
 }
 TABLE_FILENAME = 'nsr_calibration_table.csv'
 
@@ -169,8 +170,7 @@ def stage_1(names, exp_num, rtol, keep):
 def stage_2(names, exp_num, target_osr_std, rtol, keep):
     '''cal_2: the calibrated standard NSR, against the frozen table.'''
     name = f"{names['cal_2']}_#{exp_num}"
-    table_path = os.path.join('Data', f"{names['setup']}_#{exp_num}",
-                              TABLE_FILENAME)
+    table_path = frozen_table_path(exp_num)
     print(f'\n=== stage 2: {name}')
     if not experiment_exists(name):
         skipped.append(f'stage 2: no experiment {name}')

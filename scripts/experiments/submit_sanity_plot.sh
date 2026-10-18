@@ -27,9 +27,10 @@
 #
 # exp_name selects the consensus mode and defaults to the distribution one.
 # Since 8e a scenario is a GROUP of one experiment, so the plotting script
-# reads <exp_name>_#<num> and scopes by exp__<scenario>; it derives its output
-# directory (<exp_name>_sanity_#<num>) from the same name, so two consensus
-# modes cannot collide.
+# reads <exp_name>_#<num> and scopes by exp__<scenario>. Where the figure goes
+# is NOT decided here: it comes from impact_long_shedders_config.sanity_plot_path,
+# the one place that path is spelled, which nests it inside the run's own
+# directory and keeps the two consensus modes apart.
 #
 # No 'set -u': conda's activate.d hooks are not nounset-safe.
 # ============================================================================

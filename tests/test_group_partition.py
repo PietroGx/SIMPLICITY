@@ -470,7 +470,7 @@ def _checker_stage_2(checker, cfg):
             target = 0.002
             # keyed on the GROUP, which carries the phase prefix since 8e
             expected = target / slope_for(cfg.calib_std_group())
-            setup = cfg.SETUP_DIR_TEMPLATE.format(exp_num=77)
+            setup = cfg.setup_dir(77)
             os.makedirs(setup, exist_ok=True)
             rows = [{'scenario_name': s['name'] if isinstance(s, dict) else s,
                      'nucleotide_substitution_rate': expected,
@@ -479,8 +479,7 @@ def _checker_stage_2(checker, cfg):
             table = os.path.join(setup, cfg.TABLE_FILENAME)
             pd.DataFrame(rows).to_csv(table, index=False)
 
-            names = {'cal_2': 'impact_long_shedders_cal_std',
-                     'setup': 'impact_long_shedders_setup_data'}
+            names = {'cal_2': 'impact_long_shedders_cal_std'}
             checker.failures.clear()
             checker.skipped.clear()
             checker.stage_2(names, 77, target, rtol=1e-9, keep=False)

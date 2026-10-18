@@ -51,12 +51,12 @@ sys.path.insert(0, SCRIPT_DIR)
 import simplicity.dir_manager as dm
 
 from impact_long_shedders_config import (
-    EXP_NAME, SETUP_DIR_TEMPLATE, calib_std_group,
+    EXP_NAME, table_path as frozen_table_path, calib_std_group,
     exp_group, groups_of_phase,
     CALIBRATION_SKIPPED_OUTPUTS,
     TABLE_FILENAME, SCENARIOS, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
     add_slurm_resource_args, CONSENSUS_MODES, DEFAULT_CONSENSUS, exp_name,
-    sanity_exp_name, run_export_dirs,
+    run_dir, run_exp_name, sanity_plot_path, run_export_dirs,
 )
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
@@ -154,7 +154,17 @@ def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh,
     submitted = []
     for mode in consensus_modes:
         name = exp_name(mode)
-        cmd = ["sbatch", sanity_sh, str(exp_num), str(target_osr_std),
+        # without --output Slurm writes slurm-<id>.out into the CWD, which
+        # is the repo root: one stray file per run, 36 from a grid. The job's
+        # real output already goes to slurm_logs/sanity/, so these only ever
+        # held the wrapper's echo lines.
+        # get_slurm_logs_dir refuses an experiment that is not on disk
+        os.makedirs(run_dir(exp_num, mode), exist_ok=True)
+        logs = dm.get_slurm_logs_dir(run_exp_name(exp_num, mode))
+        cmd = ["sbatch",
+               f"--output={os.path.join(logs, 'sanity_%j.out')}",
+               f"--error={os.path.join(logs, 'sanity_%j.err')}",
+               sanity_sh, str(exp_num), str(target_osr_std),
                str(target_osr_long), name]
         header = f"\n$ {' '.join(cmd)}"
         print(header)
@@ -211,18 +221,18 @@ def write_artifacts_archive(archive_path, exp_num, log_file, consensus_modes):
     nothing had been asked to write.
     """
     os.makedirs(os.path.dirname(archive_path), exist_ok=True)
-    candidates = [
-        log_file,
-        os.path.join("Data", f"{EXP_NAME}_#{exp_num}", "05_Plots",
-                     f"{EXP_NAME}_#{exp_num}_long_nsr_calibration_fit.png"),
-        os.path.join("Data", f"{EXP_NAME}_#{exp_num}", "05_Plots",
-                     f"{EXP_NAME}_#{exp_num}_std_nsr_calibration_fit.png"),
-    ]
+    # every path through the config's helpers: the calibration fits used to be
+    # spelled with a bare EXP_NAME, so an argmax run looked for them under the
+    # distribution directory and reported both as missing.
+    candidates = [log_file]
     for mode in consensus_modes:
-        sanity_exp = sanity_exp_name(mode, exp_num)
-        candidates.append(
-            os.path.join("Data", sanity_exp, "05_Plots",
-                         f"{sanity_exp}_all_scenarios_global_vs_intrahost.png"))
+        plots = os.path.join(run_dir(exp_num, mode), "05_Plots")
+        stem = run_exp_name(exp_num, mode)
+        candidates += [
+            os.path.join(plots, f"{stem}_long_nsr_calibration_fit.png"),
+            os.path.join(plots, f"{stem}_std_nsr_calibration_fit.png"),
+            sanity_plot_path(exp_num, mode),
+        ]
     with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in candidates:
             if os.path.isfile(path):
@@ -404,8 +414,7 @@ def main():
             args.consensus)
         wait_for_sanity_plots(submitted, log_fh)
 
-        table_path = os.path.join(
-            SETUP_DIR_TEMPLATE.format(exp_num=args.exp_num), TABLE_FILENAME)
+        table_path = frozen_table_path(args.exp_num, args.consensus)
         archive_path = artifacts_archive_path(args.exp_num)
         summary_lines = [
             "\n===== Pipeline summary =====",

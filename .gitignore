@@ -3,6 +3,8 @@ __pycache__/
 simplicity.egg-info
 # --- session 2.3.0 additions ---
 slurm_logs/
+slurm-*.out
+slurm-*.err
 Figure_*.png
 structure.txt
 

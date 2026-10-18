@@ -5,6 +5,98 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.111 — 2026-10-18 — pietro gerletti
+
+One run, one directory. A run used to leave three top-level directories in
+Data/ -- the experiment, setup_data, the sanity grid -- so the 36-cell grid
+left 108, and two of every three held a single file: one CSV and one PNG.
+
+NOTHING SPELLS A PATH ANY MORE
+
+SETUP_DIR_TEMPLATE was a literal string and the sanity figure's path was
+spelled out three separate times, each free to drift:
+
+    impact_long_shedders_config.py:469        f"{exp_name(c)}_sanity_#{n}"
+    plot_sot_sanity_regressions.py:385        f"{args.exp_name}_sanity_#{n}"
+    run_impact_long_shedders_pipeline.py:225  f"{sanity_exp}_all_scenarios..."
+
+Every path a run writes is now derived from EXP_NAME at call time, by helpers
+in impact_long_shedders_config: run_dir, setup_dir, table_path,
+sanity_dir_name, sanity_plot_stem, sanity_plot_path, run_export_dirs. The
+sanity figure's DIRECTORY and its FILENAME are deliberately two helpers, not
+one string: the directory nests, a filename cannot hold a separator, and
+keeping one string for both is exactly what forced the sanity grid to be a
+top-level directory in the first place. consensus_of() is the inverse of
+exp_name(), for the plotting script, which is handed a name rather than a
+mode and still has to write where the pipeline will look.
+
+TWO BUGS FELL OUT OF COLLAPSING THE SPELLINGS
+
+run_export_dirs named the experiment with a bare EXP_NAME while the run
+writes exp_name(consensus)_#N, so an argmax export asked for a distribution
+directory that was never written. The artifacts zip spelled both calibration
+fits the same way, with the same result. Neither could fire while
+distribution is the default and the orchestrator refuses a second mode.
+
+THE GRID HAS ITS OWN NAMESPACE
+
+Grid cells are full pipelines, so they took experiment numbers out of the
+runs' namespace and RUNS.md had to reserve a range. They are now written as
+ils_grid_#N and number from 1. Because no path is spelled out, this is one
+rebinding: tests/test_calibrated_grid.py sets cfg.EXP_NAME for its own
+process and passes SIMPLICITY_CELL_EXP_NAME to the cells, where cellconfig's
+sitecustomize applies it -- the driver is the only process that hook does not
+run in, which is why it needs both.
+
+SLURM OUTPUT NO LONGER LANDS IN THE REPO ROOT
+
+Three sbatch calls never set --output, so Slurm fell back to slurm-<id>.out in
+the submitting process's working directory -- the repo root. The sanity plot
+(run_..._pipeline:157) submits one per run, so the 36-cell grid left 36 of
+them; packaging and reconstruct leave one each. The simulation arrays were
+never the problem: runners/slurm.py:311 has always written into the
+experiment's own slurm/ directory.
+
+The sanity job now writes there too, beside the task logs. Packaging and
+reconstruct have no experiment at that point and use slurm_logs/packaging/.
+.gitignore gained slurm-*.out as a backstop -- it covered slurm_logs/ but not
+the files themselves, so they sat in git status as untracked clutter.
+
+The files held nothing: submit_sanity_plot.sh already redirects the plotting
+script to slurm_logs/sanity/, so the root files only ever caught the wrapper's
+echo lines and conda noise.
+
+tests/check_calibration_unchanged.py kept its own spelling of the setup
+directory and lost the table when it moved; it reads the config's table_path
+now, which is the point of having one.
+
+NOTE, not changed: dir_manager captures an ABSOLUTE _data_dir at import
+(dir_manager.py:28) while the config's new helpers are relative to the cwd.
+They agree only because everything runs from the repo root, which CLAUDE.md
+already requires. run_export_dirs has to stay relative -- absolute paths would
+end up inside the tarballs -- so this is recorded rather than resolved.
+
+The sanity figure keeps its own styling. It is a diagnostic, not a paper
+figure, and the nature_plots figures are deliberately outside plots_manager
+because each needs its own fine tuning.
+
+Not applied to existing data: run #2 and the #101-#136 grid keep the flat
+layout, so the new code will not find their tables without a one-off move.
+No simulation code was touched; no recalibration.
+
+New: tests/plot_cell_trajectories.py draws infected-vs-time for every
+simulation of a cell -- the curves the decision table summarises. Two cells
+with the same horizon fraction can look nothing alike, and one number per
+column cannot say which. It reads the same simulation_trajectory.csv as
+test_config_grid.measure() and computes phi=1 by the same rule, so the
+picture and the table cannot drift apart; N comes from the experiment record
+rather than from the grid's axis defaults, which are 3x2x3 while #101-#136
+ran 3x3x4. The trajectory is one row per event (47 MB at N=5000), so each
+run is thinned to one value per day before drawing, and --slurm submits the
+job rather than reading ~2 GB of CSV on the login node.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.110 — 2026-10-18 — pietro gerletti
 
 The calibrated configuration grid ran all 36 cells (#101-#136, ~28 h, zero

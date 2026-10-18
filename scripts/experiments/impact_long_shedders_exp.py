@@ -28,7 +28,7 @@ import pandas as pd
 
 from experiment_script_runner import run_experiment_phase_script
 from impact_long_shedders_config import (
-    EXP_NAME, SETUP_DIR_TEMPLATE, TABLE_FILENAME, USER_FIXED_PARAMS,
+    EXP_NAME, table_path as default_table_path, USER_FIXED_PARAMS,
     build_exp_phase_settings, exp_group, add_slurm_resource_args,
     set_slurm_resource_env, print_fixed_params,
     CONSENSUS_MODES, DEFAULT_CONSENSUS, exp_name,
@@ -39,10 +39,6 @@ REQUIRED_COLUMNS = [
     "R", "IH_virus_emergence_rate", "R_long",
     "nucleotide_substitution_rate_long", "nucleotide_substitution_rate",
 ]
-
-
-def default_table_path(exp_num):
-    return os.path.join(SETUP_DIR_TEMPLATE.format(exp_num=exp_num), TABLE_FILENAME)
 
 
 def load_calibration_table(path):
@@ -117,7 +113,7 @@ def main():
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
 
-    table_path = default_table_path(args.exp_num)
+    table_path = default_table_path(args.exp_num, args.consensus)
     df = load_calibration_table(table_path)
 
     if args.only is not None:

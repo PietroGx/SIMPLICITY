@@ -43,7 +43,7 @@ import simplicity.tuning.evolutionary_rate as er
 from experiment_script_runner import run_experiment_phase_script
 from impact_long_shedders_config import (
     SCENARIOS, EXP_NAME, NSR_RANGES, calib_std_group,
-    SETUP_DIR_TEMPLATE, TABLE_FILENAME, TABLE_COLUMNS,
+    setup_dir, TABLE_FILENAME, TABLE_COLUMNS,
     CAL2_FINAL_TIME, USER_FIXED_PARAMS,
     derive_scenario_params, lookup_long_nsr, build_cal2_settings,
     CONSENSUS_MODES, DEFAULT_CONSENSUS,
@@ -159,8 +159,8 @@ def compute_standard_nsr(numbered, target_osr_std, model_type='exp',
 def write_frozen_table(exp_num, std_nsr, long_nsr_by_group, args,
                        long_calib_exp, std_calib_exp):
     sp = sm.read_standard_parameters_values()
-    setup_dir = SETUP_DIR_TEMPLATE.format(exp_num=exp_num)
-    os.makedirs(setup_dir, exist_ok=True)
+    target_dir = setup_dir(exp_num, args.consensus)
+    os.makedirs(target_dir, exist_ok=True)
 
     rows = []
     for scenario in SCENARIOS:
@@ -186,7 +186,7 @@ def write_frozen_table(exp_num, std_nsr, long_nsr_by_group, args,
             "std_calib_source": std_calib_exp,
         })
 
-    table_path = os.path.join(setup_dir, TABLE_FILENAME)
+    table_path = os.path.join(target_dir, TABLE_FILENAME)
     pd.DataFrame(rows)[TABLE_COLUMNS].to_csv(table_path, index=False)
     print(f"\n[Success] Frozen calibration table written:\n  {table_path}")
     return table_path

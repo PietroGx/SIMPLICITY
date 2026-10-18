@@ -168,6 +168,8 @@ def test_dispatch():
 # sanity plots: one grid per consensus pipeline
 # ---------------------------------------------------------------------------
 import io
+import shutil
+import tempfile
 import contextlib
 import subprocess as _sp
 
@@ -186,6 +188,11 @@ def test_sanity_plots():
 
     real_run = _sp.run
     runner.subprocess.run = lambda cmd, **k: (calls.append(cmd), FakeResult())[1]
+    # It creates the run's slurm log directory, so clean those up afterwards.
+    # Not by chdir'ing: dir_manager captures an ABSOLUTE _data_dir at import
+    # (dir_manager.py:28) while the config's helpers are relative to the cwd,
+    # so moving the cwd moves only one of them.
+    made = [cfg.run_dir(7, mode) for mode in cfg.CONSENSUS_MODES]
     try:
         log = io.StringIO()
         with contextlib.redirect_stdout(io.StringIO()):
@@ -193,13 +200,21 @@ def test_sanity_plots():
                                              list(cfg.CONSENSUS_MODES))
     finally:
         runner.subprocess.run = real_run
+        for path in made:
+            shutil.rmtree(path, ignore_errors=True)
 
     check("one sbatch per consensus pipeline", len(calls), len(cfg.CONSENSUS_MODES))
     for mode, cmd in zip(cfg.CONSENSUS_MODES, calls):
         check(f"{mode}: sbatch carries its own experiment name",
               cmd[-1], cfg.exp_name(mode))
+        # the command carries --output/--error now, so take the script's
+        # own arguments from the script path rather than by position
+        i = next(n for n, a in enumerate(cmd) if a.endswith('submit_sanity_plot.sh'))
         check(f"{mode}: exp_num and targets passed",
-              cmd[2:5], ['7', '0.0013', '0.00205'])
+              cmd[i + 1:i + 4], ['7', '0.0013', '0.00205'])
+        check(f"{mode}: slurm output is not the repo root",
+              any(a.startswith('--output=') and 'slurm_logs' in a for a in cmd),
+              True)
     check("returned pipelines are tagged by mode",
           [m for m, _ in got], list(cfg.CONSENSUS_MODES))
     check("job ids returned for the waiter",

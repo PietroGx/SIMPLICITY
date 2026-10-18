@@ -55,7 +55,8 @@ import matplotlib.pyplot as plt
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
-from impact_long_shedders_config import scenario_output_dirs, scenario_label
+from impact_long_shedders_config import (
+    scenario_output_dirs, scenario_label, sanity_plot_path, consensus_of)
 
 # Cohort styling (matches fig1 D/E colors).
 COHORT_STYLE = {
@@ -382,10 +383,10 @@ def main():
     if args.outfile:
         out_path = args.outfile
     else:
-        experiment_string = f"{args.exp_name}_sanity_#{args.exp_num}"
-        out_path = os.path.join(
-            dm.get_experiment_plots_dir(experiment_string),
-            f"{experiment_string}_all_scenarios_global_vs_intrahost.png")
+        # spelled once, in the config, so this cannot drift from where the
+        # pipeline's artifact list looks for it
+        out_path = sanity_plot_path(args.exp_num, consensus_of(args.exp_name))
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
     plt.savefig(out_path, format="png", dpi=300, bbox_inches="tight")
     plt.close(fig)

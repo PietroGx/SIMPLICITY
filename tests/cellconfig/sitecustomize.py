@@ -18,6 +18,7 @@ Set by tests/test_calibrated_grid.py, read here:
     SIMPLICITY_CELL_RLONG         R_long for every long-shedder scenario
     SIMPLICITY_CELL_CAL2_TIME     CAL2_FINAL_TIME
     SIMPLICITY_CELL_NSR_STEPS     points in both NSR sweeps
+    SIMPLICITY_CELL_EXP_NAME      EXP_NAME, which every path derives from
 
 With none of them set this module does nothing at all.
 
@@ -30,7 +31,7 @@ import sys
 
 _KEYS = ('SIMPLICITY_CELL_POPULATION', 'SIMPLICITY_CELL_I0',
          'SIMPLICITY_CELL_RLONG', 'SIMPLICITY_CELL_CAL2_TIME',
-         'SIMPLICITY_CELL_NSR_STEPS')
+         'SIMPLICITY_CELL_NSR_STEPS', 'SIMPLICITY_CELL_EXP_NAME')
 # One config since v2.4.91. It used to be two, the unbound one importing the
 # bound one's dicts by reference, so both module names were patched.
 _TARGET = 'impact_long_shedders_config'
@@ -53,6 +54,14 @@ def _apply_population(module):
 
 
 def _apply_config(module):
+    # Every directory a run writes is derived from EXP_NAME at call time, so
+    # rebinding it here moves the experiment, its setup_data and its sanity
+    # grid together. That is what gives the grid its own numbering: cells are
+    # ils_grid_#1.. instead of taking numbers out of the runs' namespace.
+    name = os.environ.get('SIMPLICITY_CELL_EXP_NAME')
+    if name:
+        module.EXP_NAME = name
+
     r_long = os.environ.get('SIMPLICITY_CELL_RLONG')
     if r_long is not None:
         for scenario in getattr(module, 'SCENARIOS', []):

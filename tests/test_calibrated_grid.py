@@ -56,10 +56,20 @@ sys.path.insert(0, REPO)
 sys.path.insert(0, HERE)
 sys.path.insert(0, SCRIPTS)
 
+import impact_long_shedders_config as cfg
 from impact_long_shedders_config import (
-    SETUP_DIR_TEMPLATE, TABLE_FILENAME, SCENARIOS, exp_name,
-    add_slurm_resource_args,
+    SCENARIOS, exp_name, add_slurm_resource_args,
 )
+
+# The grid's cells are full pipelines, so they used to take experiment numbers
+# out of the runs' namespace and RUNS.md had to reserve a range. They get their
+# own name instead, and with it numbering from 1. Every path in the config is
+# derived from EXP_NAME at call time, so rebinding it here moves the cells'
+# directories wholesale -- and the same name goes to the children through
+# SIMPLICITY_CELL_EXP_NAME, since this process is the only one cellconfig's
+# sitecustomize does NOT run in.
+GRID_EXP_NAME = 'ils_grid'
+cfg.EXP_NAME = GRID_EXP_NAME
 # the configuration metrics are measured by test_config_grid's own function, so
 # the two grids cannot drift apart on what "saturated" or "phi" mean
 from test_config_grid import measure, hms, fmt, se_pct
@@ -123,6 +133,7 @@ def cell_env(cell, args, cap_per_cell):
     env['SIMPLICITY_CELL_RLONG'] = str(r)
     env['SIMPLICITY_CELL_CAL2_TIME'] = str(args.cal2_final_time)
     env['SIMPLICITY_CELL_NSR_STEPS'] = str(args.nsr_steps)
+    env['SIMPLICITY_CELL_EXP_NAME'] = GRID_EXP_NAME
     # the cells share one cluster: without this each would release the full cap
     env['SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM'] = str(cap_per_cell)
     # this script captures the child's stdout to a FILE, which makes Python
@@ -196,8 +207,7 @@ def run_cells(cells, numbers, args):
 # ----------------------------------------------------------------- collecting
 
 def table_path(exp_num):
-    return os.path.join(SETUP_DIR_TEMPLATE.format(exp_num=exp_num),
-                        TABLE_FILENAME)
+    return cfg.table_path(exp_num)
 
 
 def read_table(exp_num):
@@ -209,8 +219,7 @@ def read_table(exp_num):
 
 
 def production_paths(exp_num, consensus):
-    root = os.path.join('Data', f'{exp_name(consensus)}_#{exp_num}',
-                        '04_Output')
+    root = os.path.join(cfg.run_dir(exp_num, consensus), '04_Output')
     found = []
     for dirpath, _, files in os.walk(root):
         if 'simulation_trajectory.csv' in files:

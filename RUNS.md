@@ -17,15 +17,17 @@ between runs whose commit and consensus mode match.
 | 1 | 2026-10-16 | v2.4.98 | distribution | 30 / 30 | 1e-4 .. 1e-2 | 1e-5 .. 1e-3 | **abandoned** | Died in cal_2's fit after all 300 of its simulations completed — `compute_standard_nsr` named the fit from `dm.get_groups`, which since 8e returns all four calibration groups. Fixed in v2.4.103. Left on disk; rerun as #2 rather than cleared. |
 | 2 | 2026-10-16 | v2.4.104 | distribution | 30 / 30 | 1e-4 .. 1e-2 | 1e-5 .. 1e-3 | **completed** | Rerun after the cal_2 fix, under a fresh number rather than clearing #1. Ranges from probes #1–#4 (`tests/run_nsr_range_finder.sh`, v2.4.97). First calibration under `distribution` — the pre-refactor long-side rates were fitted under `argmax`. First run at the profiled resource defaults (1G / 5h, v2.4.100–102), cal_2 included (v2.4.106 dropped its 5G override). Ran end to end: first run of the experiment phase, the sanity plots and the packing step under the merged layout. Sanity plot job 26647992 done, packing job 26647993 submitted. |
 
-## Reserved number ranges
+## Configuration grids
 
-Configuration grids run full pipelines too, so their cells take experiment
-numbers from this same namespace. They are kept out of the table above --
-a grid cell is a configuration probe, not a run anyone will cite.
+Grid cells are full pipelines, but they are configuration probes rather than
+runs anyone will cite, so they are kept out of the table above. Since v2.4.111
+they are also written under their own name, `ils_grid_#N`, and number from 1 --
+no range has to be reserved here any more. The one grid run before that change
+took numbers from the runs' namespace, so its range stays recorded.
 
 | range | what | notes |
 |-------|------|-------|
-| #101-#136 | calibrated configuration grid (`tests/run_calibrated_grid.sh --exp-base 101`) | **completed** 2026-10-17, launched 2026-10-16 at v2.4.109. 3 populations x 3 seedings x 4 R, ~9,000 tasks, ~28 h wall, all 36 cells exit 0 with a calibration table and production output. The report itself crashed on control's blank NSR_long column (fixed in v2.4.110); re-print with `--analyse-only`, no rerun needed. Cell 9 (#109) is N=1000 I0=50 R=1.03 -- run #2's configuration, except that the grid sets R_long = R, so it is 1.03 here and 1.1 in run #2. |
+| #101-#136 (pre-v2.4.111) | calibrated configuration grid (`tests/run_calibrated_grid.sh --exp-base 101`) | **completed** 2026-10-17, launched 2026-10-16 at v2.4.109. 3 populations x 3 seedings x 4 R, ~9,000 tasks, ~28 h wall, all 36 cells exit 0 with a calibration table and production output. The report itself crashed on control's blank NSR_long column (fixed in v2.4.110); re-print with `--analyse-only`, no rerun needed. Cell 9 (#109) is N=1000 I0=50 R=1.03 -- run #2's configuration, except that the grid sets R_long = R, so it is 1.03 here and 1.1 in run #2. |
 
 ## Pre-refactor runs
 

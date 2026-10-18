@@ -66,7 +66,7 @@ from experiment_script_runner import run_experiment_script
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
 from impact_long_shedders_config import (
-    SETUP_DIR_TEMPLATE, TABLE_FILENAME, CONSENSUS_MODES,
+    table_path as frozen_table_path, CONSENSUS_MODES,
     build_exp_scenario_settings, add_slurm_resource_args,
     set_slurm_resource_env,
 )
@@ -128,8 +128,7 @@ def p95(values):
 # ---------------------------------------------------------------- building
 
 def rows_from_table(table_exp_num):
-    path = os.path.join(SETUP_DIR_TEMPLATE.format(exp_num=table_exp_num),
-                        TABLE_FILENAME)
+    path = frozen_table_path(table_exp_num)
     if not os.path.isfile(path):
         raise SystemExit(f'No frozen table at {path}.')
     frame = pd.read_csv(path)

@@ -76,7 +76,7 @@ import simplicity.dir_manager as dm
 import simplicity.jobs as jobs
 import simplicity.settings_manager as sm
 from impact_long_shedders_config import (
-    SETUP_DIR_TEMPLATE, TABLE_FILENAME, build_exp_scenario_settings,
+    table_path as frozen_table_path, build_exp_scenario_settings,
     add_slurm_resource_args, set_slurm_resource_env, exp_name,
 )
 
@@ -95,8 +95,7 @@ def cell_label(cell):
 # ---------------------------------------------------------------- building
 
 def rows_from_table(table_exp_num):
-    path = os.path.join(SETUP_DIR_TEMPLATE.format(exp_num=table_exp_num),
-                        TABLE_FILENAME)
+    path = frozen_table_path(table_exp_num)
     if not os.path.isfile(path):
         raise SystemExit(f'No frozen table at {path}.')
     df = pd.read_csv(path)
@@ -423,8 +422,8 @@ def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
     w('=' * 96)
     w('CONFIGURATION GRID — population x starting infections x R')
     w('=' * 96)
-    w(f'frozen table : {SETUP_DIR_TEMPLATE.format(exp_num=table_exp_num)}'
-      f'/{TABLE_FILENAME}   (fitted at R=1.03, N=1000)')
+    w(f'frozen table : {frozen_table_path(table_exp_num)}'
+      f'   (fitted at R=1.03, N=1000)')
     w(f'consensus    : {CONSENSUS} only      R_long set equal to R throughout')
     w(f'seeds        : {n_seeds} per scenario per cell, 5 scenarios '
       f'= {expected_per_cell} per cell')

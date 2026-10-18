@@ -62,7 +62,7 @@ import pandas as pd
 
 from experiment_script_runner import run_experiment_script
 from impact_long_shedders_config import (
-    SETUP_DIR_TEMPLATE, TABLE_FILENAME, build_exp_scenario_settings,
+    table_path as frozen_table_path, build_exp_scenario_settings,
     add_slurm_resource_args, set_slurm_resource_env, exp_name,
     USER_FIXED_PARAMS,
 )
@@ -86,8 +86,7 @@ def exp_name(r, scenario, pop):
 # ---------------------------------------------------------------- running
 
 def rows_from_table(table_exp_num):
-    path = os.path.join(SETUP_DIR_TEMPLATE.format(exp_num=table_exp_num),
-                        TABLE_FILENAME)
+    path = frozen_table_path(table_exp_num)
     if not os.path.isfile(path):
         raise SystemExit(
             f'No frozen table at {path}.\n'
@@ -327,8 +326,8 @@ def report(data, r_values, exp_num, table_exp_num, n_seeds, pop, timing=None):
     w('=' * 78)
     w('R SWEEP — does raising R stop the epidemics fizzling out?')
     w('=' * 78)
-    w(f'frozen table      : {SETUP_DIR_TEMPLATE.format(exp_num=table_exp_num)}'
-      f'/{TABLE_FILENAME}  (calibrated at R={BASELINE_R})')
+    w(f'frozen table      : {frozen_table_path(table_exp_num)}'
+      f'  (calibrated at R={BASELINE_R})')
     w(f'consensus         : {CONSENSUS} only')
     w(f'population        : {pop}'
       + ('' if pop == BASELINE_POP
