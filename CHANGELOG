@@ -5,6 +5,90 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.112 — 2026-10-18 — pietro gerletti
+
+The configuration is chosen, and the analysis window stops being a constant.
+
+THE CONFIGURATION
+
+The pipeline ran at population_size 1000, I0 50, R 1.03, R_long 1.1 -- a
+configuration no grid ever selected. The calibrated grid (#101-#136) measured
+36 of them at their own calibrated rates; cell #118 is now the pipeline's:
+
+    population_size 3000    infected_individuals_at_start 90    R 1.05
+
+Over its 50 runs: phi=1 at a median of day 284, window 817 d, 48/50 reach the
+1095-day horizon, 0 saturated, 0 that never reach phi=1. It is the only
+candidate with no artefact of either kind -- N=3000/I0=150 has 2 runs that
+exhaust their susceptibles, and N=5000/I0=250 has 9 truncated by the fixed
+100000-individual reservoir, which binds at 18.8 population turnovers there
+against 32.0 here.
+
+Stated once, as POPULATION_SIZE / INFECTED_AT_START / R_STANDARD, and read by
+both CAL1_ISOLATED_FIXED_PARAMS and USER_FIXED_PARAMS. Each used to spell its
+own, which is why the grid had to override all three dicts by name
+(tests/cellconfig/sitecustomize.py:45) rather than change one number -- and
+why cal_1 has to move with production: #118's NSR_long was calibrated at
+3000/90, not at the config's 1000/10.
+
+R_long follows R rather than staying at 1.1. The grid set them equal in every
+cell, so #118's numbers were measured that way and hold only if production
+does the same. cal_1's own R stays 1.0: with long_shedders_ratio 1.0 there
+are no standard individuals, and R only reaches the model through
+beta_standard (extrande.py:145), so it has nothing to act on.
+
+CAL2_FINAL_TIME 365 -> 730. cal_2 fits the standard rate ABOVE the burn-in;
+at 365 days 78% of its window sits below phi=1 and it fits the neutral phase.
+The grid ran every cell at 730 for the same reason.
+
+THE ANALYSIS WINDOW
+
+fig3's burn-in cutoff was BURNIN_CUTOFF_DAYS = 200, one number for every
+simulation. It is now per simulation, read from that simulation's own
+trajectory: BURNIN_WINDOW = "phi".
+
+This is not a better approximation of the constant -- it is the quantity the
+constant was averaging. phenotype/update.py:39 scores a lineage as
+
+    infected_fraction * distance_from_weighted_consensus
+  + non_infected_fraction / active_lineages_n
+
+with infected_fraction = min((diagnosed + recovered)/size, 1). That is phi,
+the same expression, and below 1 the selection term is damped and every
+lineage scores on 1/active_lineages_n. The 200 came from averaging the day
+that stops being true over 250 simulations of one configuration; across the
+grid the same day ranges from 158 to 605. At the chosen configuration its
+median is 284, so a 200-day window carried 84 days of neutral evolution into
+a measurement of selection.
+
+phi_day() mirrors test_config_grid.measure(), so the figure's window and the
+configuration grid cannot disagree about what burn-in means. N comes from the
+trajectory's first row, where susceptibles + infected is the whole population.
+
+A run that never reaches phi=1 is dropped rather than given a fallback
+cutoff: it is neutral end to end and does not belong in a measurement of
+selection. The fixed-cutoff mode keeps such runs, which is what it always did.
+
+MIN_WINDOW_DAYS = 365 is new and applies in BOTH modes, so the only
+difference between them is where the left edge sits. It drops runs with too
+little record above their own cutoff -- a run reaching phi=1 on day 340 and
+stopping on day 400 has 60 usable days, and nothing in its length says so.
+_usable() is gone; _window_for() is the one place that decides.
+
+Both modes are selectable and cached separately (--window phi | <days>, the
+key carries it), so the two figures can be produced and compared rather than
+one silently replacing the other. The fixed-200 output is NOT identical to
+pre-v2.4.112: MIN_WINDOW_DAYS applies there too.
+
+Not changed: the NSR fit. extract_ih_regression_data applies no time filter
+and never did, so it already fits on all data.
+
+Local tier: 16 passed, 0 failed. Builders exercised directly for all three
+stages; phi_day and the window helpers tested against trajectories built to
+cross phi=1 on a known day.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.111 — 2026-10-18 — pietro gerletti
 
 One run, one directory. A run used to leave three top-level directories in

@@ -6,6 +6,49 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Blockers (before next production rerun)
 
+- [ ] **Production configuration set from the calibrated grid: N=3000,
+      I0=90, R=1.05, R_long=1.05 — RECALIBRATION REQUIRED** (2026-10-18,
+      v2.4.112).
+
+      The pipeline ran at `population_size` 1000, `I0` 50, `R` 1.03 and
+      `R_long` 1.1 — numbers no grid ever selected. The calibrated grid
+      (#101-#136) measured 36 configurations at their OWN calibrated rates;
+      cell #118 is the only candidate with no artefact of either kind. Over
+      its 50 runs: phi=1 at a median of day 284, window 817 d, 48/50 reach
+      the 1095-day horizon, 0 saturated, 0 that never reach phi=1.
+
+      `R_long` follows `R` rather than staying at 1.1: the grid set them
+      equal in every cell, so #118's numbers were measured that way and only
+      hold if production does the same.
+
+      `CAL2_FINAL_TIME` 365 -> 730. cal_2 fits the standard rate above the
+      burn-in; at 365 days, 78% of its window sits below phi=1 and it fits
+      the neutral phase instead.
+
+      **Every calibration and every production run before this is at a
+      different configuration.** Rerun both calibration stages.
+
+- [ ] **The individual reservoir is a fixed 100000, not scaled by
+      `population_size`** (2026-10-18, v2.4.112). Not fixed, recorded.
+
+      `extrande.check_stop_conditions` ends a run when
+      `len(population.reservoir_i) < 1000` (`extrande.py:257`). The reservoir
+      starts at `100000 - N` (`population.py:78`, never overridden) and loses
+      one individual per diagnosis (`population_model.py:123`) and one per
+      recovery (`population.py:460`), so a run stops at
+      `diagnosed + recovered = 100000 - N - 1000`, i.e. after
+      `(100000 - N - 1000)/N` population turnovers:
+
+          N=1000 -> 98.0      N=3000 -> 32.0      N=5000 -> 18.8
+
+      This is a hard ceiling that tightens as N grows, and it is invisible in
+      the decision table: `test_config_grid.measure()` classifies four of the
+      five stop conditions and reports the rest as "other". It truncated 9 of
+      50 runs in grid cell #134 (N=5000) at days 1005-1092 — the largest
+      epidemics, so the truncation is size-correlated, not random. The chosen
+      cell uses about 12 of its 32, so it does not bind; it would at N=5000,
+      or at any longer `final_time`.
+
 - [ ] **Consensus mode moved to `distribution` everywhere, including both
       calibration stages — RECALIBRATION REQUIRED** (2026-10-15, v2.4.93).
 

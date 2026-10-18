@@ -67,6 +67,30 @@ def derive_tau_3_long(scenario, sp):
 
 
 # =============================================================================
+# THE CHOSEN CONFIGURATION -- calibrated grid cell #118
+# =============================================================================
+# Stated once, here, and read by both CAL1_ISOLATED_FIXED_PARAMS and
+# USER_FIXED_PARAMS. Until v2.4.112 each spelled its own population and
+# seeding, which is how the grid came to override all three dicts by name
+# (tests/cellconfig/sitecustomize.py:45) instead of changing one number.
+#
+# Measured over 50 runs of cell #118 (N=3000, I0=90, R=1.05):
+#
+#   phi=1 at a median of day 284      window 817 d      48/50 reach 1095 d
+#   0 saturated      0 that never reach phi=1      NSR_std 113.1e-6
+#
+# Why this cell and not its neighbours: it is the only candidate with no
+# artefact of either kind. N=3000 I0=150 has 2 runs that exhaust their
+# susceptibles; N=5000 I0=250 has 9 truncated by the individual reservoir,
+# which is a fixed pool of 100000 (simplicity/population.py:78, never scaled
+# by N) and so binds at phi=18.8 there against phi=32.0 here. This cell uses
+# about 12 of its 32.
+POPULATION_SIZE = 3000
+INFECTED_AT_START = 90
+R_STANDARD = 1.05
+
+
+# =============================================================================
 # SCENARIOS
 # =============================================================================
 # edge_case is back. It was dropped in v2.4.24 for raw-Hamming saturation at
@@ -74,15 +98,15 @@ def derive_tau_3_long(scenario, sp):
 # measurement was corrected, when the calibration was returning NSR_long ~0.116
 # -- about 100x too high. At the rate the corrected pipeline actually
 # calibrates (~1.1e-3), a 350-day infection accumulates 0.0020 subs/site, some
-# 50x below the saturation threshold. Its 0.1% prevalence puts exactly one
-# carrier in the initial 1000, which is the point: what does a single
-# super-long shedder do to an outbreak?
+# 50x below the saturation threshold. Its 0.1% prevalence puts 3 carriers
+# in the initial 3000, which is the point: what does a handful of
+# super-long shedders do to an outbreak?
 SCENARIOS = [
     {"name": "control",   "inf_duration_long": None,  "long_shedders_ratio": 0.000, "R_long": None, "susceptibility_long": 1.0},
-    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.010, "R_long": 1.1,  "susceptibility_long": 1.0},
-    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.010, "R_long": 1.1,  "susceptibility_long": 1.0},
-    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.120, "R_long": 1.1,  "susceptibility_long": 1.0},
-    {"name": "edge_case", "inf_duration_long": 365.0, "long_shedders_ratio": 0.001, "R_long": 1.1,  "susceptibility_long": 1.0},
+    {"name": "SOT",       "inf_duration_long": 63.0,  "long_shedders_ratio": 0.010, "R_long": R_STANDARD,  "susceptibility_long": 1.0},
+    {"name": "HIV_low",   "inf_duration_long": 109.0, "long_shedders_ratio": 0.010, "R_long": R_STANDARD,  "susceptibility_long": 1.0},
+    {"name": "HIV_high",  "inf_duration_long": 109.0, "long_shedders_ratio": 0.120, "R_long": R_STANDARD,  "susceptibility_long": 1.0},
+    {"name": "edge_case", "inf_duration_long": 365.0, "long_shedders_ratio": 0.001, "R_long": R_STANDARD,  "susceptibility_long": 1.0},
 ]
 
 TAU_ROUND = 3  # decimals for tau_3_long dict-key / group matching
@@ -106,6 +130,7 @@ DEFAULT_CONSENSUS = "distribution"
 # calibration stage or per scenario.
 EXP_NAME = "impact_long_shedders"
 TABLE_FILENAME = "nsr_calibration_table.csv"
+
 
 # Every path a run writes is derived from EXP_NAME at call time, by the helpers
 # at the bottom of this module -- never spelled out. A run used to leave three
@@ -281,8 +306,14 @@ def lookup_long_nsr(long_nsr_by_group, tau_3_long, r_long):
 CAL1_ISOLATED_FIXED_PARAMS = {
     "long_shedders_ratio": 1.0,
     "R": 1.0,
-    "population_size": 1000,
-    "infected_individuals_at_start": 10,
+    # The configuration grid (#101-#136) overrode population_size and
+    # infected_individuals_at_start in THIS dict as well as in
+    # USER_FIXED_PARAMS -- cellconfig/sitecustomize.py:45 names all three. So
+    # the rates frozen for cell #118 were calibrated at 3000/90, and the two
+    # dicts have to move together or cal_1 fits a different population than
+    # the one the grid measured.
+    "population_size": POPULATION_SIZE,
+    "infected_individuals_at_start": INFECTED_AT_START,
     "sequence_long_shedders": True,
     "final_time": 365,
     # R_long absent: build_cal1_settings sets it per (tau_3_long, R_long)
@@ -378,16 +409,21 @@ def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None,
 # context of the impact experiment). Single source of truth -- previously
 # duplicated verbatim in both scripts.
 USER_FIXED_PARAMS = {
-    "population_size": 1000,
-    "infected_individuals_at_start": 50,
-    "R": 1.03,
+    "population_size": POPULATION_SIZE,
+    "infected_individuals_at_start": INFECTED_AT_START,
+    "R": R_STANDARD,
     "final_time": 1095,
     "IH_virus_emergence_rate": 0.1,
 }
 
 # cal_2 calibrates over a shorter window than the experiment phase runs on
 # (USER_FIXED_PARAMS['final_time']); build_cal2_settings applies it.
-CAL2_FINAL_TIME = 365
+#
+# 730, not 365. cal_2 has to fit the standard rate ABOVE the burn-in, and at
+# this configuration phi=1 lands at a median of day 284 -- a 365-day window
+# would spend 78% of itself below the boundary and fit the neutral phase. The
+# configuration grid ran every cell at 730 for the same reason.
+CAL2_FINAL_TIME = 730
 
 # Shared color palette for the calibration-fit plots (long-NSR per tau group,
 # standard-NSR per scenario), keyed by scenario name so both plots look

@@ -26,7 +26,7 @@ processes, with the Slurm release cap split between them.
 WHAT IS OVERRIDDEN, AND WHY IT HAS TO BE
 
 The pipeline hardcodes the very configuration this grid is choosing --
-population 1000 (impact_long_shedders_config.py:150,203), R_long 1.1
+the chosen one (impact_long_shedders_config.py:88), R_long = R
 (SCENARIOS), a 365-day cal_2 window. run_..._pipeline runs each stage as its own
 subprocess, so these are applied by tests/cellconfig/sitecustomize.py, which
 Python imports in every one of them. Nothing in scripts/ is modified.

@@ -42,6 +42,27 @@ from impact_long_shedders_config import SCENARIOS, DEFAULT_CONSENSUS
 HORIZON = 1095.0
 OUT_DIR = os.path.join('Data', 'grid_trajectories')
 
+# extrande.check_stop_conditions has FIVE conditions; test_config_grid.measure()
+# classifies four and calls the rest "other", so the decision table cannot say
+# which of the last two ended a run. Both are computational, not epidemic:
+#
+#   len(population.reservoir_i) < 1000   extrande.py:257
+#   time.time() - start > max_runtime    extrande.py:259
+#
+# The reservoir is a fixed pool of 100000 individuals, NOT scaled by
+# population_size (population.py:78, never overridden -- population.py:704).
+# It starts at 100000 - N and loses exactly one individual per diagnosis
+# (population_model.py:65 and :123, same function, no return between them) and
+# one per recovery (population.py:455 and :460). So the number drawn is
+# diagnosed + recovered, both of which the trajectory carries, and the stop
+# fires at (diagnosed + recovered) = 100000 - N - 1000:
+#
+#   N=5000 -> 94000 events -> phi = 18.8      N=3000 -> 96000 -> phi = 32.0
+#
+# Five conditions, four ruled out, so the fifth is named rather than guessed.
+RESERVOIR = 100000
+RESERVOIR_FLOOR = 1000
+
 # The experiment names a cell may be on disk under: 'ils_grid' from v2.4.111,
 # 'impact_long_shedders' for #101-#136, which ran before the rename.
 NAME_CANDIDATES = ('ils_grid', 'impact_long_shedders')
@@ -155,7 +176,11 @@ def daily(path, pop_size=None):
     infected = df['infected'].to_numpy(dtype=float)[idx]
 
     last = df.iloc[-1]
+    drawn = float(last['diagnosed']) + float(last['recovered'])
+    left = RESERVOIR - pop - drawn
     record = {
+        'reservoir_left': left,
+        'drawn': drawn,
         'pop': pop,
         'pop_seen': seen,
         'i0': float(df['infected'].iloc[0]),
@@ -164,13 +189,13 @@ def daily(path, pop_size=None):
         'peak_day': float(t[int(np.argmax(df['infected'].to_numpy()))]),
         'phi_day': float(t[hit[0]]) if hit.size else None,
         'full': float(t[-1]) >= HORIZON,
-        # extrande.check_stop_conditions, in its order -- the same reasons
-        # test_config_grid.measure reports
+        # extrande.check_stop_conditions, in its order and complete
         'stop': ('horizon' if float(t[-1]) >= HORIZON else
                  'died' if float(last['infected']) == 0 else
                  'saturated' if float(last['susceptibles']) == 0 else
                  'no infectious' if float(last['infectious']) == 0
-                 and float(t[-1]) > 60.0 else 'other'),
+                 and float(t[-1]) > 60.0 else
+                 'reservoir' if left < RESERVOIR_FLOOR else 'max runtime'),
     }
     return days, infected, record
 
@@ -188,6 +213,8 @@ def load_cell(paths_by_group, pop_size=None):
                 runs.append((seed, got[0], got[1], got[2]))
                 print(f'    {group:<20}{seed:<12}'
                       f'end {got[2]["end"]:>7.0f}  peak {got[2]["peak"]:>6.0f}'
+                      f'  drawn {got[2]["drawn"]:>7.0f}'
+                      f'  reservoir left {got[2]["reservoir_left"]:>7.0f}'
                       f'  {got[2]["stop"]}')
         out[group] = runs
     return out
@@ -269,6 +296,31 @@ def draw_per_simulation(cell, title, out_path, cutoff):
     print(f'  wrote {out_path}')
 
 
+def report_phi(cell, cutoff):
+    """The spread of phi=1 across the cell, not just its median.
+
+    The decision table reports the MEDIAN phi day, which is the wrong number
+    to set a burn-in cutoff against: at the median, half the runs have not
+    reached phi=1 yet and their pre-selection phase is still inside the
+    window. A cutoff has to clear the tail, so the quantiles are what decide
+    where it goes."""
+    import numpy as np
+    phis = sorted(r['phi_day'] for g in cell for *_, r in cell[g]
+                  if r['phi_day'] is not None)
+    never = sum(1 for g in cell for *_, r in cell[g] if r['phi_day'] is None)
+    if not phis:
+        print(f'  phi=1: never reached by any of {never} runs')
+        return
+    q = np.percentile(phis, [50, 75, 90, 100])
+    print(f'  phi=1 day: median {q[0]:.0f}  p75 {q[1]:.0f}  p90 {q[2]:.0f}  '
+          f'max {q[3]:.0f}  (never: {never})')
+    for day in (200, 250, 300, 350):
+        late = sum(1 for v in phis if v > day) + never
+        flag = '  <- figures\' cutoff' if cutoff and day == cutoff else ''
+        print(f'    cutoff {day}: {late:>2} of {len(phis) + never} runs still '
+              f'pre-phi=1 there{flag}')
+
+
 # -------------------------------------------------------------------- main
 
 def submit(args):
@@ -329,6 +381,13 @@ def main():
         title = (f'{base} #{exp_num}   N={any_run["pop"]:.0f}  '
                  f'I0={any_run["i0"]:.0f}'
                  + (f'  R={params["R"]}' if 'R' in params else ''))
+        tally = {}
+        for g in cell:
+            for *_, rec in cell[g]:
+                tally[rec['stop']] = tally.get(rec['stop'], 0) + 1
+        print('  stop reasons: '
+              + '  '.join(f'{k} {v}' for k, v in sorted(tally.items())))
+        report_phi(cell, cutoff)
         stem = os.path.join(args.out_dir, f'{base}_{exp_num}_infected')
         draw_by_scenario(cell, title, stem + '_by_scenario.png', cutoff)
         draw_per_simulation(cell, title, stem + '_per_simulation.png', cutoff)

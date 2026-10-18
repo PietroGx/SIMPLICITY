@@ -1,11 +1,17 @@
 """Per-cell overrides for the unbound pipeline, applied without editing scripts/.
 
-The pipeline hardcodes the configuration the grid is supposed to be choosing:
+The pipeline states one configuration; the grid sweeps around it. Since
+v2.4.112 that configuration is grid cell #118 and is declared once, so these
+overrides push past the chosen values rather than past arbitrary ones:
 
-    impact_long_shedders_config.py:166,258   population_size 1000, I0 10 / 50
-    impact_long_shedders_config.py   SCENARIOS[*]["R_long"] = 1.1
-    impact_long_shedders_config.py   CAL2_FINAL_TIME = 365
-    impact_long_shedders_config.py   NSR_RANGES[*]["steps"]
+    impact_long_shedders_config.py:88   POPULATION_SIZE 3000, I0 90
+    impact_long_shedders_config.py      SCENARIOS[*]["R_long"] = R_STANDARD
+    impact_long_shedders_config.py      CAL2_FINAL_TIME = 730
+    impact_long_shedders_config.py      NSR_RANGES[*]["steps"]
+
+POPULATION_SIZE feeds BOTH CAL1_ISOLATED_FIXED_PARAMS (:306) and
+USER_FIXED_PARAMS (:411), which is why _apply_population still names both:
+overriding production alone would leave cal_1 fitting a different population.
 
 run_impact_long_shedders_pipeline runs each stage as its own SUBPROCESS,
 so patching the config from the driver would reach nothing. Python imports

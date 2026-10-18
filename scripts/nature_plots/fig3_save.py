@@ -29,7 +29,25 @@ def parse_arguments():
     parser.add_argument('--cluster-threshold', type=int, default=5)
     parser.add_argument('--min-days', type=int, default=100)
     parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png')
+    parser.add_argument('--window', type=str, default=preproc.BURNIN_WINDOW,
+                        help="Left edge of the analysis window: 'phi' for each "
+                            "simulation's own burn-in completion (default), or "
+                            "a number of days for a fixed cutoff. Each is "
+                            "cached separately, so both can be produced and "
+                            "compared.")
     return parser.parse_args()
+
+
+def resolve_window(window):
+    """'phi' or a float. Rejected early rather than silently read as a fixed
+    cutoff of 0, which would put every simulation's neutral phase back in."""
+    if window == 'phi':
+        return window
+    try:
+        return float(window)
+    except (TypeError, ValueError):
+        raise SystemExit(f"--window must be 'phi' or a number of days, "
+                         f"not {window!r}")
 
 
 def set_nature_rcparams():
@@ -46,12 +64,23 @@ def set_nature_rcparams():
     })
 
 
+def window_caption(window):
+    """How the subtitle states the window it was measured over."""
+    window = preproc.BURNIN_WINDOW if window is None else window
+    if window == 'phi':
+        return ("measured after each simulation's own burn-in "
+                "(\u03c6=1), \u2265 %d d of it" % preproc.MIN_WINDOW_DAYS)
+    return (f"measured after day {float(window):g}, "
+            f"\u2265 {preproc.MIN_WINDOW_DAYS} d of it")
+
+
 def add_panel_label(ax, label, x_offset=-0.15, y_offset=1.15):
     ax.text(x_offset, y_offset, label, transform=ax.transAxes,
            fontsize=8, fontweight='bold', va='top', ha='right')
 
 
-def build_figure_3(exp_num, exp_name, cluster_threshold, min_days, fmt):
+def build_figure_3(exp_num, exp_name, cluster_threshold, min_days, fmt,
+                   window=None):
     set_nature_rcparams()
 
     scenarios, _ = resolve_scenarios(exp_name, exp_num)
@@ -63,7 +92,7 @@ def build_figure_3(exp_num, exp_name, cluster_threshold, min_days, fmt):
                            top=0.90, bottom=0.07)
 
     eff_raw = preproc.get_efficiency_data(exp_num, scenarios, exp_name=exp_name,
-                                          min_days=min_days)
+                                          min_days=min_days, window=window)
     eff = preproc.efficiency_ratio(eff_raw, threshold=cluster_threshold)
 
     # --- A: which host type produced the standout clade --------------------
@@ -71,7 +100,7 @@ def build_figure_3(exp_num, exp_name, cluster_threshold, min_days, fmt):
     wr = preproc.winrate_summary(
         preproc.get_winrate_data(exp_num, scenarios, exp_name=exp_name,
                                  cluster_threshold=cluster_threshold,
-                                 min_days=min_days))
+                                 min_days=min_days, window=window))
     gs_a = gridspec.GridSpecFromSubplotSpec(3, 1, subplot_spec=gs[0, 0],
                                             hspace=0.50)
     a_axes = [fig.add_subplot(gs_a[i, 0]) for i in range(3)]
@@ -113,7 +142,7 @@ def build_figure_3(exp_num, exp_name, cluster_threshold, min_days, fmt):
         "Do long shedders drive variant emergence?"
         f"   (clades at {cluster_threshold} substitutions; "
         f"simulations \u2265 {preproc.MIN_FINAL_TIME} d, "
-        f"measured after day {preproc.BURNIN_CUTOFF_DAYS})",
+        f"{window_caption(window)})",
         fontsize=7.5, y=1.025)
 
     output_filename = figure_path(3, exp_name, exp_num, fmt)
@@ -124,4 +153,4 @@ def build_figure_3(exp_num, exp_name, cluster_threshold, min_days, fmt):
 if __name__ == "__main__":
     args = parse_arguments()
     build_figure_3(args.exp_num, args.exp_name, args.cluster_threshold,
-                  args.min_days, args.format)
+                  args.min_days, args.format, resolve_window(args.window))
