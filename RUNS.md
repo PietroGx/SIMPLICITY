@@ -25,7 +25,7 @@ a grid cell is a configuration probe, not a run anyone will cite.
 
 | range | what | notes |
 |-------|------|-------|
-| #101-#136 | calibrated configuration grid (`tests/run_calibrated_grid.sh --exp-base 101`) | 3 populations x 3 seedings x 4 R, ~9,000 tasks. Cell 9 (#109) is N=1000 I0=50 R=1.03 -- run #2's configuration, except that the grid sets R_long = R, so it is 1.03 here and 1.1 in run #2. |
+| #101-#136 | calibrated configuration grid (`tests/run_calibrated_grid.sh --exp-base 101`) | **completed** 2026-10-17, launched 2026-10-16 at v2.4.109. 3 populations x 3 seedings x 4 R, ~9,000 tasks, ~28 h wall, all 36 cells exit 0 with a calibration table and production output. The report itself crashed on control's blank NSR_long column (fixed in v2.4.110); re-print with `--analyse-only`, no rerun needed. Cell 9 (#109) is N=1000 I0=50 R=1.03 -- run #2's configuration, except that the grid sets R_long = R, so it is 1.03 here and 1.1 in run #2. |
 
 ## Pre-refactor runs
 

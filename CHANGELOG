@@ -5,6 +5,59 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.4.110 — 2026-10-18 — pietro gerletti
+
+The calibrated configuration grid ran all 36 cells (#101-#136, ~28 h, zero
+pipelines exiting non-zero) and then died printing its own report, on the
+first row of the first table.
+
+A BLANK CELL IS NOT A MISSING KEY
+
+section_rates read the frozen calibration table with
+
+    float(row.get("nucleotide_substitution_rate_long", "nan"))
+
+control has no long shedders, so that column is written EMPTY rather than
+left out. dict.get's default only fires when the key is absent; here the key
+is present with value '', and float('') raises ValueError. control is the
+first row of every table, so the report died immediately after its header --
+after all 36 cells had finished and written their results.
+
+A second failure sat three lines behind it. The spread loop appended the std
+rate and the long rate inside one try/except, so control's ValueError fired
+AFTER std had landed, leaving the long list empty; the print loop then called
+min() on it. Fixing only the first would have produced "min() arg is an empty
+sequence".
+
+Both are now routed through rate(), which treats blank and absent alike, and
+the two rates are collected independently so a blank long no longer discards
+a valid std. Blanks print as "--"; control's spread row says
+"-- no long shedders --". Both fixes were mutation-tested: restoring either
+original line reproduces its exact error against run #2's real table.
+
+THE REPORT WAS HIDING THE AXIS IT EXISTS TO MEASURE
+
+cell_label produces 27 characters and both tables printed it as [:24], so
+every row read R=1 -- the four R values were indistinguishable. Section 1
+asks whether the calibrated rate moves with the configuration, and R is the
+axis it moves with most, so the table was unreadable where it mattered.
+Widened to [:27] in a 29-wide column, headers with it.
+
+WHAT THE GRID COST
+
+Per-cell wall clock is set by the slowest single task in a stage, not the
+average: the array cannot close, and the stage's fit cannot start, until the
+last seed lands. That makes R the dominant cost knob -- pooled over the grid,
+R=1.03 24.9 min, R=1.05 39.3, R=1.06 46.7, R=1.07 58.4 -- while starting
+infections matter far less, and more of them can be cheaper (I0=250 cells ran
+shorter than I0=150 at matched R, saturating sooner). The 1G/5h defaults from
+v2.4.100-102 held for every cell, including N=5000 at I0=250.
+
+Only tests/ changed. No recalibration: no simulation code was touched and
+every cell's output stands. Re-print with --analyse-only.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.109 — 2026-10-16 — pietro gerletti
 
 What a run exports is now stated, not matched. Two bugs of the same shape,

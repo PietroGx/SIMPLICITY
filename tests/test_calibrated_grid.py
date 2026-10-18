@@ -279,6 +279,16 @@ def section_completeness(cells, data, outcomes, args):
         print('  *** tables below pool a different mix and are not comparable.')
 
 
+def rate(row, key):
+    # control has no long shedders, so nucleotide_substitution_rate_long is
+    # written as an empty cell. row.get(key, 'nan') does NOT cover that: the
+    # key is present, its value is '', and float('') raises.
+    try:
+        return float(row.get(key) or 'nan')
+    except (TypeError, ValueError):
+        return float('nan')
+
+
 def section_rates(cells, data):
     heading('1. DOES THE CALIBRATED RATE MOVE WITH THE CONFIGURATION')
     print('  The question the earlier grids assumed away. If these columns are')
@@ -286,38 +296,46 @@ def section_rates(cells, data):
     print('  every configuration measured against a single frozen table was')
     print('  measuring the wrong thing.')
     print()
-    print(f"{'cell':<26}{'scenario':<12}{'NSR std':>12}{'NSR long':>12}")
+    print(f"{'cell':<29}{'scenario':<12}{'NSR std':>12}{'NSR long':>12}")
     for cell in cells:
         rows = data[cell]['table']
         if not rows:
-            print(f'{cell_label(cell)[:24]:<26}{"-- no table --":<12}')
+            print(f'{cell_label(cell)[:27]:<29}{"-- no table --":<12}')
             continue
         for row in rows:
-            print(f'{cell_label(cell)[:24]:<26}{row.get("scenario_name", "?")[:10]:<12}'
-                  f'{float(row.get("nucleotide_substitution_rate", "nan")):>12.6f}'
-                  f'{float(row.get("nucleotide_substitution_rate_long", "nan")):>12.6f}')
+            long = rate(row, 'nucleotide_substitution_rate_long')
+            print(f'{cell_label(cell)[:27]:<29}{row.get("scenario_name", "?")[:10]:<12}'
+                  f'{rate(row, "nucleotide_substitution_rate"):>12.6f}'
+                  + (f'{long:>12.6f}' if long == long else f'{"--":>12}'))
     print()
     print('  Spread per scenario, across every cell that produced a table:')
     by_scenario = defaultdict(lambda: ([], []))
     for cell in cells:
         for row in data[cell]['table'] or []:
             name = row.get('scenario_name', '?')
-            try:
-                by_scenario[name][0].append(
-                    float(row['nucleotide_substitution_rate']))
-                by_scenario[name][1].append(
-                    float(row['nucleotide_substitution_rate_long']))
-            except (KeyError, ValueError):
-                pass
+            # collected independently: paired appends dropped a valid std rate
+            # whenever the long one was blank, which is every control row.
+            for slot, key in ((0, 'nucleotide_substitution_rate'),
+                              (1, 'nucleotide_substitution_rate_long')):
+                value = rate(row, key)
+                if value == value:
+                    by_scenario[name][slot].append(value)
     print(f"{'scenario':<14}{'NSR std min':>14}{'max':>12}{'spread':>10}"
           f"{'NSR long min':>15}{'max':>12}{'spread':>10}")
     for name, (std, long) in sorted(by_scenario.items()):
         if not std:
             continue
         s_spread = (max(std) / min(std) - 1) * 100 if min(std) else float('nan')
-        l_spread = (max(long) / min(long) - 1) * 100 if min(long) else float('nan')
-        print(f'{name[:12]:<14}{min(std):>14.6f}{max(std):>12.6f}{s_spread:>9.0f}%'
-              f'{min(long):>15.6f}{max(long):>12.6f}{l_spread:>9.0f}%')
+        line = (f'{name[:12]:<14}{min(std):>14.6f}{max(std):>12.6f}'
+                f'{s_spread:>9.0f}%')
+        if long:
+            l_spread = ((max(long) / min(long) - 1) * 100 if min(long)
+                        else float('nan'))
+            line += (f'{min(long):>15.6f}{max(long):>12.6f}'
+                     f'{l_spread:>9.0f}%')
+        else:
+            line += f'{"-- no long shedders --":>37}'
+        print(line)
     print()
     print('  A spread of a few percent is calibration noise at these seed')
     print('  counts. Tens of percent is the configuration moving the rate.')
@@ -325,17 +343,17 @@ def section_rates(cells, data):
 
 def section_configuration(cells, data):
     heading('2. THE DECISION TABLE          now measured at each cell\'s OWN rate')
-    print(f"{'cell':<26}{'n':>5}{'horizon':>9}{'saturated':>11}"
+    print(f"{'cell':<29}{'n':>5}{'horizon':>9}{'saturated':>11}"
           f"{'phi=1 day':>11}{'window':>9}{'never phi':>11}")
     for cell in cells:
         metrics = data[cell]['metrics']
         if not metrics or not metrics['n']:
-            print(f'{cell_label(cell)[:24]:<26}{"-- no production --":>5}')
+            print(f'{cell_label(cell)[:27]:<29}{"-- no production --":>5}')
             continue
         m = metrics
         phi = sorted(m['phi_days'])
         window = sorted(m['window'])
-        print(f'{cell_label(cell)[:24]:<26}{m["n"]:>5}'
+        print(f'{cell_label(cell)[:27]:<29}{m["n"]:>5}'
               f'{100.0 * m["full"] / m["n"]:>8.0f}%'
               f'{m["saturated"]:>11}'
               f'{(phi[len(phi) // 2] if phi else float("nan")):>11.0f}'
