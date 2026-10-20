@@ -14,11 +14,19 @@ structure.txt
 # SCENARIOS/NSR_RANGES) lives in scripts/experiments/impact_long_shedders_config.py
 # instead, as plain code -- not a Data/ reference file.
 Data/*
-# ...except the real-world inputs Figure 1 reads (literature durations and the
-# two patient root-to-tip datasets). These are hand-curated study data, not
-# simulation output, and Figure 1 is not reproducible from a clean checkout
-# without them.
+# ...except the real-world inputs Figure 1 reads. These are hand-curated study
+# data, not simulation output, and Figure 1 is not reproducible from a clean
+# checkout without them. Two of the three are transcribed from publications --
+# the literature duration table (panel C, carries DOIs) and the intra-host
+# series (panel F, 19 published case reports) -- so they are versioned.
 !Data/RealWorldData/
+
+# The global-clock cohort is NOT. It is a sequence-database extract: 1,638
+# GISAID-style names with specimen IDs and exact collection dates, feeding
+# panels D and E. It was tracked from 2026-06-19 to 2026-10-20 and has been
+# purged from the history; keep it out. Obtain it separately and drop it here.
+Data/RealWorldData/patient_global_clock.csv
+Data/RealWorldData/data_fig1_D.csv
 
 # Archives produced by package_simplicity_data.sh / archive_paper_runs.sh.
 # Multi-GB, regenerable from Data/.

@@ -5,6 +5,59 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.1 — 2026-10-20 — pietro gerletti
+
+Removed the global-clock patient cohort from the repository and from its
+history. The repository is public.
+
+WHAT WAS REMOVED
+
+`Data/RealWorldData/data_fig1_D.csv`, latterly `patient_global_clock.csv`:
+1,638 rows whose `sequence_name` column carries GISAID-style virus names with
+specimen identifiers paired with exact collection dates
+(`IDN/10761001089/2021|2021-06-08`). It feeds figure 1's panels D and E. It is
+a sequence-database extract, not a transcription from a publication, and it
+should never have been versioned.
+
+Exposure window: 2026-06-19 (37636cc, added at the repository root) to
+2026-10-20. It moved to `Data/RealWorldData/` at v2.4.34 and was present in
+the current tree of `main`, `calibration_pipeline` and `settings_data_flow`.
+No tag and no `refs/pull/*` ref carried it, which is why force-pushing the
+branches was sufficient.
+
+WHAT STAYS VERSIONED, AND WHY
+
+`literature_long_shedders_data.csv` (panel C) is a bibliography — DOIs,
+titles, authors, quoted passages. `patient_intrahost_clock.csv` (panel F) is
+259 rows transcribed from 19 published case reports, where each "patient 1" is
+that paper's patient 1. Both are already in the literature. Only the sequence
+extract was the problem, and `.gitignore` now names it specifically rather
+than dropping the whole `!Data/RealWorldData/` exception.
+
+HOW
+
+`git filter-repo --invert-paths` over both historical path spellings. All 782
+commits survive and every tag's tree is byte-identical to its predecessor; the
+tip of `main` differs from the pre-rewrite mirror by exactly one path. The
+root commit was rewritten, so every SHA in the repository changed and all four
+branches and five tags were force-pushed. **Any existing clone must be
+re-cloned** — its commits no longer exist upstream.
+
+A pre-rewrite mirror of the published state is at
+`~/SIMPLICITY_prerewrite_backup.git`, and the data itself is at
+`~/SIMPLICITY_RealWorldData/`. The in-repo copy is now gitignored, which means
+`git clean -xfd` will delete it; the out-of-tree copy is the one to trust.
+
+STILL OPEN
+
+GitHub keeps unreachable objects fetchable by direct SHA until it garbage
+collects. Purging them requires a support request, which has not been made.
+A rewrite limits future access; it does not retract the four months the file
+was public. `scripts/archive_paper_runs.sh:79` still sweeps the whole
+`RealWorldData` directory into paper archives, by decision.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.0 — 2026-10-20 — pietro gerletti
 
 Everything the next production run needs, plus two measurement faults in
