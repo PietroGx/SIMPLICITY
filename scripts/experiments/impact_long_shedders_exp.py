@@ -31,6 +31,7 @@ from impact_long_shedders_config import (
     EXP_NAME, table_path as default_table_path, USER_FIXED_PARAMS,
     build_exp_phase_settings, exp_group, add_slurm_resource_args,
     set_slurm_resource_env, print_fixed_params,
+    set_experiment_output_env,
     CONSENSUS_MODES, DEFAULT_CONSENSUS, exp_name,
 )
 
@@ -112,6 +113,7 @@ def main():
     args = parser.parse_args()
 
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
+    set_experiment_output_env()
 
     table_path = default_table_path(args.exp_num, args.consensus)
     df = load_calibration_table(table_path)

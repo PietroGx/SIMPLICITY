@@ -83,7 +83,7 @@ def test_figure_paths_are_distinct():
 
 def test_save_scripts_still_parse():
     '''Catches an import or f-string break in the renamed help text.'''
-    for script in ['fig1_save', 'fig2_save', 'fig3_save', 'fig3S_save',
+    for script in ['fig1_save', 'fig2_save', 'fig3_save', 'fig2S_save',
                    'fig4_save']:
         r = subprocess.run([sys.executable, os.path.join(PLOTS, script + '.py'),
                             '--help'], capture_output=True, text=True)

@@ -26,7 +26,14 @@ The set of all simulations is what we call an experiment.
 """
 
 from experiment_script_runner import run_experiment_script
+import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
+
+# Declare which outputs this run writes. Required: dir_manager raises when a
+# run has not said, so that a script cannot silently write the big ones by
+# forgetting. No argument means the default -- lineage_frequency and
+# sequencing_data skipped; pass dm.declare_outputs(()) to write everything.
+dm.declare_outputs()
 import argparse
 
 experiment_name =  'Experiment_name'

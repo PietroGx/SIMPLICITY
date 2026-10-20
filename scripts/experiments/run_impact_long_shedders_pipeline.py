@@ -414,7 +414,7 @@ def main():
             args.consensus)
         wait_for_sanity_plots(submitted, log_fh)
 
-        table_path = frozen_table_path(args.exp_num, args.consensus)
+        table_path = frozen_table_path(args.exp_num, consensus)
         archive_path = artifacts_archive_path(args.exp_num)
         summary_lines = [
             "\n===== Pipeline summary =====",

@@ -272,6 +272,15 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
     only: it carries thousands of points against the data's hundreds, so its
     cloud buried the observations it is meant to be compared against. Set
     model_scatter=True to draw it anyway.
+
+    The model line is the MEAN OF THE PER-SEED SLOPES, not one fit through
+    every seed concatenated. Points inside a seed share a genealogy, so
+    pooling treats correlated points as independent: measured on run #3 it
+    biases the global clock 2.7% low and understates its standard error 53-fold
+    (tests/test_slope_pooling_and_effort.py). The shaded wedge is mean +/- 1 SD
+    ACROSS SEEDS -- the spread of individual epidemics, not the precision of
+    the mean -- because the patient cohort is itself one draw and that is what
+    it has to be compared against.
     """
     entries = []
 
@@ -282,10 +291,10 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
         xr = xr - np.min(xr)                      # days since first observation
         if len(xr) > 1:
             slope, r2 = _through_origin(xr, yr)
-            ax.scatter(xr, yr, s=7, alpha=0.28, color=DATA_COLOR,
+            ax.scatter(xr, yr, s=5, alpha=0.20, color=DATA_COLOR,
                        edgecolors='none', zorder=2, label=data_label)
             xs = np.array([0.0, x_max])           # extend to the panel edge
-            ax.plot(xs, slope * xs, color=DATA_COLOR, lw=1.7, zorder=7,
+            ax.plot(xs, slope * xs, color=DATA_COLOR, lw=1.1, zorder=7,
                     linestyle=DATA_STYLE)
             entries.append((data_label, slope * 365.25, r2))
 
@@ -297,7 +306,21 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
                 continue
             xm = cdf['Sequencing_time'].astype(float).values * 365.25
             ym = cdf['Distance_from_root'].astype(float).values
-            slope, r2 = _through_origin(xm, ym)
+            _, r2 = _through_origin(xm, ym)          # R2 of the whole cloud
+            per_seed = []
+            if 'seed' in cdf.columns:
+                for _, g in cdf.groupby('seed'):
+                    s_i, _ = _through_origin(
+                        g['Sequencing_time'].astype(float).values * 365.25,
+                        g['Distance_from_root'].astype(float).values)
+                    if np.isfinite(s_i):
+                        per_seed.append(s_i)
+            if per_seed:
+                slope = float(np.mean(per_seed))
+                sd = float(np.std(per_seed, ddof=1)) if len(per_seed) > 1 else 0.0
+            else:                                    # no seed column: old frame
+                slope, _ = _through_origin(xm, ym)
+                sd = 0.0
             if not np.isfinite(slope):
                 continue
             colour = SCEN_COLORS.get(cohort, "#888888")
@@ -308,7 +331,10 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
                            s=7, alpha=0.30, color=colour, edgecolors='none',
                            zorder=3, label=f"Model, {cohort}")
             xs = np.array([0.0, x_max])           # extend to the panel edge
-            ax.plot(xs, slope * xs, color=colour, lw=1.7, zorder=6)
+            if sd > 0:
+                ax.fill_between(xs, (slope - sd) * xs, (slope + sd) * xs,
+                                color=colour, alpha=0.16, lw=0, zorder=4)
+            ax.plot(xs, slope * xs, color=colour, lw=1.1, zorder=6)
             entries.append((f"Model, {cohort}", slope * 365.25, r2))
 
     if not entries:

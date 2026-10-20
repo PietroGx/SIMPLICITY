@@ -6,6 +6,31 @@ Working list of blockers, active refactors, features, and technical debt.
 
 ## Blockers (before next production rerun)
 
+- [ ] **The calibration curve reads ~12% high at the bracketing grid points**
+      (2026-10-20, v2.5.0). On run #3 the fitted `A*x^B` sits 1.13x / 1.12x
+      above the measured OSR at the two grid points that bracket the target,
+      so inverting it returns an NSR that is biased even when every per-seed
+      OSR is correct. Log-interpolating the measured points instead gives
+      0.001157 against production's 0.001140. Narrowing the ranges to one
+      decade (v2.5.0) reduced the residual but does not remove the bias.
+      **Recalibration required** if the fit form changes.
+
+- [ ] **HIV_high has no standard-host baseline in figure 2 panels B and D**
+      (2026-10-20, v2.5.0). Not one of its 16,805 standard substitutions
+      founded a clade passing 50% of circulating infections, so the ratio is
+      undefined and panel D's line stops at a clade threshold of 8. At 12%
+      prevalence essentially all transmission runs through long shedders. Not
+      a bug -- the scenario cannot answer the question the panel asks, and the
+      panels now say so. edge_case is the informative comparison.
+
+- [ ] **54 minutes of run #3 are unaccounted for** (2026-10-20, v2.5.0).
+      Between cal_1's array finishing (16:58:48) and cal_2's starting
+      (17:52:31) nothing is logged, and it is 43% of the 2h06m run. It is
+      either the long-NSR fit running on the orchestrator -- which calls
+      `extract_ih_regression_data` once per seed, 900 times -- or queue wait,
+      and the files cannot tell the two apart. Profile it before assuming a
+      bigger run scales.
+
 - [ ] **Production configuration set from the calibrated grid: N=3000,
       I0=90, R=1.05, R_long=1.05 — RECALIBRATION REQUIRED** (2026-10-18,
       v2.4.112).

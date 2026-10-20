@@ -32,6 +32,10 @@ import simplicity.dir_manager as dm
 import simplicity.jobs as jobs
 import simplicity.settings_manager as sm
 
+# These harnesses run real simulations, so they declare their outputs like any
+# stage: dm.skipped_outputs() raises otherwise. No argument means the default.
+dm.declare_outputs()
+
 failures = []
 
 

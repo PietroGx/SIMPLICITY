@@ -6,9 +6,11 @@ import random
 import ast
 
 import simplicity.dir_manager as dm
+import simplicity.sequencing as sq
 import simplicity.settings_manager as sm
 import simplicity.tuning.evolutionary_rate as er
-from _scenarios import scenario_names, scenario_output_dirs, scenario_label
+from _scenarios import (scenario_names, scenario_output_dirs, scenario_label,
+                        one_sod)
 import simplicity.output_manager as om
 from simplicity.intra_host_model import Host 
 
@@ -43,15 +45,37 @@ def duration_groups(exp_name):
     return out
 
 
+# Sequencing effort differs between the two clocks because the two draws are
+# not the same operation, measured in tests/test_slope_pooling_and_effort.py on
+# run #3:
+#
+#   D  global clock, ~2790 diagnosed sequences per seed. A 10% host draw still
+#      leaves ~279, and between-seed variance is 99.7% of the total -- the draw
+#      moves the mean slope by 0.05%. Free.
+#   E  intra-host clock, read from individuals_data + phylogenetic_data, NOT
+#      from the sequencing record. The analogous draw is over long-shedder
+#      HOSTS, of which there are tens per seed; at 10% sampling noise becomes
+#      91-94% of the variance and edge_case loses 28 of its 30 seeds. It also
+#      describes a study that sequences 10% of long shedders and then recovers
+#      each one's complete within-host history, which no study does.
+#
+# So the standard/global clock is read at 10% and the long-shedder/intra-host
+# clock at 100%. These are not free parameters to tune.
+GLOBAL_CLOCK_RATIO = 0.10
+INTRAHOST_CLOCK_RATIO = 1.0
+_RATIO_SEED = 20261020
+
+
 def get_panel_a_data(exp_num=1, exp_name="impact_long_shedders"):
     scenarios = duration_groups(exp_name)
     df_list = []
     for scenario in scenarios:
         experiment_string = scenario_label(exp_name, scenario, exp_num)
+        # outside the try on purpose: a guard caught by `except Exception`
+        # below would turn a loud stop back into a silent skip.
+        sod = one_sod(exp_name, scenario, exp_num)
+        if sod is None: continue
         try:
-            sods = scenario_output_dirs(exp_name, scenario, exp_num)
-            if not sods: continue
-            sod = sods[0]
             tau_1 = sm.get_parameter_value_from_simulation_output_dir(sod, 'tau_1')
             tau_2 = sm.get_parameter_value_from_simulation_output_dir(sod, 'tau_2')
             tau_4 = sm.get_parameter_value_from_simulation_output_dir(sod, 'tau_4')
@@ -74,10 +98,9 @@ def get_panel_b_data(exp_num=1, exp_name="impact_long_shedders"):
     scenarios = duration_groups(exp_name)
     df_list = []
     control_exp_string = scenario_label(exp_name, "control", exp_num)
+    control_sod = one_sod(exp_name, "control", exp_num)
+    if control_sod is None: return pd.DataFrame(columns=['duration', 'cohort'])
     try:
-        control_sods = scenario_output_dirs(exp_name, "control", exp_num)
-        if not control_sods: return pd.DataFrame(columns=['duration', 'cohort'])
-        control_sod = control_sods[0]
         all_control_ssods = dm.get_seeded_simulation_output_dirs(control_sod)
         rng = random.Random(42) 
         sampled_control_ssods = rng.sample(all_control_ssods, min(10, len(all_control_ssods)))
@@ -86,10 +109,9 @@ def get_panel_b_data(exp_num=1, exp_name="impact_long_shedders"):
 
     for scenario in scenarios:
         experiment_string = scenario_label(exp_name, scenario, exp_num)
+        sod = one_sod(exp_name, scenario, exp_num)      # outside the try
+        if sod is None: continue
         try:
-            sods = scenario_output_dirs(exp_name, scenario, exp_num)
-            if not sods: continue
-            sod = sods[0]
             all_ssods_for_scenario = dm.get_seeded_simulation_output_dirs(sod)
             for target_seed_name in matched_seed_names:
                 target_ssod = next((s for s in all_ssods_for_scenario if os.path.basename(s) == target_seed_name), None)
@@ -155,20 +177,19 @@ def get_panel_de_data():
         if 'sampling_date' in df_e.columns: df_e['sampling_date'] = pd.to_datetime(df_e['sampling_date'])
     return df_d, df_e
 
-def get_model_global_clock(exp_num=1, exp_name="impact_long_shedders"):
+def get_model_global_clock(exp_num=1, exp_name="impact_long_shedders",
+                           ratio=GLOBAL_CLOCK_RATIO):
     """Model GLOBAL clock: standard individuals in control, divergence from the
     outbreak root against absolute sequencing time. The model counterpart of
     the real standard-cohort root-to-tip regression."""
     control_exp = scenario_label(exp_name, "control", exp_num)
     rows = []
-    try:
-        sods = scenario_output_dirs(exp_name, "control", exp_num)
-    except Exception:
-        sods = []
-    if not sods:
+    sod = one_sod(exp_name, "control", exp_num)
+    if sod is None:
         print(f"[fig1][warn] global clock: no output for {control_exp}")
         return pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root', 'cohort'])
-    for ssod in dm.get_seeded_simulation_output_dirs(sods[0]):
+    warned = False
+    for s, ssod in enumerate(dm.get_seeded_simulation_output_dirs(sod)):
         seq_path = os.path.join(ssod, 'sequencing_data_regression.csv')
         if not os.path.exists(seq_path):
             continue
@@ -177,14 +198,34 @@ def get_model_global_clock(exp_num=1, exp_name="impact_long_shedders"):
         if col is None:
             continue
         sub = df[df[col] == 'standard']
-        if not sub.empty:
-            rows.append(sub[['Sequencing_time', 'Distance_from_root']].copy())
+        if sub.empty:
+            continue
+        if ratio < 1.0:
+            # Host-level, via the surveillance model's own rule: a person is
+            # sequenced or not, and then all of their genomes are read.
+            if 'individual_index' not in sub.columns:
+                if not warned:
+                    print(f"[fig1][warn] global clock: no individual_index in "
+                          f"{os.path.basename(seq_path)} -- this run predates "
+                          f"it, so ratio {ratio} CANNOT be applied and the "
+                          f"complete record is used instead. Rerun to enable.")
+                    warned = True
+            else:
+                kept = sq.subsample(sub.to_dict('records'), ratio,
+                                    seed=_RATIO_SEED + s)
+                sub = pd.DataFrame(kept, columns=sub.columns)
+                if sub.empty:
+                    continue
+        keep = sub[['Sequencing_time', 'Distance_from_root']].copy()
+        keep['seed'] = os.path.basename(ssod)
+        rows.append(keep)
     if not rows:
         print(f"[fig1][warn] global clock: no standard sequences in {control_exp}")
         return pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root', 'cohort'])
     out = pd.concat(rows, ignore_index=True)
     out['cohort'] = 'Control'
-    print(f"[fig1] global clock: {len(out)} points from {control_exp}")
+    print(f"[fig1] global clock: {len(out)} points from {control_exp} "
+          f"({out['seed'].nunique()} seeds, ratio {ratio})")
     return out
 
 
@@ -205,15 +246,12 @@ def get_model_intrahost_clock(exp_num=1, exp_name="impact_long_shedders",
         if scenario == "control":
             continue
         exp_str = scenario_label(exp_name, scenario, exp_num)
-        try:
-            sods = scenario_output_dirs(exp_name, scenario, exp_num)
-        except Exception:
-            sods = []
-        if not sods:
+        sod = one_sod(exp_name, scenario, exp_num)
+        if sod is None:
             print(f"[fig1][warn] intra-host clock: no output for {exp_str}")
             continue
         label = get_clinical_label(scenario)
-        ssods = dm.get_seeded_simulation_output_dirs(sods[0])
+        ssods = dm.get_seeded_simulation_output_dirs(sod)
         if max_seeds:
             ssods = ssods[:max_seeds]
         n = 0
@@ -226,11 +264,13 @@ def get_model_intrahost_clock(exp_num=1, exp_name="impact_long_shedders",
                 continue
             ih = ih.copy()
             ih['cohort'] = label
+            ih['seed'] = os.path.basename(ssod)     # INTRAHOST_CLOCK_RATIO = 1.0
             rows.append(ih)
             n += len(ih)
         print(f"[fig1] intra-host clock: {n} points for {label} ({scenario})")
     if not rows:
-        return pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root', 'cohort'])
+        return pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root',
+                                     'cohort', 'seed'])
     return pd.concat(rows, ignore_index=True)
 
 

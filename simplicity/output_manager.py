@@ -189,8 +189,16 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
                         genome_str = decoded_genome.replace("'", "")
                         fasta_file.write(f"{genome_str}\n")
 
-                    # Add to Regression Dict
+                    # Add to Regression Dict. individual_index makes a
+                    # host-level subsample expressible on this file alone --
+                    # a sequencing ratio keeps or drops a HOST, never a row.
+                    # sampling_event says which act produced the row:
+                    # individual_type names the person, not how they were
+                    # sampled, and a long shedder can reach this file either
+                    # way (see PART B).
                     sequencing_data_regression_dic.append({
+                        'individual_index': ind_index,
+                        'sampling_event': 'diagnosis',
                         'Sequencing_time': round(seq_time / 365.25, 4), # Years
                         'Distance_from_root': dis.hamming(sequence) / len(dis.reference),
                         'individual_type': ind_type
@@ -251,8 +259,16 @@ def save_sequencing_dataset(simulation_output, output_path, sequence_long_shedde
                             genome_str = decoded_genome.replace("'", "")
                             long_shedder_entries.append(f"{header}\n{genome_str}\n")
                         
-                        # Add to Regression Dict 
+                        # Add to Regression Dict. 'census', not 'diagnosis':
+                        # these hosts RECOVERED without ever being diagnosed
+                        # (diagnosis leaves infected_i, so the two states are
+                        # disjoint), so they are in the file because they
+                        # exist, not because surveillance found them. Mixing
+                        # the two is what put figure 1's old panel G at
+                        # 0.00022 s/s/y against a true 0.00202.
                         sequencing_data_regression_dic.append({
+                            'individual_index': i,
+                            'sampling_event': 'census',
                             'Sequencing_time': round(seq_time / 365.25, 4),
                             'Distance_from_root': dis.hamming(sequence_list) / len(dis.reference),
                             'individual_type': 'long_shedder'
@@ -292,7 +308,7 @@ def save_simulation_trajectory(simulation_output, seeded_simulation_output_dir):
     # Streamed run: the rows are already on disk under ".partial". The rename
     # is what publishes them, so the file appearing under its real name still
     # means the simulation reached the end.
-    partial = simulation_output.finalize_stream(simulation_output.TRAJECTORY_FILE)
+    partial = simulation_output.finalize_stream('simulation_trajectory')
     if partial is not None:
         os.replace(partial, trajectory_file_path)
         return
@@ -311,18 +327,34 @@ def save_lineage_frequency(simulation_output, seeded_simulation_output_dir):
         return
     lineage_frequency_file_path = os.path.join(seeded_simulation_output_dir,
                                                simulation_output.LINEAGE_FREQUENCY_FILE)
-    partial = simulation_output.finalize_stream(simulation_output.LINEAGE_FREQUENCY_FILE)
+    partial = simulation_output.finalize_stream('lineage_frequency')
     if partial is not None:
         os.replace(partial, lineage_frequency_file_path)
         return
     df = simulation_output.lineage_frequency_to_df()
     df.to_csv(lineage_frequency_file_path, index=False)
 
+LINEAGE_FREQUENCY_NAMES = ("lineage_frequency.csv.gz", "lineage_frequency.csv")
+
+
+def lineage_frequency_path(seeded_simulation_output_dir):
+    """Where this seed's lineage frequencies are, gzipped or not.
+
+    Runs written before the stream was compressed carry the plain .csv; the
+    gzipped name is preferred when both somehow exist. Returns the gzipped
+    path when neither does, so the error names the file a new run would write.
+    """
+    for name in LINEAGE_FREQUENCY_NAMES:
+        path = os.path.join(seeded_simulation_output_dir, name)
+        if os.path.isfile(path):
+            return path
+    return os.path.join(seeded_simulation_output_dir,
+                        LINEAGE_FREQUENCY_NAMES[0])
+
+
 def read_lineage_frequency(seeded_simulation_output_dir):
-    lineage_frequency_file_path = os.path.join(seeded_simulation_output_dir,
-                                        "lineage_frequency.csv")
-    df = pd.read_csv(lineage_frequency_file_path)
-    return df
+    # pandas decompresses by extension, so one call covers both names
+    return pd.read_csv(lineage_frequency_path(seeded_simulation_output_dir))
 
 def save_individuals_data(simulation_output, seeded_simulation_output_dir):
     individuals_data = simulation_output.individuals_data_to_df()

@@ -393,12 +393,16 @@ def build_cal1_settings(seeds, ranges, R=None, ih_virus_emergence_rate=None,
 # NSR, shared by every scenario -- there is nothing scenario-specific left to
 # fit once calibration stops compensating for the long side.
 #
-# final_time 365, matching the standard cal_1 window. Production runs 1095, so
-# control will not sit exactly on target_osr_std -- but in this pipeline that
-# is not what the standard rate is for: it defines "the rate at which standard
-# individuals mutate", measured in a clean population, and the population clock
-# is deliberately an output. Worth watching control's production clock all the
-# same, since it is the reference every elevation is measured against.
+# Same window as production (CAL2_FINAL_TIME, below). The standard rate still
+# defines "the rate at which standard individuals mutate", measured in a clean
+# population, and the population clock is still deliberately an OUTPUT -- free
+# to rise once long shedders are present. What the matched window removes is
+# the part of the discrepancy that was never about long shedders: a global
+# root-to-tip slope measured over 0-730 d is not the same quantity as one
+# measured over 0-1095 d, so the old mismatch made control differ from target
+# for a reason nothing in the model cared about. Control's production clock is
+# still worth watching -- it is the reference every elevation is measured
+# against.
 #
 # There is no sequencing_rate to set: a run writes the COMPLETE diagnosed
 # record, which is what the old rate 1.0 produced and what both calibration
@@ -416,14 +420,20 @@ USER_FIXED_PARAMS = {
     "IH_virus_emergence_rate": 0.1,
 }
 
-# cal_2 calibrates over a shorter window than the experiment phase runs on
-# (USER_FIXED_PARAMS['final_time']); build_cal2_settings applies it.
+# cal_2 calibrates over the SAME window the experiment phase runs on, by
+# construction rather than by a literal that has to be kept in step.
 #
-# 730, not 365. cal_2 has to fit the standard rate ABOVE the burn-in, and at
-# this configuration phi=1 lands at a median of day 284 -- a 365-day window
-# would spend 78% of itself below the boundary and fit the neutral phase. The
-# configuration grid ran every cell at 730 for the same reason.
-CAL2_FINAL_TIME = 730
+# It was 365, then 730. Run #3 measured what the mismatch costs: control --
+# long_shedders_ratio 0.0, the composition cal_2 calibrates in -- realizes
+# 0.00107 over 1095 d against the 0.0013 it was calibrated to at 730 d, and
+# 0.00114 when its own record is cut back to 730. The global root-to-tip clock
+# is a property of the window, so the only window that cannot disagree with
+# production is production's own (tests/test_global_clock_window.py).
+#
+# This does NOT close the whole gap -- about 12 of those 18 points are the
+# calibration curve reading high where it is inverted, which is a separate
+# finding in BACKLOG. It removes the part that is ours to remove.
+CAL2_FINAL_TIME = USER_FIXED_PARAMS["final_time"]
 
 # Shared color palette for the calibration-fit plots (long-NSR per tau group,
 # standard-NSR per scenario), keyed by scenario name so both plots look
@@ -486,6 +496,25 @@ CALIBRATION_SKIPPED_OUTPUTS = ("lineage_frequency", "simulation_trajectory",
                                "sequencing_data")
 
 
+# The experiment phase writes what the figures read and nothing else:
+# lineage_frequency for figure 2's muller plots, simulation_trajectory for
+# figure 3's per-simulation phi window. sequencing_data has no reader at all
+# -- sequencing_data_regression.csv carries the columns the fits use, and
+# since it now also carries individual_index a host-level subsample needs
+# nothing else.
+EXPERIMENT_SKIPPED_OUTPUTS = ("sequencing_data",)
+
+
+def set_experiment_output_env():
+    """Tell the experiment-phase simulations which outputs to leave unwritten.
+
+    Every stage declares: dir_manager.skipped_outputs() raises when nothing
+    has, so a stage that forgets stops at once instead of writing the 100.6 GB
+    of lineage_frequency the calibrated grid once produced.
+    """
+    dm.declare_outputs(EXPERIMENT_SKIPPED_OUTPUTS)
+
+
 def set_calibration_output_env():
     """Tell the calibration simulations which outputs to leave unwritten.
 
@@ -494,7 +523,7 @@ def set_calibration_output_env():
     would not travel with the code. simplicity.runners.slurm forwards the whole
     environment through sbatch, so this reaches every task.
     """
-    os.environ[dm.SKIP_OUTPUTS_ENV] = ",".join(CALIBRATION_SKIPPED_OUTPUTS)
+    dm.declare_outputs(CALIBRATION_SKIPPED_OUTPUTS)
 
 
 def exp_name(consensus):
@@ -658,19 +687,38 @@ def build_exp_phase_settings(rows, n_seeds, consensus=DEFAULT_CONSENSUS):
 # =============================================================================
 # NSR SWEEP RANGES
 # =============================================================================
-# cal_long reaches a decade lower than the bound pipeline's old 1e-4..1e-2:
-# edge_case sheds for 350 days against HIV's 109, so it has far longer to
-# accumulate and should calibrate below the others.
-# cal_std brackets bound run #7's control, which landed at 1.38e-4 -- the
-# closest thing to this stage that pipeline had.
+# ONE DECADE, centred on the rate the data says. Not a style preference: the
+# exp model A*x^B cannot follow this curve over two decades, and the error is
+# not noise. Refitting run #3's own grid point by point (fit/data per point):
+#
+#   cal_std, 2 decades   0.68 0.85 0.94 0.99 1.09 1.11 1.10 1.08 1.01 0.93
+#   cal_long, 2 decades  0.33 0.45 0.61 0.78 0.93 1.04 1.09 1.08 1.04 0.97
+#   either, 1 decade     0.95 1.02 1.03 0.99
+#
+# 32% off its own data on the standard side, 67% on the long side, and
+# S-shaped -- low at both ends, high through the middle, which is where the
+# curve gets inverted. The inversion then returns a rate ~12% too low on the
+# standard side, which is most of why run #3's control realized 0.00107
+# against the 0.0013 it was calibrated to. One decade brings the worst
+# residual to 4-6% with no structure left.
+#
+# The centres are the midpoints of what the TIGHTENED fits returned on run #3:
+# 1.51e-4 standard, and the geometric mean of 7.5e-4 / 1.18e-3 / 1.75e-3 for
+# the three long cohorts. Written as centre +/- sqrt(10) rather than as two
+# endpoints, so the one-decade rule is structural: widening the sweep takes
+# deciding to, not editing a literal.
+#
+# cal_1's old answers were accidentally right, not correctly right -- its
+# crossings happened to sit where the overshooting curve passed back through
+# the data, which is why the sanity plot showed the intra-host clocks on
+# target while the fit was 67% off at its ends.
 _NSR_STEPS = 10
-
-# Probes #1-#4 (tests/run_nsr_range_finder.sh, 6 nodes x 10 seeds) put the
-# three cal_1 cohorts at NSR_long 5.7e-4 / 1.0e-3 / 1.7e-3 and the standard
-# rate near 7e-5. Rounded out from there; see CHANGELOG v2.4.97.
+# Hand-calibrated for THIS configuration (3000 / 90 / R 1.05) from run #3's
+# own grid, refitted one decade at a time. Not a formula and not general: a
+# different population or R needs them re-chosen the same way.
 NSR_RANGES = {
-    "cal_long": {"min": 1e-04, "max": 1e-02, "steps": _NSR_STEPS},
-    "cal_std":  {"min": 1e-05, "max": 1e-03, "steps": _NSR_STEPS},
+    "cal_long": {"min": 3.6e-04, "max": 3.6e-03, "steps": _NSR_STEPS},
+    "cal_std":  {"min": 4.8e-05, "max": 4.8e-04, "steps": _NSR_STEPS},
 }
 
 TABLE_COLUMNS = [

@@ -92,6 +92,29 @@ def has_output(exp_name, scenario, exp_num):
     return bool(scenario_output_dirs(exp_name, scenario, exp_num))
 
 
+def one_sod(exp_name, scenario, exp_num):
+    """The ONE simulation output dir of an experiment-phase scenario.
+
+    None when the scenario has not been run. Raises when the group holds more
+    than one: every figure here assumes a scenario is a single parameter
+    point, and `sods[0]` silently plotted the first and dropped the rest. The
+    day the experiment phase sweeps anything inside a scenario -- the duration
+    sweep at fixed prevalence is the obvious one -- that produces a plausible
+    wrong panel instead of a stop. Call this OUTSIDE any `except Exception`,
+    or the guard is swallowed and buys nothing.
+    """
+    sods = scenario_output_dirs(exp_name, scenario, exp_num)
+    if not sods:
+        return None
+    if len(sods) > 1:
+        raise RuntimeError(
+            f"{scenario}: {len(sods)} simulation dirs in this group, expected "
+            f"1. The panel would use only {os.path.basename(sods[0])} and "
+            f"silently drop {len(sods) - 1}. Scope it to the parameter point "
+            "you mean.\n  " + "\n  ".join(os.path.basename(s) for s in sods))
+    return sods[0]
+
+
 def resolve_scenarios(exp_name, exp_num, required=None, verbose=True):
     """(present, missing) for this pipeline at this experiment number.
 
@@ -132,7 +155,7 @@ def figure_path(number, exp_name, exp_num, fmt, seed=None, subdir=None,
 
     The pipeline and run number are in the name so no two pipelines can
     overwrite each other. `seed` is included for the seed-dependent figures
-    (2, 3, 4) so rendering a second seed no longer silently overwrites the
+    (3, 4) so rendering a second seed no longer silently overwrites the
     first -- which made comparing seeds impossible.
     """
     out = figures_dir()

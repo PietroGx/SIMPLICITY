@@ -10,9 +10,9 @@
 # (at your option) any later version.
 #
 # ============================================================================
-# Figure 3S -- clade-origin pies for EVERY scenario.
+# Figure 2S -- clade-origin pies for EVERY scenario.
 #
-# Figure 3 panel A shows the 2x2 pies for one representative group. This is
+# Figure 2 panel A shows the 2x2 pies for one representative group. This is
 # the same four metrics for all scenarios side by side, so the trend across
 # long-shedder burden is visible rather than asserted.
 #
@@ -29,7 +29,7 @@ import argparse
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-import fig3_preprocess_data as preproc
+import fig2_preprocess_data as preproc
 from _scenarios import EXP_NAME, figure_path, resolve_scenarios
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -39,7 +39,7 @@ from long_shedders_plots import plot_fig4_pies, add_global_pie_legend
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="Figure 3S: clade-origin pies for every scenario.")
+        description="Figure 2S: clade-origin pies for every scenario.")
     parser.add_argument('--exp-num', type=int, required=True)
     parser.add_argument('--exp-name', type=str, default=EXP_NAME)
     parser.add_argument('--cluster-threshold', type=int, default=5)
@@ -58,7 +58,7 @@ def set_nature_rcparams():
     })
 
 
-def build_figure_3S(exp_num, exp_name, cluster_threshold, min_days, fmt):
+def build_figure_2S(exp_num, exp_name, cluster_threshold, min_days, fmt):
     set_nature_rcparams()
 
     scenarios, _ = resolve_scenarios(exp_name, exp_num)
@@ -98,12 +98,12 @@ def build_figure_3S(exp_num, exp_name, cluster_threshold, min_days, fmt):
 
     add_global_pie_legend(fig)
 
-    out = figure_path("3S", exp_name, exp_num, fmt)
+    out = figure_path("2S", exp_name, exp_num, fmt)
     plt.savefig(out, dpi=300, bbox_inches='tight')
     print(f"\n[Success] Generated {out}")
 
 
 if __name__ == "__main__":
     args = parse_arguments()
-    build_figure_3S(args.exp_num, args.exp_name, args.cluster_threshold,
+    build_figure_2S(args.exp_num, args.exp_name, args.cluster_threshold,
                     args.min_days, args.format)

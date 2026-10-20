@@ -21,6 +21,11 @@ import simplicity.dir_manager as dm
 import simplicity.jobs as jobs
 import simplicity.settings_manager as sm
 
+# Every run declares which outputs it writes; dm.skipped_outputs() raises
+# otherwise. These harnesses run real simulations, so they declare too -- the
+# default, which is what a stage gets when it asks for nothing special.
+dm.declare_outputs()
+
 # run_seeded_simulations reads this with a hard subscript
 os.environ.setdefault('SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM', '4')
 

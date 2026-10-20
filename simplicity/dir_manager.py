@@ -353,10 +353,49 @@ def get_seed_from_SSOD(seeded_simulation_output_dir):
 # a grid point that exists to be rejected by the fit.
 SKIP_OUTPUTS_ENV = "SIMPLICITY_SKIP_OUTPUTS"
 
+# Every output that can be skipped, by LOGICAL NAME -- the same string the
+# streams, the buffers and the skip list are all keyed on, so nothing has to
+# derive one from the other (it used to slice four characters off a filename,
+# which stopped working the moment an extension changed length).
+ALL_OUTPUTS = ("lineage_frequency", "simulation_trajectory", "sequencing_data")
+
+# What a run writes when it has said nothing else. Skipping is the DEFAULT:
+# lineage_frequency reached 100.6 GB on the calibrated grid and is read by one
+# figure, for one seed per scenario; sequencing_data is read by nothing at all
+# (sequencing_data_regression.csv carries what the fits need). A stage that
+# wants them says so.
+DEFAULT_SKIPPED_OUTPUTS = ("lineage_frequency", "sequencing_data")
+
+
+def declare_outputs(skip=DEFAULT_SKIPPED_OUTPUTS):
+    """State which outputs this run must NOT write. Every stage calls this.
+
+    The list is COMPLETE, not additive: what is not named here gets written.
+    Call it once, before the simulations start; it reaches the tasks through
+    the environment, which is how sbatch carries it to a compute node.
+    """
+    unknown = sorted(set(skip) - set(ALL_OUTPUTS))
+    if unknown:
+        raise ValueError(
+            f"not skippable outputs: {unknown}. Known: {sorted(ALL_OUTPUTS)}")
+    os.environ[SKIP_OUTPUTS_ENV] = ",".join(skip)
+
 
 def skipped_outputs():
-    """Base names of the outputs this run must not write."""
-    raw = os.environ.get(SKIP_OUTPUTS_ENV, "")
+    """Base names of the outputs this run must not write.
+
+    Raises when no stage declared them. Deliberate: the previous default was
+    "skip nothing", so a script that forgot wrote every output -- 100.6 GB of
+    lineage_frequency on the calibrated grid, for files nothing opened. A
+    crash names the caller; a silent default names nobody.
+    """
+    raw = os.environ.get(SKIP_OUTPUTS_ENV)
+    if raw is None:
+        raise RuntimeError(
+            f"{SKIP_OUTPUTS_ENV} is unset: this run never declared which "
+            f"outputs to write. Call dir_manager.declare_outputs() -- with no "
+            f"argument for the default ({', '.join(DEFAULT_SKIPPED_OUTPUTS)} "
+            f"skipped), or with the complete list this stage needs.")
     return frozenset(name.strip() for name in raw.split(",") if name.strip())
 
 

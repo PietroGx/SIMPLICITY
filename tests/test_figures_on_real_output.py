@@ -274,7 +274,7 @@ def figure_1(exp_num, exp_name, present):
 
 def figure_2(exp_num, exp_name, present, heavy):
     print('\nfigure 2')
-    import fig2_preprocess_data as f2
+    import fig3_preprocess_data as f2
     scenarios = sorted(present)
     if 'control' not in present:
         print('  [n/a       ] fig2 selects its seeds from `control`, which has '
@@ -315,7 +315,7 @@ def figure_2(exp_num, exp_name, present, heavy):
 
 def figure_3(exp_num, exp_name, present, heavy):
     print('\nfigure 3')
-    import fig3_preprocess_data as f3
+    import fig2_preprocess_data as f3
     scenario = sorted(present)[0]
     known = set(present[scenario]['sods'])
     probe('fig3._experiment_sod',

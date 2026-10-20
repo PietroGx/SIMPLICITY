@@ -278,6 +278,61 @@ def test_shell_passes_exp_name():
           '--exp-name impact_long_shedders \\' in sh, False)
 
 
+def test_main_reaches_the_summary():
+    """main() must run to the END with every stage stubbed.
+
+    The summary spells the frozen table with the RESOLVED mode, not argparse's
+    list: --consensus is nargs='+', so args.consensus is ['distribution'] and
+    table_path() rejects it. Nothing exercised the orchestrator past its
+    two-mode guard, so v2.4.111 shipped the list there and run #3 died on the
+    summary line after every simulation had finished. The two calls below it
+    take DIFFERENT shapes -- the archive iterates modes, compression takes
+    one -- which is why this checks both rather than the table path alone.
+    """
+    stubbed = ('run_stage', 'report_simulation_health', 'submit_sanity_plots',
+               'wait_for_sanity_plots', 'write_artifacts_archive',
+               'compress_results')
+    real = {name: getattr(runner, name) for name in stubbed}
+    real_groups = runner.dm.get_groups
+    calls = {}
+
+    runner.run_stage = lambda *a, **k: None
+    runner.report_simulation_health = lambda *a, **k: None
+    runner.dm.get_groups = lambda *a, **k: []
+    runner.submit_sanity_plots = lambda *a, **k: []
+    runner.wait_for_sanity_plots = lambda *a, **k: None
+    runner.write_artifacts_archive = lambda *a, **k: calls.__setitem__('archive', a)
+    runner.compress_results = lambda *a, **k: calls.__setitem__('compress', a)
+
+    argv = sys.argv
+    sys.argv = ['run', '--exp-num', '998', '--runner', 'serial']
+    log = os.path.join('Data', 'pipeline_logs',
+                       f'{cfg.EXP_NAME}_pipeline_#998.log')
+    outcome, text = 'reached', ''
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            runner.main()
+        text = open(log).read() if os.path.isfile(log) else ''
+    except Exception as exc:                                    # noqa: BLE001
+        outcome = f'{type(exc).__name__}: {exc}'
+    finally:
+        sys.argv = argv
+        for name, fn in real.items():
+            setattr(runner, name, fn)
+        runner.dm.get_groups = real_groups
+        if os.path.isfile(log):
+            os.remove(log)
+
+    check("main() runs through to the summary", outcome, 'reached')
+    check("the summary names the frozen table",
+          cfg.table_path(998, 'distribution') in text, True)
+    modes = calls.get('archive', (None,) * 4)[3]
+    check("the archive is handed the mode LIST",
+          list(modes) if modes is not None else None, ['distribution'])
+    check("compression is handed the RESOLVED mode",
+          calls.get('compress', (None,) * 3)[2], 'distribution')
+
+
 if __name__ == '__main__':
     print("-- builder --");            test_builder()
     print("-- calibration consensus --"); test_calibration_states_its_consensus()
@@ -286,5 +341,6 @@ if __name__ == '__main__':
     print("-- sanity plots --");       test_sanity_plots()
     print("-- artifacts archive --");  test_archive_follows_the_mode_run()
     print("-- sbatch wrapper --");     test_shell_passes_exp_name()
+    print("-- orchestrator tail --");  test_main_reaches_the_summary()
     print("\nCONSENSUS PIPELINES PASSED" if not _fails else f"\nFAILED: {_fails}")
     raise SystemExit(1 if _fails else 0)

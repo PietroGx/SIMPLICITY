@@ -5,6 +5,158 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.0 — 2026-10-20 — pietro gerletti
+
+Everything the next production run needs, plus two measurement faults in
+figure 1 that had been producing confident wrong numbers.
+
+RERUN CONFIGURATION
+
+NSR_RANGES narrowed to one decade each, hand-calibrated for THIS configuration
+(3000 / 90 / R 1.05) from run #3's own grid:
+
+    cal_long  3.6e-04 .. 3.6e-03      (was 1e-04 .. 1e-02)
+    cal_std   4.8e-05 .. 4.8e-04      (was 1e-05 .. 1e-03)
+
+A*x^B cannot follow the OSR curve over two decades. Refitted one decade at a
+time on run #3: cal_std's residual fell 31.7% -> 3.8%, cal_long's 62-67% ->
+4-6%. These are literals, not a formula, and they do not transfer to another
+population. Side effect on disk: the dropped top points were the expensive
+ones -- calib_long__edge_case alone spent 11.5 GB of its 14 GB on NSR_long
+6e-03 and 1e-02.
+
+CAL2_FINAL_TIME now follows USER_FIXED_PARAMS['final_time'] (1095) instead of
+730, so cal_2 fits the standard rate over the same window the experiment phase
+runs.
+
+OUTPUT DECLARATION IS NOW STRICT
+
+dir_manager.declare_outputs() must be called before any simulation writes;
+skipped_outputs() raises when the environment variable is unset rather than
+defaulting. A run that never declared used to silently write everything. The
+experiment phase skips sequencing_data only (EXPERIMENT_SKIPPED_OUTPUTS) --
+nothing reads it, because sequencing_data_regression.csv now carries the
+columns the fits need. Calibration also skips lineage_frequency and
+simulation_trajectory.
+
+lineage_frequency streams gzipped (lineage_frequency.csv.gz), measured at 13.6%
+of the plain size on a real file: 1.44 GB -> 0.20 GB across the experiment
+phase. output_manager.lineage_frequency_path() prefers the gzipped name and
+falls back to the plain one, so runs written before this still read.
+
+sequencing_data_regression.csv gained individual_index and sampling_event in
+both the diagnosis and census blocks, which is what lets a host-level
+subsample be drawn from it without joining to sequencing_data.csv.
+
+FIGURES 2 AND 3 SWAPPED
+
+The four-panel long-shedder figure is now Figure 2 and the per-seed lineage/
+clade turnover grid is Figure 3; the supplement follows its parent, 3S -> 2S.
+Done as a three-way git mv of fig2_*/fig3_* plus fig3S_save -> fig2S_save, so
+module names and emitted filenames agree rather than a save script emitting a
+number that is not its own. fig4_preprocess_data imports _experiment_sod from
+fig2_preprocess_data accordingly.
+
+FIGURE 1: THE PANELS NO LONGER POOL THEIR SEEDS
+
+Panels D and E fitted one zero-intercept line through every seed concatenated.
+Points inside a seed share a genealogy, so that treats correlated points as
+independent. Measured on run #3 (tests/test_slope_pooling_and_effort.py):
+
+    global clock   pooled 1.0711e-03   mean of per-seed slopes 1.0996e-03
+                   pooling 2.7% low; SE 6.2e-07 against an honest 3.3e-05,
+                   53-fold too confident
+
+The model line is now the mean of the per-seed slopes and the shaded wedge is
++/- 1 SD ACROSS seeds -- the spread of individual epidemics, not the precision
+of the mean, because the patient cohort is itself one draw. On that footing the
+patient global clock (0.00130) sits just outside +/-1 SD rather than being "18%
+off"; against target the gap is 15.4%, not 17.6%. The calibration was never
+affected: output_manager.py:691 already fits one regression per seed and feeds
+one point per seed to the curve.
+
+FIGURE 1: SEQUENCING EFFORT DIFFERS BY CLOCK, AND IT IS MEASURED
+
+GLOBAL_CLOCK_RATIO 0.10, INTRAHOST_CLOCK_RATIO 1.0. The two draws are not the
+same operation:
+
+    D  ~2790 diagnosed sequences per seed; a 10% host draw leaves ~279 and
+       between-seed variance is 99.7% of the total. The mean slope moves 0.05%.
+    E  read from individuals_data + phylogenetic_data, never from the
+       sequencing record. The analogous draw is over long-shedder HOSTS, of
+       which there are tens per seed; at 10% sampling noise is 91-94% of the
+       variance and edge_case loses 28 of its 30 seeds.
+
+The global draw goes through sequencing.subsample, the surveillance model's own
+host-level rule, not a reimplementation. Run #3 predates individual_index, so
+the ratio cannot be applied to it; the build says so and uses the complete
+record rather than quietly pretending.
+
+sods[0] REPLACED BY A GUARD THAT FAILS LOUDLY
+
+_scenarios.one_sod() returns the single simulation dir of an experiment-phase
+scenario and raises, naming them, when the group holds more than one. Six sites
+took sods[0] and silently dropped the rest: fig1_preprocess_data.py 54, 80, 92,
+171, 216 and fig2_preprocess_data.py 44. Harmless while every experiment group
+holds one parameter point -- calibration groups hold ten, which is the shape
+that will arrive the day the experiment phase sweeps a duration at fixed
+prevalence. Two of the six sat inside `except Exception: continue`, where a
+guard would have been swallowed and bought nothing, so those calls were hoisted
+above the try. scripts/long_paper_figures is left alone: it is stale, kept only
+for the pie helpers.
+
+TESTS
+
+test_slope_pooling_and_effort.py -- the variance decomposition above, reusing
+test_global_clock_window.seed_points and test_ih_clock_seq_effort.per_host_points
+rather than re-deriving either clock. test_global_clock_window.seed_points now
+prefers individual_index and keeps the positional join only for older runs,
+since the experiment phase will stop writing sequencing_data.csv.
+
+------------------------------------------------------------------------
+
+## Version 2.4.113 — 2026-10-19 — pietro gerletti
+
+The orchestrator crashed on its own summary line, after run #3 had finished
+every simulation it was asked to run.
+
+    run_impact_long_shedders_pipeline.py:417
+    - table_path = frozen_table_path(args.exp_num, args.consensus)
+    + table_path = frozen_table_path(args.exp_num, consensus)
+
+--consensus is nargs='+', so args.consensus is ['distribution'] and
+table_path() rejects a list (impact_long_shedders_config.py:503). The resolved
+scalar is set 76 lines above, at :341, and the two calls BELOW the summary
+already use the right shapes: write_artifacts_archive takes the list because
+it iterates modes (:228), compress_results takes the one mode. One site in
+three had the wrong one.
+
+Introduced in v2.4.111, when this path moved from
+SETUP_DIR_TEMPLATE.format(exp_num=...) to the helper. The template took only
+exp_num, so the second argument was new and picked up the wrong variable.
+v2.4.112 never touched the line.
+
+Nothing was lost. It fires after cal_1, cal_2, the experiment phase and the
+sanity plot, and before three things that are all post-processing: the summary
+block in the log, the artifacts zip, and the packing job. Run #3's output was
+complete on disk; the last two were run by hand against the same functions.
+
+WHY NOTHING CAUGHT IT
+
+main() was called in exactly one test -- the two-mode refusal,
+test_consensus_pipelines.py:100 -- which exits at the guard on :346, seventy
+lines above. Everything else tested single functions. The orchestrator's tail
+had never been executed, stubs or not.
+
+tests/test_consensus_pipelines.py now runs main() end to end with run_stage,
+report_simulation_health, the sanity-plot pair, the archive and the packer
+stubbed, and asserts all THREE argument shapes rather than the table path
+alone: a fix that spelled every call with the scalar would pass the table
+check and silently stop the archive from finding the run's own sanity plot.
+Re-introducing the bug reproduces run #3's ValueError verbatim.
+
+------------------------------------------------------------------------
+
 ## Version 2.4.112 — 2026-10-18 — pietro gerletti
 
 The configuration is chosen, and the analysis window stops being a constant.

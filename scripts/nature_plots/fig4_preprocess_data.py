@@ -12,9 +12,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 from long_shedders_preprocess import get_lineage_labels
 
 # _experiment_sod is the same "resolve one scenario's sod, or None if that
-# scenario hasn't been run yet" helper already used for Figure 3 -- same
+# scenario hasn't been run yet" helper already used for Figure 2 -- same
 # directory, plain sibling import.
-from fig3_preprocess_data import _experiment_sod
+from fig2_preprocess_data import _experiment_sod
 
 EXP_NAME = "impact_long_shedders"
 
@@ -56,7 +56,7 @@ def get_tree_for_scenario(exp_num, scenario, seed, cluster_threshold=5,
     """
     Loads scenario's phylogenetic tree (for `seed`) into a baltic tree object,
     with every branch's `.traits['cluster']` set to its long/standard/mixed/
-    founder label (same color language as Figure 3). Returns None if the
+    founder label (same color language as Figure 2). Returns None if the
     scenario hasn't been run yet.
     """
     sod = _experiment_sod(exp_num, scenario, exp_name=exp_name)

@@ -1,54 +1,22 @@
-import os
-import sys
 import argparse
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 import fig3_preprocess_data as preproc
+from _scenarios import EXP_NAME, figure_path, resolve_scenarios
 import fig3_plots as plots
-from _scenarios import (EXP_NAME, figure_path, resolve_scenarios,
-                        scenario_meta)
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
-from long_shedders_plots import plot_fig4_pies, add_global_pie_legend
-
-SCENARIO_PALETTE = {
-    "control": "#333333", "SOT": "#56B4E9", "HIV_low": "#D55E00",
-    "HIV_high": "#E69F00", "edge_case": "#CC79A7",
-}
-
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Generate Figure 3 for the long-shedders paper")
+    parser = argparse.ArgumentParser(description="Generate Figure 3 for SIMPLICITY Nature Paper")
     parser.add_argument('--exp-num', type=int, required=True,
                         help="Experiment number to plot. Required on purpose: the "
                             "old default of 4 pointed at one of the runs that "
                             "produced invalid science.")
     parser.add_argument('--exp-name', type=str, default=EXP_NAME,
                         help=f"Pipeline to plot (default: {EXP_NAME}).")
-    parser.add_argument('--cluster-threshold', type=int, default=5)
-    parser.add_argument('--min-days', type=int, default=100)
-    parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png')
-    parser.add_argument('--window', type=str, default=preproc.BURNIN_WINDOW,
-                        help="Left edge of the analysis window: 'phi' for each "
-                            "simulation's own burn-in completion (default), or "
-                            "a number of days for a fixed cutoff. Each is "
-                            "cached separately, so both can be produced and "
-                            "compared.")
+    parser.add_argument('--seed', type=str, default="1", help="Target seed for lineage frequency plots (Rows 1 & 2)")
+    parser.add_argument('--format', type=str, choices=['pdf', 'png'], default='png', help="Output format: pdf or png (default: png)")
     return parser.parse_args()
-
-
-def resolve_window(window):
-    """'phi' or a float. Rejected early rather than silently read as a fixed
-    cutoff of 0, which would put every simulation's neutral phase back in."""
-    if window == 'phi':
-        return window
-    try:
-        return float(window)
-    except (TypeError, ValueError):
-        raise SystemExit(f"--window must be 'phi' or a number of days, "
-                         f"not {window!r}")
-
 
 def set_nature_rcparams():
     plt.rcParams.update({
@@ -60,97 +28,96 @@ def set_nature_rcparams():
         'ytick.labelsize': 7,
         'legend.fontsize': 7,
         'pdf.fonttype': 42,
-        'ps.fonttype': 42,
+        'ps.fonttype': 42
     })
 
-
-def window_caption(window):
-    """How the subtitle states the window it was measured over."""
-    window = preproc.BURNIN_WINDOW if window is None else window
-    if window == 'phi':
-        return ("measured after each simulation's own burn-in "
-                "(\u03c6=1), \u2265 %d d of it" % preproc.MIN_WINDOW_DAYS)
-    return (f"measured after day {float(window):g}, "
-            f"\u2265 {preproc.MIN_WINDOW_DAYS} d of it")
-
-
-def add_panel_label(ax, label, x_offset=-0.15, y_offset=1.15):
-    ax.text(x_offset, y_offset, label, transform=ax.transAxes,
-           fontsize=8, fontweight='bold', va='top', ha='right')
-
-
-def build_figure_3(exp_num, exp_name, cluster_threshold, min_days, fmt,
-                   window=None):
+def build_figure_3(exp_num, exp_name, target_seed, fmt):
     set_nature_rcparams()
-
+    # from the pipeline's own config, never a list typed here
     scenarios, _ = resolve_scenarios(exp_name, exp_num)
     if not scenarios:
         raise SystemExit(f"No scenario output found for {exp_name} #{exp_num}.")
+    palette = {"control": "#333333", "SOT": "#56B4E9", "HIV_low": "#D55E00",
+               "HIV_high": "#E69F00", "edge_case": "#CC79A7"}
 
-    fig = plt.figure(figsize=(180 / 25.4, 165 / 25.4))
-    gs = gridspec.GridSpec(2, 2, figure=fig, wspace=0.40, hspace=0.55,
-                           top=0.90, bottom=0.07)
+    # --- Phase A: Pre-calculation for strict alignments ---
+    shared_violin_seeds = preproc.get_shared_valid_seeds(exp_num, scenarios, exp_name=exp_name)
+    
+    print(f"Calculating global time bounds for Seed #{target_seed}...")
+    global_max_t = 0
+    for scenario in scenarios:
+        _, _, t_final = preproc.get_fig2_freq_data(exp_num, scenario, target_seed, exp_name=exp_name)
+        if t_final > global_max_t:
+            global_max_t = t_final
+            
+    if global_max_t == 0:
+        print(f"Warning: Seed {target_seed} not found or produced empty timeframes.")
+        global_max_t = 365 
+        
+    print(f"Global X-axis standardized to {global_max_t} days.")
 
-    eff_raw = preproc.get_efficiency_data(exp_num, scenarios, exp_name=exp_name,
-                                          min_days=min_days, window=window)
-    eff = preproc.efficiency_ratio(eff_raw, threshold=cluster_threshold)
+    # --- Phase B: Build Grid ---
+    width_in = 180 / 25.4
+    height_in = 150 / 25.4
+    fig = plt.figure(figsize=(width_in, height_in))
+    
+    # One column per scenario, widely spaced so the scenarios read as separate
+    # blocks rather than one continuous grid.
+    gs = gridspec.GridSpec(3, len(scenarios), figure=fig, wspace=0.62, hspace=0.45)
+    
+    print(f"--- Building Figure 3 Grid (Exp #{exp_num}) ---")
 
-    # --- A: which host type produced the standout clade --------------------
-    print("Panel A: standout clade by origin...")
-    wr = preproc.winrate_summary(
-        preproc.get_winrate_data(exp_num, scenarios, exp_name=exp_name,
-                                 cluster_threshold=cluster_threshold,
-                                 min_days=min_days, window=window))
-    gs_a = gridspec.GridSpecFromSubplotSpec(3, 1, subplot_spec=gs[0, 0],
-                                            hspace=0.50)
-    a_axes = [fig.add_subplot(gs_a[i, 0]) for i in range(3)]
-    plots.plot_winrate(a_axes, wr, scenario_order=scenarios)
-    # Header and legend positioned from the block's own bbox, so they sit
-    # inside panel A rather than drifting into the suptitle or the panel below.
-    box = gs[0, 0].get_position(fig)
-    fig.text(box.x0 - 0.030, box.y1 + 0.052, "A",
-             fontsize=8, fontweight="bold", ha="right", va="bottom")
-    fig.text(box.x0 - 0.042, box.y0 + box.height / 2, plots.WIN_YLABEL,
-             rotation=90, va="center", ha="center", fontsize=5.8)
-    plots.winrate_legend(fig, loc="upper center",
-                         bbox_to_anchor=(box.x0 + box.width / 2, box.y1 + 0.056),
-                         ncol=2)
+    # Row 3 shares one y-scale across scenarios; per-column autoscaling made
+    # control's jumps (max 3) look comparable to edge_case's (max 15).
+    global_div_max = 0
+    all_dists = {}
+    for scenario in scenarios:
+        d = preproc.get_fig2_divergence_data(exp_num, scenario, shared_violin_seeds,
+                                             exp_name=exp_name)
+        all_dists[scenario] = d
+        if d:
+            global_div_max = max(global_div_max, max(d))
+    global_div_max = global_div_max * 1.08 if global_div_max else None
+    print(f"Divergence-jump y-axis standardized to {global_div_max}")
 
-    # --- B: conversion rate, pooled ----------------------------------------
-    print("Panel B: conversion rate, pooled...")
-    ax_b = fig.add_subplot(gs[0, 1])
-    plots.plot_efficiency_bars(ax_b, eff, scenario_order=scenarios)
-    add_panel_label(ax_b, "B", y_offset=1.22)
+    div_axes = []
+    for col, scenario in enumerate(scenarios):
+        display_name = preproc.get_clinical_label(scenario)
+        print(f"Processing column {col+1}/{len(scenarios)}: {display_name}...")
+        
+        ax_freq = fig.add_subplot(gs[0, col])
+        ax_clust = fig.add_subplot(gs[1, col])
+        ax_div = fig.add_subplot(gs[2, col])
+        
+        lf, cmap_df, _ = preproc.get_fig2_freq_data(exp_num, scenario, target_seed, exp_name=exp_name)
+        _, clade_to_lineages, clade_meta_df, _ = preproc.get_fig2_clustered_data(exp_num, scenario, target_seed, exp_name=exp_name)
+        dists = all_dists[scenario]
+        
+        plots.plot_fig2_lineage_freq(ax_freq, lf, cmap_df, global_max_t, title=display_name)
+        plots.plot_fig2_clustered_freq(ax_clust, lf, clade_to_lineages, clade_meta_df, cmap_df, global_max_t)
+        plots.plot_fig2_divergence_violin(ax_div, dists, color=palette[scenario],
+                                          y_max=global_div_max)
+        div_axes.append(ax_div)
 
-    # --- C: conversion rate, per simulation --------------------------------
-    print("Panel C: conversion rate, per simulation...")
-    ax_c = fig.add_subplot(gs[1, 0])
-    plots.plot_efficiency_vs_duration(ax_c, eff_raw, scenario_meta(exp_name),
-                                      threshold=cluster_threshold,
-                                      scenario_order=scenarios)
-    add_panel_label(ax_c, "C", y_offset=1.30)
+        # One letter per scenario, above its column.
+        plots.add_column_label(ax_freq, chr(ord('A') + col))
 
-    # --- D: robustness to both analysis choices ----------------------------
-    print("Panel D: robustness...")
-    ax_d = fig.add_subplot(gs[1, 1])
-    plots.plot_efficiency_robustness(ax_d, preproc.efficiency_robustness(eff_raw),
-                                     scenario_order=scenarios,
-                                     palette=SCENARIO_PALETTE)
-    add_panel_label(ax_d, "D", y_offset=1.30)
-
-    fig.suptitle(
-        "Do long shedders drive variant emergence?"
-        f"   (clades at {cluster_threshold} substitutions; "
-        f"simulations \u2265 {preproc.MIN_FINAL_TIME} d, "
-        f"{window_caption(window)})",
-        fontsize=7.5, y=1.025)
-
-    output_filename = figure_path(3, exp_name, exp_num, fmt)
+        if col == 0:
+            ax_freq.set_ylabel("Lineage Freq", fontsize=7)
+            ax_clust.set_ylabel("Clade Freq", fontsize=7)
+            ax_div.set_ylabel("distinct gen.pos.count", fontsize=7)
+        else:
+            ax_freq.set_ylabel("")
+            ax_clust.set_ylabel("")
+            ax_div.set_ylabel("")
+            
+        ax_freq.set_xlabel("")
+        ax_clust.set_xlabel("Time (days)")
+        
+    output_filename = figure_path(3, exp_name, exp_num, fmt, seed=target_seed)
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"\n[Success] Generated {output_filename}")
 
-
 if __name__ == "__main__":
     args = parse_arguments()
-    build_figure_3(args.exp_num, args.exp_name, args.cluster_threshold,
-                  args.min_days, args.format, resolve_window(args.window))
+    build_figure_3(args.exp_num, args.exp_name, args.seed, args.format)

@@ -30,14 +30,20 @@ def check_seeded_simulation_output(ssod):
     # Anything SIMPLICITY_SKIP_OUTPUTS told the run not to write is not
     # missing -- a calibration run writes four of these on purpose, and
     # requiring the rest would mark every one of them incomplete.
+    # Keyed on the LOGICAL name the skip list holds, not on a filename with
+    # four characters chopped off: lineage_frequency is gzipped now, and that
+    # slice stopped matching it the moment the extension changed length.
     skipped = dm.skipped_outputs()
-    required_files = [
-        f for f in ('final_time.csv', 'individuals_data.csv',
-                    'lineage_frequency.csv', 'phylogenetic_data.csv',
-                    'simulation_trajectory.csv')
-        if f[:-4] not in skipped
-    ]
-    return all(check_output_file(ssod, f) for f in required_files)
+    required = (
+        ('final_time',           'final_time.csv'),
+        ('individuals_data',     'individuals_data.csv'),
+        ('lineage_frequency',    os.path.basename(
+            om.lineage_frequency_path(ssod))),
+        ('phylogenetic_data',    'phylogenetic_data.csv'),
+        ('simulation_trajectory', 'simulation_trajectory.csv'),
+    )
+    return all(check_output_file(ssod, filename)
+               for name, filename in required if name not in skipped)
 
 def categorize_simulations_by_end_time(ssod_list, final_time_limit, pop_size):
     early, mid, late = 0, 0, 0

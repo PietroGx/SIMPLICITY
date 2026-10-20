@@ -20,6 +20,7 @@ Created on Tue Jun  6 13:13:14 2023
 @author: pietro
 """
 import csv
+import gzip
 import os
 import simplicity.dir_manager        as dm
 import simplicity.intra_host_model    as h
@@ -31,20 +32,41 @@ import numpy as np
 import scipy.stats
 import scipy.special
 
-# Streamed outputs: name and column order of the files Population writes row by
-# row. output_manager imports these rather than keeping a second copy -- the
-# header is written here and the file is renamed there, so a drift between the
-# two would be a silently malformed csv.
-LINEAGE_FREQUENCY_FILE = "lineage_frequency.csv"
-LINEAGE_FREQUENCY_COLUMNS = ['Lineage_name', 'Time_sampling', 'Frequency_at_t',
-                             'Individuals_infected_at_t']
-TRAJECTORY_FILE = "simulation_trajectory.csv"
-TRAJECTORY_COLUMNS = ['time', 'infected', 'diagnosed', 'recovered',
-                      'infectious', 'detectables', 'susceptibles',
-                      'long_shedders']
+# Streamed outputs. The LOGICAL NAME is primary -- it is what the skip list,
+# the stream table and the buffer table are all keyed on -- and the filename
+# is looked up from it. It used to run the other way, with the skip key taken
+# as filename[:-4]; that silently stops matching as soon as an extension is
+# not four characters, which is exactly what gzipping one of them does.
+# output_manager imports these rather than keeping a second copy: the header
+# is written here and the file is renamed there, so a drift between the two
+# would be a silently malformed csv.
+LINEAGE_FREQUENCY = "lineage_frequency"
+TRAJECTORY = "simulation_trajectory"
+
+# lineage_frequency is gzipped at the stream: it is the largest output this
+# repo writes (100.6 GB across the calibrated grid; 555 MB in one N=5000 task)
+# and compresses 8.4x, being one row per lineage per day with a heavily
+# repeated lineage column. pandas.read_csv decompresses by extension, so
+# readers need the name and nothing else.
+_OUTPUT_FILES = {
+    LINEAGE_FREQUENCY: "lineage_frequency.csv.gz",
+    TRAJECTORY:        "simulation_trajectory.csv",
+}
+_OUTPUT_COLUMNS = {
+    LINEAGE_FREQUENCY: ['Lineage_name', 'Time_sampling', 'Frequency_at_t',
+                        'Individuals_infected_at_t'],
+    TRAJECTORY: ['time', 'infected', 'diagnosed', 'recovered',
+                 'infectious', 'detectables', 'susceptibles',
+                 'long_shedders'],
+}
 # where a row goes when there is no output directory to stream to
-_BUFFER_ATTRS = {LINEAGE_FREQUENCY_FILE: 'lineage_frequency',
-                 TRAJECTORY_FILE: 'trajectory'}
+_BUFFER_ATTRS = {LINEAGE_FREQUENCY: 'lineage_frequency',
+                 TRAJECTORY: 'trajectory'}
+
+LINEAGE_FREQUENCY_FILE = _OUTPUT_FILES[LINEAGE_FREQUENCY]
+LINEAGE_FREQUENCY_COLUMNS = _OUTPUT_COLUMNS[LINEAGE_FREQUENCY]
+TRAJECTORY_FILE = _OUTPUT_FILES[TRAJECTORY]
+TRAJECTORY_COLUMNS = _OUTPUT_COLUMNS[TRAJECTORY]
 
 # Internal switch, not a simulation parameter. The fitness trajectory is a
 # diagnostic: nothing in the model reads it, and of the columns it writes only
@@ -184,12 +206,9 @@ class Population:
         self._skip = dm.skipped_outputs()
         self._streams = {}
         if output_directory is not None:
-            if 'lineage_frequency' not in self._skip:
-                self._open_stream(output_directory, LINEAGE_FREQUENCY_FILE,
-                                  LINEAGE_FREQUENCY_COLUMNS)
-            if 'simulation_trajectory' not in self._skip:
-                self._open_stream(output_directory, TRAJECTORY_FILE,
-                                  TRAJECTORY_COLUMNS)
+            for name in (LINEAGE_FREQUENCY, TRAJECTORY):
+                if name not in self._skip:
+                    self._open_stream(output_directory, name)
 
         # -------------------------------------------------------------------------   
 
@@ -243,30 +262,37 @@ class Population:
     # -------------------------------------------------------------------------
     #                            Streamed outputs
     # -------------------------------------------------------------------------
-    def _open_stream(self, directory, filename, columns):
-        path = os.path.join(directory, filename + '.partial')
-        handle = open(path, 'w', newline='')
+    def _open_stream(self, directory, name):
+        path = os.path.join(directory, _OUTPUT_FILES[name] + '.partial')
+        # gzip when the filename says so -- the extension is the single place
+        # that decides, here and in pandas.read_csv alike
+        opener = gzip.open if _OUTPUT_FILES[name].endswith('.gz') else open
+        handle = opener(path, 'wt', newline='')
         # pandas' to_csv ends lines with \n; csv.writer defaults to \r\n, which
         # would change every line of the file.
         writer = csv.writer(handle, lineterminator='\n')
-        writer.writerow(columns)
-        self._streams[filename] = [handle, writer, path]
+        writer.writerow(_OUTPUT_COLUMNS[name])
+        self._streams[name] = [handle, writer, path]
 
-    def _record(self, filename, row):
+    def _record(self, name, row):
         '''Write one output row, or buffer it when there is nothing to stream
-        to. A skipped output is discarded outright.'''
-        if filename[:-4] in self._skip:
+        to. A skipped output is discarded outright.
+
+        Keyed on the logical name, which is the same string the skip list
+        holds -- no slicing, so the filename can gain an extension without
+        quietly disabling the skip.'''
+        if name in self._skip:
             return
-        stream = self._streams.get(filename)
+        stream = self._streams.get(name)
         if stream is None:
-            getattr(self, _BUFFER_ATTRS[filename]).append(row)
+            getattr(self, _BUFFER_ATTRS[name]).append(row)
         else:
             stream[1].writerow(row)
 
-    def finalize_stream(self, filename):
+    def finalize_stream(self, name):
         '''Close a streamed output and return its partial path, or None if this
         run buffered the rows in memory instead.'''
-        stream = self._streams.pop(filename, None)
+        stream = self._streams.pop(name, None)
         if stream is None:
             return None
         stream[0].close()
@@ -374,7 +400,7 @@ class Population:
                 self.long_shedders += 1
 
         # update lineage_frequency
-        self._record(LINEAGE_FREQUENCY_FILE, ['wt', 0.0, 1.0, int(I_0)])
+        self._record(LINEAGE_FREQUENCY, ['wt', 0.0, 1.0, int(I_0)])
         
         # return dictionary containing all individuals data (self.individuals)
         return dic        
@@ -522,7 +548,7 @@ class Population:
         # streamed writer has no dtype inference to fall back on: pandas read
         # the t=0 row's int 0 as part of a float64 column and wrote "0.0", so
         # an uncoerced csv.writer would emit "0" and the file would differ.
-        self._record(TRAJECTORY_FILE, [float(self.time),
+        self._record(TRAJECTORY, [float(self.time),
                            int(self.infected),
                            int(self.diagnosed),
                            int(self.recovered),
@@ -603,7 +629,7 @@ class Population:
         by_genome = {}
         for lineage_name, share in share_lineages_t.items():
             frequency = share / hosts_at_t
-            self._record(LINEAGE_FREQUENCY_FILE,
+            self._record(LINEAGE_FREQUENCY,
                          [lineage_name, float(t), float(frequency),
                           int(count_lineages_t[lineage_name])])
             genome = self.get_lineage_genome(lineage_name)

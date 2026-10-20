@@ -71,6 +71,12 @@ import simplicity.output_manager as om
 import simplicity.settings_manager as sm
 import simplicity.tuning.evolutionary_rate as er
 
+# This harness checks that the ANALYSIS path can read every output, so the
+# probe has to write every output: an empty skip list, not the default (which
+# skips lineage_frequency and would make this test assert a file it asked not
+# to have).
+dm.declare_outputs(())
+
 failures = []
 
 
