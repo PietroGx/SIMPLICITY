@@ -91,7 +91,7 @@ def describe(value):
 def is_empty(value):
     """Empty means empty all the way down.
 
-    len() of a container is not the question: get_panel_de_data returns a
+    len() of a container is not the question: get_patient_clock_data returns a
     TUPLE of two DataFrames, so len() is 2 even when both are empty, and two
     empty panels were counted [ok]. Same family as the "139 item(s)" bug.
     """
@@ -268,8 +268,9 @@ def figure_1(exp_num, exp_name, present):
     rw = lambda f: os.path.normpath(os.path.join(f1.REAL_WORLD_DIR, f))
     probe('fig1.get_panel_c_data  (RealWorldData)', f1.get_panel_c_data,
           required_inputs=[rw('literature_long_shedders_data.csv')])
-    probe('fig1.get_panel_de_data (RealWorldData)', f1.get_panel_de_data,
-          required_inputs=[rw('data_fig1_D.csv'), rw('data_fig1_E.csv')])
+    probe('fig1.get_patient_clock_data (RealWorldData)', f1.get_patient_clock_data,
+          required_inputs=[rw('patient_global_clock.csv'),
+                           rw('patient_intrahost_clock.csv')])
 
 
 def figure_2(exp_num, exp_name, present, heavy):

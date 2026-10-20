@@ -41,8 +41,19 @@ LEGEND_ENTRIES = [
 ]
 
 
+# Left edge of the legend card in figure coordinates; fig1_save ends the
+# GridSpec just short of it.
+LEGEND_X = 0.845
+
+
 def add_figure_legend(fig, has_edge_case=True, has_patient_data=True):
-    """Single legend for the whole figure, below the panels."""
+    """Single legend for the whole figure, as a card to the RIGHT of the panels.
+
+    One column outside the axes rather than a strip underneath: the strip cost
+    a full row of figure height and pushed D and E's x-labels against the
+    bottom edge. The canvas stays at the 180 mm double-column width, so the
+    space comes out of the panels (fig1_save reserves it in the GridSpec).
+    """
     from matplotlib.lines import Line2D
     handles = []
     for label, colour in LEGEND_ENTRIES:
@@ -52,9 +63,11 @@ def add_figure_legend(fig, has_edge_case=True, has_patient_data=True):
     if has_patient_data:
         handles.append(Line2D([0], [0], color=DATA_COLOR, lw=2.4,
                               linestyle=DATA_STYLE, label="Patient data"))
-    fig.legend(handles=handles, loc='lower center', ncol=len(handles),
-               frameon=False, fontsize=6.4, bbox_to_anchor=(0.5, -0.015),
-               handlelength=2.2, columnspacing=1.5, handletextpad=0.5)
+    fig.legend(handles=handles, loc='center left', ncol=1,
+               frameon=True, fancybox=False, framealpha=1.0,
+               edgecolor='0.82', borderpad=0.7, labelspacing=0.75,
+               fontsize=6.0, bbox_to_anchor=(LEGEND_X, 0.5),
+               handlelength=1.9, handletextpad=0.6)
 
 
 def format_clean_axis(ax, remove_ticks=True):
@@ -346,7 +359,7 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
     if SHOW_FIT_STATS:
         txt = "\n".join(f"{n}: {rate:.5f} s/s/y ($R^2$={r2:.2f})"
                         for n, rate, r2 in entries)
-        ax.text(0.03, 0.97, txt, transform=ax.transAxes, fontsize=5.4,
+        ax.text(0.03, 0.97, txt, transform=ax.transAxes, fontsize=4.4,
                 va='top', ha='left',
                 bbox=dict(facecolor='white', alpha=0.78, edgecolor='none', pad=1.2))
 
@@ -354,6 +367,153 @@ def plot_clock_overlay(ax, df_real, df_model, real_x, real_y, title,
     ax.set_ylim(0, y_max)
     ax.set_xlabel(x_label, fontsize=7)
     ax.set_ylabel("Divergence (subs/site)", fontsize=7)
-    ax.text(0.5, 1.06, title, transform=ax.transAxes, ha='center',
-            fontsize=7, fontweight='bold')
+    ax.text(0.0, 1.06, title, transform=ax.transAxes, ha='left',
+            fontsize=6.2, fontweight='bold')
+    format_clean_axis(ax, remove_ticks=False)
+
+
+def _lattice(values, min_frac=1.0 / 500.0):
+    """Spacing of the grid a discrete variable lives on, or None if it has none.
+
+    A count over a FIXED denominator can only land on k/L, so the smallest gap
+    between distinct values recovers 1/L exactly. A ratio whose denominator
+    changes per observation -- the patient cohort, where every sequence has its
+    own overlap length -- lies on no grid, and its smallest gap is arbitrary.
+    """
+    u = np.unique(np.round(np.asarray(values, float), 12))
+    if len(u) < 3:
+        return None
+    gaps = np.diff(u)
+    gaps = gaps[gaps > 1e-12]
+    if not len(gaps):
+        return None
+    step, span = float(np.min(gaps)), float(u[-1] - u[0])
+    return step if span > 0 and step >= min_frac * span else None
+
+
+def _density(values, width, lo, hi):
+    """Histogram as a density, so two different bin widths stay comparable."""
+    edges = np.arange(lo, hi + width, width)
+    counts, _ = np.histogram(values, bins=edges)
+    total = counts.sum()
+    if total == 0:
+        return None, None
+    return edges[:-1] + width / 2, counts / (total * width)
+
+
+def _smoothed(values, grid, lattice=None):
+    """Gaussian KDE for the eye, floored at 1.2x the grid step where there is one.
+
+    Scott's rule on 10^4-10^5 points sitting on a 1/genome grid returns a
+    bandwidth SMALLER than the step, so the curve ripples once per grid point
+    and draws the discreteness as if it were structure.
+    """
+    v = np.asarray(values, float)
+    sigma = float(np.std(v))
+    if sigma <= 0 or len(v) < 3:
+        return None
+    bw = len(v) ** (-1.0 / 5.0)
+    if lattice:
+        bw = max(bw, 1.2 * lattice / sigma)
+    return stats.gaussian_kde(v, bw_method=bw)(grid)
+
+
+def _time_match(t, d, ref_t, n_bins, rng):
+    """Resample (t, d) so its sampling-time histogram matches ref_t's.
+
+    Mirrors tests/test_kl_root_to_tip.time_match. Without it this panel would
+    compare two sampling designs as much as two clocks: the model sequences on
+    its own schedule, not the cohort's.
+    """
+    if len(t) == 0 or len(ref_t) == 0:
+        return t, d
+    edges = np.quantile(ref_t, np.linspace(0, 1, n_bins + 1))
+    want = np.histogram(ref_t, bins=edges)[0]
+    edges[0], edges[-1] = -np.inf, np.inf
+    scale = max(1, len(t) // len(ref_t))
+    idx = np.digitize(t, edges[1:-1])
+    picked = []
+    for b, n in enumerate(want * scale):
+        pool = np.flatnonzero(idx == b)
+        if len(pool) and n:
+            picked.append(rng.choice(pool, size=int(n), replace=True))
+    if not picked:
+        return t, d
+    sel = np.concatenate(picked)
+    return t[sel], d[sel]
+
+
+def plot_divergence_density(ax, df_real, df_model,
+                            real_x='days_since_ref',
+                            real_y='hamming_per_overlap',
+                            title="Divergence distribution",
+                            data_label="Patient data", x_max=0.004,
+                            n_time_bins=10, rng_seed=4242, show_hist=True):
+    """The global-clock panel's two series with time collapsed.
+
+    The clock panel shows divergence against time and reports both fitted
+    rates. This shows the DISTRIBUTION of the same values, from the same two
+    frames. The two rates agree to within 5%, so anything visible here is a
+    difference in shape rather than speed: the cohort is bimodal, the model is
+    not. tests/test_kl_root_to_tip.py puts a number on that gap.
+
+    Each side is binned on ITS OWN resolution. The model steps by 1/genome;
+    the cohort has no such step, because every sequence has its own overlap
+    length. Binning both at the cohort's width leaves roughly every third bin
+    holding two model steps, which gives the model a bimodality it does not
+    have.
+    """
+    rng = np.random.default_rng(rng_seed)
+    series = []
+
+    if df_real is not None and not df_real.empty:
+        r = df_real.dropna(subset=[real_x, real_y])
+        tp = r[real_x].astype(float).values
+        dp = r[real_y].astype(float).values
+        tp = tp - np.min(tp)
+        res = (1.0 / float(np.median(r['overlap_length']))
+               if 'overlap_length' in r.columns else None)
+        series.append((data_label, dp, res, DATA_COLOR, DATA_STYLE))
+    else:
+        tp = np.empty(0)
+
+    if df_model is not None and not df_model.empty:
+        cdf = df_model[df_model.get('cohort', 'Control') == 'Control']
+        if not cdf.empty:
+            tm = cdf['Sequencing_time'].astype(float).values * 365.25
+            dmv = cdf['Distance_from_root'].astype(float).values
+            tm, dmv = _time_match(tm, dmv, tp, n_time_bins, rng)
+            series.append(("Model, Control", dmv, _lattice(dmv),
+                           SCEN_COLORS["Control"], 'solid'))
+
+    if not series:
+        format_clean_axis(ax, remove_ticks=True)
+        ax.text(0.5, 0.5, f"{title}\n(Data Missing)", ha='center', va='center',
+                transform=ax.transAxes)
+        return
+
+    hi = max(float(np.max(v)) for _, v, _, _, _ in series)
+    grid = np.linspace(0.0, hi, 600)
+    for name, vals, step, colour, style in series:
+        width = (step or hi / 120.0) * 2
+        if show_hist:
+            c, y = _density(vals, width, 0.0, hi)
+            if c is not None:
+                ax.step(c, y * 1e-3, where='mid', color=colour, lw=0.4,
+                        alpha=0.25, zorder=3)
+        y = _smoothed(vals, grid, lattice=step)
+        if y is None:
+            continue
+        if name.startswith("Model"):
+            ax.fill_between(grid, 0, y * 1e-3, color=colour, alpha=0.10, lw=0,
+                            zorder=2)
+        ax.plot(grid, y * 1e-3, color=colour, lw=1.1, linestyle=style,
+                zorder=6)
+
+    ax.set_xlim(0, x_max)
+    ax.set_ylim(bottom=0)
+    ax.set_xlabel("Divergence (subs/site)", fontsize=7)
+    ax.set_ylabel("Density", fontsize=7)
+    ax.text(0.0, 1.06, title, transform=ax.transAxes, ha='left',
+            fontsize=6.2, fontweight='bold')
     format_clean_axis(ax, remove_ticks=False)

@@ -61,6 +61,14 @@ def duration_groups(exp_name):
 #
 # So the standard/global clock is read at 10% and the long-shedder/intra-host
 # clock at 100%. These are not free parameters to tune.
+# A sequence with large unaligned stretches puts its substitution count over
+# a denominator that no longer means the same thing as everyone else's, which
+# is the one thing a divergence RATIO cannot absorb. The global-clock cohort
+# carries per-sequence coverage, so it is cut here, at the source, and panels
+# D and E read the same rows tests/test_kl_root_to_tip.py has always used.
+# The intra-host CSV has no coverage column; this cannot be applied there.
+MIN_OVERLAP_COVERAGE = 0.95
+
 GLOBAL_CLOCK_RATIO = 0.10
 INTRAHOST_CLOCK_RATIO = 1.0
 _RATIO_SEED = 20261020
@@ -164,18 +172,36 @@ def get_panel_c_data():
           f"{df['clinical_category'].nunique()} categories")
     return df[['duration', 'clinical_category']]
 
-def get_panel_de_data():
-    df_d = pd.DataFrame()
-    df_e = pd.DataFrame()
-    loaded_d = _real_world_csv('data_fig1_D.csv', 'panel D')
-    if loaded_d is not None:
-        df_d = loaded_d
-        if 'sampling_date' in df_d.columns: df_d['sampling_date'] = pd.to_datetime(df_d['sampling_date'])
-    loaded_e = _real_world_csv('data_fig1_E.csv', 'panel E')
-    if loaded_e is not None:
-        df_e = loaded_e
-        if 'sampling_date' in df_e.columns: df_e['sampling_date'] = pd.to_datetime(df_e['sampling_date'])
-    return df_d, df_e
+def get_patient_clock_data():
+    """The two patient cohorts, as (global clock, intra-host clock).
+
+    Named for the MEASUREMENTS, not for the panels that happen to carry them.
+    They were data_fig1_D.csv and data_fig1_E.csv, read by get_panel_de_data;
+    adding a panel shifted the intra-host clock from E to F and left every one
+    of those names pointing at the wrong letter. A measurement's name should
+    not depend on where it is drawn.
+    """
+    df_global = pd.DataFrame()
+    df_ih = pd.DataFrame()
+    loaded = _real_world_csv('patient_global_clock.csv', 'global clock')
+    if loaded is not None:
+        df_global = loaded
+        if 'sampling_date' in df_global.columns:
+            df_global['sampling_date'] = pd.to_datetime(df_global['sampling_date'])
+        if 'overlap_coverage' in df_global.columns:
+            before = len(df_global)
+            df_global = df_global[
+                df_global['overlap_coverage'] >= MIN_OVERLAP_COVERAGE]
+            df_global = df_global.reset_index(drop=True)
+            print(f"[fig1] global clock cohort: {len(df_global)} of {before} "
+                  f"sequences at coverage >= {MIN_OVERLAP_COVERAGE}")
+    loaded = _real_world_csv('patient_intrahost_clock.csv', 'intra-host clock')
+    if loaded is not None:
+        df_ih = loaded
+        if 'sampling_date' in df_ih.columns:
+            df_ih['sampling_date'] = pd.to_datetime(df_ih['sampling_date'])
+    return df_global, df_ih
+
 
 def get_model_global_clock(exp_num=1, exp_name="impact_long_shedders",
                            ratio=GLOBAL_CLOCK_RATIO):
