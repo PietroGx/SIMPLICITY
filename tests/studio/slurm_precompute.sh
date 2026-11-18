@@ -69,11 +69,21 @@ python -I tests/studio/sweep.py --list | sed -n "$((IDX + 1))p" \
     | awk '{print "  k="$1" m_T="$2" win="$3" prom="$4" band "$5"-"$6" "$7}'
 date
 
+T0=$SECONDS
 python -I tests/studio/sweep.py \
     --only "$IDX" \
     --out "$OUT" \
     --procs "$PROCS" \
     --seeds "$SEEDS"
+ELAPSED=$(( SECONDS - T0 ))
 
-echo "fig2 precompute: grid entry $IDX done"
+# One file per task, never a shared append: 384 tasks appending to one file is
+# a race, and the point of this record is to replace a guessed rate with a
+# measured one. run_precompute.sh averages whatever files exist.
+TIMES="slurm_logs/fig2_precompute/timings"
+mkdir -p "$TIMES"
+printf '%s %s %s %s\n' "$IDX" "$ELAPSED" "$PROCS" "$(hostname -s)" \
+    > "$TIMES/${IDX}.txt"
+
+echo "fig2 precompute: grid entry $IDX done in ${ELAPSED}s on $PROCS cpus"
 date

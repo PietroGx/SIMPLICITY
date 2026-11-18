@@ -23,6 +23,13 @@
 #     bash tests/studio/run_precompute.sh --yes           # no prompt
 #     bash tests/studio/run_precompute.sh --limit 24      # at most 24 at once
 #     bash tests/studio/run_precompute.sh --check-only     # checks, submit nothing
+#     bash tests/studio/run_precompute.sh --calibrate      # time ONE build, then stop
+#
+# --calibrate submits a single task, waits for it, and reports what a build
+# actually costs on THIS cluster. Until it has been run the cost line is an
+# extrapolation from a developer box, which is the wrong machine with the wrong
+# core count: it read 6 min a build at --procs 2, and a task here gets
+# --cpus-per-task 4. Run it once before committing to 384.
 #     EXP_NUM=3 SEEDS=50 bash tests/studio/run_precompute.sh
 #
 # The env: this activates `simplicity` itself. scripts/start_simplicity_session.sh
@@ -39,6 +46,9 @@ cd "$ROOT"
 YES=0
 LIMIT=""
 CHECK_ONLY=0
+CALIBRATE=0
+CAL_IDX=0
+TIMES="slurm_logs/fig2_precompute/timings"
 EXP_NUM="${EXP_NUM:-1}"
 SEEDS="${SEEDS:-50}"
 STORE="${STORE:-$HOME/fig2_studio}"
@@ -48,6 +58,8 @@ while [ $# -gt 0 ]; do
         --yes|-y)     YES=1 ;;
         --limit)      LIMIT="$2"; shift ;;
         --check-only) CHECK_ONLY=1 ;;
+        --calibrate)  CALIBRATE=1 ;;
+        --calibrate-index) CAL_IDX="$2"; shift ;;
         --exp-num)    EXP_NUM="$2"; shift ;;
         --seeds)      SEEDS="$2"; shift ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -149,6 +161,16 @@ else
 fi
 rm -f /tmp/fig2_clade_check.$$
 
+# --- how long a build actually takes, if anything has measured it -------
+RATE_MIN=6
+RATE_SRC="assumed, from a developer box at --procs 2 -- run --calibrate"
+if [ -d "$TIMES" ] && [ -n "$(ls -A "$TIMES" 2>/dev/null)" ]; then
+    read -r RATE_MIN NTIME <<<"$(cat "$TIMES"/*.txt 2>/dev/null | awk \
+        '{s+=$2; n++} END {if (n) printf "%.1f %d", s/n/60, n; else printf "6 0"}')"
+    [ "${NTIME:-0}" -gt 0 ] && RATE_SRC="measured on $NTIME task(s) here"
+fi
+note "minutes per build" "$RATE_MIN  ($RATE_SRC)"
+
 # --- what is left to build, and what it costs ---------------------------
 # Captured whole, then read -- NOT piped into `head`. `head` closes the pipe
 # after one line, sweep.py dies on SIGPIPE, pipefail turns that into a failed
@@ -161,7 +183,8 @@ if [ -z "$TODO" ]; then
     TODO=0
 else
     note "builds still to run" "$TODO of $WANT  (a finished build is skipped)"
-    note "rough cost" "$(( TODO * 6 / 60 ))h of task time, about $(( TODO * 8 / 1000 )).$(( TODO * 8 % 1000 / 100 )) GB"
+    COST=$(awk -v t="$TODO" -v r="$RATE_MIN" 'BEGIN {printf "%.0f", t*r/60}')
+    note "rough cost" "${COST}h of task time, about $(( TODO * 8 / 1000 )).$(( TODO * 8 % 1000 / 100 )) GB"
 fi
 note "archive afterwards" "~350 MB as one tar.gz (measured 8.3x on JSON)"
 
@@ -174,6 +197,33 @@ fi
 echo "  All checks passed."
 
 [ "$CHECK_ONLY" -eq 1 ] && { echo "  --check-only: submitting nothing."; exit 0; }
+
+if [ "$CALIBRATE" -eq 1 ]; then
+    mkdir -p slurm_logs/fig2_precompute
+    echo
+    echo "  timing ONE build (grid entry $CAL_IDX). sbatch --wait blocks until"
+    echo "  it finishes, including any queue time -- expect minutes."
+    rm -f "$TIMES/${CAL_IDX}.txt"
+    EXP_NUM="$EXP_NUM" SEEDS="$SEEDS" \
+        sbatch --wait --array="${CAL_IDX}-${CAL_IDX}" \
+        tests/studio/slurm_precompute.sh || true
+    if [ ! -f "$TIMES/${CAL_IDX}.txt" ]; then
+        echo "  no timing was written. Either the task failed -- check"
+        echo "  slurm_logs/fig2_precompute/ -- or that build already existed,"
+        echo "  in which case pass --calibrate-index N for one not yet built."
+        exit 1
+    fi
+    read -r _i SECS CPUS HOST < "$TIMES/${CAL_IDX}.txt"
+    echo
+    awk -v s="$SECS" -v c="$CPUS" -v h="$HOST" -v n="$WANT" 'BEGIN {
+        printf "  one build took %d s (%.1f min) on %s cpus, node %s\n", s, s/60, c, h
+        printf "  the whole grid is therefore about %.0f h of task time\n", n*s/3600
+        printf "  at 24 tasks at once that is roughly %.1f h of wall clock\n", n*s/3600/24
+    }'
+    echo
+    echo "  Re-run without --calibrate to submit; the cost line now uses this."
+    exit 0
+fi
 
 if [ "$YES" -ne 1 ]; then
     echo
