@@ -44,9 +44,18 @@ UPSTREAM_TODO.md
 tests/HPC_7C_VALIDATION.md
 tests/slurm_local_setup.md
 
-# Local tools, not part of the published project: the figure-2 studio (served
-# from a dev box over an SSH tunnel) and the artifact pages it was built from,
-# plus the CSV output of the tests/ diagnostics.
-tests/studio/
+# Local tools, not part of the published project: the artifact pages the studio
+# was built from, and the CSV output of the tests/ diagnostics.
 tests/artifacts/
 tests/_*.csv
+
+# The figure-2 studio is split. Its COMPUTATION is pipeline code: it runs on
+# the cluster, and a clade build records a hash of compute.py, so that file has
+# to be reproducible from the repo. Its UI is a local tool, served from a dev
+# box over an SSH tunnel, and stays out.
+tests/studio/*
+!tests/studio/compute.py
+!tests/studio/sweep.py
+!tests/studio/slurm_precompute.sh
+!tests/studio/pack_cache.sh
+!tests/studio/run_precompute.sh

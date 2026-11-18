@@ -5,6 +5,66 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.8 — 2026-11-18 — pietro gerletti
+
+One command runs the clade-build grid on the cluster and brings it back as one
+file, and the studio is split so that command can reach the cluster at all.
+
+The studio's computation is pipeline code; its UI is not
+--------------------------------------------------------
+
+`tests/studio/` was ignored wholesale in v2.5.6, on the reasoning that the
+studio is a local tool served over an SSH tunnel. That is right for the UI and
+wrong for the computation. `compute.py` is one of the three files a clade
+build's hash is computed from, and the grid runs on the cluster -- so an
+ignored `compute.py` cannot be pulled onto a compute node, and the hash a build
+records cannot be reproduced from a clone by anyone.
+
+`.gitignore` now ignores `tests/studio/*` and un-ignores the five files the
+cluster needs: `compute.py`, `sweep.py`, `slurm_precompute.sh`,
+`pack_cache.sh`, `run_precompute.sh`. The web layer, `server.py`, `panels.py`
+and the JS harnesses stay local.
+
+`git status` says nothing about ignored files, which is how this would have
+gone unnoticed until 384 array tasks failed on a missing path. The check that
+found it now asserts that each hashed file is TRACKED, not merely unmodified.
+
+run_precompute.sh
+-----------------
+
+Checks, asks, submits, packs -- from the login node:
+
+    bash tests/studio/run_precompute.sh
+
+It verifies the grid size (384), prints the build hash, refuses to submit if any
+of the three hashed files is untracked or modified, confirms the run output has
+all five scenarios with enough seeds, and runs
+`tests/check_clustering_module.py` -- the one check worth doing first, because a
+broken clade rule makes every build in the grid wrong in the same way and
+nothing downstream would say so. Then it reports what is left to build and asks.
+
+It submits two jobs: the array, and `pack_cache.sh` with
+`--dependency=afterok`. The dependency is the point -- the archive is only
+written if every build succeeded.
+
+`scripts/start_simplicity_session.sh` is not called from it: that script ends in
+`exec tmux attach` and would replace the process. The wrapper activates the env
+itself.
+
+pack_cache.sh
+-------------
+
+Tars the grid into `~/fig2_studio/fig2_cache_<hash>_<date>.tar.gz` with a
+manifest carrying the hash, the build and file counts, the sha256 and the
+commit. Measured 8.3x on this JSON, so the 2.9 GB grid travels as about 350 MB.
+
+It refuses to pack a partial grid unless asked with `--partial`: a tarball
+holding 300 of 384 builds looks identical from the outside, and would be found
+out on the wrong machine. Builds are counted by the current code hash, so a
+directory left from an earlier checkout is not mistaken for part of this grid.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.7 — 2026-11-18 — pietro gerletti
 
 Four measurement defects in the figure-2 path, each fixed and each measured
