@@ -5,6 +5,24 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.9 — 2026-11-18 — pietro gerletti
+
+`run_precompute.sh` could exit silently in the middle of its own checks, having
+printed every one of them green.
+
+`TODO=$(python ... --dry-run | head -1 | sed ...)`. `head` closes the pipe after
+one line, `sweep.py` keeps printing its 384 and dies on SIGPIPE, `pipefail`
+turns that into a failed pipeline, and `set -e` exits the script -- after the
+grid size, the hash, the tracked-file check, the run output and the clade rules
+have all reported. The output reads as a pass and the submission never happens.
+
+It is a race between the writer's buffer and the reader's exit, so it passed on
+the box it was written on and failed on the cluster. The output is now captured
+whole and read afterwards, so there is no pipe to close, and a reading that
+comes back empty is reported as a failed check rather than passing in silence.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.8 — 2026-11-18 — pietro gerletti
 
 One command runs the clade-build grid on the cluster and brings it back as one

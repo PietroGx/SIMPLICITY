@@ -150,10 +150,19 @@ fi
 rm -f /tmp/fig2_clade_check.$$
 
 # --- what is left to build, and what it costs ---------------------------
-TODO=$(python -I tests/studio/sweep.py --dry-run --seeds "$SEEDS" 2>/dev/null \
-       | head -1 | sed 's/.*already built, \([0-9]*\) to run.*/\1/')
-note "builds still to run" "$TODO of $WANT  (a finished build is skipped)"
-note "rough cost" "$(( TODO * 6 / 60 ))h of task time, about $(( TODO * 8 / 1000 )).$(( TODO * 8 % 1000 / 100 )) GB"
+# Captured whole, then read -- NOT piped into `head`. `head` closes the pipe
+# after one line, sweep.py dies on SIGPIPE, pipefail turns that into a failed
+# pipeline and `set -e` exits the script silently, AFTER every check has
+# printed green. It won that race on one box and lost it on the cluster.
+DRY=$(python -I tests/studio/sweep.py --dry-run --seeds "$SEEDS" 2>/dev/null) || true
+TODO=$(printf '%s\n' "$DRY" | sed -n '1s/.*already built, \([0-9]*\) to run.*/\1/p')
+if [ -z "$TODO" ]; then
+    bad "builds still to run" "could not read sweep.py --dry-run"
+    TODO=0
+else
+    note "builds still to run" "$TODO of $WANT  (a finished build is skipped)"
+    note "rough cost" "$(( TODO * 6 / 60 ))h of task time, about $(( TODO * 8 / 1000 )).$(( TODO * 8 % 1000 / 100 )) GB"
+fi
 note "archive afterwards" "~350 MB as one tar.gz (measured 8.3x on JSON)"
 
 echo
