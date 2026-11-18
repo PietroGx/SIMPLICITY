@@ -9,6 +9,7 @@ import pandas as pd
 
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
+import simplicity.clustering as cl
 from _scenarios import scenario_output_dirs, scenario_label, one_sod
 from simplicity.phenotype.distance import hamming_iw
 
@@ -18,10 +19,9 @@ from simplicity.phenotype.distance import hamming_iw
 # module lives in a sibling top-level scripts/ directory, not a package, so
 # it needs its own directory on sys.path (same cross-directory sibling-import
 # pattern already used by long_nsr_calibration_plot.py).
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
-from long_shedders_preprocess import (get_clade_metrics, summarize_sod_pies,
-                                     _clade_analysis, _peak_values, _resolve_label,
-                                     _survival_durations, _growth_crossing_times)
+from clade_preprocess import (get_clade_metrics, summarize_sod_pies,
+                             _clade_analysis, _peak_values,
+                             _survival_durations, _growth_crossing_times)
 
 EXP_NAME = "impact_long_shedders"
 # Scenario lists come from the pipeline config via _scenarios.resolve_scenarios;
@@ -517,7 +517,7 @@ def get_efficiency_data(exp_num, scenarios, exp_name=EXP_NAME, min_days=100,
                     for origin, key in (("long", "long"), ("standard", "std")):
                         rec[f"succ_{key}_{pk}"] = sum(
                             1 for c in F.columns
-                            if _resolve_label(labels, c) == origin
+                            if cl.resolve_clade_label(labels, c) == origin
                             and peaks.get(c, 0.0) > pk)
                 rows.append(rec)
         print(f"[fig3] efficiency: {scenario}: {kept} measurable, "
@@ -648,10 +648,10 @@ def get_winrate_data(exp_num, scenarios, exp_name=EXP_NAME, cluster_threshold=5,
                     # _resolve_label would silently return "standard" here.
                     continue
                 n_long = sum(1 for c in pool
-                             if _resolve_label(labels, c) == "long")
+                             if cl.resolve_clade_label(labels, c) == "long")
                 rows.append({
                     "scenario": scenario, "seed": seed, "metric": metric,
-                    "won_long": int(_resolve_label(labels, winner) == "long"),
+                    "won_long": int(cl.resolve_clade_label(labels, winner) == "long"),
                     "pool": len(pool),
                     "null": n_long / len(pool),
                 })

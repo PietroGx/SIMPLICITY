@@ -8,8 +8,7 @@ import baltic as bt
 
 # get_lineage_labels/_clade_analysis already work against plain sod/ssod
 # paths (no dependency on the old grid) -- reuse rather than duplicate.
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
-from long_shedders_preprocess import get_lineage_labels
+from clade_preprocess import get_lineage_labels
 
 # _experiment_sod is the same "resolve one scenario's sod, or None if that
 # scenario hasn't been run yet" helper already used for Figure 2 -- same

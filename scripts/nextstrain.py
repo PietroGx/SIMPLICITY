@@ -27,7 +27,20 @@ import simplicity.output_manager as om
 import simplicity.tree.tree_builder as tb
 import simplicity.clustering as clustering
 import simplicity.plots_manager as pm
-from long_shedders_preprocess import get_grid_sod
+def get_grid_sod(M, ratio, tau, R, exp_num):
+    """The SOD of one cell of the old long_shedders_exp grid.
+
+    Inlined from scripts/long_paper_figures/long_shedders_preprocess.py in
+    v2.5.6, when that directory was archived. This is the only caller, and the
+    naming scheme it reconstructs is that grid's, not the current
+    impact_long_shedders one.
+    """
+    exp_name = (f"long_shedders_exp_M{float(M)}_lsr{float(ratio)}"
+                f"_tau{float(tau)}_R{float(R)}_#{int(exp_num)}")
+    sods = dm.get_simulation_output_dirs(exp_name)
+    if not sods:
+        raise RuntimeError(f"No SOD found for {exp_name}")
+    return sods[0]
 
 # ---------------- helpers ----------------
 

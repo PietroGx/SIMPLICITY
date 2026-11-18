@@ -71,7 +71,7 @@ NAME_CANDIDATES = ('ils_grid', 'impact_long_shedders')
 def burnin_cutoff():
     """fig3_preprocess_data.BURNIN_CUTOFF_DAYS, read rather than re-spelled.
 
-    Imported it would drag in _scenarios and long_shedders_preprocess through
+    Imported it would drag in _scenarios and clade_preprocess through
     two sibling-directory sys.path tricks; the constant is what is wanted."""
     path = os.path.join(REPO, 'scripts', 'nature_plots', 'fig3_preprocess_data.py')
     try:

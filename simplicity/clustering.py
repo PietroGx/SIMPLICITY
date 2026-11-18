@@ -34,26 +34,83 @@ def _serialize_definers_for_clade(def_df: pd.DataFrame) -> List[Dict[str, Any]]:
         out.append(rec)
     return out
 
+# Rule B's operating point. m_T is a share of the run's own transmissions; see
+# GLOSSARY.md. Named here so the pipeline, the figure builder and the studio
+# cannot drift to different defaults.
+MIN_TX_PCT = 1.0
+
+
+def _table_matches(path, shared_mut_threshold, min_tx_pct) -> bool:
+    """Was this clustering CSV built by this (k, min_tx_pct)?
+
+    A table written before v2.5.7 carries neither column, so it cannot be shown
+    to match and is rebuilt. Any read failure counts as no match too:
+    recomputing costs about 1.4s for one run, while serving the wrong clade
+    definition costs a figure.
+    """
+    try:
+        head = pd.read_csv(path, nrows=1)
+    except Exception:
+        return False
+    if len(head) == 0:
+        return False
+    for col, want in (("shared_mut_threshold", shared_mut_threshold),
+                      ("min_tx_pct", min_tx_pct)):
+        if col not in head.columns:
+            return False
+        try:
+            if float(head[col].iloc[0]) != float(want):
+                return False
+        except Exception:
+            return False
+    return True
+
+
 def get_clustering_for_ssod(
     experiment_name: str,
     seeded_simulation_output_dir: str,
     phylogenetic_df: pd.DataFrame | None = None,
     shared_mut_threshold: int = 5,
+    min_tx_pct: float = MIN_TX_PCT,
     force: bool = False,
 ) -> str:
     """
-    If the clustering CSV exists (and not force), returns it.
-    Otherwise computes clustering and writes a single CSV.
+    If the clustering CSV on disk was built by THIS definition (and not force),
+    returns it. Otherwise computes the clustering and writes a single CSV.
+
+    The table carries rule B: a clade must clear the divergence threshold AND
+    have transmitted at least `min_tx_pct` of the run's own transmission
+    events. Divergence alone makes a clade of almost every tip -- measured on
+    control at k=5, 402 clades per run of which 86% hold one lineage and 78%
+    infected nobody, against 14 under rule B.
+
+    The definition is written into the table and checked on the way back out,
+    because the filename does not carry it: the path is
+    `07_Clustering/{SOD}_seed_{SEED}_clustering.csv`, with no k and no
+    `min_tx_pct` in it. Returning the file whenever it merely EXISTS was wrong
+    twice over -- a table built at k=5 was served to a caller asking for k=7,
+    and a divergence-only table written before rule B was served as though it
+    carried rule B. Neither is visible to the caller: both are well-formed CSVs.
     """
     path = om.get_clustering_table_filepath(experiment_name, seeded_simulation_output_dir)
-    if (not force) and os.path.exists(path):
+    if (not force) and os.path.exists(path) and _table_matches(
+            path, shared_mut_threshold, min_tx_pct):
         return path
 
     if phylogenetic_df is None:
         phylogenetic_df = om.read_phylogenetic_data(seeded_simulation_output_dir)
 
+    support = min_support = None
+    if min_tx_pct > 0:
+        ind = om.read_individuals_data(seeded_simulation_output_dir)
+        support = subtree_transmission_counts(phylogenetic_df, ind)
+        min_support = transmission_floor(ind, min_tx_pct)
+
     clade_to_lineages, lineage_to_clade, per_clade_mut_df, clade_meta_df = \
-        cluster_lin_into_clades_with_meta(phylogenetic_df, shared_mut_threshold=shared_mut_threshold)
+        cluster_lin_into_clades_with_meta(phylogenetic_df,
+                                         shared_mut_threshold=shared_mut_threshold,
+                                         support=support,
+                                         min_support=min_support or 0.0)
         
     # Set 'clade' as the index 
     if isinstance(clade_meta_df, pd.DataFrame) and "clade" in clade_meta_df.columns:
@@ -82,6 +139,10 @@ def get_clustering_for_ssod(
         definers_list = _serialize_definers_for_clade(def_df)
 
         rows.append({
+            # the definition that produced this table; _table_matches reads it
+            # back before the file is ever served from cache
+            "shared_mut_threshold": int(shared_mut_threshold),
+            "min_tx_pct": float(min_tx_pct),
             "clade": clade,
             "root_lineage": root_lineage,
             "parent_clade": parent_clade,
@@ -116,9 +177,262 @@ def build_lineage_to_mutation_dict(phylogenetic_data_df):
         for _, row in phylogenetic_data_df.iterrows()
     }
 
+def subtree_transmission_counts(phylogenetic_data_df, individuals_df):
+    """{lineage -> onward infections produced by it and its descendants}.
+
+    The support term of rule B. Cumulative down the tree, so a refusal is
+    hereditary: a lineage whose whole subtree transmitted too little cannot
+    have a descendant that transmitted more. Ported unchanged from
+    tests/clade_tx_minimum.py, which is where the rule was measured.
+    """
+    par = {l: (None if (not isinstance(p, str) or p == l) else p)
+           for l, p in zip(phylogenetic_data_df["Lineage_name"],
+                           phylogenetic_data_df["Lineage_parent"])}
+    order = list(phylogenetic_data_df
+                 .sort_values("Time_emergence", kind="mergesort")["Lineage_name"])
+    tx = individuals_df["inherited_lineage"].value_counts().to_dict()
+    stx = {l: int(tx.get(l, 0)) for l in order}
+    for l in reversed(order):                      # children before parents
+        p = par.get(l)
+        if p is not None and p in stx:
+            stx[p] += stx[l]
+    return stx
+
+
+def transmission_total(individuals_df):
+    """The run's own transmission events: inherited_lineage, one row per host."""
+    return int(individuals_df["inherited_lineage"].value_counts().sum())
+
+
+def transmission_floor(individuals_df, min_tx_pct):
+    """m_T as an absolute count for one run.
+
+    m_T is a SHARE of the run's own transmissions, not a count: the scenarios
+    run 11,846 to 27,510 transmissions, so a fixed count is a different filter
+    in each.
+    """
+    return (float(min_tx_pct) / 100.0) * transmission_total(individuals_df)
+
+
+def normalise_host_type(h):
+    """Host type as one of "long" or "standard".
+
+    Was written four times -- _host_of in tests/export_fig2_builder.py,
+    _is_long in tests/studio/compute.py, _norm_host inside the clade builder,
+    and inline in the browser. Every copy tested the same "long" prefix, which
+    is the only thing that makes them agree; this is the one that is allowed to
+    change.
+    """
+    if h is None:
+        return "standard"
+    v = str(h).strip().lower()
+    return "long" if v.startswith("long") else "standard"
+
+
+def resolve_clade_label(clade_labels, clade):
+    """A clade's origin label, normalised to long / standard / mixed / founder.
+
+    Restated here from _resolve_label in
+    scripts/long_paper_figures/long_shedders_preprocess.py, which left the
+    studio importing a clade rule from a figure script. That script still
+    carries its own copy: collapsing the two means editing scripts/, which is
+    out of scope for figure 2 (see BACKLOG).
+    """
+    if not clade:
+        return "standard"
+    raw = str(clade_labels.get(clade, "standard")).lower()
+    if "long" in raw:
+        return "long"
+    if "mix" in raw:
+        return "mixed"
+    if "founder" in raw:
+        return "founder"
+    return "standard"
+
+
+def founds_clade(lineage, clade_root_mutset, lin2mut, shared_mut_threshold,
+                 support=None, min_support=0.0):
+    """Rule B, as one predicate: does this lineage start a new clade?
+
+    Both walks in this module ask it -- the metadata-building recursion in
+    `cluster_lin_into_clades_with_meta` and the flat `designate_clades` -- so
+    the rule has one statement rather than one per walk.
+
+      divergence   >= shared_mut_threshold mutations from the clade root,
+                   measured on genome SETS, not mutation counts, which disagree
+                   on seeds with back-mutations
+      support      and, when min_support > 0, at least that much support, which
+                   is normally the onward infections of this lineage and its
+                   descendants
+    """
+    if len(lin2mut.get(lineage, frozenset()) - clade_root_mutset) < shared_mut_threshold:
+        return False
+    if min_support > 0:
+        return (support or {}).get(lineage, 0) >= min_support
+    return True
+
+
+def lineage_tree(phylogenetic_data_df, individuals_df=None,
+                 order_by="emergence"):
+    """Parent map, walk order, and the two cumulative subtree counts.
+
+    One replacement for the three `_tree` functions in tests/ that each built
+    this again (clade_tx_minimum, clade_formation_grid, clade_designation_rules).
+
+    Returns (lin2mut, par, order, sub, stx): subtree lineage counts and subtree
+    onward infections. `stx` is all zeros without `individuals_df`.
+
+    `order_by` picks the walk order, and the two are not interchangeable:
+
+      "emergence"  sorted by Time_emergence, which is what the clade build and
+                   `cluster_lin_into_clades_with_meta` use
+      "topology"   down from the roots, so a parent is always placed before its
+                   children whatever the timestamps say
+
+    `designate_clades` reads a lineage's parent's clade, so a child placed
+    before its parent becomes its own clade root. Under "emergence" that is the
+    build's own behaviour and is deliberate; a diagnostic that wants the
+    partition the topology implies asks for "topology".
+    """
+    lin2mut = build_lineage_to_mutation_dict(phylogenetic_data_df)
+    par = {l: (None if (not isinstance(p, str) or p == l) else p)
+           for l, p in zip(phylogenetic_data_df["Lineage_name"],
+                           phylogenetic_data_df["Lineage_parent"])}
+    if order_by == "emergence":
+        order = list(phylogenetic_data_df
+                     .sort_values("Time_emergence", kind="mergesort")["Lineage_name"])
+    elif order_by == "topology":
+        kids = {}
+        roots = []
+        for l, p in par.items():
+            if p is None:
+                roots.append(l)
+            else:
+                kids.setdefault(p, []).append(l)
+        order, stack = [], list(roots)
+        while stack:
+            v = stack.pop()
+            order.append(v)
+            stack.extend(kids.get(v, ()))
+    else:
+        raise ValueError(
+            f'order_by must be "emergence" or "topology", got {order_by!r}')
+    tx = ({} if individuals_df is None
+          else individuals_df["inherited_lineage"].value_counts().to_dict())
+    sub = {l: 1 for l in order}
+    stx = {l: int(tx.get(l, 0)) for l in order}
+    for l in reversed(order):                      # children before parents
+        p = par.get(l)
+        if p is not None and p in sub:
+            sub[p] += sub[l]
+            stx[p] += stx[l]
+    return lin2mut, par, order, sub, stx
+
+
+def designate_clades(lin2mut, par, order, shared_mut_threshold,
+                     support=None, min_support=0.0):
+    """{lineage -> its clade's root lineage}, by rule B.
+
+    The lightweight walk: no clade names, no defining mutations, no metadata.
+    `cluster_lin_into_clades_with_meta` is the one that builds those; this is
+    for the diagnostics that only need the partition, and both reach the same
+    decision because both call `founds_clade`.
+    """
+    croot = {}
+    for v in order:
+        p = par.get(v)
+        if p is None or p not in croot:
+            croot[v] = v
+            continue
+        cr = croot[p]
+        croot[v] = v if founds_clade(v, lin2mut.get(cr, frozenset()), lin2mut,
+                                     shared_mut_threshold, support,
+                                     min_support) else cr
+    return croot
+
+
+def clade_max_divergence(member_lineages, root_lineage, lin2mut):
+    """Mutations between the clade's furthest member and its own root.
+
+    A bound, so it is the clade's worst case, not its typical one. Derived
+    independently in tests/export_fig2_builder.py and tests/studio/compute.py
+    before this.
+    """
+    rmut = lin2mut.get(root_lineage, frozenset())
+    return max((len(lin2mut.get(m, frozenset()) - rmut) for m in member_lineages),
+               default=0)
+
+
+def keep_clades_by_transmission(clades, n_tx_run, min_tx_pct,
+                                ntx=lambda c: c["ntx"],
+                                founding=lambda c: c["founding"],
+                                n_defining=lambda c: c["ndef"]):
+    """Rule B's support term applied to already-built clades.
+
+    The studio stores the divergence-only superset so m_T can be varied without
+    re-clustering, then filters here. That filter IS half the clade definition,
+    so it belongs beside the other half rather than restated in the panel code.
+
+    The founding clade is kept and labelled separately -- it has no defining
+    mutations and no parent, so neither term applies to it. A group with no
+    defining mutations and a parent is not a clade.
+    """
+    floor = (float(min_tx_pct) / 100.0) * n_tx_run
+    out = []
+    for c in clades:
+        if founding(c):
+            out.append(c)
+            continue
+        if n_defining(c) <= 0:
+            continue
+        if ntx(c) <= 0 or ntx(c) < floor:
+            continue
+        out.append(c)
+    return out
+
+
+def keep_designated_clades(clades,
+                           founding=lambda c: c["founding"],
+                           n_defining=lambda c: c["ndef"]):
+    """Structural filter for clades ALREADY designated under rule B.
+
+    The counterpart to `keep_clades_by_transmission`, and the two must not be
+    confused:
+
+      keep_clades_by_transmission   designation used divergence alone, so the
+                                    support term is applied here, by DROPPING
+                                    clades under m_T and discarding their
+                                    lineages
+      keep_designated_clades        designation used rule B, so the support
+                                    term is already satisfied and every lineage
+                                    is already FOLDED into a surviving clade
+
+    Re-applying the floor after rule B designation would be wrong, not merely
+    redundant. Designation tests the founding lineage's SUBTREE support, which
+    includes descendants that later found clades of their own; a clade's own
+    `ntx` counts only the lineages that stayed. So a legitimate rule B clade
+    can carry fewer than m_T transmissions itself, and the floor would drop it.
+
+    What is still structural: the founding clade is kept and labelled -- it has
+    no defining mutations and no parent, so neither term applies to it -- and a
+    group with no defining mutations and a parent is not a clade.
+    """
+    out = []
+    for c in clades:
+        if founding(c):
+            out.append(c)
+            continue
+        if n_defining(c) <= 0:
+            continue
+        out.append(c)
+    return out
+
+
 def cluster_lin_into_clades_with_meta(
     phylogenetic_data_df: pd.DataFrame,
     shared_mut_threshold: int = 5,
+    support: dict | None = None,
+    min_support: float = 0.0,
 ):
     """
     Cluster lineages into nested clades and, at the moment a new clade
@@ -131,6 +445,13 @@ def cluster_lin_into_clades_with_meta(
       - 'Genome'
       - 'Host_type'
       - 'Time_emergence'   
+
+    Rule B: with `support` and `min_support > 0`, a lineage founds a clade only
+    if it has ALSO got at least `min_support` support -- normally the onward
+    infections of it and its descendants, from `subtree_transmission_counts`.
+    Leaving them out (the default) applies the divergence test alone, which is
+    the superset: every rule-B clade is in it, so a caller that wants to vary
+    m_T without re-clustering filters that output instead.
 
     Returns
     -------
@@ -205,15 +526,20 @@ def cluster_lin_into_clades_with_meta(
     def recurse(current_lin: str, clade_root_mutset: frozenset, clade_path: str, path_since_root: list[str]):
         
         current_mut = lin2mut.get(current_lin, frozenset())
-        mut_distance = len(current_mut - clade_root_mutset)
-        start_new_clade = (mut_distance >= shared_mut_threshold) or (clade_path == "")
+        start_new_clade = (clade_path == "") or founds_clade(
+            current_lin, clade_root_mutset, lin2mut, shared_mut_threshold,
+            support, min_support)
 
         if start_new_clade:
             parent_clade = clade_path if clade_path != "" else None
 
             # Build the segment from the previous clade root to the new clade root:
             # nodes on the path since last root (path_since_root) plus current node.
-            segment_nodes = (path_since_root + [current_lin]) if clade_path != "" else [current_lin]
+            # path_since_root[0] is the PARENT clade's root. Its edge mutations are
+            # already inside clade_root_mutset, so the divergence test never counted
+            # them, and they already define the parent clade. Including them here
+            # let one mutation define two clades at once; dropped (v2.5.3).
+            segment_nodes = (path_since_root[1:] + [current_lin]) if clade_path != "" else [current_lin]
 
             # Create the new clade name
             if clade_path == "":

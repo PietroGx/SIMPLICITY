@@ -1,8 +1,7 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
-from long_shedders_plots import PIE_COLORS
+from simplicity.plots_manager import PIE_COLORS
 
 
 def _color_for(k):

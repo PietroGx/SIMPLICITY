@@ -8,7 +8,7 @@
 WHY
 
 The v2.4.71 refactor moved every output directory a level deeper and renamed
-all of them. nature_plots/ and long_paper_figures/ hold the largest block of
+all of them. nature_plots/ holds the largest block of
 call sites it never touched, and they cannot be exercised against a synthetic
 tree: they read PRODUCTION experiments by name, one per scenario.
 
@@ -49,7 +49,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'nature_plots'))
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'long_paper_figures'))
 
 import matplotlib
 matplotlib.use('Agg')
@@ -337,38 +336,6 @@ def experiment_exists(name):
         return False
 
 
-def long_paper(exp_num):
-    """The long-paper figures read the GRID: a different experiment family from
-    the impact pipeline, made of a master log plus calibration_run_#N and
-    long_shedders_exp_M*_#N.
-
-    Each reader is gated on ITS OWN input, not on whichever one happens to be
-    checked first. get_baseline_sod reads calibration_run_#N and never opens the
-    master log, so gating it on the log would call a missing baseline a pass and
-    a present-log/absent-baseline run a spurious FAILED.
-    """
-    print('\nlong-paper figures  (a DIFFERENT experiment shape: the grid)')
-    import long_shedders_preprocess as lp
-
-    master = os.path.join(dm.get_data_dir(), f'master_grid_log_#{exp_num}.csv')
-    baseline = f'calibration_run_#{exp_num}'
-
-    for label, available, why, call in (
-        ('long_paper.read_master_log', os.path.isfile(master),
-         f'no {os.path.basename(master)}',
-         lambda: lp.read_master_log(exp_num)),
-        ('long_paper.get_baseline_sod', experiment_exists(baseline),
-         f'no {baseline}',
-         lambda: lp.get_baseline_sod(exp_num)),
-    ):
-        if available:
-            probe(label, call)
-        else:
-            print(f'  [n/a       ] {label}: {why} -- reads the long-paper '
-                  f'grid, not the impact pipeline')
-            notapplicable.append((label, why))
-
-
 def library(exp_name, exp_num, present):
     print('\nplots_manager / output_manager, against one production experiment')
     import simplicity.plots_manager as pm
@@ -411,7 +378,6 @@ def main():
     for stage in (lambda: figure_1(args.exp_num, args.exp_name, present),
                   lambda: figure_2(args.exp_num, args.exp_name, present, args.heavy),
                   lambda: figure_3(args.exp_num, args.exp_name, present, args.heavy),
-                  lambda: long_paper(args.exp_num),
                   lambda: library(args.exp_name, args.exp_num, present)):
         try:
             stage()

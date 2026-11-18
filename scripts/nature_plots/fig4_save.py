@@ -8,8 +8,7 @@ import fig4_preprocess_data as preproc
 import fig4_plots as plots
 from _scenarios import EXP_NAME, figure_path, resolve_scenarios
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'long_paper_figures'))
-from long_shedders_plots import add_global_pie_legend
+from simplicity.plots_manager import add_global_pie_legend
 
 
 

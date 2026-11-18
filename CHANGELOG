@@ -5,6 +5,376 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.7 — 2026-11-18 — pietro gerletti
+
+Four measurement defects in the figure-2 path, each fixed and each measured
+before and after.
+
+The clustering cache now knows which definition filled it
+---------------------------------------------------------
+
+`get_clustering_for_ssod` returned the CSV whenever it merely existed. That was
+wrong twice over, and the second way is the sharper one: the path is
+`07_Clustering/{SOD}_seed_{SEED}_clustering.csv`, with no k and no `min_tx_pct`
+in it, so a table built at k=5 was served to a caller asking for k=7, and a
+divergence-only table written before rule B was served as though it carried
+rule B. Both produce a well-formed CSV, so neither was visible to the caller.
+
+The definition is now written into the table as two columns and checked by
+`_table_matches` before the file is served. Exercised across five cases: a
+fresh call computes in 1.46s and writes 10 rows at k=7; the same call again
+returns in 0.001s; a different k recomputes and gives 14 rows; a different m_T
+recomputes and gives 335; and a table with no provenance columns is rebuilt
+rather than served.
+
+`plong`'s denominator counts what its numerator counts
+------------------------------------------------------
+
+`nl` counts rows of the definer frame, one per (node, mutation); `nd` was
+`n_defining`, a count of DISTINCT mutations. A mutation recurring on two edges
+of one segment therefore made `nl/nd` exceed 1, and the `uint8` cast wrapped
+rather than clipped -- a fully long-origin clade would have read 13.7% instead
+of 100%. The denominator is now the row count and the cast clips as well.
+
+The two are equal whenever no mutation recurs, which is every clade measured so
+far: 0 of 2,283,098 records in the divergence-only export and 0 of 166 under
+rule B. So the change is provably neutral on current data. Confirmed on export:
+HIV_high's shares come out at exactly 3/7, 4/7, 5/7, 6/7 and 7/7 with nothing
+above 1.0, and control is all zero.
+
+One rise, one implementation
+----------------------------
+
+Three definitions of "how fast did it rise" shipped together: the builder's
+`_rise` (the last approach to the global peak), its `_risef` (the first local
+maximum clearing the upper crossing), and the studio's emergence rise (the
+episode containing the clade's own maximum).
+
+`smooth`, `episodes_of` and `rise_of` moved to
+`scripts/nature_plots/clade_preprocess.py`, beside the other clade metrics, and
+the builder and the studio now measure with the same code. `_rise` and `_risef`
+are gone; `risef` -- the column the pages label "Sweep time" -- is the
+emergence-episode rise. `rise`/`rise_w` were dropped: exported, read by
+nothing. Verified per clade by name, **55 of 55 exported clades agree to
+0.01 d** over two scenarios and two seeds each.
+
+`compute.code_hash()` now covers `clade_preprocess.py` as well, since the
+episode definition lives there and a change to it has to invalidate a build.
+
+An episode start must be a dip, not a wiggle
+--------------------------------------------
+
+An episode starts at the local minimum directly before its peak. On a long
+almost-flat approach there are many near-equal minima, so which one is LAST
+could turn on noise below the data's own resolution: rounding a trajectory to
+five decimals moved one clade from a 35.02-day rise to 106.06 days, because the
+rounding erased a wiggle at index 600 and promoted the real trough at 496. One
+clade in 137, but the number was arbitrary.
+
+A trough must now clear `TROUGH_PROM` of the clade's peak. The bar was chosen
+by sweeping it over 150 clades in 15 runs, not picked:
+
+    bar       median   mean   clades changed   bistable
+    none       34.01   32.53        0 of 150      1
+    1e-4*h     34.01   33.36        4             0
+    1e-3*h     34.99   35.57       14             0
+    1e-2*h     36.00   39.09       36             0
+    1e-1*h     41.00   52.65       61             0
+
+The first attempt used the peaks' own bar, 0.1*h. It removed the instability
+and moved the mean by +20 days while changing 44.5% of clades, one by 193 --
+tunnelling leftward, which is what the prominence base was rejected for.
+1e-4 is the smallest bar that removes it: the median is unchanged, four clades
+move, and one of those four IS the unstable clade now choosing the deeper
+trough. It sits above the ~1e-5 noise and below the ~1e-4 granularity of a
+frequency.
+
+**Recalibration required** for the last two: both change what the rise means.
+
+------------------------------------------------------------------------
+
+## Version 2.5.6 — 2026-11-18 — pietro gerletti
+
+`scripts/long_paper_figures/` is archived, and what the live figures needed
+from it moved to where it belongs.
+
+It was not dead code. Seven call sites in `scripts/` imported from it --
+`fig2_preprocess_data`, `fig2_save`, `fig2S_save`, `fig4_preprocess_data`,
+`fig4_plots`, `fig4_save` and `nextstrain` -- plus about a dozen diagnostics
+under `tests/`. Moving it without unpicking that would have broken figures 2
+and 4, the supplement, and the only writer of the clustering CSV.
+
+Where things went:
+
+  the clade metrics (`_clade_analysis`, `_peak_values`, `_survival_durations`,
+  `_growth_crossing_times`, `get_clade_winners`, `get_clade_metrics`,
+  `get_lineage_labels`, `summarize_sod_pies`)
+      -> `scripts/nature_plots/clade_preprocess.py`, new
+  the pie helpers (`PIE_COLORS`, `plot_fig4_pies`, `add_global_pie_legend`)
+      -> `simplicity/plots_manager.py`, which was missing
+         `from matplotlib.patches import Patch`
+  `get_grid_sod`
+      -> inlined into `scripts/nextstrain.py`, its only caller
+  `_resolve_label`
+      -> dropped; `clustering.resolve_clade_label` is the only copy now
+
+The three archived files carry a header saying they are frozen, that they still
+cluster on divergence alone, and where each moved thing went.
+
+Rule B reaches the published figures
+------------------------------------
+
+`_clade_analysis` was the one call that mattered: `get_clade_metrics`,
+`get_lineage_labels` and `summarize_sod_pies` all route through it, so figures
+2 and 4 counted 402 clades per run where the studio counted 14.
+`scripts/nature_plots/fig3_preprocess_data.py` had the same gap. Both now
+designate under rule B. Exercised on real output, control at k=5: 14 clades, 0%
+singletons, 2,118 lineages labelled, and zero long-origin winners across all 50
+seeds -- which is the right answer for a scenario with no long shedders.
+**Recalibration required** for figures 2, 3 and 4.
+
+The repo carries code and two documents
+---------------------------------------
+
+`CHANGELOG` and `README.md` are the only docs tracked. `PERFORMANCE.md` and
+`RUNS.md` are deleted; `BACKLOG.md`, `UPSTREAM_TODO.md`,
+`tests/HPC_7C_VALIDATION.md` and `tests/slurm_local_setup.md` are untracked and
+ignored, keeping their local copies. `tests/studio/`, `tests/artifacts/` and
+`tests/_*.csv` are ignored too: the studio is a local tool served over an SSH
+tunnel, not part of the published project.
+
+`RUNS.md` held one row per run with the commit it was launched at. Losing it
+means a run's output no longer names the code that produced it; that is
+recorded as technical debt, deliberately deferred.
+
+tests/
+------
+
+Eleven exploratory scripts were removed, each having answered its question:
+the designation-rule and m_T comparisons that settled rule B, the
+clustering-configuration and origin-definition sweeps, the singleton-outcome
+study (moot under rule B, which produces no singletons), two ad-hoc
+founding-clade probes, and two synthetic-data figure mock-ups.
+
+`tests/test_tree_building_script_simulation.py` is removed as broken: it
+imported `tests.common_test_fixtures`, which does not exist, and hardcoded a
+`/scratch/gerlettip/...` path to an experiment that is gone. It could never
+have run.
+
+Three library-level checks are now tracked, because they pin `simplicity/`
+rather than the studio: `check_clustering_module.py` (31 checks),
+`check_manipulation.py` (28), and `clustering_sanity.py`, which was itself
+measuring the divergence-only partition -- 335 clades and 87.8% singletons at
+k=5 where the pipeline now gives 14 and 0%.
+
+------------------------------------------------------------------------
+
+## Version 2.5.5 — 2026-11-18 — pietro gerletti
+
+Not committed. Rule B becomes the clade definition everywhere in figure 2, and
+the precomputation it needs moves to the cluster.
+
+Rule B designates; it no longer filters
+---------------------------------------
+
+`tests/studio/compute.py` and `tests/export_fig2_builder.py` designated clades
+on divergence alone and then DROPPED the ones under m_T. Dropping is not
+folding: a dropped clade's lineages were discarded rather than merged into the
+surviving ancestor, so the panels were computed over part of the tree. Measured
+at the operating point, k=7 and m_T=1%: the two give the SAME clade counts (10,
+10, 22, 17 on four runs) but rule B covers 1.12x to 1.51x more lineages —
+2,118 against 1,785 on control seed 0, 12,515 against 8,287 on HIV_high seed 0.
+Rule B accounts for every lineage; dropping covered 66-84% of them.
+
+`run_context` now passes the subtree transmission support and the run's own
+floor into `cluster_lin_into_clades_with_meta`, so designation is rule B. The
+read-time filter becomes `clustering.keep_designated_clades`, which is new and
+deliberately does NOT re-apply the floor: designation tests the founding
+lineage's SUBTREE, which includes descendants that later found clades of their
+own, while a clade's own `ntx` counts only the lineages that stayed. A
+legitimate rule B clade can carry fewer than m_T transmissions itself, and
+re-applying the floor would drop it.
+
+m_T is a build parameter
+------------------------
+
+Under rule B, moving m_T moves the partition, so it cannot be applied over an
+existing build the way the burn-in toggle can. m_T joins the build key
+(`k7_m1_w15_p0.1_...`), `compute.DEFAULTS` and `BUILD_SETTINGS`; the m_T
+control becomes a ladder over the values the grid was built at; and the Export
+tab's rebuild button now posts every name in `BUILD_SETTINGS` rather than a
+hand-written list, which is what let m_T go missing from it in the first place.
+
+The across-the-set tab consequently reads one clade build per rung instead of
+filtering one build sixteen times, and reports the rungs that have no build
+rather than guessing them. The m_T ladder moved to `compute.MT_LADDER` so the
+sweep driver and the panels cannot disagree about which rungs exist.
+
+Two divergences this exposed, both fixed. `panels._daily_series` built its
+parameters without m_T, so the daily series was designated at m_T=0 — 199
+groups where the build had 10. And the browser's clade pool filtered on its own
+`ndef`, derived from the export's per-lineage mutation counts, which disagrees
+with the build's under rule B because a folded lineage brings its mutations
+with it: on control seed 0 at m_T=0.012% the build's pool is 32 clades and the
+browser's filter left 9. When a build is in hand the pool is now the build's.
+
+`tests/studio/check_episodes.js` also compares the two DESIGNATIONS, not only
+the episodes. The browser filters the export's divergence-only `starts[k]` by
+subtree support, which is not obviously rule B — a lineage could clear k from
+the folded root without ever having been a divergence-only start. Measured: 0
+mismatches on four runs, which is evidence rather than proof, so the check
+exists to notice the day it stops being true. 29 passed, 0 failed.
+
+The grid moves to the cluster
+-----------------------------
+
+The grid gains m_T as an axis: 3 k x 16 m_T x 4 windows x 2 prominences = 384
+builds, about 38 hours sequentially. `tests/studio/slurm_precompute.sh` is new
+and runs it as a Slurm array, one build per task. The axes are not restated in
+bash: `sweep.py --list` prints the grid and `sweep.py --only N` runs entry N,
+so the array index is the whole contract between them.
+
+Local precomputation is dropped. The Export tab's compute button stays, for the
+one-off builds that follow a clustering or episode-rule decision.
+
+Disk, measured per rung and extrapolated to 250 runs: m_T=0 is 52.3 MB (that
+rung is divergence alone), 0.005 is 6.9 MB, 0.012 is 5.7 MB, 0.05 is 3.9 MB,
+0.2 is 2.5 MB, 1.0 is 1.7 MB, 2.0 is 1.3 MB. The whole grid is about 2.9 GB,
+the low rungs dominating. A rule B build at the operating point is 22x smaller
+than the divergence-only build it replaces.
+
+------------------------------------------------------------------------
+
+## Version 2.5.4 — 2026-11-18 — pietro gerletti
+
+Not committed. The working tree also carries uncommitted 2.5.3 work that
+predates this entry: the one-line change to the clade walk in
+`simplicity/clustering.py` (`path_since_root[1:]`) and the first version of the
+figure-2 studio.
+
+One definition, one implementation
+----------------------------------
+
+`simplicity/clustering.py` becomes the single source of truth for the clade
+rules. Ten primitives are exported — `subtree_transmission_counts`,
+`transmission_total`, `transmission_floor`, `normalise_host_type`,
+`resolve_clade_label`, `founds_clade`, `lineage_tree`, `designate_clades`,
+`clade_max_divergence`, `keep_clades_by_transmission` — and the places that had
+their own copy now call them: `tests/clade_tx_minimum.py`,
+`tests/clade_formation_grid.py`, `tests/clade_designation_rules.py`,
+`tests/export_fig2_builder.py`, `tests/studio/compute.py`,
+`tests/studio/panels.py`.
+
+`founds_clade` is one predicate asked by both walks in the module, so the
+metadata-building recursion and the flat `designate_clades` cannot disagree
+about what starts a clade. `lineage_tree` gained `order_by`, because
+`clade_formation_grid` deliberately walks parents-before-children while the
+build sorts by emergence time, and those are not interchangeable.
+
+Proved rather than asserted. The three diagnostics were captured before the
+rewiring and re-run after: byte-identical output, including a 5,600-row grid
+CSV (its row order was never deterministic — `imap_unordered`). The studio's
+clade records were compared against the pre-refactor grid at every stage: 349
+clade records over two runs, every field identical.
+`tests/check_clustering_module.py` is new and pins the module to what it
+replaced — 31 checks, including the module's two walks producing one partition
+over 6 real runs, and `resolve_clade_label` against the copy still living in
+`scripts/long_paper_figures/`.
+
+The Sweep time tab and panel 3 now report one number
+----------------------------------------------------
+
+The tab measured episodes on `~/fig2_studio/runs/`, which samples 120 points
+about 9.2 days apart, while panel 3 measured on the daily record: control seed
+0 at win=1 gave 275 emergence episodes against the browser's 13.
+`compute.run_context` was factored out of `compute._one` so one function serves
+the pass and the new `compute.run_daily` / `/api/run_daily`, which serves the
+daily record. A clade is joined to the browser's own row by the index of its
+root lineage in ph row order — verified against the export's `starts[k=7]`,
+10/10 and 17/17.
+
+Two further drifts surfaced on the way and are gone. `web/episodes.js` carried
+its own reimplementation of scipy's prominence test and chose a different
+trough: 71 days of difference on one clade. Episode detection now happens once,
+in python, in `panels.run_daily`; the browser draws what it is given. And the
+daily series was rounded to five decimals in transit, which reshaped the local
+minima an episode start depends on and reproduced the same 71-day split; it is
+served unrounded. `tests/studio/check_episodes.js` compares clade by clade and
+passes: 25 checks, worst disagreement 0.010 d.
+
+Panel 3's rise time measures the trajectory, not the window
+-----------------------------------------------------------
+
+`tests/rise_window_effect.py` is new. It freezes the episode set at one
+smoothing window and re-measures the rise inside it at every other window,
+which separates smoothing from merging. Over 599 clades in 50 runs: the free
+measurement moves 1.01 → 37.00 days as `win` goes 1 → 21, the frozen one moves
+35.02 → 37.00, and the same frozen window with no smoothing at all is 35.02
+days flat. So the window-dependence is episode IDENTIFICATION — at win=1 the
+detector fragments one real rise into 2.45 episodes and calls a 1-day spike the
+emergence episode. win=1 is degenerate and should not be an operating point.
+
+What else the numbers say
+-------------------------
+
+`tests/panel_denominators.py` is new: what each panel's denominator actually
+is. Panel 3's latency rests on 48.7% of HIV_high's kept clades against 75% for
+control, because truncation is scenario-dependent. The `other` class (a clade
+whose defining count is not k) is empty at k=7. Measured on 2 runs per
+scenario; re-run on the full grid before quoting.
+
+`tests/check_manipulation.py` is new and exercises the two manipulation checks
+on a real run's frozen table: R_long equals R at 1.05 in every scenario,
+`susceptibility_long` is 1.0, expected secondary infections are equal, and the
+long daily transmission rate is correspondingly LOWER — 0.0107/day against
+0.0920 in the HIV scenarios, spread over 8.6x longer. It also asserts that the
+four expressions it mirrors from `extrande.py` still read as mirrored, so a
+change there fails the check instead of silently invalidating it.
+
+A build now records the code that computed it
+---------------------------------------------
+
+`compute.code_hash()` hashed `compute.py` alone, so the uncommitted 2.5.3
+change to the clade walk altered what a clade is while the key was unchanged:
+24 builds on disk carried the new maths under a key claiming the old. The hash
+now covers `compute.py` and `simplicity/clustering.py` together, which orphaned
+every build and forced the full 24-set rebuild.
+
+The packed sentinel survives packing
+------------------------------------
+
+`tests/export_fig2_builder.py` declared `NEVER = 65535` but `_u16` clipped
+every value to 65534, the sentinel included, and turned a non-finite metric
+into 0 — indistinguishable from a measured zero. Measured at k=7 over 2,657
+clades: `grow` has no value for 99.5% of them, and nothing was actually
+misread, because the artifact pages test `grow >= 10000` rather than the
+declared value. `_u16` now reserves 65535 for a non-finite input; `grow`,
+`rise` and `risef` emit NaN where their precondition fails; both artifact
+decoders map 65535 to NaN on every column.
+`tests/artifacts/check_sentinel.js` is new and packs its own payload, so it
+needs no `fig2b/`.
+
+Panel 4 becomes a surface
+-------------------------
+
+Panel 4 listed one row per build. It now also reports the grid it spans, the
+value at the operating point against the range over every build, and
+one-at-a-time sensitivity with the other axes pinned — which is the form the
+question is actually asked in.
+
+Smaller things
+--------------
+
+The nine per-page documents and `studio.js` are deleted: the studio is one
+document with ten tabs. `tests/studio/check_pages.js` goes with them, and
+section B of `tests/check_studio_api.py` now reads the script list out of
+`index.html`, so a script added to the page cannot be left untested.
+`~/fig2_studio/clades/` (177 MB) and `runs/formation.json` are deleted;
+`~/fig2_studio/runs/` is NOT — it is the only source for the phylogeny, the
+Muller plot and the episode grid.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.2 — 2026-10-20 — pietro gerletti
 
 Figure 1 gains a sixth panel, and the inputs behind it are named for what they

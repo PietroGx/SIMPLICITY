@@ -31,3 +31,22 @@ Data/RealWorldData/data_fig1_D.csv
 # Archives produced by package_simplicity_data.sh / archive_paper_runs.sh.
 # Multi-GB, regenerable from Data/.
 Data_Export/
+
+# Working notes for agents, not part of the published project. The repo is
+# public; these are internal and change constantly. CHANGELOG and README.md
+# are the only docs that belong to it.
+GLOSSARY.md
+CLAUDE.md
+DECISIONS.md
+BACKLOG.md
+RUNS.md
+UPSTREAM_TODO.md
+tests/HPC_7C_VALIDATION.md
+tests/slurm_local_setup.md
+
+# Local tools, not part of the published project: the figure-2 studio (served
+# from a dev box over an SSH tunnel) and the artifact pages it was built from,
+# plus the CSV output of the tests/ diagnostics.
+tests/studio/
+tests/artifacts/
+tests/_*.csv

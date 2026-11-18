@@ -18,6 +18,7 @@ import os
 import math
 import matplotlib
 import matplotlib.colors as mcolors
+from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter
 from matplotlib.gridspec import GridSpec
 from sklearn.linear_model import LinearRegression
@@ -1903,13 +1904,41 @@ def plot_OSR_fit_figure(experiment_name,
     plt.savefig(os.path.join(dm.get_experiment_plots_dir(experiment_name), 
         f"OSR_{model_type}_fit.png"))
 
+# ---------------------------------------------------------------- clade pies
+# Moved here from scripts/long_paper_figures/long_shedders_plots.py in v2.5.6,
+# when that directory was archived. figures 2, 2S and 4 all draw these, and a
+# plotting helper three figure scripts share belongs with the other plotting
+# helpers, not in a figure directory of its own.
+
+PIE_COLORS = {"standard": "#4daf4a", "long": "#e41a1c", "mixed": "#377eb8",
+              "founder": "#8172B2"}
 
 
+def plot_fig4_pies(axes_2x2, pie_data_dict):
+    """One pie per metric: which origin class won it, over the seeds of an SOD."""
+    metrics = ["Peak", "Burden", "Survival", "Growth"]
+    label_order = ["standard", "long", "mixed", "founder"]
+
+    for idx, metric in enumerate(metrics):
+        ax = axes_2x2[idx]
+        counts = pie_data_dict[metric]
+
+        if sum(counts.values()) == 0:
+            ax.text(0.5, 0.5, "No Data", ha="center", va="center", fontsize=8)
+            ax.axis("off")
+            continue
+
+        values = [counts.get(k, 0) for k in label_order]
+        colors = [PIE_COLORS[k] for k in label_order]
+
+        ax.pie(values, colors=colors,
+               wedgeprops={"linewidth": 0.5, "edgecolor": "white"})
+        ax.set_title(metric, fontsize=9)
 
 
-
-
-
-
-
-
+def add_global_pie_legend(fig):
+    """One legend for every pie on the figure, so each pie carries none."""
+    handles = [Patch(facecolor=PIE_COLORS[k], edgecolor="white", label=k)
+               for k in ["standard", "long", "mixed", "founder"]]
+    fig.legend(handles=handles, loc="upper right", bbox_to_anchor=(0.98, 0.98),
+               frameon=False, ncol=4)

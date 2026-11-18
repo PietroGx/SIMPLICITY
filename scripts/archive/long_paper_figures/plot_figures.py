@@ -1,5 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# ============================================================================
+# ARCHIVED 2026-11-18 (v2.5.6). Frozen: not on any live read path.
+#
+# This directory held the long-paper figures, built on the long_shedders_exp
+# GRID -- a different experiment family from the impact_long_shedders pipeline
+# the current figures read. `plot_figures.py` is its driver.
+#
+# What left, and where it went, because three live things imported from here:
+#   the clade metrics (_clade_analysis, _peak_values, _survival_durations,
+#   _growth_crossing_times, get_clade_winners, get_clade_metrics,
+#   get_lineage_labels, summarize_sod_pies)
+#       -> scripts/nature_plots/clade_preprocess.py, where rule B is applied
+#   the pie helpers (PIE_COLORS, plot_fig4_pies, add_global_pie_legend)
+#       -> simplicity/plots_manager.py
+#   get_grid_sod
+#       -> inlined into scripts/nextstrain.py, its only caller
+#   _resolve_label
+#       -> dropped; simplicity.clustering.resolve_clade_label is the one copy
+#
+# The copies below are the pre-move versions and still cluster on DIVERGENCE
+# ALONE. Do not edit them expecting a figure to change, and do not import from
+# them: on control at k=5 they give 402 clades per run where rule B gives 14.
+# ============================================================================
+
 import os
 import random
 import argparse
