@@ -631,7 +631,7 @@ def plot_OSR_fit(experiment_name,
         experiment_name, parameter, min_seq_number, min_sim_lenght, group=group)
     # Group by nucleotide_substitution_rate and compute mean and standard deviation for OSR
     data_mean_df = om.get_mean_std_OSR(
-        experiment_name, parameter, min_seq_number, min_sim_lenght)
+        experiment_name, parameter, min_seq_number, min_sim_lenght, group=group)
 
     x_data = data['nucleotide_substitution_rate']
 

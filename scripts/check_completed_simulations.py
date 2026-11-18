@@ -52,10 +52,13 @@ def categorize_simulations_by_end_time(ssod_list, final_time_limit, pop_size):
     late_died, late_sat = 0, 0
     early_seeds, first_third_seeds, second_third_seeds, last_third_seeds = [], [], [], []
 
+    skips = {}
     for ssod in ssod_list:
         try:
             end_time = om.read_final_time(ssod)
-        except Exception:
+        except om.EXPECTED_READ_SKIPS as exc:
+            name = type(exc).__name__
+            skips[name] = skips.get(name, 0) + 1
             continue
 
         seed = dm.get_seed_from_SSOD(ssod)
@@ -74,8 +77,9 @@ def categorize_simulations_by_end_time(ssod_list, final_time_limit, pop_size):
                     is_died_out = True
                 elif final_S <= threshold:
                     is_saturated = True
-            except Exception:
-                pass
+            except om.EXPECTED_READ_SKIPS + (IndexError,) as exc:
+                name = f"autopsy {type(exc).__name__}"
+                skips[name] = skips.get(name, 0) + 1
 
         if end_time <= 1.0:
             early_seeds.append(seed)
@@ -101,6 +105,9 @@ def categorize_simulations_by_end_time(ssod_list, final_time_limit, pop_size):
                 if is_saturated: late_sat += 1
             last_third_seeds.append(seed)
 
+    if skips:
+        print("  [!] skipped: "
+              + ', '.join(f'{n} x{c}' for n, c in sorted(skips.items())))
     return (early, mid, late, 
             early_died, early_sat, 
             mid_died, mid_sat, 

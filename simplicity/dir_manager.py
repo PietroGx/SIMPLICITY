@@ -22,7 +22,10 @@ Created on Tue Aug 27 19:36:24 2024
 @author: pietro
 """
 
+import json
 import os
+import subprocess
+from datetime import datetime
 
 # Default data directory 
 DEFAULT_DATA_DIR = os.path.join(os.getcwd(), "Data")
@@ -134,6 +137,125 @@ def get_experiment_dir(experiment_name):
     else:
         raise ValueError('No experiment with that name!')
         
+# ---------------------------------------------------------------------------
+# EXPERIMENT LIFECYCLE -- when a run started, and whether it is finished
+# ---------------------------------------------------------------------------
+# One JSON per experiment, in its own directory. A completed experiment is
+# SEALED: every guarded writer refuses it, wherever the write is attempted.
+# ABSENT means UNKNOWN, and unknown is writable -- every experiment on disk
+# predates this file. Seal a legacy run by hand with
+# `python -m simplicity.dir_manager --seal <experiment>`.
+EXPERIMENT_STATE_FILENAME = "experiment_state.json"
+
+
+def get_experiment_state_path(experiment_name):
+    """The lifecycle file's path. Not via get_experiment_dir: the state is
+    written before the first stage has created the directory."""
+    return os.path.join(_data_dir, experiment_name, EXPERIMENT_STATE_FILENAME)
+
+
+def read_experiment_state(experiment_name):
+    """The lifecycle record, or None when the experiment has none."""
+    path = get_experiment_state_path(experiment_name)
+    if not os.path.isfile(path):
+        return None
+    with open(path) as fh:
+        return json.load(fh)
+
+
+def _git_commit():
+    """HEAD of the repo this module lives in, or None."""
+    try:
+        result = subprocess.run(
+            ['git', 'rev-parse', 'HEAD'],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            return None
+        return result.stdout.strip() or None
+    except Exception:
+        return None
+
+
+def _write_experiment_state(experiment_name, state):
+    path = get_experiment_state_path(experiment_name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as fh:
+        json.dump(state, fh, indent=2)
+        fh.write("\n")
+    return path
+
+
+def _enclosing_experiments(experiment_name):
+    """`experiment_name` and every experiment it nests inside, innermost
+    first. The sanity grid is named <run>/sanity, so sealing <run> seals it."""
+    parts = os.path.normpath(experiment_name).split(os.sep)
+    return [os.path.join(*parts[:n]) for n in range(len(parts), 0, -1)]
+
+
+def experiment_is_complete(experiment_name):
+    """True only for an experiment whose own state file says completed."""
+    state = read_experiment_state(experiment_name)
+    return bool(state and state.get('completed'))
+
+
+def assert_experiment_writable(experiment_name):
+    """Raise if this experiment, or one it nests inside, is sealed."""
+    for name in _enclosing_experiments(experiment_name):
+        state = read_experiment_state(name)
+        if state and state.get('completed'):
+            via = '' if name == experiment_name else f' (which {experiment_name} nests inside)'
+            raise RuntimeError(
+                f"{name} was completed at {state['completed']}{via} and is "
+                f"sealed: nothing may write into a finished experiment. "
+                f"State file: {get_experiment_state_path(name)}. To write "
+                f"again, that file is the only thing standing in the way -- "
+                f"remove its 'completed' deliberately, or write elsewhere.")
+
+
+def mark_experiment_started(experiment_name):
+    """Record when this experiment was FIRST run. Idempotent: an existing
+    `started` is left alone. Refuses a sealed experiment."""
+    assert_experiment_writable(experiment_name)
+    state = read_experiment_state(experiment_name)
+    if state is not None:
+        return state
+    state = {'experiment': experiment_name,
+             'started': datetime.now().isoformat(timespec='seconds'),
+             'started_commit': _git_commit(),
+             'completed': None,
+             'completed_commit': None}
+    _write_experiment_state(experiment_name, state)
+    print(f"[lifecycle] {experiment_name} started "
+          f"{state['started']} -> {get_experiment_state_path(experiment_name)}")
+    return state
+
+
+def mark_experiment_complete(experiment_name):
+    """Seal the experiment. Raises if it is already complete: a second
+    completion means a pipeline ran twice over the same experiment."""
+    state = read_experiment_state(experiment_name)
+    if state and state.get('completed'):
+        raise RuntimeError(
+            f"{experiment_name} was already completed at "
+            f"{state['completed']}: a second completion means a pipeline ran "
+            f"twice over the same experiment. State file: "
+            f"{get_experiment_state_path(experiment_name)}.")
+    assert_experiment_writable(experiment_name)
+    if state is None:
+        # A legacy run sealed by hand: nothing recorded when it started, and
+        # the time of the seal is not that.
+        state = {'experiment': experiment_name, 'started': None,
+                 'started_commit': None, 'completed': None,
+                 'completed_commit': None}
+    state['completed'] = datetime.now().isoformat(timespec='seconds')
+    state['completed_commit'] = _git_commit()
+    _write_experiment_state(experiment_name, state)
+    print(f"[lifecycle] {experiment_name} completed {state['completed']}; "
+          f"sealed against further writes.")
+    return state
+
+
 def get_experiment_settings_dir(experiment_name):
     """Get the experiment_name simulation parameters directory path."""
     experiment_dir = os.path.join(_data_dir,experiment_name)
@@ -401,3 +523,55 @@ def skipped_outputs():
 
 def skipping(name):
     return name in skipped_outputs()
+
+
+def _state_cli():
+    """`python -m simplicity.dir_manager --show|--seal <experiment>`: read an
+    experiment's lifecycle state, or seal a legacy run that has none."""
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Show or seal an experiment's lifecycle state.")
+    parser.add_argument('experiment')
+    parser.add_argument('--data-dir', default=None,
+                        help="Default: ./Data (run from the repo root).")
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument('--show', action='store_true',
+                        help="Print the state (the default).")
+    action.add_argument('--seal', action='store_true',
+                        help="Mark it complete. Nothing may write into it "
+                             "afterwards.")
+    args = parser.parse_args()
+
+    if args.data_dir:
+        set_data_dir(args.data_dir)
+    if not os.path.isdir(os.path.join(get_data_dir(), args.experiment)):
+        raise SystemExit(f"No experiment directory: "
+                         f"{os.path.join(get_data_dir(), args.experiment)}")
+
+    if args.seal:
+        try:
+            mark_experiment_complete(args.experiment)
+        except RuntimeError as exc:
+            raise SystemExit(str(exc))
+        return
+
+    state = read_experiment_state(args.experiment)
+    path = get_experiment_state_path(args.experiment)
+    if state is None:
+        print(f"{args.experiment}: UNKNOWN -- no state file ({path}). "
+              f"Treated as writable; seal it with --seal.")
+    elif state.get('completed'):
+        print(f"{args.experiment}: COMPLETE -- started "
+              f"{state['started'] or 'unrecorded (sealed by hand)'}, "
+              f"completed {state['completed']}. Sealed; nothing may write "
+              f"into it. ({path})")
+    else:
+        print(f"{args.experiment}: STARTED {state['started']}, not completed. "
+              f"Writable. ({path})")
+    for key in ('started_commit', 'completed_commit'):
+        if state and state.get(key):
+            print(f"  {key}: {state[key]}")
+
+
+if __name__ == "__main__":
+    _state_cli()

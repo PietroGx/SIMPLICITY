@@ -5,6 +5,268 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.12 — 2026-11-18 — pietro gerletti
+
+A measurement that reports something other than what its name claims is this
+repo's recurring failure. v2.5.11 removed one shape of it. This removes the
+rest that were findable in a day.
+
+Sixteen handlers that swallowed in silence
+------------------------------------------
+
+`except Exception: continue` on a per-seed loop makes a defect indistinguishable
+from absent data. Reproduced, not argued: with `min_seq_number` arriving as the
+string `'30'`, every `len(df) >= min_seq_number` raised `TypeError`, and
+`create_combined_sequencing_df` reported `Total kept files: 0` and `No
+sequencing data available! Check filter settings!` -- a confident, wrong
+diagnosis pointing at the filter. It now raises, naming the comparison.
+
+Every broad handler in `simplicity/` and `scripts/` was classified. Sixteen that
+swallowed silently on a path deciding what data enters a measurement were
+narrowed to `EXPECTED_READ_SKIPS` -- an absent or unreadable file, an empty or
+truncated CSV -- with the skips counted by reason and reported per simulation
+output dir (`30/30 seeds used, 0 skipped`). Eighteen that already recorded were
+left; four whose breadth is right were left and named.
+
+That `Check filter settings!` message is gone too. It was a diagnosis, and a
+wrong one whenever the cause was structural. It now reports the funnel: files
+found, files past the length filter, files read, files skipped and why, files
+meeting the sequence threshold.
+
+`scripts/fit_OSR.py` wrapped its whole stage -- two CSV writes, the fit, the
+fit-results write, the plot -- in one handler that printed and returned, so
+`main()` exited 0 over a half-written experiment. It re-raises, as
+`experiment_script_runner.py:95` already did for the same situation.
+
+Reads that write
+----------------
+
+`read_r_effective_trajs_csv` regenerated a missing cache by calling the writer,
+and `get_mean_std_OSR` called `write_OSR_vs_parameter_csv` on every call. Both
+computed and persisted as a side effect of being asked for a value -- the same
+layering mistake v2.5.11 removed from the fit, and it surfaced because a read
+into a sealed experiment now raises. Both compute and return; the OSR writer is
+split into `compute_OSR_vs_parameter` plus a writer. Equivalence measured on
+real data, strict dtypes and index types, including the two coercions it needed.
+
+Everything a test creates carries `test` in its name
+----------------------------------------------------
+
+`tests/test_group_partition.py` wrote `Data/impact_long_shedders_#77` into the
+live data directory on every run, and `tests/test_merged_experiment.py` named
+its fixture `impact_long_shedders_#1` -- a real production run. Fixtures are now
+named for the test that creates them and numbered from 1 within that name. The
+rule is in CLAUDE.md.
+
+`run_dir` and `sanity_plot_path` built their paths on the literal `"Data"`
+rather than `dm.get_data_dir()`, so a test could not redirect them. That is why
+`_#77` escaped. Fixing it exposed what `chdir`-based isolation really does: with
+an absolute data dir, `tests/test_export_packaging.py` wrote a 1-byte file over
+a 2.4 MB figure inside run #3 -- restored from `Data_Export/`, byte-identical.
+Both tests now isolate with `dm.set_data_dir`, which survives a `chdir`.
+
+Two checks that passed while testing nothing
+--------------------------------------------
+
+One compared `os.listdir(Fit_results)` before and after a refit -- filenames
+only -- and passed with the restore step deleted entirely. Removed. The other
+drove its "a changed measurement is caught" loop from a dict populated inside a
+forked worker, so the parent's copy was always empty and the loop iterated
+nothing; it now enumerates its cohorts explicitly and raises on an empty list.
+The synthetic slopes behind it were derived from insertion order into that dict
+-- fork-unsafe -- and now come from a digest of the group name, which also made
+the leakage assertion four times sharper.
+
+The calibration fit is parallelised
+-----------------------------------
+
+`er.extract_ih_regression_data` is 99.8% of the per-seed cost, and the loop ran
+serially over 900 seeds: 41 minutes, 34.6 of them in `calib_long__edge_case` at
+6.93 s a seed. A forked pool over the seeded output dirs gives **41 min -> ~13
+min** (measured 3.12x on SOT; edge_case extrapolated). Results byte-identical.
+Workers are capped at 4 because one edge_case seed peaks at 1.57 GB and four
+plus the parent is 6.5 GB, inside the stage's 8G.
+
+The grid scripts build the experiment they check
+------------------------------------------------
+
+`EXP_NUM` was read and printed by `slurm_precompute.sh` and gated on by
+`run_precompute.sh`, but `sweep.py` never forwarded it, so `compute.py` took its
+default of 1: `EXP_NUM=3` checked experiment 3 and built experiment 1. It is
+forwarded now, and since `params_key` carries no experiment identity, a
+non-default experiment builds into its own store -- pointing one at another's
+cache is refused before any build. The gate prints the experiment it checked and
+the experiment it will build, side by side.
+
+`pack_cache.sh` counted *directories* to decide the grid was complete while the
+array used `sweep.py`'s `done()`, which reads `index.json`. A half-built
+directory counted as finished: on a fixture with all 384 directories present and
+five unfinished, the old check packed. One definition now, and the pack job runs
+on `afterany` rather than `afterok` -- under `afterok` a single failed task left
+the job cancelled and silent. It refuses with `exit 3`, names the missing
+indices and their states, and prints the resubmit command;
+`run_precompute.sh --resubmit` submits only those. Each failed task leaves
+`slurm_logs/fig2_precompute/failed/<IDX>.txt`.
+
+The export archive's layout is its own, not the caller's spelling
+-----------------------------------------------------------------
+
+With `run_dir` absolute, `tar` stored members as `home/pietro/.../Data/<run>/`.
+The packer now passes `-C` with a relative member, so the prefix is
+`Data/<experiment>/` whichever way the caller spelled it.
+`tests/test_export_packaging.py` asserts that again.
+
+Clades were never labelled
+--------------------------
+
+`simplicity/clustering.py` called `label_clades_from_definers` two lines after
+`set_index("clade")`, and that function reads `clade` as a column -- so it
+raised `KeyError` on every call where any clade had no definers, which the root
+always has. A bare `except Exception` turned that into no labels at all, and the
+`label` column of every clustering table ever written is blank. Labelling now
+happens before the index is set; definer-less non-root clades are withheld from
+the vote as the figure builders already do; an unknown `host_type` propagates,
+which is what that function's `ValueError` was written for. No figure moves --
+figure 2 reads `clade_preprocess._clade_analysis`, which always passed the
+un-indexed frame.
+
+`summarize_sod_pies` wrapped its read, its computation, its accumulation and its
+`valid_seeds` increment in one silent handler, so a failing seed left numerator
+and denominator at once. `valid_seeds` is figure 2 and 4's pie denominator. It
+now states itself: `3 of 6 seeds, 1 under 100 days, 2 skipped: EmptyDataError
+x1, FileNotFoundError x1`.
+
+A half-written file no longer kills a stage that already ran
+--------------------------------------------------------------
+
+Found by the first end-to-end local run of this pipeline, which nothing else
+today had done. `om.save_final_time` opens with mode `'w'`, truncating before
+writing, so a walltime or OOM kill in that window leaves a zero-byte
+`final_time.csv`; `read_final_time` parsed it with `float()` and raised
+`ValueError`, which is not in `EXPECTED_READ_SKIPS`. One such seed out of 1,350
+aborted cal_1 or cal_2 **after every simulation had run**. A truncated
+`phylogenetic_data.csv` did the same through `ast.literal_eval`.
+
+Adding `ValueError` to the skip tuple would have reopened the hole the section
+above closes -- it is the superclass of both pandas errors and of most
+structural mistakes. The readers translate instead: `om.TruncatedOutputError`
+subclasses `pd.errors.EmptyDataError`, so every existing narrowed loop counts it
+already, under its own name. The tuple is unchanged.
+
+Which failures count as truncation was measured, not assumed: over 999
+truncation points of a real `phylogenetic_data.csv` and `individuals_data.csv`,
+every parse failure fell in the **final** row, because output is written
+sequentially. So a failure confined to the last row is a counted skip and a
+failure anywhere else propagates, naming the row: `Genome unparsable in row(s)
+[126] of 253`. 360 aborts became 360 skips, and 41, with the structural cases
+-- a missing column, `min_seq_number` as a string -- still raising.
+
+The production stage never reported its own health
+--------------------------------------------------
+
+`report_simulation_health` was called for stage 3 without `skip_outputs`, so the
+child died on `SIMPLICITY_SKIP_OUTPUTS is unset` and the completeness report for
+the experiment phase produced nothing -- on every run this has ever had. It
+logged `[skip] health report exited 1`, and `[skip]` is this codebase's word for
+a benign filtered seed, so the line read like nothing. It now says `[!! NO
+HEALTH REPORT !!] ... This stage's completeness is UNKNOWN, not healthy.` and
+repeats in the pipeline summary. The control flow is unchanged: a reporting
+failure must not abort a stage that completed.
+
+The sanity plot ignored the seal
+--------------------------------
+
+`plot_sot_sanity_regressions.py` wrote through `sanity_plot_path()` and
+`os.makedirs` rather than a guarded writer, and overwrote the figure of a sealed
+run -- with a two-scenario version of a five-scenario run. It is the stage the
+pipeline farms out as its own Slurm job, so it is the one most likely to be
+re-run by hand against a finished experiment. It now asks
+`dm.assert_experiment_writable` twice: after parsing, before the fits run, and
+again at the write.
+
+**The build hash moves, `31e8448c8277` -> `3a10a01aa3b3`.** Every clade build at
+the old hash is orphaned.
+
+------------------------------------------------------------------------
+
+## Version 2.5.11 — 2026-11-18 — pietro gerletti
+
+Nothing may write into a finished experiment.
+
+Four production runs were lost to a measurement that reported something other
+than what its name claimed. This is the same shape one layer out: a tool that
+re-examines a finished run was altering it while doing so.
+
+The fit no longer persists
+--------------------------
+
+`fit_observed_substitution_rate_regressor` called `om.write_fit_results_csv`
+from inside itself, so every caller wrote whether it wanted to or not --
+re-deriving a fit in order to look at it overwrote the run's own
+`Fit_results/`. The call is gone and the signature with it: the function is now
+`(df, model_type, weights=None, parameter_name=...)`. A calibration stage
+persists by calling `om.write_fit_results_csv` itself; a diagnostic persists
+nothing. Every output filename and its contents are unchanged.
+
+`check_calibration.py` is read-only against the experiment: it takes a required
+`--out` and sends its figure there instead of the run's `05_Plots/`.
+
+An experiment is sealed when its pipeline completes
+---------------------------------------------------
+
+`Data/<experiment>/experiment_state.json` records `started` and `completed`
+with the git commit at each mark. `dm.assert_experiment_writable` refuses a
+write into a sealed experiment and runs in every `output_manager` writer that
+takes an experiment name, and in every stage before dispatch -- so a re-run is
+refused before its simulations burn, not after. A pipeline that dies mid-way
+leaves the experiment unsealed, because re-running it is legitimate.
+
+An experiment with no state file is UNKNOWN, not sealed: every run made before
+the marker existed is in that state and stays writable. Seal one by hand with
+`python -m simplicity.dir_manager <experiment> --seal`.
+
+A scoped stage run no longer deletes the other cohorts
+------------------------------------------------------
+
+`write_calibrated_long_nsr` rebuilt the whole frozen table from only the groups
+just fitted, so fitting one cohort left a one-row file -- and that file is what
+cal_2 reads back. It now merges on the cohort key: a scoped run replaces its
+own rows and preserves the rest, in a deterministic order. A merge that would
+mix two `target_osr_long` values, or two model types, is refused rather than
+written. `write_osr_per_seed` merges the same way, on `group`.
+
+Found while doing it: pandas' default float parser silently drops the last
+digits, turning 0.0011636593295004315 into 0.0011636593295004. The merge reads
+with `float_precision='round_trip'`. `read_calibrated_long_nsr` and
+`om.read_fit_results_csv` still use the default, so the rate cal_2 reads back
+is not literally the number cal_1 wrote -- a change at the sixteenth
+significant figure, recorded here because changing it would move frozen values.
+
+Also
+----
+
+`scripts/00_SIMPLICITY_paper_archive/` is deleted, 25 files. Nothing in the
+live code imported it, and its `Figure_2.py` had carried committed
+merge-conflict markers since 969d6a4.
+
+------------------------------------------------------------------------
+
+## Version 2.5.10 — 2026-11-18 — pietro gerletti
+
+The 38-hour estimate for the clade-build grid was a developer box's rate, not
+the cluster's, and nothing measured the difference.
+
+`slurm_precompute.sh` now times each build and writes the result to
+`slurm_logs/fig2_precompute/timings/<IDX>.txt` -- one file per task, never a
+shared append, because 384 tasks appending to one file is a race.
+`run_precompute.sh --calibrate` submits a single task with `sbatch --wait`,
+reads the timing back and reports what a full grid would cost at the measured
+rate; `--calibrate-index` picks which build to time. Without a timing on disk
+the printed rate says so, rather than presenting an assumption as a
+measurement.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.9 — 2026-11-18 — pietro gerletti
 
 `run_precompute.sh` could exit silently in the middle of its own checks, having

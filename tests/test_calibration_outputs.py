@@ -21,6 +21,15 @@ scripts and checks that
                                 that path. A file nobody reads should be on the
                                 skip list, not written "just in case".
 
+  the switch is declared        the same call the calibration stages make
+                                (set_calibration_output_env, at cal_1.py:118
+                                and cal_2.py:279) is what reaches dir_manager,
+                                and dm.skipping -- the function om.save_*
+                                consults -- agrees with the list. Undeclared
+                                raises rather than defaulting to "skip
+                                nothing", which is the default that let a
+                                stage write the 100.6 GB in the first place.
+
     python tests/test_calibration_outputs.py
 '''
 import os
@@ -37,16 +46,20 @@ from impact_long_shedders_config import (
     CALIBRATION_SKIPPED_OUTPUTS, set_calibration_output_env,
 )
 
-# Everything a simulation can write, and the output_manager reader that opens
-# it. extract_ih_regression_data reads individuals_data and phylogenetic_data
-# directly, so those two are matched on their file names as well.
+# Everything a simulation can write, and the output_manager accessors that open
+# it -- alternatives separated by "|". extract_ih_regression_data reads
+# individuals_data and phylogenetic_data directly, so those two are matched on
+# their file names as well. lineage_frequency is matched on the stem
+# "lineage_frequency.csv", which catches the gzipped name too, and on
+# lineage_frequency_path, which reaches the file without naming it.
 READERS = {
     'final_time': ('read_final_time', 'final_time.csv'),
     'sequencing_data_regression': ('read_sequencing_data_regression',
                                    'sequencing_data_regression.csv'),
     'individuals_data': ('read_individuals_data', 'individuals_data.csv'),
     'phylogenetic_data': ('read_phylogenetic_data', 'phylogenetic_data.csv'),
-    'lineage_frequency': ('read_lineage_frequency', 'lineage_frequency.csv'),
+    'lineage_frequency': ('read_lineage_frequency|lineage_frequency_path',
+                          'lineage_frequency.csv'),
     'simulation_trajectory': ('read_simulation_trajectory',
                               'simulation_trajectory.csv'),
     'sequencing_data': ('read_sequencing_data', 'sequencing_data.csv'),
@@ -74,6 +87,22 @@ def check(label, got, want):
         failures.append(f'{label}: got {got!r}, want {want!r}')
 
 
+def is_read(name, source):
+    """Does the calibration path open this output, by reader call or by name?"""
+    reader, filename = READERS[name]
+    return bool(re.search(rf'\b(?:{reader})\s*\(', source)) or filename in source
+
+
+def undeclared():
+    """True when dir_manager refuses to answer instead of defaulting to "skip
+    nothing" -- the default a stage could forget its way past."""
+    try:
+        dm.skipped_outputs()
+    except RuntimeError:
+        return True
+    return False
+
+
 def read_path():
     text = ''
     for rel in CALIBRATION_PATH:
@@ -95,31 +124,30 @@ def main():
 
     print('\nwhat the calibration path opens')
     for name in sorted(READERS):
-        reader, filename = READERS[name]
-        used = bool(re.search(rf'\b{reader}\s*\(', source)) or filename in source
         where = 'skipped' if name in skipped else 'written'
-        print(f'    {name:<28} {where:<8} read={used}')
+        print(f'    {name:<28} {where:<8} read={is_read(name, source)}')
 
     print('\nnothing skipped is read')
     for name in sorted(skipped):
-        reader, filename = READERS[name]
-        used = bool(re.search(rf'\b{reader}\s*\(', source)) or filename in source
-        check(f'{name} is not read by the calibration path', used, False)
+        check(f'{name} is not read by the calibration path',
+              is_read(name, source), False)
 
     print('\neverything kept is read')
     for name in sorted(kept):
-        reader, filename = READERS[name]
-        used = bool(re.search(rf'\b{reader}\s*\(', source)) or filename in source
-        check(f'{name} is read, so writing it is justified', used, True)
+        check(f'{name} is read, so writing it is justified',
+              is_read(name, source), True)
 
     print('\nthe switch reaches dir_manager')
-    before = dm.skipped_outputs()
-    check('nothing skipped by default', set(before), set())
+    os.environ.pop(dm.SKIP_OUTPUTS_ENV, None)
+    check('an undeclared run refuses to guess', undeclared(), True)
+    # the one call impact_long_shedders_cal_1.py:118 and cal_2.py:279 make
     set_calibration_output_env()
     check('the calibration set is applied',
           sorted(dm.skipped_outputs()), sorted(skipped))
+    check('dm.skipping agrees, which is what om.save_* consults',
+          sorted(n for n in dm.ALL_OUTPUTS if dm.skipping(n)), sorted(skipped))
     os.environ.pop(dm.SKIP_OUTPUTS_ENV, None)
-    check('and clears again', set(dm.skipped_outputs()), set())
+    check('and clears again', undeclared(), True)
 
     print('\n' + ('FAILURES:\n  ' + '\n  '.join(failures) if failures
                   else 'all passed'))

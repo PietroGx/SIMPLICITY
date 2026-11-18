@@ -102,10 +102,9 @@ RUNNERS = {
 def unique_tau_labels(sp):
     """{rounded tau_3_long: 'SOT' / 'HIV_low+HIV_high'} across every
     long-shedder scenario, deduplicated by tau (HIV_low and HIV_high
-    share a duration, hence a label, in this isolated context). '+' not '/'
-    -- this label is also used as fit_observed_substitution_rate_regressor's
-    experiment_group, which becomes part of a saved-results file path, and
-    '/' would be read as a directory separator there."""
+    share a duration, hence a label, in this isolated context). '+' not '/',
+    as the config joins them: the label reaches the recap file and the plot,
+    and '/' reads as a directory separator anywhere it lands in a path."""
     labels = {}
     for s in SCENARIOS:
         if s["long_shedders_ratio"] <= 0.0:
@@ -254,9 +253,8 @@ def analyze_and_report(numbered, nsr_values, tau_labels, test_n,
 
                 try:
                     fit_result = er.fit_observed_substitution_rate_regressor(
-                        numbered, cell_df, model_type=model_type,
-                        parameter_name='nucleotide_substitution_rate_long',
-                        experiment_group=cell_label)
+                        cell_df, model_type=model_type,
+                        parameter_name='nucleotide_substitution_rate_long')
                     x_vals = np.geomspace(
                         cell_df['nucleotide_substitution_rate_long'].min(),
                         cell_df['nucleotide_substitution_rate_long'].max(), 100)

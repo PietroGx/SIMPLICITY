@@ -25,7 +25,9 @@
 #             differing in nothing but how the distance from the consensus
 #             is measured
 #   4. sanity combined root-to-tip grid over real output
-#   5. artifacts zipped into one file per run
+#   5. seal   every experiment the run wrote is marked complete, after which
+#             nothing may write into it (dir_manager's lifecycle marker)
+#   6. artifacts zipped into one file per run
 #
 # Stages 1 and 2 are independent -- cal_2 never reads cal_1's sweep, only its
 # fitted result when assembling the table -- so they could in principle be
@@ -53,13 +55,19 @@ import simplicity.dir_manager as dm
 from impact_long_shedders_config import (
     EXP_NAME, table_path as frozen_table_path, calib_std_group,
     exp_group, groups_of_phase,
-    CALIBRATION_SKIPPED_OUTPUTS,
+    CALIBRATION_SKIPPED_OUTPUTS, EXPERIMENT_SKIPPED_OUTPUTS,
     TABLE_FILENAME, SCENARIOS, CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
     add_slurm_resource_args, CONSENSUS_MODES, DEFAULT_CONSENSUS, exp_name,
     run_dir, run_exp_name, sanity_plot_path, run_export_dirs,
 )
 
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, os.pardir, "check_completed_simulations.py")
+
+# Health reports that did not run. Reporting-only, so a failure must not
+# abort a finished stage -- but it must not read as a clean run either: an
+# unset SIMPLICITY_SKIP_OUTPUTS killed stage 3's report on every run and the
+# log said [skip] and moved on.
+HEALTH_REPORT_FAILURES = []
 
 _SBATCH_JOB_ID_RE = re.compile(r'Submitted batch job (\d+)')
 SANITY_PLOT_POLL_INTERVAL_S = 15
@@ -125,6 +133,11 @@ def report_simulation_health(experiment, groups, log_fh, label,
     simulation incomplete. The run would be fine and the report would say
     otherwise, which is the failure mode this pipeline can least afford.
     """
+    def _failed(reason):
+        HEALTH_REPORT_FAILURES.append(f"{label}: {reason}")
+        _log(log_fh, f"  [!! NO HEALTH REPORT !!] {label}: {reason}. This "
+                     f"stage's completeness is UNKNOWN, not healthy.")
+
     _log(log_fh, f"\n===== simulation health: {label} =====")
     cmd = [sys.executable, CHECK_SCRIPT, experiment]
     for group in groups:
@@ -136,13 +149,13 @@ def report_simulation_health(experiment, groups, log_fh, label,
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, env=env)
     except Exception as exc:
-        _log(log_fh, f"  [skip] health report failed to run: {exc}")
+        _failed(f"could not be run ({type(exc).__name__}: {exc})")
         return
     for stream in (result.stdout, result.stderr):
         for line in stream.splitlines():
             _log(log_fh, line)
     if result.returncode != 0:
-        _log(log_fh, f"  [skip] health report exited {result.returncode}")
+        _failed(f"exited {result.returncode}")
 
 
 def submit_sanity_plots(exp_num, target_osr_std, target_osr_long, log_fh,
@@ -340,6 +353,17 @@ def main():
             "under its own --exp-num.")
     consensus = args.consensus[0]
 
+    # The run's experiments: the calibration one every stage writes, plus one
+    # production experiment per consensus mode (the same directory for the
+    # default mode, a separate _amx one otherwise). Marked started here so a
+    # sealed run is refused before anything is submitted.
+    numbered = f"{EXP_NAME}_#{args.exp_num}"
+    run_experiments = list(dict.fromkeys(
+        [numbered] + [run_exp_name(args.exp_num, m) for m in args.consensus]))
+    for name in run_experiments:
+        dm.assert_experiment_writable(name)
+    dm.mark_experiment_started(numbered)
+
     log_file = args.log_file or os.path.join(
         "Data", "pipeline_logs",
         f"{EXP_NAME}_pipeline_#{args.exp_num}.log")
@@ -370,7 +394,6 @@ def main():
                       "--consensus", consensus,
                       *slurm_res_args], log_fh)
 
-        numbered = f"{EXP_NAME}_#{args.exp_num}"
         # read the groups off the experiment rather than rebuilding the names
         # here: the phase that wrote them is the authority on what it wrote
         report_simulation_health(
@@ -407,12 +430,21 @@ def main():
             report_simulation_health(
                 f"{exp_name(mode)}_#{args.exp_num}",
                 [exp_group(s['name']) for s in SCENARIOS],
-                log_fh, f"stage 3 (experiment phase, consensus={mode})")
+                log_fh, f"stage 3 (experiment phase, consensus={mode})",
+                skip_outputs=EXPERIMENT_SKIPPED_OUTPUTS)
 
         submitted = submit_sanity_plots(
             args.exp_num, args.target_osr_std, args.target_osr_long, log_fh,
             args.consensus)
         wait_for_sanity_plots(submitted, log_fh)
+
+        # Every stage returned 0 and the sanity jobs have left the queue, so
+        # nothing is left that writes into these experiments: seal them. A
+        # stage that fails raises SystemExit out of run_stage and never
+        # reaches this, which is what leaves a half-run experiment writable.
+        for name in run_experiments:
+            dm.mark_experiment_complete(name)
+            _log(log_fh, f"[lifecycle] sealed {name}")
 
         table_path = frozen_table_path(args.exp_num, consensus)
         archive_path = artifacts_archive_path(args.exp_num)
@@ -427,6 +459,10 @@ def main():
         ]
         for scenario, sbatch_out in submitted:
             summary_lines.append(f"  - {scenario}: {sbatch_out}")
+        if HEALTH_REPORT_FAILURES:
+            summary_lines.append("HEALTH REPORTS THAT DID NOT RUN "
+                                 "(completeness UNKNOWN for these stages):")
+            summary_lines += [f"  - {f}" for f in HEALTH_REPORT_FAILURES]
         summary_lines.append(f"Full log: {log_file}")
         summary_lines.append(f"Artifacts archive: {archive_path}")
         if not args.no_compress:

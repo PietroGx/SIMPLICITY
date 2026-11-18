@@ -313,8 +313,8 @@ def recommend_range(nodes, target, window_days, min_yield):
     }
 
 
-def calibrated_nsr_from_probe(numbered, group_points, nsr_param, target, rec,
-                              model_type, label):
+def calibrated_nsr_from_probe(group_points, nsr_param, target, rec,
+                              model_type):
     """Stage 1's own calibrated NSR_long, to hand to stage 2. Fit+invert
     exactly as cal_1 does, but a probe has few nodes, so the result is
     sanity-checked and falls back to the bracketing pair rather than
@@ -327,8 +327,7 @@ def calibrated_nsr_from_probe(numbered, group_points, nsr_param, target, rec,
 
     try:
         fit = er.fit_observed_substitution_rate_regressor(
-            numbered, fit_df, model_type=model_type,
-            parameter_name=nsr_param, experiment_group=label)
+            fit_df, model_type=model_type, parameter_name=nsr_param)
         nsr = float(er.compute_calibrated_parameter(model_type, fit, target))
         r2 = getattr(fit, 'rsquared', float('nan'))
         exps = ", ".join(f"{k}={v:.4g}" for k, v in fit.params.valuesdict().items())
@@ -484,8 +483,7 @@ def run_stage(stage, args, sp):
             if not points_df.empty else points_df
         if stage == 1 and not group_points.empty:
             nsr_long, how = calibrated_nsr_from_probe(
-                numbered, group_points, nsr_param, target, rec,
-                args.model, label)
+                group_points, nsr_param, target, rec, args.model)
             result['nsr_long'] = nsr_long
             recap.append(f"  inverts to NSR_long {nsr_long:.8f}  [{how}]")
             print(f"{label:20s}: inverts to NSR_long {nsr_long:.8f} ({how})")

@@ -56,13 +56,24 @@ import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
 from impact_long_shedders_config import (
-    scenario_output_dirs, scenario_label, sanity_plot_path, consensus_of)
+    scenario_output_dirs, scenario_label, sanity_plot_path, sanity_dir_name,
+    consensus_of)
+from long_nsr_calibration_plot import (EXPECTED_SEED_SKIPS, record_seed_skip,
+                                       format_seed_skips)
 
 # Cohort styling (matches fig1 D/E colors).
 COHORT_STYLE = {
     "standard":     {"color": "#3b528b", "label": "Standard"},
     "long_shedder": {"color": "#e41a1c", "label": "Long shedder"},
 }
+
+
+def assert_sanity_writable(exp_num, exp_name):
+    """The figure lands in <run>/sanity, so the run's own seal covers it.
+    This stage is submitted as its own Slurm job and is the one re-run by
+    hand against a finished run, which is how it overwrote a sealed one."""
+    dm.assert_experiment_writable(sanity_dir_name(exp_num,
+                                                  consensus_of(exp_name)))
 
 
 def set_nature_rcparams():
@@ -95,6 +106,7 @@ def load_regression_data(exp_name, scenario, exp_num, min_seq=30, min_len=100):
             f"No simulation output dirs for '{experiment_string}'.")
 
     frames = []
+    skips = {}
     for sod in sods:
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
             path = os.path.join(ssod, "sequencing_data_regression.csv")
@@ -103,7 +115,8 @@ def load_regression_data(exp_name, scenario, exp_num, min_seq=30, min_len=100):
             try:
                 final_time = om.read_final_time(ssod)
                 df = om.read_sequencing_data_regression(ssod)
-            except Exception:
+            except EXPECTED_SEED_SKIPS as exc:
+                record_seed_skip(skips, exc)
                 continue
             if df is None or df.empty:
                 continue
@@ -111,10 +124,13 @@ def load_regression_data(exp_name, scenario, exp_num, min_seq=30, min_len=100):
                 continue
             frames.append(df)
 
+    print(f"  [{experiment_string}] global clock: {len(frames)} seeds used, "
+          f"{format_seed_skips(skips)}")
     if not frames:
         raise RuntimeError(
             f"No sequencing_data_regression.csv data for '{experiment_string}' "
-            f"passed the min_len={min_len}/min_seq={min_seq} filter.")
+            f"passed the min_len={min_len}/min_seq={min_seq} filter "
+            f"({format_seed_skips(skips)}).")
 
     combined = pd.concat(frames, ignore_index=True)
     required = {"Sequencing_time", "Distance_from_root", "individual_type"}
@@ -151,27 +167,32 @@ def load_intrahost_long_data(exp_name, scenario, exp_num, min_seq=30, min_len=10
             f"No simulation output dirs for '{experiment_string}'.")
 
     frames = []
+    skips = {}
     for sod in sods:
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
             try:
                 final_time = om.read_final_time(ssod)
                 seq_data = om.read_sequencing_data_regression(ssod)
-            except Exception:
+            except EXPECTED_SEED_SKIPS as exc:
+                record_seed_skip(skips, exc)
                 continue
             if seq_data is None or final_time < min_len or len(seq_data) < min_seq:
                 continue
 
             try:
                 ih_points = er.extract_ih_regression_data(ssod)
-            except Exception:
+            except EXPECTED_SEED_SKIPS as exc:
+                record_seed_skip(skips, exc)
                 continue
             if not ih_points.empty:
                 frames.append(ih_points)
 
+    print(f"  [{experiment_string}] intra-host clock: {len(frames)} seeds used, "
+          f"{format_seed_skips(skips)}")
     if not frames:
         raise RuntimeError(
             f"No intra-host long-shedder points assembled for "
-            f"'{experiment_string}'.")
+            f"'{experiment_string}' ({format_seed_skips(skips)}).")
 
     combined = pd.concat(frames, ignore_index=True)
     combined["individual_type"] = "long_shedder"
@@ -250,6 +271,10 @@ def main():
     scenarios = [s.strip() for s in args.scenarios.split(",") if s.strip()]
     if not scenarios:
         raise SystemExit("--scenarios resolved to an empty list.")
+
+    # Refuse a sealed run BEFORE the fits, not after them.
+    if not args.outfile:
+        assert_sanity_writable(args.exp_num, args.exp_name)
 
     set_nature_rcparams()
 
@@ -383,6 +408,7 @@ def main():
     if args.outfile:
         out_path = args.outfile
     else:
+        assert_sanity_writable(args.exp_num, args.exp_name)
         # spelled once, in the config, so this cannot drift from where the
         # pipeline's artifact list looks for it
         out_path = sanity_plot_path(args.exp_num, consensus_of(args.exp_name))

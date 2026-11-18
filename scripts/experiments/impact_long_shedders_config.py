@@ -548,7 +548,10 @@ def run_exp_name(exp_num, consensus=DEFAULT_CONSENSUS):
 
 
 def run_dir(exp_num, consensus=DEFAULT_CONSENSUS):
-    return os.path.join("Data", run_exp_name(exp_num, consensus))
+    # dm.get_data_dir(), not a literal "Data": a test can redirect it, and
+    # NOT dm.get_experiment_dir(), which raises on a directory not yet made --
+    # the pipeline names this one before creating it.
+    return os.path.join(dm.get_data_dir(), run_exp_name(exp_num, consensus))
 
 
 def setup_dir(exp_num, consensus=DEFAULT_CONSENSUS):
@@ -578,8 +581,10 @@ def sanity_plot_path(exp_num, consensus=DEFAULT_CONSENSUS):
     """The sanity figure, spelled once. It used to be spelled three times --
     here, in plot_sot_sanity_regressions and in the pipeline's artifact list
     -- each free to drift from the others."""
+    # dm.get_experiment_plots_dir() would makedirs, turning this query into a
+    # write against a sealed experiment.
     return os.path.join(
-        "Data", sanity_dir_name(exp_num, consensus), "05_Plots",
+        dm.get_data_dir(), sanity_dir_name(exp_num, consensus), "05_Plots",
         f"{sanity_plot_stem(exp_num, consensus)}"
         "_all_scenarios_global_vs_intrahost.png")
 

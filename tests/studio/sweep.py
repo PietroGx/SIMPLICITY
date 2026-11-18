@@ -13,6 +13,16 @@ The grid is 3 k x 16 m_T x 4 windows x 2 prominences = 384 builds, which is
 about 38 hours sequentially. That is an HPC job, not a local one:
 `tests/studio/slurm_precompute.sh` runs it as a Slurm array, one build per
 task. Use `--list` to see the grid and `--only N` to run one entry.
+
+`--missing` and `--status` answer "which builds are finished?" for the shell,
+so that question has one implementation (`state()`) rather than one here and a
+directory count in `pack_cache.sh`.
+
+`--exp-num`/`--exp-name` say which RUN OUTPUT a build reads, and are forwarded
+to every compute.py call. `compute.params_key` is the clade parameters plus the
+code hash and holds no experiment identity, so experiments are kept apart by
+directory instead: `--print-paths` resolves the store, and `out_conflict`
+refuses an `--out` belonging to another experiment.
 """
 import argparse, itertools, json, os, subprocess, sys, time
 
@@ -28,6 +38,61 @@ PROM = [0.10, 0.20]
 # its own partition. The ladder comes from compute, which the panels also read.
 MT = compute.MT_LADDER
 LO, HI, WINDOW = 0.10, 0.90, "post"
+DEFAULT_STORE = "~/fig2_studio"
+
+
+def exp_tag(exp_num, exp_name):
+    return f"exp_{exp_name}_{int(exp_num)}"
+
+
+def is_default_exp(exp_num, exp_name):
+    return int(exp_num) == 1 and exp_name == compute.EXP_NAME
+
+
+def store_dir(store, exp_num=1, exp_name=compute.EXP_NAME):
+    """The store holding ONE experiment's grid.
+
+    `compute.params_key` carries no experiment identity, so two experiments
+    building into one cache directory take the same directory names and
+    `done()` reports the other one's finished build as this one's. Separation
+    is therefore by directory: experiment 1 of the default experiment keeps the
+    historical `<store>/cache`, anything else gets its own store at
+    `<store>/exp_<name>_<num>` -- a store, not a renamed cache, so
+    `server.py --store` and `panels.py` read it unchanged.
+    """
+    store = os.path.expanduser(store)
+    if is_default_exp(exp_num, exp_name):
+        return store
+    return os.path.join(store, exp_tag(exp_num, exp_name))
+
+
+def cache_dir(store, exp_num=1, exp_name=compute.EXP_NAME):
+    return os.path.join(store_dir(store, exp_num, exp_name), "cache")
+
+
+def out_conflict(out, exp_num, exp_name):
+    """Why `out` cannot hold this experiment's builds, or None.
+
+    The refusal is what makes the separation hold: `--out` is also passed by
+    hand, `slurm_precompute.sh` takes it positionally, and the historical
+    default is experiment 1's. Sharing one directory would serve one
+    experiment's builds as another's, and no index.json records which
+    experiment a build read.
+    """
+    parts = os.path.abspath(os.path.expanduser(out)).split(os.sep)
+    mine = exp_tag(exp_num, exp_name)
+    others = sorted({p for p in parts if p.startswith("exp_")} - {mine})
+    if is_default_exp(exp_num, exp_name):
+        if others:
+            return (f"--out {out} is under {others[0]}, another experiment's "
+                    f"store, but this builds {exp_name} #{exp_num}")
+        return None
+    if mine not in parts:
+        return (f"--out {out} has no {mine} component, so {exp_name} "
+                f"#{exp_num} would build into another experiment's cache; "
+                f"pass --store STORE instead (builds go to "
+                f"STORE/{mine}/cache) or an --out under {mine}/")
+    return None
 
 
 def grid():
@@ -40,21 +105,72 @@ def grid():
             for k, m, w, pr in itertools.product(K, MT, WIN, PROM)]
 
 
-def done(outdir, want_runs):
+STATES = ("ok", "absent", "no-index", "bad-index", "stale-code", "short-runs")
+
+
+def state(outdir, want_runs):
+    """Why a build is or is not finished. `done()` is this returning "ok".
+
+    The single definition of a finished build. A build that died halfway leaves
+    a directory with no index.json or a truncated one, so counting directories
+    counts those as present; `pack_cache.sh` asks for this instead.
+    """
+    if not os.path.isdir(outdir):
+        return "absent"
     f = os.path.join(outdir, "index.json")
     if not os.path.isfile(f):
-        return False
+        return "no-index"
     try:
-        d = json.load(open(f))
+        with open(f) as fh:
+            d = json.load(fh)
+        n = sum(d.get("counts", {}).values())
     except Exception:
-        return False
-    return (d.get("code") == compute.code_hash()
-            and sum(d.get("counts", {}).values()) >= want_runs)
+        return "bad-index"
+    if d.get("code") != compute.code_hash():
+        return "stale-code"
+    return "ok" if n >= want_runs else "short-runs"
+
+
+def done(outdir, want_runs):
+    return state(outdir, want_runs) == "ok"
+
+
+def states(out, want_runs, g=None):
+    return [state(os.path.join(out, compute.params_key(p)), want_runs)
+            for p in (g or grid())]
+
+
+def dir_count(out):
+    """The OLD measure: directories carrying the current hash, built or not."""
+    suffix = "__" + compute.code_hash()
+    try:
+        return sum(1 for e in os.scandir(out)
+                   if e.is_dir() and e.name.endswith(suffix))
+    except OSError:
+        return 0
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=os.path.expanduser("~/fig2_studio/cache"))
+    ap.add_argument("--store", default=DEFAULT_STORE,
+                    help="store root. One experiment's grid lives in "
+                         "<store>/cache, or <store>/exp_<name>_<num>/cache "
+                         "for anything but #1 of the default experiment.")
+    ap.add_argument("--out", default=None,
+                    help="the cache directory itself. Default: --store "
+                         "resolved for --exp-num/--exp-name. An --out that "
+                         "belongs to another experiment is refused.")
+    ap.add_argument("--exp-num", type=int, default=1,
+                    help="which run output a build reads; forwarded to "
+                         "compute.py, which used to take its own default of 1 "
+                         "whatever the shell printed.")
+    ap.add_argument("--exp-name", default=compute.EXP_NAME,
+                    help="experiment name, forwarded to compute.py.")
+    ap.add_argument("--print-paths", action="store_true",
+                    help="print `exp_name exp_num rel store cache` for the "
+                         "shell scripts and exit, so the cache location has "
+                         "one implementation. `rel` is the store subdirectory "
+                         "('.' for the default experiment).")
     ap.add_argument("--procs", type=int, default=2)
     ap.add_argument("--seeds", type=int, default=50)
     ap.add_argument("--dry-run", action="store_true")
@@ -64,10 +180,50 @@ def main():
     ap.add_argument("--only", type=int, default=None,
                     help="run just grid entry N (0-based). One Slurm array "
                          "task is one entry.")
+    ap.add_argument("--missing", action="store_true",
+                    help="print the grid index of every build that is not "
+                         "done(), one per line, and exit 0. This is what "
+                         "pack_cache.sh and --resubmit read.")
+    ap.add_argument("--status", action="store_true",
+                    help="print the tally per state, the old directory count "
+                         "beside it, and a line per unfinished build.")
     a = ap.parse_args()
+
+    sd = store_dir(a.store, a.exp_num, a.exp_name)
+    if a.print_paths:
+        print(a.exp_name, a.exp_num,
+              os.path.relpath(sd, os.path.expanduser(a.store)),
+              sd, os.path.join(sd, "cache"))
+        return 0
+    if a.out is None:
+        a.out = os.path.join(sd, "cache")
+    clash = out_conflict(a.out, a.exp_num, a.exp_name)
+    if clash:
+        print(f"refusing: {clash}", file=sys.stderr)
+        return 2
+    exp = f"{a.exp_name} #{a.exp_num}"
 
     want = a.seeds * len(compute.SCEN_ORDER)
     g = grid()
+    if a.missing or a.status:
+        st = states(a.out, want, g)
+        miss = [i for i, s in enumerate(st) if s != "ok"]
+        if a.missing:
+            for i in miss:
+                print(i)
+            return 0
+        print(f"grid {len(g)} builds, code {compute.code_hash()}, "
+              f"want {want} runs each, out {a.out}")
+        print(f"  experiment {exp}")
+        print("  " + "  ".join(f"{s} {st.count(s)}" for s in STATES
+                               if st.count(s)))
+        print(f"  directories at this hash {dir_count(a.out)}  "
+              f"(the old count; it cannot see a half-built one)")
+        print(f"  finished {len(g)-len(miss)} of {len(g)}, "
+              f"missing {len(miss)}")
+        for i in miss:
+            print(f"    {i:4d} {st[i]:10s} {compute.params_key(g[i])}")
+        return 0
     if a.list:
         for p in g:
             print(f"{p['k']} {p['mt']:g} {p['win']:g} {p['prom']:g} "
@@ -81,6 +237,7 @@ def main():
     todo = [p for p in g
             if not done(os.path.join(a.out, compute.params_key(p)), want)]
 
+    print(f"experiment {exp} -> {a.out}")
     print(f"{len(g)} parameter set(s), {len(g)-len(todo)} already built, "
           f"{len(todo)} to run at {want} runs each")
     for p in g:
@@ -96,6 +253,7 @@ def main():
               flush=True)
         argv = [sys.executable, "-I", os.path.join(HERE, "compute.py"),
                 "--out", a.out, "--procs", str(a.procs), "--seeds", str(a.seeds),
+                "--exp-num", str(a.exp_num), "--exp-name", a.exp_name,
                 "--window", p["window"], "--k", str(p["k"]),
                 "--mt", str(p["mt"]),
                 "--win", str(p["win"]), "--prom", str(p["prom"]),

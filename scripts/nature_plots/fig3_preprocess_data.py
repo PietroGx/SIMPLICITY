@@ -6,7 +6,9 @@ import os
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.clustering as cl
-from _scenarios import scenario_output_dirs, scenario_label
+from _scenarios import (scenario_output_dirs, scenario_label,
+                        EXPECTED_SEED_SKIPS, record_seed_skip,
+                        format_seed_skips)
 import simplicity.settings_manager as sm
 from simplicity.phenotype.distance import hamming_iw
 
@@ -54,8 +56,11 @@ def get_shared_valid_seeds(exp_num, scenarios, exp_name="impact_long_shedders", 
         return []
         
     valid_control_seeds = set()
+    skips = {}
+    n_seen = 0
     for sod in sods:
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
+            n_seen += 1
             try:
                 seed_str = dm.get_seed_from_SSOD(str(ssod))
                 seed_int = int(seed_str)
@@ -63,11 +68,13 @@ def get_shared_valid_seeds(exp_num, scenarios, exp_name="impact_long_shedders", 
                 t_final = om.read_final_time(ssod)
                 if t_final >= min_days:
                     valid_control_seeds.add(seed_int)
-            except Exception as e:
+            except (ValueError,) + EXPECTED_SEED_SKIPS as exc:
+                record_seed_skip(skips, exc)
                 continue
                 
     valid_list = sorted(list(valid_control_seeds))
-    print(f"DEBUG [control]: Found {len(valid_list)} valid baseline seeds.")
+    print(f"DEBUG [control]: Found {len(valid_list)} valid baseline seeds "
+          f"out of {n_seen} seeds, {format_seed_skips(skips)}.")
     
     if len(valid_list) == 0:
         print("DEBUG: Zero valid seeds found in control. Violins will be empty.")
@@ -143,13 +150,15 @@ def get_fig2_divergence_data(exp_num, scenario, target_seeds, exp_name="impact_l
     
     target_type = "standard" if scenario == "control" else "long_shedder"
     processed_count = 0
+    skips = {}
     
     for sod in sods:
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
             try:
                 seed_str = dm.get_seed_from_SSOD(str(ssod))
                 seed_int = int(seed_str)
-            except Exception:
+            except ValueError as exc:   # unparseable seed directory name
+                record_seed_skip(skips, exc)
                 continue
                 
             if seed_int not in target_seeds:
@@ -159,7 +168,8 @@ def get_fig2_divergence_data(exp_num, scenario, target_seeds, exp_name="impact_l
             try:
                 df_ind = om.read_individuals_data(ssod)
                 phylo = om.read_phylogenetic_data(ssod)
-            except Exception as e:
+            except EXPECTED_SEED_SKIPS as exc:
+                record_seed_skip(skips, exc)
                 continue
             
             if df_ind.empty or phylo.empty: continue
@@ -181,5 +191,6 @@ def get_fig2_divergence_data(exp_num, scenario, target_seeds, exp_name="impact_l
                         d = hamming_iw(lin2gen[inherited], lin2gen[tlin])
                         if np.isfinite(d): dists.append(d)
                         
-    print(f"[{scenario}] Processed {processed_count}/{len(target_seeds)} baseline seeds: {len(dists)} jumps found.")
+    print(f"[{scenario}] Processed {processed_count}/{len(target_seeds)} baseline seeds: "
+          f"{len(dists)} jumps found, {format_seed_skips(skips)}.")
     return dists

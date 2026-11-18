@@ -49,6 +49,7 @@ Nothing is simulated: the settings, simulation-parameter and repeat files are
 written by the real pipeline path, the output tree with them, and only the
 per-repeat measurement is stubbed.
 '''
+import hashlib
 import os
 import shutil
 import sys
@@ -59,6 +60,10 @@ import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
+# check_calibration_unchanged is a plain sibling import below; spell this
+# directory out rather than relying on it being sys.path[0]. First, so the
+# three below keep the precedence they have today.
+sys.path.insert(0, HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts'))
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
@@ -149,6 +154,12 @@ class Scratch:
         self.close()
 
 
+# Fixture experiments are named for this test and numbered from 1 in the
+# order they are used: a scratch experiment must never be able to collide with
+# a production run's number.
+BASE = 'test_group_partition'
+
+
 def legacy_value_partition(experiment_name, parameters):
     '''The pre-7c bucketing, kept here as the reference the new code has to
     agree with: list the whole experiment, read these parameters back off each
@@ -179,16 +190,56 @@ def same_partition(left, right):
 # straight line to that and the inversion returns target/slope -- so the
 # calibrated value a group reports IS the identity of the rows it was fed. One
 # contaminating row from a neighbour moves it.
-SLOPES = {}
+#
+# The slope comes from a digest of the group NAME, not from insertion order
+# into a dict: the extraction loops run in a forked pool, so a worker mutating
+# its own copy would give a cohort whichever slope that worker saw first, and
+# the parent's copy would stay empty. Not builtin hash() either -- that is
+# salted per process. SLOPE_SCALE is read at call time and inherited by a
+# fork, which is how a "changed measurement" reaches the workers.
+#
+# Geometric in the bucket, not arithmetic: two groups are then at least
+# SLOPE_BASE-1 apart RELATIVE to each other wherever they land, so the
+# no-leakage assertions discriminate as sharply at the top of the range as at
+# the bottom. 8 buckets keeps the steepest slope at 1.5**7 = 17.1, whose
+# inverted NSR (0.002/17.1 = 1.2e-4) is still inside the calibration grid.
+SLOPE_SCALE = 1.0
+SLOPE_BASE = 1.5
+SLOPE_BUCKETS = 8
 
 
 def slope_for(group):
-    return SLOPES.setdefault(group, 1.0 + 0.5 * len(SLOPES))
+    digest = hashlib.md5(group.encode()).digest()
+    bucket = int.from_bytes(digest[:8], 'big') % SLOPE_BUCKETS
+    return SLOPE_SCALE * SLOPE_BASE ** bucket
+
+
+def slopes_for(groups):
+    '''The slopes of an EXPLICIT list of group names. Refuses an empty list or
+    a digest collision: anything driven off this must never iterate nothing,
+    and two groups sharing a slope would stop the no-leakage checks
+    discriminating.'''
+    slopes = {g: slope_for(g) for g in groups}
+    if not slopes or len(set(slopes.values())) != len(slopes):
+        raise RuntimeError('synthetic slopes must be non-empty and distinct, '
+                           f'got {slopes} for {list(groups)!r}')
+    return slopes
+
+
+def scale_slopes(factor, groups):
+    '''Change every group's synthetic measurement by `factor`. `groups` is the
+    explicit set the caller then counts one reported difference per.'''
+    global SLOPE_SCALE
+    slopes_for(groups)
+    SLOPE_SCALE = factor
+    return groups
 
 
 def install_stubs(nsr_parameter):
     '''Replace the per-repeat measurement with a deterministic function of the
     repeat's group. Returns a callable that puts the real ones back.'''
+    global SLOPE_SCALE
+    SLOPE_SCALE = 1.0
     real = {
         'read_final_time': om.read_final_time,
         'read_sequencing_data_regression': om.read_sequencing_data_regression,
@@ -203,7 +254,12 @@ def install_stubs(nsr_parameter):
         return slope_for(group) * float(nsr)
 
     def frame(ssod, rows=40):
+        # Distance_from_root is not what gets fit -- tempest_regression is
+        # stubbed below and reads _osr -- but both calibration loops take
+        # muts_median/muts_max off this column, so a frame without it is a
+        # KeyError, not a seed to skip.
         return pd.DataFrame({'_osr': [osr_of(ssod)] * rows,
+                             'Distance_from_root': [0.001] * rows,
                              'individual_type': ['standard'] * rows})
 
     class Fit:
@@ -216,6 +272,8 @@ def install_stubs(nsr_parameter):
     er.tempest_regression = lambda df: Fit(float(df['_osr'].iloc[0]))
 
     def restore():
+        global SLOPE_SCALE
+        SLOPE_SCALE = 1.0
         om.read_final_time = real['read_final_time']
         om.read_sequencing_data_regression = real['read_sequencing_data_regression']
         er.extract_ih_regression_data = real['extract_ih_regression_data']
@@ -240,7 +298,7 @@ def section_cal_1():
 
     with Scratch() as scratch:
         name = scratch.build(
-            'cal1_probe',
+            f'{BASE}_#1',
             cfg.build_cal1_settings(2, {'min': 1e-4, 'max': 1e-2, 'steps': 3}))
 
         groups = plot._cal1_groups(name)
@@ -293,7 +351,7 @@ def section_cal_1():
         # Bucketing on (tau_3_long, R_long) cannot see the difference.
         shared = {'tau_3_long': 100.0, 'R_long': 1.1,
                   'nucleotide_substitution_rate_long': [1e-4, 1e-3]}
-        name = scratch.build('cal1_collision', lambda: (
+        name = scratch.build(f'{BASE}_#2', lambda: (
             {'_scenario_groups': [
                 dict(shared, name='cohort_kv_low', IH_virus_emergence_rate=0.01),
                 dict(shared, name='cohort_kv_high', IH_virus_emergence_rate=0.1)]},
@@ -339,7 +397,7 @@ def section_experiment_is_single_group():
 
     with Scratch() as scratch:
         name = scratch.build(
-            'impact_long_shedders_HIV_high_probe',
+            f'{BASE}_#3',
             cfg.build_exp_scenario_settings(pd.Series(row), 2))
         group = cfg.exp_group('HIV_high')
         check('and on disk it is one group', dm.get_groups(name), [group])
@@ -364,7 +422,7 @@ def section_nsr_sensitivity_cells():
     with Scratch() as scratch:
         sp = sm.read_standard_parameters_values()
         durations, k_vs = nsr.QUICK_DURATIONS, nsr.QUICK_K_V
-        name = scratch.build('nsr_cells_probe', nsr.build_settings(
+        name = scratch.build(f'{BASE}_#4', nsr.build_settings(
             durations, k_vs, [1e-4, 1e-3], 1, 40, 4, sp))
 
         cells = nsr.cell_groups(name, sp)
@@ -383,7 +441,7 @@ def section_nsr_sensitivity_cells():
 
     print('\n  a group holding two cells is refused')
     with Scratch() as scratch:
-        name = scratch.build('nsr_cells_mixed', lambda: (
+        name = scratch.build(f'{BASE}_#5', lambda: (
             {'_scenario_groups': [{'name': 'two_cells',
                                    'tau_3_long': [50.0, 90.0],
                                    'IH_virus_emergence_rate': 0.1,
@@ -412,39 +470,34 @@ def section_calibration_checker():
 
     with Scratch() as scratch:
         name = scratch.build(
-            'impact_long_shedders_cal_long_#77',
+            f'{BASE}_#6',
             cfg.build_cal1_settings(2, {'min': 1e-4, 'max': 1e-2, 'steps': 3}))
 
-        SLOPES.clear()
+        # enumerated from the experiment on disk, not from whatever a worker
+        # left in a dict: an empty list raises in slopes_for
+        cohorts = [g['name'] for g in plot._cal1_groups(name)]
         restore = install_stubs('nucleotide_substitution_rate_long')
         try:
             # a finished run: the fit, the frozen CSV, the fit-results files
             plot.plot_and_fit_long_nsr_calibration(
                 name, 0.002, model_type='lin', min_seq=10, min_len=10)
-            saved = sorted(os.listdir(dm.get_experiment_fit_result_dir(name)))
 
             print('\n  re-fitting the same output reproduces it')
             checker.failures.clear()
             checker.skipped.clear()
-            checker.stage_1(
-                {'cal_1': 'impact_long_shedders_cal_long'}, 77,
-                rtol=1e-9, keep=False)
+            checker.stage_1({'cal_1': BASE}, 6, rtol=1e-9, keep=False)
             check('no differences reported', checker.failures, [])
             check('and nothing was skipped', checker.skipped, [])
-            check('the run\'s own Fit_results are back',
-                  sorted(os.listdir(dm.get_experiment_fit_result_dir(name))),
-                  saved)
+            # A check on the Fit_results filenames here could not fail: the
+            # re-fit writes the names the run did, restore or no restore.
 
             print('\n  and a changed measurement is caught')
-            for group in list(SLOPES):
-                SLOPES[group] *= 1.5          # every cohort now calibrates 1/1.5x
+            scale_slopes(1.5, cohorts)        # every cohort now calibrates 1/1.5x
             checker.failures.clear()
             checker.skipped.clear()
-            checker.stage_1(
-                {'cal_1': 'impact_long_shedders_cal_long'}, 77,
-                rtol=1e-9, keep=False)
+            checker.stage_1({'cal_1': BASE}, 6, rtol=1e-9, keep=False)
             check('one difference reported per cohort',
-                  len(checker.failures), len(SLOPES))
+                  len(checker.failures), len(cohorts))
             checker.failures.clear()
             checker.skipped.clear()
         finally:
@@ -461,16 +514,20 @@ def _checker_stage_2(checker, cfg):
     print('\n  stage 2: the standard-only fit, against the frozen table')
     with Scratch() as scratch:
         name = scratch.build(
-            'impact_long_shedders_cal_std_#77',
+            f'{BASE}_#7',
             cfg.build_cal2_settings(2, {'min': 1e-4, 'max': 1e-2, 'steps': 3}))
 
-        SLOPES.clear()
         restore = install_stubs('nucleotide_substitution_rate')
+        # The frozen table stays on cfg.setup_dir -- the config's path logic is
+        # part of what stage 2 is being exercised on -- so the fixture owns the
+        # name cfg composes it from, and Scratch owns the data directory.
+        saved_exp_name = cfg.EXP_NAME
+        cfg.EXP_NAME = BASE
         try:
             target = 0.002
             # keyed on the GROUP, which carries the phase prefix since 8e
             expected = target / slope_for(cfg.calib_std_group())
-            setup = cfg.setup_dir(77)
+            setup = cfg.setup_dir(7)
             os.makedirs(setup, exist_ok=True)
             rows = [{'scenario_name': s['name'] if isinstance(s, dict) else s,
                      'nucleotide_substitution_rate': expected,
@@ -479,24 +536,25 @@ def _checker_stage_2(checker, cfg):
             table = os.path.join(setup, cfg.TABLE_FILENAME)
             pd.DataFrame(rows).to_csv(table, index=False)
 
-            names = {'cal_2': 'impact_long_shedders_cal_std'}
+            names = {'cal_2': BASE}
             checker.failures.clear()
             checker.skipped.clear()
-            checker.stage_2(names, 77, target, rtol=1e-9, keep=False)
+            checker.stage_2(names, 7, target, rtol=1e-9, keep=False)
             check('no differences reported', checker.failures, [])
             check('and nothing was skipped', checker.skipped, [])
 
             print('\n  and a changed measurement is caught on every row')
-            SLOPES[cfg.calib_std_group()] *= 1.5
+            scale_slopes(1.5, [cfg.calib_std_group()])
             checker.failures.clear()
             checker.skipped.clear()
-            checker.stage_2(names, 77, target, rtol=1e-9, keep=False)
+            checker.stage_2(names, 7, target, rtol=1e-9, keep=False)
             check('one difference reported per table row',
                   len(checker.failures), len(rows))
             checker.failures.clear()
             checker.skipped.clear()
         finally:
             restore()
+            cfg.EXP_NAME = saved_exp_name
 
 
 def main():

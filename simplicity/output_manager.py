@@ -41,6 +41,53 @@ from tqdm import tqdm
 import warnings
 from pathlib import Path
 
+# A per-file read fails for two unrelated reasons and only one is a reason to
+# skip: the file is absent/unreadable, or its content is empty/truncated.
+# Anything structural -- a missing column, a type error -- is a defect of this
+# code and must propagate. Mirrors
+# scripts/experiments/long_nsr_calibration_plot.EXPECTED_SEED_SKIPS; a library
+# cannot import a script, so the tuple is repeated rather than imported.
+EXPECTED_READ_SKIPS = (OSError,
+                       pd.errors.EmptyDataError,
+                       pd.errors.ParserError)
+
+
+class TruncatedOutputError(pd.errors.EmptyDataError):
+    """A file that exists but whose content is incomplete -- what a walltime
+    or OOM kill inside a write window leaves behind. An EmptyDataError
+    subclass so the narrowed read loops already count it as a skip, and its
+    own class so the count names truncation rather than a missing file."""
+
+
+def _unparsable(value, parse):
+    try:
+        parse(value)
+    except (ValueError, SyntaxError, TypeError, MemoryError):
+        return True
+    return False
+
+
+def _parse_serialized_column(df, column, parse, path):
+    """Parse one serialized column, telling a half-written file from a bad one.
+
+    A truncation's parse failure is confined to the final row: measured over
+    999 truncation points each of phylogenetic_data.csv (360 failures, all in
+    the last row) and individuals_data.csv (41, likewise). That case is
+    reported as truncation, which the read loops skip; a failure anywhere
+    else is a defect and propagates.
+    """
+    try:
+        return df[column].apply(parse)
+    except (ValueError, SyntaxError, TypeError, MemoryError) as exc:
+        bad = [i for i, v in enumerate(df[column]) if _unparsable(v, parse)]
+        if bad == [len(df) - 1]:
+            raise TruncatedOutputError(
+                f"{path}: {column} unparsable in the last of {len(df)} rows "
+                f"({os.path.getsize(path)} bytes) -- half-written file") from None
+        raise ValueError(
+            f"{path}: {column} unparsable in row(s) {bad[:5]} of {len(df)}: "
+            f"{exc}") from exc
+
 def setup_output_directory(experiment_name, group, repeat):
     """This repeat's output directory: 04_Output/<group>/<stem>/seed_NNNN.
 
@@ -354,7 +401,17 @@ def lineage_frequency_path(seeded_simulation_output_dir):
 
 def read_lineage_frequency(seeded_simulation_output_dir):
     # pandas decompresses by extension, so one call covers both names
-    return pd.read_csv(lineage_frequency_path(seeded_simulation_output_dir))
+    path = lineage_frequency_path(seeded_simulation_output_dir)
+    try:
+        return pd.read_csv(path)
+    except EOFError:
+        # A half-written gzip ends before its end-of-stream marker: of 1,065
+        # truncation points sampled on one 70,655-byte file, 1,062 raise
+        # EOFError, which is no OSError and so aborted the whole read loop.
+        # None raise zlib.error -- that is corruption, and propagates.
+        raise TruncatedOutputError(
+            f"{path}: gzip stream ends before the end-of-stream marker "
+            f"({os.path.getsize(path)} bytes) -- half-written file") from None
 
 def save_individuals_data(simulation_output, seeded_simulation_output_dir):
     individuals_data = simulation_output.individuals_data_to_df()
@@ -382,10 +439,11 @@ def read_individuals_data(seeded_simulation_output_dir):
                                         "individuals_data.csv")
     df = pd.read_csv(trajectory_file_path, index_col=0,low_memory=False)
     df['type'] = df['type'].astype(str)
-    df['IH_lineages'] = df['IH_lineages'].apply(_np_safe_literal_eval)
-    df['IH_lineages_fitness_score'] = df['IH_lineages_fitness_score'].apply(_np_safe_literal_eval) 
-    df['new_infections'] = df['new_infections'].apply(_np_safe_literal_eval)
-    df['IH_lineages_trajectory'] = df['IH_lineages_trajectory'].apply(_np_safe_literal_eval)
+    for column in ('IH_lineages', 'IH_lineages_fitness_score',
+                   'new_infections', 'IH_lineages_trajectory'):
+        df[column] = _parse_serialized_column(df, column,
+                                              _np_safe_literal_eval,
+                                              trajectory_file_path)
     return df
 
 def save_phylogenetic_data(simulation_output, seeded_simulation_output_dir):
@@ -399,7 +457,8 @@ def read_phylogenetic_data(seeded_simulation_output_dir):
                                         "phylogenetic_data.csv")
     
     df = pd.read_csv(trajectory_file_path, index_col=0)
-    df['Genome'] = df['Genome'].apply(ast.literal_eval)
+    df['Genome'] = _parse_serialized_column(df, 'Genome', ast.literal_eval,
+                                            trajectory_file_path)
     return df
     
 def save_fitness_trajectory(simulation_output, seeded_simulation_output_dir):
@@ -412,16 +471,28 @@ def save_final_time(simulation_output, seeded_simulation_output_dir):
     final_time = round(simulation_output.time,6)
     final_time_file_path = os.path.join(seeded_simulation_output_dir,
                                                "final_time.csv")
-    with open(final_time_file_path, mode='w', newline='') as file:
+    # mode 'w' truncates before writing, so a kill inside that window left a
+    # zero-byte file. Write beside it and replace, as the streamed outputs do.
+    partial_path = final_time_file_path + '.partial'
+    with open(partial_path, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([final_time]) 
+        writer.writerow([final_time])
+    os.replace(partial_path, final_time_file_path)
         
 def read_final_time(seeded_simulation_output_dir):
     final_time_file_path = os.path.join(seeded_simulation_output_dir,
                                                "final_time.csv")
     with open(final_time_file_path, 'r') as f:
-        final_time = float(f.read().strip())
-    return final_time
+        raw = f.read().strip()
+    try:
+        return float(raw)
+    except ValueError:
+        # save_final_time opens mode 'w', so a kill inside that window leaves
+        # a zero-byte file. Absent stays FileNotFoundError; empty/garbage is
+        # a truncation, not a structural defect.
+        raise TruncatedOutputError(
+            f"{final_time_file_path}: expected one number, found {raw[:40]!r} "
+            f"({os.path.getsize(final_time_file_path)} bytes)") from None
 
 def save_R_effective_trajectory(simulation_output, seeded_simulation_output_dir):
     R_effective_trajectory = simulation_output.R_effective_trajectory_to_df()
@@ -543,6 +614,7 @@ def create_combined_sequencing_df(source,
 
     # 3. Read and concatenate DataFrames
     data_frames = []
+    skipped = {}
     for csv_file in filtered_csv_files:
        try:
            df = pd.read_csv(csv_file)
@@ -555,14 +627,32 @@ def create_combined_sequencing_df(source,
            # Check sequence count AFTER filtering 
            if len(df) >= min_seq_number:
                data_frames.append(df)
-       except: pass 
+       except EXPECTED_READ_SKIPS as exc:
+           name = type(exc).__name__
+           skipped[name] = skipped.get(name, 0) + 1
        
-    print('Total kept files: ', len(data_frames))
+    print('Total kept files: ', len(data_frames),
+          '  skipped: ', sum(skipped.values()),
+          ('(' + ', '.join(f'{n} x{c}' for n, c in sorted(skipped.items())) + ')')
+          if skipped else '')
     try:
         combined_df = pd.concat(data_frames, ignore_index=True)
         return combined_df
-    except:
-        print('No sequencing data available! Check filter settings!')
+    except ValueError as exc:
+        # Facts only. The old text named the filter settings as the cause,
+        # which is a guess: an empty list is just as often structural (no
+        # files, unreadable tree). Report the funnel and let the reader see
+        # where it emptied.
+        read_ok = len(filtered_csv_files) - sum(skipped.values())
+        print(f'No combined sequencing data ({exc}).')
+        print(f'  sequencing_data_regression.csv found: {len(csv_files)}'
+              f' -> simulation lenght >= {min_sim_lenght}: {len(filtered_csv_files)}'
+              f' -> read: {read_ok}, skipped: {sum(skipped.values())}'
+              + ((' (' + ', '.join(f'{n} x{c}' for n, c in sorted(skipped.items())) + ')')
+                 if skipped else ''))
+        print(f'  -> >= {min_seq_number} sequences'
+              + (f" of individual_type '{individual_type}'" if individual_type else '')
+              + f': {len(data_frames)}')
         print('')
         return None
 
@@ -646,15 +736,14 @@ def get_OSR_vs_parameter_csv_file_path(experiment_name,
       f'{experiment_name}_OSR_vs_{parameter}_sim_lenght_{min_sim_lenght}_seq_n_{min_seq_number}{type_suffix}{group_suffix}.csv')
     return csv_file_path
 
-def write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq_number=0, min_sim_lenght=0, individual_type=None, group=None):
+def compute_OSR_vs_parameter(experiment_name, parameter, min_seq_number=0, min_sim_lenght=0, individual_type=None, group=None):
     """
     Calculates OSR for every individual seed and detects outliers per parameter set.
-    """
-    csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name, parameter, min_seq_number, min_sim_lenght, individual_type, group)
-    
-    if os.path.exists(csv_file_path):
-        return
 
+    Computes and returns; persists nothing, so a read of a finished experiment
+    cannot write into it. write_OSR_vs_parameter_csv persists what this returns.
+    Shaped as the CSV round trip leaves it: RangeIndex, sorted by `parameter`.
+    """
     simulation_output_dirs = dm.get_simulation_output_dirs(experiment_name, group)
     all_sod_dfs = []
     # Why a repeat contributed nothing, counted rather than swallowed. The loop
@@ -722,14 +811,30 @@ def write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq_number=0, min
               f"skipped " + ", ".join(f"{n}x {why}"
                                       for why, n in sorted(skipped.items())))
 
-    if all_sod_dfs:
-        final_df = pd.concat(all_sod_dfs, ignore_index=True)
-        final_df.sort_values(by=str(parameter)).to_csv(csv_file_path, index=False)
-    else:
-        print(f"No results to write for individual OSR: none of {total} "
+    if not all_sod_dfs:
+        print(f"No individual OSR results: none of {total} "
               f"repeat(s) in {experiment_name} produced a usable rate. "
               f"If the skip reasons above are not about data volume, the "
               f"output tree may not be readable.")
+        return pd.DataFrame()
+
+    final_df = pd.concat(all_sod_dfs, ignore_index=True)
+    return final_df.sort_values(by=str(parameter)).reset_index(drop=True)
+
+def write_OSR_vs_parameter_csv(experiment_name, parameter, min_seq_number=0, min_sim_lenght=0, individual_type=None, group=None):
+    """
+    Persist compute_OSR_vs_parameter's table, unless it is already on disk.
+    """
+    dm.assert_experiment_writable(experiment_name)
+    csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name, parameter, min_seq_number, min_sim_lenght, individual_type, group)
+
+    if os.path.exists(csv_file_path):
+        return
+
+    final_df = compute_OSR_vs_parameter(experiment_name, parameter, min_seq_number,
+                                        min_sim_lenght, individual_type, group)
+    if not final_df.empty:
+        final_df.to_csv(csv_file_path, index=False)
 
 def read_OSR_vs_parameter_csv(experiment_name, 
                               parameter,
@@ -771,6 +876,7 @@ def write_combined_OSR_vs_parameter_csv(experiment_name,
     Create df of observed substitution rate (tempest regression on joint data).
     Uses individual OSR results to filter out outliers before combining, unless include_outliers=True.
     '''
+    dm.assert_experiment_writable(experiment_name)
     csv_file_path = get_combined_OSR_vs_parameter_csv_file_path(experiment_name, 
                                                                 parameter, 
                                                                 min_seq_number,
@@ -853,23 +959,41 @@ def get_mean_std_OSR(experiment_name,
                      min_seq_number,
                      min_sim_lenght,
                      individual_type=None,
-                     include_outliers=False): 
+                     include_outliers=False,
+                     group=None): 
     
-    # Ensure the CSV exists 
-    write_OSR_vs_parameter_csv(experiment_name, 
-                               parameter, 
-                               min_seq_number, 
-                               min_sim_lenght,
-                               individual_type)
-    
-    # Read the data
-    df = read_OSR_vs_parameter_csv(experiment_name,
-                                   parameter,
-                                   min_seq_number,
-                                   min_sim_lenght,
-                                   individual_type,
-                                   include_outliers=include_outliers)
-    
+    # `group` scopes the aggregate. Without it the mean/std pool every group
+    # of the experiment while the caller's scatter shows one -- two
+    # populations in one panel.
+    csv_file_path = get_OSR_vs_parameter_csv_file_path(experiment_name,
+                                                       parameter,
+                                                       min_seq_number,
+                                                       min_sim_lenght,
+                                                       individual_type,
+                                                       group)
+
+    if os.path.exists(csv_file_path):
+        df = read_OSR_vs_parameter_csv(experiment_name,
+                                       parameter,
+                                       min_seq_number,
+                                       min_sim_lenght,
+                                       individual_type,
+                                       include_outliers=include_outliers,
+                                       group=group)
+    else:
+        # asking for a value must not fill the cache: compute in memory and
+        # leave the experiment untouched
+        warnings.warn(f"OSR table absent ({csv_file_path}). Computing it in "
+                      f"memory; nothing is written.")
+        df = compute_OSR_vs_parameter(experiment_name,
+                                      parameter,
+                                      min_seq_number,
+                                      min_sim_lenght,
+                                      individual_type,
+                                      group)
+        if not include_outliers and 'is_outlier' in df.columns:
+            df = df[df['is_outlier'] == 0]
+
     if df.empty:
         return pd.DataFrame()
 
@@ -887,6 +1011,7 @@ def get_fit_results_filepath(experiment_name, model_type, individual_type=None, 
     return os.path.join(experiment_fit_result_dir, filename)
 
 def write_fit_results_csv(experiment_name, model_type, fit_result, individual_type=None, experiment_group=None):
+    dm.assert_experiment_writable(experiment_name)
     # Pass individual_type and experiment_group to get unique filepath
     fit_results_filepath = get_fit_results_filepath(experiment_name, model_type, individual_type, experiment_group)
     
@@ -903,7 +1028,9 @@ def read_fit_results_csv(experiment_name, model_type, individual_type=None, expe
         print(f"[Warning] Fit results file not found: {fit_results}")
         return None
 
-    df = pd.read_csv(fit_results, index_col=0)
+    # round_trip: these are the fitted coefficients a calibration inverts, so
+    # they must read back as exactly what write_fit_results_csv wrote.
+    df = pd.read_csv(fit_results, index_col=0, float_precision='round_trip')
     best_fit_df = pd.to_numeric(df['Best Fit'], errors='coerce')
     return best_fit_df
 
@@ -1140,6 +1267,7 @@ def write_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir,
     """
     Compute and write R_effective (population + lineage) trajectories to CSV.
     """
+    dm.assert_experiment_writable(experiment_name)
     # Compute R_effective
     r_effective_population_traj = get_r_effective_population_traj(seeded_simulation_output_dir, time_window)
     r_effective_lineages_traj = get_r_effective_lineages_traj(seeded_simulation_output_dir, time_window, threshold)
@@ -1158,7 +1286,7 @@ def read_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir,
                                time_window, threshold):
     """
     Read R_effective (population + lineage) trajectories from CSV.
-    If files are missing, issues a warning and generates them.
+    If files are missing, issues a warning and computes them in memory.
 
     Returns:
         - r_effective_population_traj: pd.Series
@@ -1169,8 +1297,18 @@ def read_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir,
 
     # Check if files exist
     if not os.path.exists(pop_fp) or not os.path.exists(line_fp):
-        warnings.warn("R_effective CSVs missing. Recomputing and writing them.")
-        write_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir, time_window, threshold)
+        # asking for a value must not fill the cache: compute in memory and
+        # leave the experiment untouched. Shaped as the CSV round trip leaves
+        # it -- each lineage Series keyed and named by the column name a
+        # read_csv would have produced.
+        warnings.warn("R_effective CSVs missing. Computing them in memory; "
+                      "nothing is written.")
+        r_eff_pop = get_r_effective_population_traj(seeded_simulation_output_dir, time_window)
+        lineages = get_r_effective_lineages_traj(seeded_simulation_output_dir, time_window, threshold)
+        df_line = pd.DataFrame(lineages)
+        df_line.columns = df_line.columns.astype(str)
+        return r_eff_pop, {lineage: df_line[lineage].rename(lineage)
+                           for lineage in df_line.columns}
 
     # Read population R_eff
     r_eff_pop = pd.read_csv(pop_fp, index_col=0)
@@ -1207,6 +1345,7 @@ def write_clustering_table(experiment_name: str, ssod: str, df: pd.DataFrame):
     """
     Writes the clustering CSV. 
     """
+    dm.assert_experiment_writable(experiment_name)
     path = get_clustering_table_filepath(experiment_name, ssod)
     df.to_csv(path, index=False)
 

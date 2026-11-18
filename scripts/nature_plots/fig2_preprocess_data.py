@@ -10,7 +10,9 @@ import pandas as pd
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.clustering as cl
-from _scenarios import scenario_output_dirs, scenario_label, one_sod
+from _scenarios import (scenario_output_dirs, scenario_label, one_sod,
+                        EXPECTED_SEED_SKIPS, record_seed_skip,
+                        format_seed_skips)
 from simplicity.phenotype.distance import hamming_iw
 
 # get_clade_metrics/get_clade_winners/summarize_sod_pies already work against
@@ -91,7 +93,9 @@ def get_panel_b_data(exp_num, scenarios, cluster_threshold=5, min_days=100,
         sod = _experiment_sod(exp_num, scenario, exp_name=exp_name)
         if sod is None:
             continue
-        for ssod in dm.get_seeded_simulation_output_dirs(sod):
+        skips = {}
+        ssods = dm.get_seeded_simulation_output_dirs(sod)
+        for ssod in ssods:
             try:
                 if om.read_final_time(ssod) < min_days:
                     continue
@@ -101,8 +105,11 @@ def get_panel_b_data(exp_num, scenarios, cluster_threshold=5, min_days=100,
                     "seed": dm.get_seed_from_SSOD(ssod),
                     **values,
                 })
-            except Exception:
+            except EXPECTED_SEED_SKIPS as exc:
+                record_seed_skip(skips, exc)
                 continue
+        print(f"[fig3] panel B: {scenario}: {len(ssods)} seeds, "
+              f"{format_seed_skips(skips)}", flush=True)
     df = pd.DataFrame(rows, columns=["scenario", "seed", "Peak", "Burden", "Survival", "Growth"])
     try:
         df.to_pickle(cache_file)
@@ -237,7 +244,9 @@ def get_panel_c_consistency_data(exp_num, group, max_long_per_individual=None,
         return float(np.mean(vals)) if vals else np.nan
 
     rows = []
-    for ssod in dm.get_seeded_simulation_output_dirs(sod):
+    skips = {}
+    ssods = dm.get_seeded_simulation_output_dirs(sod)
+    for ssod in ssods:
         try:
             standard = [g for _, g in _standard_sequenced_genomes(ssod, max_long_per_individual)]
             long = [g for _, g in _long_shedder_sequenced_genomes(ssod, max_long_per_individual)]
@@ -251,9 +260,12 @@ def get_panel_c_consistency_data(exp_num, group, max_long_per_individual=None,
             ):
                 if np.isfinite(value):
                     rows.append({"seed": seed, "comparison": label, "distance": value})
-        except Exception:
+        except EXPECTED_SEED_SKIPS as exc:
+            record_seed_skip(skips, exc)
             continue
 
+    print(f"[fig3] panel C distances: {len(ssods)} seeds, "
+          f"{format_seed_skips(skips)}", flush=True)
     return pd.DataFrame(rows, columns=["seed", "comparison", "distance"])
 
 
@@ -384,7 +396,7 @@ def _window_for(ssod, window=None):
     try:
         end = float(om.read_final_time(ssod))
         cutoff = window_cutoff(ssod, window)
-    except Exception:
+    except EXPECTED_SEED_SKIPS:
         return None
     if cutoff is None or end < MIN_FINAL_TIME or (end - cutoff) < MIN_WINDOW_DAYS:
         return None
@@ -488,6 +500,7 @@ def get_efficiency_data(exp_num, scenarios, exp_name=EXP_NAME, min_days=100,
             continue
         print(f"[fig3] efficiency: {scenario}...", flush=True)
         kept = dropped = 0
+        skips = {}
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
             got = _window_for(ssod, window)
             if got is None:
@@ -500,14 +513,16 @@ def get_efficiency_data(exp_num, scenarios, exp_name=EXP_NAME, min_days=100,
                 if ind.empty:
                     continue
                 subs = _substitutions_by_type(ind, cutoff=cutoff)
-            except Exception:
+            except EXPECTED_SEED_SKIPS as exc:
+                record_seed_skip(skips, exc)
                 continue
             for ct in EFFICIENCY_THRESHOLDS:
                 try:
                     F, _tot, labels = _windowed_clade_data(ssod, ct, cutoff,
                                                            ind=ind)
                     peaks = _peak_values(F)
-                except Exception:
+                except EXPECTED_SEED_SKIPS as exc:
+                    record_seed_skip(skips, exc)
                     continue
                 rec = {"scenario": scenario, "seed": dm.get_seed_from_SSOD(ssod),
                        "threshold": ct, "cutoff": cutoff,
@@ -521,7 +536,8 @@ def get_efficiency_data(exp_num, scenarios, exp_name=EXP_NAME, min_days=100,
                             and peaks.get(c, 0.0) > pk)
                 rows.append(rec)
         print(f"[fig3] efficiency: {scenario}: {kept} measurable, "
-              f"{dropped} dropped (window {window_tag(window)})", flush=True)
+              f"{dropped} dropped (window {window_tag(window)}), "
+              f"{format_seed_skips(skips)}", flush=True)
 
     df = pd.DataFrame(rows)
     try:
@@ -626,6 +642,7 @@ def get_winrate_data(exp_num, scenarios, exp_name=EXP_NAME, cluster_threshold=5,
             continue
         print(f"[fig3] win rate: {scenario}...", flush=True)
         kept = dropped = 0
+        skips = {}
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
             got = _window_for(ssod, window)
             if got is None:
@@ -636,7 +653,8 @@ def get_winrate_data(exp_num, scenarios, exp_name=EXP_NAME, cluster_threshold=5,
             try:
                 F, totals, labels = _windowed_clade_data(ssod, cluster_threshold,
                                                          cutoff)
-            except Exception:
+            except EXPECTED_SEED_SKIPS as exc:
+                record_seed_skip(skips, exc)
                 continue
             if F is None or F.empty or not len(F.columns):
                 continue
@@ -656,7 +674,8 @@ def get_winrate_data(exp_num, scenarios, exp_name=EXP_NAME, cluster_threshold=5,
                     "null": n_long / len(pool),
                 })
         print(f"[fig3] win rate: {scenario}: {kept} measurable, "
-              f"{dropped} dropped (window {window_tag(window)})", flush=True)
+              f"{dropped} dropped (window {window_tag(window)}), "
+              f"{format_seed_skips(skips)}", flush=True)
 
     df = pd.DataFrame(rows)
     try:

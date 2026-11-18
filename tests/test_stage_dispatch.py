@@ -53,7 +53,12 @@ sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
 
-EXP_NUM = 9999
+# The fixture is named for this test and numbered from 1 inside that name.
+# The stages compose their own paths from EXP_NAME, which they import by value,
+# so owning the name means setting it on the config AND on the stage module --
+# see install(), which is the one place every stage goes through.
+FIXTURE_NAME = 'test_stage_dispatch'
+EXP_NUM = 1
 failures = []
 
 
@@ -95,13 +100,16 @@ class Dispatch:
 
 
 def install(module, dispatch):
-    '''Replace the module's dispatch, refusing if it does not have one.'''
+    '''Replace the module's dispatch and the name it writes under, refusing if
+    it does not have a dispatch.'''
     name = 'run_experiment_phase_script'
     if not hasattr(module, name):
         raise AssertionError(
             f'{module.__name__} has no {name} to stub -- the stage was '
             f'rewired and this test would have run real simulations.')
     setattr(module, name, dispatch)
+    if hasattr(module, 'EXP_NAME'):
+        module.EXP_NAME = FIXTURE_NAME
 
 
 def long_nsr_table():
@@ -233,10 +241,13 @@ def main():
     data = os.path.join(root, 'Data')
     os.makedirs(data)
     saved_cwd = os.getcwd()
-    # the stages build "Data/<...>_setup_data_#N" relative to the cwd
     os.chdir(root)
     dm.set_data_dir(data)
     sm._data_dir = data
+    # the config composes every path from EXP_NAME; the stage modules import it
+    # by value, which install() handles
+    import impact_long_shedders_config as config
+    config.EXP_NAME = FIXTURE_NAME
 
     try:
         for label, run, expected_dispatches in STAGES:

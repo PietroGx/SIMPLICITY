@@ -35,6 +35,7 @@ import os
 import sys
 
 import simplicity.dir_manager as dm
+import simplicity.output_manager as om
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 os.pardir, 'experiments'))
@@ -167,3 +168,27 @@ def figure_path(number, exp_name, exp_num, fmt, seed=None, subdir=None,
     return os.path.join(
         out,
         f"Figure_{number}_{pipeline_label(exp_name)}_#{exp_num}{tail}.{fmt}")
+
+
+# ----------------------------------------------------------------- skip accounting
+# A per-seed read fails for two unrelated reasons and only one is a reason to
+# skip: the repeat produced no output, or its output cannot be read/parsed.
+# Anything structural -- a missing column, a type error -- is a defect of the
+# figure code, and absorbing it reported "no data" for a run that had plenty.
+# Same contract as scripts/experiments/long_nsr_calibration_plot's helpers.
+# The tuple itself comes from output_manager rather than being repeated: that
+# module runs matplotlib.use("Agg") at import time and no figure script here
+# picks a backend, so it cannot be imported from.
+EXPECTED_SEED_SKIPS = om.EXPECTED_READ_SKIPS
+
+
+def record_seed_skip(skips, exc):
+    name = type(exc).__name__
+    skips[name] = skips.get(name, 0) + 1
+
+
+def format_seed_skips(skips):
+    if not skips:
+        return 'no seed was skipped'
+    return (f"{sum(skips.values())} skipped: "
+            + ', '.join(f'{name} x{n}' for name, n in sorted(skips.items())))

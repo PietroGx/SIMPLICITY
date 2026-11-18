@@ -222,9 +222,8 @@ def analyze_and_report(numbered, nsr_values, sp, test_n, min_seq=30, min_len=100
                     recap.append(f"  NSR={nsr:.6f} -> no valid points")
             try:
                 fit_result = er.fit_observed_substitution_rate_regressor(
-                    numbered, cell_df, model_type=model_type,
-                    parameter_name='nucleotide_substitution_rate',
-                    experiment_group=name)
+                    cell_df, model_type=model_type,
+                    parameter_name='nucleotide_substitution_rate')
                 x_vals = np.linspace(cell_df['nucleotide_substitution_rate'].min(),
                                     cell_df['nucleotide_substitution_rate'].max(), 100)
                 y_vals = fit_result.eval(x=x_vals)

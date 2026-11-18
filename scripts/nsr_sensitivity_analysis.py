@@ -65,10 +65,12 @@
 # confident numbers about a different quantity (see BACKLOG).
 # ============================================================================
 
+import io
 import os
 import sys
 import glob
 import json
+import contextlib
 import zipfile
 import argparse
 import subprocess
@@ -298,6 +300,7 @@ def extract_datasets(numbered, sp, min_seq=30, min_len=100):
     grouped_sods = [(group, sod) for group in cells
                     for sod in dm.get_simulation_output_dirs(numbered, group=group)]
 
+    host_skips = {}
     for group, sod in grouped_sods:
         # The cell comes from the group the simulation was assigned to; only
         # NSR_long, the swept axis, is read off the simulation itself. It used
@@ -350,10 +353,14 @@ def extract_datasets(numbered, sp, min_seq=30, min_len=100):
                             float(t_end) - float(t_inf)
                             if pd.notna(t_inf) and pd.notna(t_end) else np.nan,
                     })
-            except Exception:
-                pass
+            except om.EXPECTED_READ_SKIPS as exc:
+                name = type(exc).__name__
+                host_skips[name] = host_skips.get(name, 0) + 1
 
-    print(f"  seeds kept: {kept}   dropped (gate or no data): {dropped}")
+    print(f"  seeds kept: {kept}   dropped (gate or no data): {dropped}"
+          + (f"   host table skipped: "
+             + ', '.join(f'{n} x{c}' for n, c in sorted(host_skips.items()))
+             if host_skips else ''))
     return pd.DataFrame(point_rows), pd.DataFrame(host_rows)
 
 
@@ -512,14 +519,10 @@ def fit_cells(osr_df, model_type='exp', target=TARGET_OSR_LONG):
                                    'osr': 'observed_substitution_rate'})
         rec = {'inf_duration': dur, 'k_v': k_v, 'n_points': len(g)}
         try:
-            # Same model and same inversion the pipeline uses
-            # (factory_model_lmfit + compute_calibrated_parameter), but NOT
-            # via fit_observed_substitution_rate_regressor: that writes a CSV
-            # into the experiment directory, which would tie --plot to the
-            # simulation output it is meant to be independent of.
-            model, init = er.factory_model_lmfit(model_type)
-            fit = model.fit(fit_df['observed_substitution_rate'], init,
-                            x=fit_df['nucleotide_substitution_rate'])
+            # the shared fitter prints lmfit's full report per call
+            with contextlib.redirect_stdout(io.StringIO()):
+                fit = er.fit_observed_substitution_rate_regressor(
+                    fit_df, model_type)
             params = fit.params.valuesdict()
             rec.update({
                 'A': params.get('A'), 'B': params.get('B'),

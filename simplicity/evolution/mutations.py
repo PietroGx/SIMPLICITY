@@ -377,7 +377,7 @@ def get_lineage_name(phylodots,lineage_name):
     try: 
         phylodots[n_dots] += 1
         lineage_name = lineage_name + '.' + str(phylodots[n_dots])
-    except: 
+    except IndexError:          # first lineage at this depth; anything else is a defect
         phylodots.append(0)
         lineage_name = lineage_name + '.0'
     

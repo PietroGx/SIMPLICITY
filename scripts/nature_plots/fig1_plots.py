@@ -182,7 +182,9 @@ def plot_tempest_regression(ax, df, title, x_col='sampling_date', y_col='hamming
                 x_vals = fit_cdf['Sequencing_time'].values.reshape(-1, 1)
                 y_vals = fit_cdf['Distance_from_root'].values
                 r_squared = fitted_model.score(x_vals, y_vals)
-            except Exception: continue
+            except ValueError as exc:   # degenerate cohort; anything else is a defect
+                print(f"[fig1][warn] {title}: no fit for cohort {cohort}: {exc}")
+                continue
             
             c_color = palette.get(cohort, scatter_color)
             

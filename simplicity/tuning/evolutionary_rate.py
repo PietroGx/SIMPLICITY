@@ -195,15 +195,17 @@ def factory_model_lmfit(model_type: str):
     
     else: raise ValueError('Invalid model selection')
 
-def fit_observed_substitution_rate_regressor(experiment_name, 
-                                             df, model_type, weights=None,
-                                             parameter_name='nucleotide_substitution_rate',
-                                             experiment_group=None):
+def fit_observed_substitution_rate_regressor(df, model_type, weights=None,
+                                             parameter_name='nucleotide_substitution_rate'):
     """
     Fits a model to the observed substitution rate against a varying parameter.
-    
+
+    Computes and returns; persists nothing. Persisting is the calibration
+    stage's job, so that a tool refitting a finished experiment cannot write
+    into it just by asking for a fit. Callers that own the experiment call
+    om.write_fit_results_csv themselves right after.
+
     Parameters:
-        experiment_name (str): Name of the experiment
         df (pd.DataFrame): Data containing the parameter column and 'observed_substitution_rate'
         model_type (str): Type of model to fit ('lin', 'log', etc.)
         weights: Optional weights for fitting
@@ -233,9 +235,7 @@ def fit_observed_substitution_rate_regressor(experiment_name,
             
         # Print the fit results
         print(fit_result.fit_report())
-        
-        # save fit results
-        om.write_fit_results_csv(experiment_name, model_type, fit_result, experiment_group=experiment_group)
+
         return fit_result
         
     except Exception as e:

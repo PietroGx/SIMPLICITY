@@ -6,11 +6,14 @@
 # Runs on the LOGIN node. It submits two jobs and returns:
 #
 #   1. the array, one task per build (tests/studio/slurm_precompute.sh)
-#   2. a pack job with --dependency=afterok on the array, which tars the grid
+#   2. a pack job with --dependency=afterany on the array, which tars the grid
 #      into one downloadable file (tests/studio/pack_cache.sh)
 #
-# The dependency is the point: the archive is only written if every build
-# succeeded, so a partial grid cannot quietly become a file you download.
+# pack_cache.sh still refuses a partial grid, so a partial grid cannot quietly
+# become a file you download. The dependency is afterany, not afterok, because
+# afterok CANCELLED the pack job whenever a task failed and nothing said so:
+# the only symptom was an archive that never appeared. Under afterany the pack
+# job runs, refuses, and prints which grid indices are missing.
 #
 # Before submitting it runs the checks that are cheap on a login node and
 # expensive to get wrong 384 tasks in, then shows what it found and asks. The
@@ -24,6 +27,25 @@
 #     bash tests/studio/run_precompute.sh --limit 24      # at most 24 at once
 #     bash tests/studio/run_precompute.sh --check-only     # checks, submit nothing
 #     bash tests/studio/run_precompute.sh --calibrate      # time ONE build, then stop
+#     bash tests/studio/run_precompute.sh --resubmit        # only unfinished builds
+#     EXP_NUM=3 bash tests/studio/run_precompute.sh         # another experiment
+#
+# EXP_NUM/EXP_NAME (or --exp-num/--exp-name) pick the run output the builds
+# read, and reach compute.py through sweep.py. They used to be printed and
+# gated on but never forwarded, so EXP_NUM=3 checked experiment 3 and built
+# experiment 1. Since compute.params_key holds no experiment identity, each
+# experiment gets its OWN STORE -- experiment 1 of impact_long_shedders keeps
+# $STORE/cache, anything else builds into $STORE/exp_<name>_<num>/cache -- and
+# sweep.py refuses an --out belonging to another experiment. The resolution is
+# `sweep.py --print-paths`, in one place, and the gate/build agreement is
+# printed rather than assumed.
+#
+# --resubmit submits an array covering just the grid indices that sweep.py
+# reports as not done, instead of all 384. Slurm takes an explicit index list
+# but not an unbounded one, so the list is cut into arrays of at most
+# RESUBMIT_CHUNK (default 100, or --chunk N) indices and the pack job depends
+# on all of them with afterany. Note --limit throttles EACH array, so with 3
+# chunks and --limit 24 the ceiling is 72 tasks at once, not 24.
 #
 # --calibrate submits a single task, waits for it, and reports what a build
 # actually costs on THIS cluster. Until it has been run the cost line is an
@@ -48,8 +70,11 @@ LIMIT=""
 CHECK_ONLY=0
 CALIBRATE=0
 CAL_IDX=0
+RESUBMIT=0
+CHUNK="${RESUBMIT_CHUNK:-100}"
 TIMES="slurm_logs/fig2_precompute/timings"
 EXP_NUM="${EXP_NUM:-1}"
+EXP_NAME="${EXP_NAME:-}"
 SEEDS="${SEEDS:-50}"
 STORE="${STORE:-$HOME/fig2_studio}"
 
@@ -60,7 +85,10 @@ while [ $# -gt 0 ]; do
         --check-only) CHECK_ONLY=1 ;;
         --calibrate)  CALIBRATE=1 ;;
         --calibrate-index) CAL_IDX="$2"; shift ;;
+        --resubmit)   RESUBMIT=1 ;;
+        --chunk)      CHUNK="$2"; shift ;;
         --exp-num)    EXP_NUM="$2"; shift ;;
+        --exp-name)   EXP_NAME="$2"; shift ;;
         --seeds)      SEEDS="$2"; shift ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
@@ -84,6 +112,15 @@ echo "================================================================"
 fail=0
 note() { printf "  %-54s %s\n" "$1" "$2"; }
 bad()  { printf "  %-54s %s\n" "$1" "$2"; fail=1; }
+
+# --- which experiment, and where its grid goes ---------------------------
+# One implementation of the cache location, shared with slurm_precompute.sh
+# and pack_cache.sh. EXP_NAME unset means sweep.py's default.
+PATHS=$(python -I tests/studio/sweep.py --print-paths --store "$STORE" \
+        --exp-num "$EXP_NUM" ${EXP_NAME:+--exp-name "$EXP_NAME"})
+read -r EXP_NAME EXP_NUM EXP_REL EXP_STORE CACHE <<<"$PATHS"
+note "experiment to build" "$EXP_NAME #$EXP_NUM"
+note "cache directory" "$CACHE"
 
 # --- the grid, and the hash the builds will carry ------------------------
 WANT=$(python -I tests/studio/sweep.py --list | wc -l)
@@ -125,14 +162,19 @@ else
 fi
 
 # --- is the run output there, and complete? -----------------------------
-python - "$EXP_NUM" "$SEEDS" <<'PY' || fail=1
+# It must be the experiment the array will BUILD, not merely the one printed:
+# the gate reports the identity it resolved and the note below sets it beside
+# the build's. It prints that line FIRST, so a gate that then dies on
+# unreadable output still says what it was looking at.
+GATE=$(python - "$EXP_NUM" "$SEEDS" "$EXP_NAME" <<'PY'
 import sys, os
 sys.path.insert(0, "tests/studio")
 import compute
 import simplicity.dir_manager as dm
-exp_num, seeds = int(sys.argv[1]), int(sys.argv[2])
+exp_num, seeds, exp_name = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+print(f"gate-exp {exp_name} {exp_num}")
 try:
-    present, _ = compute.resolve_scenarios(compute.EXP_NAME, exp_num,
+    present, _ = compute.resolve_scenarios(exp_name, exp_num,
                                            required=compute.SCEN_ORDER)
 except Exception as exc:
     print(f"  {'run output':54} UNREADABLE: {exc}")
@@ -144,13 +186,23 @@ if missing:
 short = []
 for sc in compute.SCEN_ORDER:
     n = len(dm.get_seeded_simulation_output_dirs(
-        compute.one_sod(compute.EXP_NAME, sc, exp_num)))
+        compute.one_sod(exp_name, sc, exp_num)))
     if n < seeds:
         short.append(f"{sc}={n}")
 print(f"  {'run output':54} 5/5 scenarios, "
       + ("all >= %d seeds" % seeds if not short else "SHORT: " + ", ".join(short)))
 raise SystemExit(1 if short else 0)
 PY
+) || fail=1
+printf '%s\n' "$GATE" | grep -v '^gate-exp ' || true
+read -r GATE_NAME GATE_NUM \
+    <<<"$(printf '%s\n' "$GATE" | sed -n 's/^gate-exp //p')" || true
+if [ "$GATE_NAME" = "$EXP_NAME" ] && [ "$GATE_NUM" = "$EXP_NUM" ]; then
+    note "experiment, gate == build" "$GATE_NAME #$GATE_NUM  ->  $CACHE"
+else
+    bad "experiment, gate vs build" \
+        "gate ${GATE_NAME:-?} #${GATE_NUM:-?} != build $EXP_NAME #$EXP_NUM"
+fi
 
 # --- the clade rules themselves -----------------------------------------
 if python -I tests/check_clustering_module.py > /tmp/fig2_clade_check.$$ 2>&1; then
@@ -172,17 +224,26 @@ fi
 note "minutes per build" "$RATE_MIN  ($RATE_SRC)"
 
 # --- what is left to build, and what it costs ---------------------------
-# Captured whole, then read -- NOT piped into `head`. `head` closes the pipe
-# after one line, sweep.py dies on SIGPIPE, pipefail turns that into a failed
-# pipeline and `set -e` exits the script silently, AFTER every check has
-# printed green. It won that race on one box and lost it on the cluster.
-DRY=$(python -I tests/studio/sweep.py --dry-run --seeds "$SEEDS" 2>/dev/null) || true
-TODO=$(printf '%s\n' "$DRY" | sed -n '1s/.*already built, \([0-9]*\) to run.*/\1/p')
-if [ -z "$TODO" ]; then
-    bad "builds still to run" "could not read sweep.py --dry-run"
+# sweep.py --missing is the same done() test the array and pack_cache.sh use,
+# so all three agree on what a finished build is. Captured whole, then read --
+# NOT piped into `head`. `head` closes the pipe after one line, sweep.py dies
+# on SIGPIPE, pipefail turns that into a failed pipeline and `set -e` exits the
+# script silently, AFTER every check has printed green. It won that race on one
+# box and lost it on the cluster.
+MISS=$(python -I tests/studio/sweep.py --missing \
+       --out "$CACHE" --seeds "$SEEDS" \
+       --exp-num "$EXP_NUM" --exp-name "$EXP_NAME") || MISS="__err__"
+if [ "$MISS" = "__err__" ]; then
+    bad "builds still to run" "could not read sweep.py --missing"
     TODO=0
+    MISS=""
 else
+    TODO=$(printf '%s' "$MISS" | grep -c . || true)
     note "builds still to run" "$TODO of $WANT  (a finished build is skipped)"
+    # `|| true`: a new experiment's cache does not exist yet, find exits 1 and
+    # pipefail would kill the script after every check had printed green.
+    DIRS=$(find "$CACHE" -maxdepth 1 -type d -name "*__${HASH}" 2>/dev/null | wc -l || true)
+    note "directories at this hash" "$DIRS  (not the same question as done())"
     COST=$(awk -v t="$TODO" -v r="$RATE_MIN" 'BEGIN {printf "%.0f", t*r/60}')
     note "rough cost" "${COST}h of task time, about $(( TODO * 8 / 1000 )).$(( TODO * 8 % 1000 / 100 )) GB"
 fi
@@ -204,9 +265,9 @@ if [ "$CALIBRATE" -eq 1 ]; then
     echo "  timing ONE build (grid entry $CAL_IDX). sbatch --wait blocks until"
     echo "  it finishes, including any queue time -- expect minutes."
     rm -f "$TIMES/${CAL_IDX}.txt"
-    EXP_NUM="$EXP_NUM" SEEDS="$SEEDS" \
+    EXP_NUM="$EXP_NUM" EXP_NAME="$EXP_NAME" SEEDS="$SEEDS" \
         sbatch --wait --array="${CAL_IDX}-${CAL_IDX}" \
-        tests/studio/slurm_precompute.sh || true
+        tests/studio/slurm_precompute.sh "$CACHE" || true
     if [ ! -f "$TIMES/${CAL_IDX}.txt" ]; then
         echo "  no timing was written. Either the task failed -- check"
         echo "  slurm_logs/fig2_precompute/ -- or that build already existed,"
@@ -225,9 +286,40 @@ if [ "$CALIBRATE" -eq 1 ]; then
     exit 0
 fi
 
+# --- which indices go in, and in how many arrays -------------------------
+# One spec per sbatch. The full grid is a range; --resubmit is an explicit list
+# cut into chunks, because Slurm takes `--array=12,45,97` but not a list of any
+# length. Each chunk is its own array job and the pack job waits on all of them.
+SPECS=()
+if [ "$RESUBMIT" -eq 1 ]; then
+    n=0; cur=""
+    for i in $MISS; do
+        cur="${cur:+$cur,}$i"; n=$(( n + 1 ))
+        [ "$n" -ge "$CHUNK" ] && { SPECS+=("$cur"); cur=""; n=0; }
+    done
+    [ -n "$cur" ] && SPECS+=("$cur")
+    echo
+    if [ "${#SPECS[@]}" -eq 0 ]; then
+        echo "  --resubmit: nothing is missing. Submitting the pack job alone."
+    else
+        echo "  --resubmit: $TODO missing index(es) in ${#SPECS[@]} array(s)" \
+             "of at most $CHUNK"
+        IDS=$(printf '%s' "$MISS" | tr '\n' ' ')
+        if [ "$TODO" -le 40 ]; then
+            printf '  missing:   %s\n' "$IDS"
+        else
+            printf '  missing:   %s...\n' "${IDS:0:200}"
+            echo "             (all $TODO: sweep.py --missing --out $CACHE" \
+                 "--exp-num $EXP_NUM --exp-name $EXP_NAME)"
+        fi
+    fi
+else
+    SPECS=("0-$(( WANT - 1 ))")
+fi
+
 if [ "$YES" -ne 1 ]; then
     echo
-    read -r -p "Submit $TODO builds plus the packing job? [y/N] " reply
+    read -r -p "Submit ${#SPECS[@]} array job(s) covering $TODO builds, plus the packing job? [y/N] " reply
     case "$reply" in
         y|Y|yes|YES) ;;
         *) echo "  Nothing submitted."; exit 0 ;;
@@ -236,18 +328,31 @@ fi
 
 mkdir -p slurm_logs/fig2_precompute
 
-ARRAY_SPEC="0-$(( WANT - 1 ))"
-[ -n "$LIMIT" ] && ARRAY_SPEC="${ARRAY_SPEC}%${LIMIT}"
-
-JOB=$(EXP_NUM="$EXP_NUM" SEEDS="$SEEDS" \
-      sbatch --parsable --array="$ARRAY_SPEC" tests/studio/slurm_precompute.sh)
+JOBS=()
 echo
-echo "  array      $JOB   ($ARRAY_SPEC)"
+for spec in "${SPECS[@]}"; do
+    [ -n "$LIMIT" ] && spec="${spec}%${LIMIT}"
+    JOB=$(EXP_NUM="$EXP_NUM" EXP_NAME="$EXP_NAME" SEEDS="$SEEDS" \
+          sbatch --parsable --array="$spec" tests/studio/slurm_precompute.sh \
+          "$CACHE")
+    JOBS+=("$JOB")
+    SHOWN="$spec"
+    [ "${#spec}" -gt 72 ] && SHOWN="${spec:0:72} ..."
+    echo "  array      $JOB   ($SHOWN)"
+done
 
-PACK=$(STORE="$STORE" sbatch --parsable --dependency=afterok:"$JOB" \
+DEP=""
+[ "${#JOBS[@]}" -gt 0 ] && DEP="--dependency=afterany:$(IFS=:; echo "${JOBS[*]}")"
+PACK=$(STORE="$STORE" SEEDS="$SEEDS" \
+       EXP_NUM="$EXP_NUM" EXP_NAME="$EXP_NAME" sbatch --parsable $DEP \
        tests/studio/pack_cache.sh)
-echo "  pack       $PACK  (runs only if every build succeeds)"
+echo "  pack       $PACK  (afterany: runs even if tasks fail, and says which)"
 echo
-echo "  watch:     squeue -j $JOB,$PACK"
+WATCH="$PACK"
+[ "${#JOBS[@]}" -gt 0 ] && WATCH="$(IFS=,; echo "${JOBS[*]}"),$PACK"
+echo "  watch:     squeue -j $WATCH"
 echo "  logs:      slurm_logs/fig2_precompute/"
-echo "  result:    $STORE/fig2_cache_${HASH}_<date>.tar.gz + .manifest.txt"
+echo "  failures:  slurm_logs/fig2_precompute/failed/<IDX>.txt"
+echo "  result:    $EXP_STORE/fig2_cache_${HASH}_<date>.tar.gz + .manifest.txt"
+echo "  if the grid is short the pack job exits 3 and names the indices;"
+echo "  then: bash tests/studio/run_precompute.sh --resubmit"

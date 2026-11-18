@@ -10,7 +10,8 @@ import simplicity.sequencing as sq
 import simplicity.settings_manager as sm
 import simplicity.tuning.evolutionary_rate as er
 from _scenarios import (scenario_names, scenario_output_dirs, scenario_label,
-                        one_sod)
+                        one_sod, EXPECTED_SEED_SKIPS, record_seed_skip,
+                        format_seed_skips)
 import simplicity.output_manager as om
 from simplicity.intra_host_model import Host 
 
@@ -98,7 +99,9 @@ def get_panel_a_data(exp_num=1, exp_name="impact_long_shedders"):
             time_array = np.arange(0, time_max, step)
             temp_df = pd.DataFrame({'time': time_array[:len(p_inf)], 'p_infectious': p_inf, 'cohort': label})
             df_list.append(temp_df)
-        except Exception: continue
+        except EXPECTED_SEED_SKIPS as exc:
+            print(f"[fig1][warn] panel A: {experiment_string}: {type(exc).__name__}: {exc}")
+            continue
     if not df_list: return pd.DataFrame(columns=['time', 'p_infectious', 'cohort'])
     return pd.concat(df_list, ignore_index=True)
 
@@ -113,12 +116,16 @@ def get_panel_b_data(exp_num=1, exp_name="impact_long_shedders"):
         rng = random.Random(42) 
         sampled_control_ssods = rng.sample(all_control_ssods, min(10, len(all_control_ssods)))
         matched_seed_names = [os.path.basename(ssod) for ssod in sampled_control_ssods]
-    except Exception: return pd.DataFrame(columns=['duration', 'cohort'])
+    except EXPECTED_SEED_SKIPS as exc:
+        print(f"[fig1][warn] panel B: no control seeds for {control_exp_string}: "
+              f"{type(exc).__name__}: {exc}")
+        return pd.DataFrame(columns=['duration', 'cohort'])
 
     for scenario in scenarios:
         experiment_string = scenario_label(exp_name, scenario, exp_num)
         sod = one_sod(exp_name, scenario, exp_num)      # outside the try
         if sod is None: continue
+        skips = {}
         try:
             all_ssods_for_scenario = dm.get_seeded_simulation_output_dirs(sod)
             for target_seed_name in matched_seed_names:
@@ -133,7 +140,11 @@ def get_panel_b_data(exp_num=1, exp_name="impact_long_shedders"):
                     filtered_df = filtered_df[['duration']].dropna()
                     filtered_df['cohort'] = label
                     df_list.append(filtered_df)
-        except Exception: continue
+        except EXPECTED_SEED_SKIPS as exc:
+            record_seed_skip(skips, exc)
+        if skips:
+            print(f"[fig1][warn] panel B: {experiment_string}: "
+                  f"{format_seed_skips(skips)}")
     if not df_list: return pd.DataFrame(columns=['duration', 'cohort'])
     return pd.concat(df_list, ignore_index=True)
 
@@ -281,10 +292,12 @@ def get_model_intrahost_clock(exp_num=1, exp_name="impact_long_shedders",
         if max_seeds:
             ssods = ssods[:max_seeds]
         n = 0
+        skips = {}
         for ssod in ssods:
             try:
                 ih = er.extract_ih_regression_data(ssod)
-            except Exception:
+            except EXPECTED_SEED_SKIPS as exc:
+                record_seed_skip(skips, exc)
                 continue
             if ih is None or ih.empty:
                 continue
@@ -293,7 +306,8 @@ def get_model_intrahost_clock(exp_num=1, exp_name="impact_long_shedders",
             ih['seed'] = os.path.basename(ssod)     # INTRAHOST_CLOCK_RATIO = 1.0
             rows.append(ih)
             n += len(ih)
-        print(f"[fig1] intra-host clock: {n} points for {label} ({scenario})")
+        print(f"[fig1] intra-host clock: {n} points for {label} ({scenario}), "
+              f"{len(ssods)} seeds, {format_seed_skips(skips)}")
     if not rows:
         return pd.DataFrame(columns=['Sequencing_time', 'Distance_from_root',
                                      'cohort', 'seed'])

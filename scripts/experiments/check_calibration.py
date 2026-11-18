@@ -3,16 +3,18 @@
 #
 # Thin CLI wrapper around the shared long-shedder NSR calibration fit/plot
 # (scripts/experiments/long_nsr_calibration_plot.py), kept as a standalone
-# tool to manually rerun the fit/plot for a past
-# impact_long_shedders_calibration_lng_nsr_#N experiment.
+# tool to manually re-fit a past impact_long_shedders_#N experiment.
 # impact_long_shedders_cal_1.py calls the same shared function automatically
-# at the end of its own run.
+# at the end of its own run -- that call is the calibration stage, and it is
+# what persists.
 #
-# NOT side-effect-free: this also overwrites that experiment's saved
-# calibrated-long-NSR file (write_calibrated_long_nsr), which
-# impact_long_shedders_cal_2.py reads back as its Stage 1 result. Rerunning
-# this with a different --target-osr changes what the NEXT cal_2.py run
-# under that exp_num will use, not just the plot.
+# READ-ONLY with respect to the experiment. Nothing is written under its
+# directory: no fit-results CSV, no calibrated-long-NSR table (the Stage 1
+# result impact_long_shedders_cal_2.py reads back), no per-seed OSR frame,
+# and not the figure either. --out says where the figure goes, and is
+# required for that reason. Rerunning with a different --target-osr shows
+# what that target would give; it does not change what the next cal_2.py run
+# under that exp_num will use.
 
 import sys
 import argparse
@@ -22,8 +24,8 @@ from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Rerun the long-shedder NSR calibration fit/plot for a "
-                    "run already on disk.")
+        description="Re-fit the long-shedder NSR calibration for a run "
+                    "already on disk, without writing into it.")
     parser.add_argument('--experiment-name', type=str, required=True,
                         help="Numbered experiment, e.g. "
                             "impact_long_shedders_#3. Since the pipeline "
@@ -34,6 +36,10 @@ def main():
                         dest='groups',
                         help="Fit only this group; repeatable. Default: the "
                              "experiment's long-calibration groups.")
+    parser.add_argument('--out', type=str, required=True,
+                        help="Directory the calibration figure is written "
+                             "to. Required: this tool writes nothing into "
+                             "the experiment, its 05_Plots included.")
     parser.add_argument('--target-osr', type=float, default=0.00205)
     parser.add_argument('--model', type=str, default='exp',
                         choices=['lin', 'log', 'exp', 'tan'])
@@ -44,7 +50,7 @@ def main():
     try:
         plot_and_fit_long_nsr_calibration(
             args.experiment_name, args.target_osr, args.model, args.min_seq,
-            args.min_len, groups=args.groups)
+            args.min_len, groups=args.groups, refit_out_dir=args.out)
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)

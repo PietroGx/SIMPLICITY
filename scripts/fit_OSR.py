@@ -47,8 +47,10 @@ def run_fitting(experiment_name, experiment_number, parameter='nucleotide_substi
         # Fit Model
         print(f'[Fitting] Fitting {model_type} model...')
         fit_result = er.fit_observed_substitution_rate_regressor(
-            experiment_numbered_name, OSR_single, model_type, weights=None
+            OSR_single, model_type, weights=None
         )
+        om.write_fit_results_csv(experiment_numbered_name, model_type,
+                                 fit_result)
 
         # Get Stats
         OSR_combined = om.read_combined_OSR_vs_parameter_csv(experiment_numbered_name, parameter, min_seq, min_len)
@@ -63,7 +65,11 @@ def run_fitting(experiment_name, experiment_number, parameter='nucleotide_substi
         print("[Fitting] SUCCESS. Plot saved.")
 
     except Exception as e:
+        # Re-raise, as experiment_script_runner does: swallowing this returned
+        # normally and main() exited 0, reporting success for a half-written
+        # experiment.
         print(f"[Error] Fitting failed: {e}")
+        raise
 
 def main():
     parser = argparse.ArgumentParser(description="Simplicity Experiment Manager Pipeline")

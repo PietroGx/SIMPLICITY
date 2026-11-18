@@ -58,8 +58,11 @@ dm.declare_outputs()
 
 import impact_long_shedders_config as cfg
 
+# The fixture is named for this test and numbered from 1 inside that name:
+# a scratch experiment must never be able to collide with a production run.
+BASE = 'test_merged_experiment'
 EXP_NUM = 1
-NAME = f'{cfg.EXP_NAME}_#{EXP_NUM}'
+NAME = f'{BASE}_#{EXP_NUM}'
 CAL_SEEDS, EXP_SEEDS = 2, 3
 RANGES = {'min': 1e-4, 'max': 1e-2, 'steps': 3}
 
@@ -160,7 +163,7 @@ def test_figures_read_only_their_scenario():
     print('\n=== a scenario resolves to its own group and nothing else')
     for scenario in (s['name'] for s in cfg.SCENARIOS):
         group = cfg.exp_group(scenario)
-        sods = cfg.scenario_output_dirs(cfg.EXP_NAME, scenario, EXP_NUM)
+        sods = cfg.scenario_output_dirs(BASE, scenario, EXP_NUM)
         check(f'{scenario}: every directory is in its group',
               all(group in sod.split(os.sep) for sod in sods), True)
         check(f'{scenario}: one grid point, as the frozen table has one row',
@@ -168,7 +171,7 @@ def test_figures_read_only_their_scenario():
 
     # the calibration cohorts share SOT's and edge_case's names after the
     # prefix; without it they would be the same group
-    sot = cfg.scenario_output_dirs(cfg.EXP_NAME, 'SOT', EXP_NUM)
+    sot = cfg.scenario_output_dirs(BASE, 'SOT', EXP_NUM)
     calib = dm.get_simulation_output_dirs(NAME,
                                           group=cfg.calib_long_group('SOT'))
     check('the SOT scenario and the SOT cohort are different directories',
@@ -176,10 +179,10 @@ def test_figures_read_only_their_scenario():
     check('and the cohort is the one with the swept grid', len(calib), 3)
 
     check('an unknown scenario resolves to nothing, rather than everything',
-          cfg.scenario_output_dirs(cfg.EXP_NAME, 'not_a_scenario', EXP_NUM), [])
+          cfg.scenario_output_dirs(BASE, 'not_a_scenario', EXP_NUM), [])
     check('has_output agrees',
-          [cfg.scenario_output_dirs(cfg.EXP_NAME, 'SOT', EXP_NUM) != [],
-           cfg.scenario_output_dirs(cfg.EXP_NAME, 'SOT', 999) != []],
+          [cfg.scenario_output_dirs(BASE, 'SOT', EXP_NUM) != [],
+           cfg.scenario_output_dirs(BASE, 'SOT', 999) != []],
           [True, False])
 
 
@@ -234,8 +237,8 @@ def test_cal2_fit_names_the_group_it_was_scoped_to():
     8e, where cal_1's cohorts are in the same experiment. So the stage died
     AFTER its 300 simulations had run, on an experiment that was fine.
 
-    Only the per-seed readers and the regressor are stubbed; the scoping, the
-    group listing and the naming are the real ones.
+    Only the per-seed readers, the regressor and the results write are
+    stubbed; the scoping, the group listing and the naming are the real ones.
     """
     print('\n=== cal_2 fits under its own group, not whatever is on disk')
     import impact_long_shedders_cal_2 as c2
@@ -248,20 +251,29 @@ def test_cal2_fit_names_the_group_it_was_scoped_to():
     saved = (c2.om.read_final_time, c2.om.read_sequencing_data_regression,
              c2.er.tempest_regression,
              c2.er.fit_observed_substitution_rate_regressor,
-             c2.er.compute_calibrated_parameter)
+             c2.er.compute_calibrated_parameter,
+             c2.om.write_fit_results_csv, c2.write_osr_per_seed)
 
-    def record_fit(numbered, df, model, parameter_name=None,
-                   experiment_group=None):
-        seen['group'] = experiment_group
+    def record_fit(df, model, weights=None, parameter_name=None):
         seen['rows'] = len(df)
         return Fit()
 
+    # The group no longer reaches the fitter: the stage names it when it
+    # persists. That call is where the naming is now checked.
+    def record_write(numbered, model, fit_result, individual_type=None,
+                     experiment_group=None):
+        seen['group'] = experiment_group
+
     c2.om.read_final_time = lambda ssod: 365.0
+    # Distance_from_root is read for the per-seed frame's mutation counts.
     c2.om.read_sequencing_data_regression = lambda ssod: pd.DataFrame(
-        {'individual_type': ['standard'] * 40})
+        {'individual_type': ['standard'] * 40,
+         'Distance_from_root': [0.0005] * 40})
     c2.er.tempest_regression = lambda df: type('R', (), {'coef_': [0.0013]})()
     c2.er.fit_observed_substitution_rate_regressor = record_fit
     c2.er.compute_calibrated_parameter = lambda *a, **k: 7e-5
+    c2.om.write_fit_results_csv = record_write
+    c2.write_osr_per_seed = lambda *a, **k: None
     try:
         nsr = c2.compute_standard_nsr(NAME, 0.0013)
         check('it runs at all on a merged experiment', isinstance(nsr, float),
@@ -291,7 +303,8 @@ def test_cal2_fit_names_the_group_it_was_scoped_to():
         (c2.om.read_final_time, c2.om.read_sequencing_data_regression,
          c2.er.tempest_regression,
          c2.er.fit_observed_substitution_rate_regressor,
-         c2.er.compute_calibrated_parameter) = saved
+         c2.er.compute_calibrated_parameter,
+         c2.om.write_fit_results_csv, c2.write_osr_per_seed) = saved
 
 
 def main():

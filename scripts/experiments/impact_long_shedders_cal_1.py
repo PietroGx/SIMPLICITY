@@ -25,6 +25,8 @@
 
 import argparse
 
+import simplicity.dir_manager as dm
+
 from experiment_script_runner import run_experiment_phase_script
 from impact_long_shedders_config import (
     SCENARIOS, EXP_NAME, NSR_RANGES, CAL1_FINAL_TIME,
@@ -64,6 +66,10 @@ def run_long_calibration(exp_num, runner, seeds, target_osr_long, R,
              f"[{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
 
     numbered = f"{EXP_NAME}_#{exp_num}"
+    # Idempotent, and the stage can be run standalone: whoever gets here
+    # first records the start, and a sealed experiment is refused here rather
+    # than after its simulations have run.
+    dm.mark_experiment_started(numbered)
     print(f"\nDispatching the long-calibration phase of {numbered} to "
           f"{runner}...")
     # append=False: cal_1 is the FIRST phase of a run, so it writes the

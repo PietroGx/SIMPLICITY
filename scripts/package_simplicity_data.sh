@@ -116,6 +116,24 @@ else
 fi
 
 echo "--- STEP 2: MULTI-CORE COMPRESSION ---"
+# Member names must not depend on how the caller spelled the folder: run_dir
+# builds on dm.get_data_dir(), which is absolute, and `tar` stores whatever it
+# is handed. Keep the last two components (Data/<experiment>) and give tar the
+# rest as -C, which it applies positionally.
+tar_args() {
+    TAR_ARGS=()
+    local p parent
+    for p in "$@"; do
+        p="${p%/}"
+        parent=$(dirname "$p")
+        if [[ "$parent" == "." ]]; then
+            TAR_ARGS+=(-C . "$p")
+        else
+            TAR_ARGS+=(-C "$(dirname "$parent")" "$(basename "$parent")/$(basename "$p")")
+        fi
+    done
+}
+
 current_part=1
 current_batch=()
 current_batch_size=0
@@ -126,7 +144,8 @@ for folder in "${TARGET_FOLDERS[@]}"; do
     if (( current_batch_size + folder_size > MAX_SIZE_BYTES )) && [ ${#current_batch[@]} -gt 0 ]; then
         archive_name="${ARCHIVE_PREFIX}_part${current_part}.tar.xz"
         echo " -> Creating $archive_name..."
-        tar -I pixz -cf "$archive_name" "${current_batch[@]}"
+        tar_args "${current_batch[@]}"
+        tar -I pixz -cf "$archive_name" "${TAR_ARGS[@]}"
         ((current_part++))
         current_batch=()
         current_batch_size=0
@@ -134,7 +153,10 @@ for folder in "${TARGET_FOLDERS[@]}"; do
     current_batch+=("$folder")
     current_batch_size=$((current_batch_size + folder_size))
 done
-[ ${#current_batch[@]} -gt 0 ] && tar -I pixz -cf "${ARCHIVE_PREFIX}_part${current_part}.tar.xz" "${current_batch[@]}"
+if [ ${#current_batch[@]} -gt 0 ]; then
+    tar_args "${current_batch[@]}"
+    tar -I pixz -cf "${ARCHIVE_PREFIX}_part${current_part}.tar.xz" "${TAR_ARGS[@]}"
+fi
 
 echo "--- STEP 3: INTEGRITY VERIFICATION ---"
 # `pixz -l` lists the tarball index: a read-only check that the archive is

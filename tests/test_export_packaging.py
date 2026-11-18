@@ -45,6 +45,8 @@ sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts'))
 sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
 
+import simplicity.dir_manager as dm
+
 import impact_long_shedders_config as cfg
 import run_impact_long_shedders_pipeline as pipeline
 
@@ -73,8 +75,10 @@ def plant(root, name, *files):
 # ===========================================================================
 def test_export_dirs():
     print('\n=== run_export_dirs names the one directory a run writes')
-    for mode, root in (('distribution', 'Data/impact_long_shedders_#7'),
-                       ('argmax', 'Data/impact_long_shedders_amx_#7')):
+    data = dm.get_data_dir()
+    for mode, root in (
+            ('distribution', os.path.join(data, 'impact_long_shedders_#7')),
+            ('argmax', os.path.join(data, 'impact_long_shedders_amx_#7'))):
         dirs = cfg.run_export_dirs(7, mode)
         check(f'{mode}: one directory', len(dirs), 1)
         # it used to name the experiment with a bare EXP_NAME, so an argmax
@@ -95,9 +99,14 @@ def test_export_dirs():
 def test_artifacts_archive():
     print('\n=== the artifacts zip collects the mode that ran, and only that')
     root = tempfile.mkdtemp(prefix='simp_export_')
-    cwd = os.getcwd()
+    # dm.set_data_dir, not os.chdir: dm.DEFAULT_DATA_DIR is the cwd's Data/ as
+    # captured at import and does not follow a later chdir, so the config's
+    # helpers would still name the LIVE Data/impact_long_shedders_#3 -- the
+    # distribution half of this section then passes on that run's plots, and
+    # plant() writes into it through the ../ that relpath produces.
+    saved_data = dm.get_data_dir()
+    dm.set_data_dir(os.path.join(root, 'Data'))
     try:
-        os.chdir(root)
         num = 3
         exp = cfg.run_exp_name(num)
         # BOTH modes fully on disk, so the mode asked for is the only thing
@@ -108,7 +117,8 @@ def test_artifacts_archive():
             plant(root, run,
                   f'05_Plots/{run}_long_nsr_calibration_fit.png',
                   f'05_Plots/{run}_std_nsr_calibration_fit.png')
-            rel = os.path.relpath(cfg.sanity_plot_path(num, mode), 'Data')
+            rel = os.path.relpath(cfg.sanity_plot_path(num, mode),
+                                  dm.get_data_dir())
             plant(root, os.path.dirname(rel), os.path.basename(rel))
         log = os.path.join(root, 'pipeline.log')
         with open(log, 'w') as fh:
@@ -133,12 +143,13 @@ def test_artifacts_archive():
         os.remove(os.path.join(root, 'Data', exp, '05_Plots',
                                f'{exp}_std_nsr_calibration_fit.png'))
         zpath = os.path.join(root, 'artifacts_missing.zip')
-        code = ('import sys, os\n'
+        code = ('import sys\n'
                 'sys.path[:0] = %r\n'
+                'import simplicity.dir_manager as dm\n'
                 'import run_impact_long_shedders_pipeline as p\n'
-                'os.chdir(%r)\n'
+                'dm.set_data_dir(%r)\n'
                 'p.write_artifacts_archive(%r, %d, %r, ["distribution"])\n'
-                % (sys.path[:3], root, zpath, num, log))
+                % (sys.path[:3], dm.get_data_dir(), zpath, num, log))
         r = subprocess.run([sys.executable, '-c', code],
                            capture_output=True, text=True)
         skips = [l for l in r.stdout.splitlines() if 'artifact not found' in l]
@@ -146,7 +157,7 @@ def test_artifacts_archive():
         check('and it names the std fit',
               'std_nsr_calibration_fit' in (skips[0] if skips else ''), True)
     finally:
-        os.chdir(cwd)
+        dm.set_data_dir(saved_data)
         shutil.rmtree(root, ignore_errors=True)
 
 
@@ -209,10 +220,22 @@ def test_compress_command():
 
 # ===========================================================================
 def _top_level(archive):
+    '''The run directories inside the archive, and the archive layout pinned.
+
+    run_export_dirs is absolute whenever the data directory is -- which in a
+    run it always is -- and tar stores whatever path it is handed, so an
+    absolute --dir used to prefix every member with home/pietro/... . The
+    packer now passes tar a -C base plus a Data/<experiment> member name, so
+    the prefix is the same either way. Accepting both spellings here is what
+    let that through.'''
     out = subprocess.run(['tar', '-I', 'pixz', '-tf', archive],
                          capture_output=True, text=True)
-    return sorted({p.split('/')[1] for p in out.stdout.split()
-                   if p.startswith('Data/') and len(p.split('/')) > 1})
+    data = os.path.basename(dm.get_data_dir())
+    members = [m.strip('/').split('/') for m in out.stdout.split() if m.strip('/')]
+    stray = sorted({'/'.join(p) for p in members
+                    if len(p) < 2 or p[0] != data})
+    check(f'{len(members)} members, all under {data}/<experiment>/', stray, [])
+    return sorted({p[1] for p in members if len(p) > 1 and p[0] == data})
 
 
 def test_packer_end_to_end():
@@ -222,8 +245,11 @@ def test_packer_end_to_end():
         return
     root = tempfile.mkdtemp(prefix='simp_pack_')
     cwd = os.getcwd()
+    saved_data = dm.get_data_dir()
     try:
+        # the packer writes Data_Export/ into the cwd, so this one moves both
         os.chdir(root)
+        dm.set_data_dir(os.path.join(root, 'Data'))
         os.makedirs('scripts', exist_ok=True)
         shutil.copy(PKG_SCRIPT, 'scripts/')
         wanted = sorted(os.path.basename(d) for d in cfg.run_export_dirs(2))
@@ -258,6 +284,7 @@ def test_packer_end_to_end():
         check('which is the bug this test exists for', globbed != packed, True)
     finally:
         os.chdir(cwd)
+        dm.set_data_dir(saved_data)
         shutil.rmtree(root, ignore_errors=True)
 
 

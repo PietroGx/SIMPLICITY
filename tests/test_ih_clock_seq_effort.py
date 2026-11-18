@@ -27,9 +27,8 @@ function on every seed, row for row: if the two ever disagree the seed is
 reported as DRIFT and excluded, so this file cannot quietly fit something
 else than cal_1 does.
 
-om.write_fit_results_csv is stubbed out: the shared fitter writes into the
-experiment's Fit_results, and a diagnostic must not overwrite the run's own
-calibration output.
+Nothing is written into the experiment: the shared fitter persists nothing,
+and this diagnostic adds no write of its own.
 
 Run from the repo root:
     python tests/test_ih_clock_seq_effort.py --exp-num 3
@@ -138,8 +137,6 @@ def main():
                    help="0 = every seed.")
     args = p.parse_args()
 
-    om.write_fit_results_csv = lambda *a, **k: None     # never touch the run
-
     experiment = f"{cfg.exp_name(cfg.DEFAULT_CONSENSUS)}_#{args.exp_num}"
     groups = [g for g in dm.get_groups(experiment) if g.startswith('calib_long__')]
     print(f"experiment : {experiment}")
@@ -221,9 +218,8 @@ def main():
                     # the shared fitter prints lmfit's full report per call
                     with contextlib.redirect_stdout(io.StringIO()):
                         fit = er.fit_observed_substitution_rate_regressor(
-                            experiment, clean, model_type=args.model_type,
-                            parameter_name='nucleotide_substitution_rate_long',
-                            experiment_group=group)
+                            clean, model_type=args.model_type,
+                            parameter_name='nucleotide_substitution_rate_long')
                     nsrs.append(float(er.compute_calibrated_parameter(
                         args.model_type, fit, args.target)))
                 except Exception as exc:

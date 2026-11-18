@@ -29,6 +29,12 @@ import simplicity.output_manager as om
 import simplicity.clustering as cl
 from scipy.signal import find_peaks
 
+# Skip accounting, from the sibling that already owns it -- every importer of
+# this module imports _scenarios too, directly or through
+# fig2_preprocess_data, so the import direction costs nothing.
+from _scenarios import (EXPECTED_SEED_SKIPS, record_seed_skip,
+                        format_seed_skips)
+
 
 
 # ---------------------------------------------------------------- episodes
@@ -277,17 +283,33 @@ def get_lineage_labels(ssod, cluster_threshold):
 
 
 def summarize_sod_pies(sod, cluster_threshold, min_days):
-    """Aggregates winners across all seeds in an SOD."""
+    """Aggregates winners across all seeds in an SOD.
+
+    `valid_seeds` is the pie denominator for figures 2 and 4, so it states
+    itself: N of M, with every seed that did not make it and why. Only an
+    absent/unreadable or empty/truncated output is a skip; anything structural
+    propagates. The accumulation and the increment sit OUTSIDE the try --
+    covering them dropped a failing seed from numerator and denominator at
+    once, leaving a smaller pie with no indication.
+    """
     results = {"Peak": Counter(), "Burden": Counter(), "Survival": Counter(), "Growth": Counter()}
-    valid_seeds = 0
-    for ssod in dm.get_seeded_simulation_output_dirs(sod):
+    valid_seeds, skips, short = 0, {}, 0
+    ssods = dm.get_seeded_simulation_output_dirs(sod)
+    for ssod in ssods:
         try:
-            if om.read_final_time(ssod) >= min_days:
-                winners = get_clade_winners(ssod, cluster_threshold)
-                for k, v in winners.items(): results[k][v] += 1
-                valid_seeds += 1
-        except Exception:
-            pass
+            if om.read_final_time(ssod) < min_days:
+                short += 1
+                continue
+            winners = get_clade_winners(ssod, cluster_threshold)
+        except EXPECTED_SEED_SKIPS as exc:
+            record_seed_skip(skips, exc)
+            continue
+        for k, v in winners.items(): results[k][v] += 1
+        valid_seeds += 1
+    print(f"[summarize_sod_pies] {os.path.basename(os.path.dirname(sod))}: "
+          f"{valid_seeds} of {len(ssods)} seeds"
+          + (f", {short} under {min_days} days" if short else "")
+          + f", {format_seed_skips(skips)}", flush=True)
     return results, valid_seeds
     
 # --- Figure 5 Extractors (Epidemiological Stats) ---

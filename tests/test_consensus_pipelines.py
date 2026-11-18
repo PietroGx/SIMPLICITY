@@ -7,16 +7,32 @@ per the repo rule that "the config is correct" is not verification.
 Run from the repo root:
     python tests/test_consensus_pipelines.py
 """
+import atexit
 import os
+import shutil
 import sys
+import tempfile
 
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 os.pardir, 'scripts', 'experiments'))
 
+import simplicity.dir_manager as dm
+
 import impact_long_shedders_config as cfg
 import impact_long_shedders_exp as exp
+
+# A scratch Data/ for the whole module. Not os.chdir: dm captured an ABSOLUTE
+# _data_dir at import (dir_manager.py:31) and does not follow the cwd, so the
+# orchestrator sections below wrote experiment_state.json into the live Data/
+# for exp-nums 99 (both modes) and 998. The reference parameters come along, so
+# the stages still read this machine's standard_values.json.
+_SCRATCH = tempfile.mkdtemp(prefix='consensus_pipelines_')
+shutil.copytree(os.path.join(dm.get_data_dir(), '00_Reference_parameters'),
+                os.path.join(_SCRATCH, '00_Reference_parameters'))
+dm.set_data_dir(_SCRATCH)
+atexit.register(shutil.rmtree, _SCRATCH, True)
 
 _fails = []
 
@@ -168,8 +184,6 @@ def test_dispatch():
 # sanity plots: one grid per consensus pipeline
 # ---------------------------------------------------------------------------
 import io
-import shutil
-import tempfile
 import contextlib
 import subprocess as _sp
 
@@ -188,10 +202,8 @@ def test_sanity_plots():
 
     real_run = _sp.run
     runner.subprocess.run = lambda cmd, **k: (calls.append(cmd), FakeResult())[1]
-    # It creates the run's slurm log directory, so clean those up afterwards.
-    # Not by chdir'ing: dir_manager captures an ABSOLUTE _data_dir at import
-    # (dir_manager.py:28) while the config's helpers are relative to the cwd,
-    # so moving the cwd moves only one of them.
+    # It creates the run's slurm log directory; both it and the config's
+    # helpers resolve under the module's scratch Data/, so this only tidies up.
     made = [cfg.run_dir(7, mode) for mode in cfg.CONSENSUS_MODES]
     try:
         log = io.StringIO()
@@ -223,23 +235,15 @@ def test_sanity_plots():
 
 def _archive_looked_for(modes):
     """Run write_artifacts_archive over an empty tree and return what it asked
-    for. In a temp cwd: the candidate paths are relative to Data/, and after
-    the v2.4.91 rename the argmax name collides with the bound run #7 still on
-    this machine -- a found file prints nothing, so the check would pass or
-    fail on what happens to be on disk."""
-    import tempfile
+    for. The candidate paths come from the module's scratch Data/, where
+    nothing is planted: a found file prints nothing, so against the live Data/
+    this would pass or fail on what happens to be on disk."""
     buf = io.StringIO()
-    saved = os.getcwd()
     with tempfile.TemporaryDirectory() as tmp:
         arc = os.path.join(tmp, 'out', 'a.zip')
-        os.chdir(tmp)
-        try:
-            with contextlib.redirect_stdout(buf):
-                runner.write_artifacts_archive(arc, 7,
-                                               os.path.join(tmp, 'no.log'),
-                                               modes)
-        finally:
-            os.chdir(saved)
+        with contextlib.redirect_stdout(buf):
+            runner.write_artifacts_archive(arc, 7,
+                                           os.path.join(tmp, 'no.log'), modes)
     return buf.getvalue()
 
 

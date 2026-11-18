@@ -26,6 +26,8 @@ import os
 import argparse
 import pandas as pd
 
+import simplicity.dir_manager as dm
+
 from experiment_script_runner import run_experiment_phase_script
 from impact_long_shedders_config import (
     EXP_NAME, table_path as default_table_path, USER_FIXED_PARAMS,
@@ -126,6 +128,7 @@ def main():
     print(f"\n[Runner] Dispatching {len(df)} scenario(s) from {table_path} "
           f"with consensus={args.consensus} -> "
           f"{exp_name(args.consensus)}_#{args.exp_num}, one group each")
+    dm.mark_experiment_started(f"{exp_name(args.consensus)}_#{args.exp_num}")
     shared = {k: v for k, v in USER_FIXED_PARAMS.items() if k != "R"}
     print_fixed_params(shared, label="Shared parameters (R shown per scenario below)")
 

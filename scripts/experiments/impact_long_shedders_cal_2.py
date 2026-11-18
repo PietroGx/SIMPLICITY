@@ -39,6 +39,7 @@ import simplicity.settings_manager as sm
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
+import simplicity.phenotype.distance as dis
 
 from experiment_script_runner import run_experiment_phase_script
 from impact_long_shedders_config import (
@@ -50,11 +51,53 @@ from impact_long_shedders_config import (
     add_slurm_resource_args, set_slurm_resource_env, print_fixed_params,
     set_calibration_output_env,
 )
-from long_nsr_calibration_plot import read_calibrated_long_nsr
+from long_nsr_calibration_plot import (read_calibrated_long_nsr,
+                                       write_osr_per_seed,
+                                       EXPECTED_SEED_SKIPS, record_seed_skip,
+                                       report_seed_usage, merge_seed_skips,
+                                       format_seed_skips,
+                                       MAX_CALIBRATION_WORKERS,
+                                       calibration_workers, seed_task_mapper,
+                                       read_seed_outcomes)
+
+_REF_LEN = len(dis.reference)
+
+
+def _std_seed_osr_row(task):
+    """One seeded simulation output dir's standard-cohort OSR row, run here or
+    in a pool worker. Tagged exactly as cal_1's _seed_osr_row: ('row', dict),
+    ('empty', None) for a seed that fails the gate, ('skip', exception name)
+    for an expected read failure. Anything structural is re-raised naming its
+    seeded dir, the traceback not surviving the pickle."""
+    ssod, nsr_val, sim_name, min_seq, min_len = task
+    try:
+        final_time = om.read_final_time(ssod)
+        seq_data = om.read_sequencing_data_regression(ssod)
+        # Every individual is standard here; the filter is kept so this
+        # measures the same quantity as the bound pipeline's.
+        seq_data = seq_data[seq_data['individual_type'] == 'standard']
+        if not (final_time >= min_len and len(seq_data) >= min_seq):
+            return 'empty', None
+        return 'row', {
+            'nucleotide_substitution_rate': nsr_val,
+            'observed_substitution_rate':
+                er.tempest_regression(seq_data).coef_[0],
+            'simulation': sim_name,
+            'seed': os.path.basename(ssod),
+            'n_points': len(seq_data),
+            'muts_median': float(
+                seq_data['Distance_from_root'].median()) * _REF_LEN,
+            'muts_max': float(
+                seq_data['Distance_from_root'].max()) * _REF_LEN,
+        }
+    except EXPECTED_SEED_SKIPS as exc:
+        return 'skip', type(exc).__name__
+    except Exception as exc:
+        raise RuntimeError(f"{type(exc).__name__} in {ssod}: {exc}") from exc
 
 
 def compute_standard_nsr(numbered, target_osr_std, model_type='exp',
-                         min_seq=30, min_len=100, groups=None):
+                         min_seq=30, min_len=100, groups=None, workers=None):
     """Read back the standard-only sweep, fit OSR vs NSR over standard
     individuals, invert at target. Returns the calibrated standard NSR.
 
@@ -64,47 +107,55 @@ def compute_standard_nsr(numbered, target_osr_std, model_type='exp',
     listing would pool a 100%-long-shedder sweep and single-point scenario
     runs into this fit and still produce a healthy-looking R^2. None means
     the calib_std group the config names.
+
+    `workers` is the process count for the per-seed extraction; None asks
+    calibration_workers. It changes only how long this takes -- outcomes are
+    read back in task order, so the fit is fed the identical rows.
     """
     wanted = list(groups) if groups is not None else [calib_std_group()]
     print(f"\n[Stage 2] Standard-only NSR sweep: {numbered}  groups={wanted}")
 
     all_rows = []
+    skipped_all = {}
     sods = [sod for group in wanted
             for sod in dm.get_simulation_output_dirs(numbered, group=group)]
     if not sods:
         raise RuntimeError(
             f"{numbered} has no simulation output in group(s) {wanted}. "
             f"Groups on disk: {dm.get_groups(numbered)}.")
+    # Flat task list over every (simulation output dir, seed), so one pool
+    # covers the stage; `plan` holds the structure the outcomes are read back
+    # with -- they arrive in task order, so each directory's slice is
+    # consumed, reported and outlier-filtered in its turn, as before.
+    plan = []
+    tasks = []
     for sod in sods:
         nsr_val = sm.get_parameter_value_from_simulation_output_dir(
             sod, 'nucleotide_substitution_rate')
+        ssods = dm.get_seeded_simulation_output_dirs(sod)
+        plan.append((sod, len(ssods)))
+        tasks.extend((ssod, nsr_val, os.path.basename(sod), min_seq, min_len)
+                     for ssod in ssods)
 
-        sod_rows = []
-        for ssod in dm.get_seeded_simulation_output_dirs(sod):
-            try:
-                final_time = om.read_final_time(ssod)
-                seq_data = om.read_sequencing_data_regression(ssod)
-                # Every individual is standard here; the filter is kept so
-                # this measures the same quantity as the bound pipeline's.
-                seq_data = seq_data[seq_data['individual_type'] == 'standard']
-                if final_time >= min_len and len(seq_data) >= min_seq:
-                    sod_rows.append({
-                        'nucleotide_substitution_rate': nsr_val,
-                        'observed_substitution_rate':
-                            er.tempest_regression(seq_data).coef_[0],
-                    })
-            except Exception:
-                continue
+    with seed_task_mapper(calibration_workers(workers), len(tasks)) as mapper:
+        outcomes = mapper(_std_seed_osr_row, tasks)
+        for sod, n_seeds in plan:
+            sod_rows, skips = read_seed_outcomes(outcomes, n_seeds)
+            report_seed_usage('  [Stage 2]', sod, len(sod_rows), n_seeds,
+                              skips)
+            merge_seed_skips(skipped_all, skips)
 
-        if sod_rows:
-            all_rows.append(om.detect_sod_outliers(pd.DataFrame(sod_rows)))
+            if sod_rows:
+                all_rows.append(om.detect_sod_outliers(pd.DataFrame(sod_rows)))
 
     if not all_rows:
         raise RuntimeError(
             f"[Stage 2] No standard OSR data for {numbered} "
-            f"(min_seq={min_seq}, min_len={min_len}).")
+            f"(min_seq={min_seq}, min_len={min_len}): "
+            f"{format_seed_skips(skipped_all)}.")
 
     clean_df = pd.concat(all_rows, ignore_index=True)
+    write_osr_per_seed(numbered, clean_df, 'std')
     clean_df = clean_df[clean_df['is_outlier'] == 0]
 
     # The group name comes from the config, via `wanted` -- not a string typed
@@ -119,9 +170,10 @@ def compute_standard_nsr(numbered, target_osr_std, model_type='exp',
             f"[Stage 2] one fit needs one group, got {wanted}. "
             f"Groups on disk: {dm.get_groups(numbered)}.")
     fit_result = er.fit_observed_substitution_rate_regressor(
-        numbered, clean_df, model_type,
-        parameter_name='nucleotide_substitution_rate',
-        experiment_group=wanted[0])
+        clean_df, model_type,
+        parameter_name='nucleotide_substitution_rate')
+    om.write_fit_results_csv(numbered, model_type, fit_result,
+                             experiment_group=wanted[0])
     nsr_std = float(er.compute_calibrated_parameter(
         model_type, fit_result, target_osr_std))
     print(f"          calibrated standard NSR = {nsr_std:.8f}")
@@ -214,6 +266,11 @@ def main():
                         choices=['lin', 'log', 'exp', 'tan'])
     parser.add_argument('--min-seq', type=int, default=30)
     parser.add_argument('--min-len', type=int, default=100)
+    parser.add_argument('--workers', type=int, default=None,
+                        help="Processes for the per-seed extraction "
+                             "(default: SLURM_CPUS_PER_TASK, else the core "
+                             f"count, capped at {MAX_CALIBRATION_WORKERS}). "
+                             "1 runs it inline.")
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 
@@ -239,6 +296,7 @@ def main():
              f"[{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
 
     numbered = f"{EXP_NAME}_#{args.exp_num}"
+    dm.mark_experiment_started(numbered)
     # append: cal_1 wrote this experiment, and its groups are finished. Only
     # the groups below are run.
     groups = run_experiment_phase_script(args.runner, args.exp_num,
@@ -247,7 +305,7 @@ def main():
     std_nsr = compute_standard_nsr(numbered, args.target_osr_std,
                                    model_type=args.model,
                                    min_seq=args.min_seq, min_len=args.min_len,
-                                   groups=groups)
+                                   groups=groups, workers=args.workers)
 
     long_nsr_by_group = read_calibrated_long_nsr(numbered, args.target_osr_long)
 

@@ -112,14 +112,21 @@ def get_clustering_for_ssod(
                                          support=support,
                                          min_support=min_support or 0.0)
         
-    # Set 'clade' as the index 
+    # Labelled BEFORE the set_index below: label_clades_from_definers reads
+    # 'clade' as a COLUMN, so the indexed frame raised KeyError('clade') on
+    # every call and the bare handler turned that into no labels at all.
+    # Definer-less NON-root clades are withheld from the vote, as
+    # tests/export_fig2_builder.py and tests/studio/compute.py do -- at low k
+    # the function refuses them by design and they carry n_defining = 0. Every
+    # other refusal, an unknown host_type above all, propagates.
+    par_of = dict(zip(clade_meta_df["clade"], clade_meta_df["parent_clade"]))
+    votable = {c: d for c, d in per_clade_mut_df.items()
+               if not ((d is None or len(d) == 0) and isinstance(par_of.get(c), str))}
+    labels_s, _ = label_clades_from_definers(votable, clade_meta_df)
+
+    # Set 'clade' as the index
     if isinstance(clade_meta_df, pd.DataFrame) and "clade" in clade_meta_df.columns:
         clade_meta_df = clade_meta_df.set_index("clade")
-
-    try:
-        labels_s, _ = label_clades_from_definers(per_clade_mut_df, clade_meta_df)
-    except Exception:
-        labels_s = pd.Series({}, dtype=object)
 
     rows = []
     meta_cols = set(clade_meta_df.columns) if isinstance(clade_meta_df, pd.DataFrame) else set()
