@@ -36,12 +36,13 @@ def _serialize_definers_for_clade(def_df: pd.DataFrame) -> List[Dict[str, Any]]:
 
 # Rule B's operating point. m_T is a share of the run's own transmissions; see
 # GLOSSARY.md. Named here so the pipeline, the figure builder and the studio
-# cannot drift to different defaults.
-MIN_TX_PCT = 1.0
+# cannot drift to different defaults. A FRACTION since v2.5.15, not a
+# percentage: 0.01 is the same floor the old MIN_TX_FRAC = 1.0 computed.
+MIN_TX_FRAC = 0.01
 
 
-def _table_matches(path, shared_mut_threshold, min_tx_pct) -> bool:
-    """Was this clustering CSV built by this (k, min_tx_pct)?
+def _table_matches(path, shared_mut_threshold, min_tx_frac) -> bool:
+    """Was this clustering CSV built by this (k, min_tx_frac)?
 
     A table written before v2.5.7 carries neither column, so it cannot be shown
     to match and is rebuilt. Any read failure counts as no match too:
@@ -55,7 +56,7 @@ def _table_matches(path, shared_mut_threshold, min_tx_pct) -> bool:
     if len(head) == 0:
         return False
     for col, want in (("shared_mut_threshold", shared_mut_threshold),
-                      ("min_tx_pct", min_tx_pct)):
+                      ("min_tx_frac", min_tx_frac)):
         if col not in head.columns:
             return False
         try:
@@ -71,7 +72,7 @@ def get_clustering_for_ssod(
     seeded_simulation_output_dir: str,
     phylogenetic_df: pd.DataFrame | None = None,
     shared_mut_threshold: int = 5,
-    min_tx_pct: float = MIN_TX_PCT,
+    min_tx_frac: float = MIN_TX_FRAC,
     force: bool = False,
 ) -> str:
     """
@@ -79,7 +80,7 @@ def get_clustering_for_ssod(
     returns it. Otherwise computes the clustering and writes a single CSV.
 
     The table carries rule B: a clade must clear the divergence threshold AND
-    have transmitted at least `min_tx_pct` of the run's own transmission
+    have transmitted at least `min_tx_frac` of the run's own transmission
     events. Divergence alone makes a clade of almost every tip -- measured on
     control at k=5, 402 clades per run of which 86% hold one lineage and 78%
     infected nobody, against 14 under rule B.
@@ -87,24 +88,24 @@ def get_clustering_for_ssod(
     The definition is written into the table and checked on the way back out,
     because the filename does not carry it: the path is
     `07_Clustering/{SOD}_seed_{SEED}_clustering.csv`, with no k and no
-    `min_tx_pct` in it. Returning the file whenever it merely EXISTS was wrong
+    `min_tx_frac` in it. Returning the file whenever it merely EXISTS was wrong
     twice over -- a table built at k=5 was served to a caller asking for k=7,
     and a divergence-only table written before rule B was served as though it
     carried rule B. Neither is visible to the caller: both are well-formed CSVs.
     """
     path = om.get_clustering_table_filepath(experiment_name, seeded_simulation_output_dir)
     if (not force) and os.path.exists(path) and _table_matches(
-            path, shared_mut_threshold, min_tx_pct):
+            path, shared_mut_threshold, min_tx_frac):
         return path
 
     if phylogenetic_df is None:
         phylogenetic_df = om.read_phylogenetic_data(seeded_simulation_output_dir)
 
     support = min_support = None
-    if min_tx_pct > 0:
+    if min_tx_frac > 0:
         ind = om.read_individuals_data(seeded_simulation_output_dir)
         support = subtree_transmission_counts(phylogenetic_df, ind)
-        min_support = transmission_floor(ind, min_tx_pct)
+        min_support = transmission_floor(ind, min_tx_frac)
 
     clade_to_lineages, lineage_to_clade, per_clade_mut_df, clade_meta_df = \
         cluster_lin_into_clades_with_meta(phylogenetic_df,
@@ -149,7 +150,7 @@ def get_clustering_for_ssod(
             # the definition that produced this table; _table_matches reads it
             # back before the file is ever served from cache
             "shared_mut_threshold": int(shared_mut_threshold),
-            "min_tx_pct": float(min_tx_pct),
+            "min_tx_frac": float(min_tx_frac),
             "clade": clade,
             "root_lineage": root_lineage,
             "parent_clade": parent_clade,
@@ -211,14 +212,14 @@ def transmission_total(individuals_df):
     return int(individuals_df["inherited_lineage"].value_counts().sum())
 
 
-def transmission_floor(individuals_df, min_tx_pct):
+def transmission_floor(individuals_df, min_tx_frac):
     """m_T as an absolute count for one run.
 
     m_T is a SHARE of the run's own transmissions, not a count: the scenarios
     run 11,846 to 27,510 transmissions, so a fixed count is a different filter
-    in each.
+    in each. A FRACTION since v2.5.15 -- 0.01, not 1.0, for one percent.
     """
-    return (float(min_tx_pct) / 100.0) * transmission_total(individuals_df)
+    return float(min_tx_frac) * transmission_total(individuals_df)
 
 
 def normalise_host_type(h):
@@ -370,7 +371,7 @@ def clade_max_divergence(member_lineages, root_lineage, lin2mut):
                default=0)
 
 
-def keep_clades_by_transmission(clades, n_tx_run, min_tx_pct,
+def keep_clades_by_transmission(clades, n_tx_run, min_tx_frac,
                                 ntx=lambda c: c["ntx"],
                                 founding=lambda c: c["founding"],
                                 n_defining=lambda c: c["ndef"]):
@@ -384,7 +385,7 @@ def keep_clades_by_transmission(clades, n_tx_run, min_tx_pct,
     mutations and no parent, so neither term applies to it. A group with no
     defining mutations and a parent is not a clade.
     """
-    floor = (float(min_tx_pct) / 100.0) * n_tx_run
+    floor = float(min_tx_frac) * n_tx_run
     out = []
     for c in clades:
         if founding(c):

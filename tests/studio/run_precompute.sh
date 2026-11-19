@@ -16,7 +16,7 @@
 # job runs, refuses, and prints which grid indices are missing.
 #
 # Before submitting it runs the checks that are cheap on a login node and
-# expensive to get wrong 384 tasks in, then shows what it found and asks. The
+# expensive to get wrong 168 tasks in, then shows what it found and asks. The
 # clade-rule check is the one that matters: if the clade definition is broken,
 # every build in the grid is wrong in the same way and nothing downstream will
 # say so.
@@ -41,7 +41,7 @@
 # printed rather than assumed.
 #
 # --resubmit submits an array covering just the grid indices that sweep.py
-# reports as not done, instead of all 384. Slurm takes an explicit index list
+# reports as not done, instead of all 168. Slurm takes an explicit index list
 # but not an unbounded one, so the list is cut into arrays of at most
 # RESUBMIT_CHUNK (default 100, or --chunk N) indices and the pack job depends
 # on all of them with afterany. Note --limit throttles EACH array, so with 3
@@ -51,7 +51,7 @@
 # actually costs on THIS cluster. Until it has been run the cost line is an
 # extrapolation from a developer box, which is the wrong machine with the wrong
 # core count: it read 6 min a build at --procs 2, and a task here gets
-# --cpus-per-task 4. Run it once before committing to 384.
+# --cpus-per-task 4. Run it once before committing to 168.
 #     EXP_NUM=3 SEEDS=50 bash tests/studio/run_precompute.sh
 #
 # The env: this activates `simplicity` itself. scripts/start_simplicity_session.sh

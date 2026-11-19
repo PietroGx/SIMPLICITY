@@ -50,7 +50,7 @@ def check(ssod, ct):
     # a partition nothing builds is worse than no check.
     ind = om.read_individuals_data(ssod)
     support = cl.subtree_transmission_counts(ph, ind)
-    min_support = cl.transmission_floor(ind, cl.MIN_TX_PCT)
+    min_support = cl.transmission_floor(ind, cl.MIN_TX_FRAC)
     c2l, l2c, pcm, meta = cl.cluster_lin_into_clades_with_meta(
         ph, shared_mut_threshold=ct, support=support, min_support=min_support)
     lin2mut = cl.build_lineage_to_mutation_dict(ph)

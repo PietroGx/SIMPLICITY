@@ -9,7 +9,7 @@ cannot be driven from the Export page. This runs them sequentially:
 A set whose directory already carries the current code hash and the full run
 count is skipped, so an interrupted sweep resumes where it stopped.
 
-The grid is 3 k x 16 m_T x 4 windows x 2 prominences = 384 builds, which is
+The grid is 3 k x 7 m_T x 4 windows x 2 prominences = 168 builds, which is
 about 38 hours sequentially. That is an HPC job, not a local one:
 `tests/studio/slurm_precompute.sh` runs it as a Slurm array, one build per
 task. Use `--list` to see the grid and `--only N` to run one entry.
@@ -34,9 +34,9 @@ import compute
 K = [5, 7, 10]
 WIN = [1.0, 7.0, 15.0, 21.0]
 PROM = [0.10, 0.20]
-# m_T is a BUILD axis since v2.5.5: rule B designation uses it, so each rung is
-# its own partition. The ladder comes from compute, which the panels also read.
-MT = compute.MT_LADDER
+# m_T is a BUILD axis since v2.5.5: rule B designation uses it, so each value is
+# its own partition. The values come from compute, which the panels also read.
+MT = compute.MT_VALUES
 LO, HI, WINDOW = 0.10, 0.90, "post"
 DEFAULT_STORE = "~/fig2_studio"
 

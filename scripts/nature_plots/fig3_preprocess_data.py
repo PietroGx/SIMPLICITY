@@ -118,14 +118,14 @@ def get_fig2_clustered_data(exp_num, scenario, target_seed, cluster_threshold=5,
         # Rule B, exactly as simplicity.clustering.get_clustering_for_ssod
         # applies it: a lineage founds a clade when it has diverged
         # >= cluster_threshold mutations from its clade root AND its subtree
-        # carries at least MIN_TX_PCT of this run's own transmission events.
+        # carries at least MIN_TX_FRAC of this run's own transmission events.
         # Divergence alone makes a clade of almost every tip -- measured on
         # control at k=5, 402 clades per run of which 86% hold one lineage and
         # 78% infected nobody, against 14 under rule B -- so figure 3 was
         # counting a different object than figure 2.
         individuals_df = om.read_individuals_data(ssod)
         support = cl.subtree_transmission_counts(phylo_df, individuals_df)
-        min_support = cl.transmission_floor(individuals_df, cl.MIN_TX_PCT)
+        min_support = cl.transmission_floor(individuals_df, cl.MIN_TX_FRAC)
 
         clade_to_lineages, _, _, clade_meta_df = cl.cluster_lin_into_clades_with_meta(
             phylo_df, shared_mut_threshold=cluster_threshold,

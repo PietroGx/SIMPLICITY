@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=fig2_precompute
-#SBATCH --array=0-383
+#SBATCH --array=0-167
 #SBATCH --time=01:00:00
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=4
@@ -19,7 +19,7 @@
 # PARTITION and cannot be applied over an existing build. The grid therefore
 # gains m_T as an axis:
 #
-#     3 k  x  16 m_T  x  4 smoothing windows  x  2 prominences  =  384 builds
+#     3 k  x  7 m_T  x  4 smoothing windows  x  2 prominences  =  168 builds
 #
 # At roughly 6 minutes each that is about 38 hours sequentially, which is a day
 # and a half of a box that also serves production vhosts. As an array it is one
@@ -29,13 +29,13 @@
 # `sweep.py --only N` runs entry N, so the axes live in one place and the array
 # index is the contract between them. Check before submitting:
 #
-#     python -I tests/studio/sweep.py --list | wc -l      # must equal 384
+#     python -I tests/studio/sweep.py --list | wc -l      # must equal 168
 #
 # Usage, from the REPO ROOT:
 #
 #     mkdir -p slurm_logs/fig2_precompute
-#     sbatch tests/studio/slurm_precompute.sh                      # all 384
-#     sbatch --array=0-15 tests/studio/slurm_precompute.sh         # one k block
+#     sbatch tests/studio/slurm_precompute.sh                      # all 168
+#     sbatch --array=0-55 tests/studio/slurm_precompute.sh         # one k block
 #     sbatch tests/studio/slurm_precompute.sh /scratch/$USER/cache # another out dir
 #     EXP_NUM=3 sbatch tests/studio/slurm_precompute.sh            # another experiment
 #
@@ -44,7 +44,7 @@
 # `run_precompute.sh --resubmit` submits an array of just the unfinished
 # indices. A task that dies writes slurm_logs/fig2_precompute/failed/<IDX>.txt
 # naming itself, its parameters and its log, so the cause is findable without
-# reading 384 logs.
+# reading 168 logs.
 #
 # What it needs: the run output for the experiment (Data/impact_long_shedders_#1
 # by default) readable from the compute node, and the `simplicity` conda env.
@@ -57,9 +57,9 @@
 # its own store ($STORE/exp_<name>_<num>/cache); $1 still overrides, and
 # sweep.py refuses an out directory belonging to a different experiment.
 #
-# Disk, measured per build extrapolated to 250 runs: m_T=0 is 52 MB (that rung
+# Disk, measured per build extrapolated to 250 runs: m_T=0 is 52 MB (that value
 # is divergence alone), 0.005 is 6.9 MB, 0.05 is 3.9 MB, 1.0 is 1.7 MB. The
-# whole grid is about 2.9 GB -- the low rungs dominate.
+# whole grid is about 2.9 GB -- the low values dominate.
 #
 # No 'set -u': conda's activate.d hooks are not nounset-safe.
 # ============================================================================
@@ -79,9 +79,9 @@ FAILED="$LOGS/failed"
 STEM="${SLURM_ARRAY_JOB_ID:-local}_${IDX}"
 mkdir -p "$TIMES" "$FAILED"
 
-# One file per task, never a shared append: 384 tasks appending to one file is
+# One file per task, never a shared append: 168 tasks appending to one file is
 # a race. A task that dies leaves $FAILED/<IDX>.txt naming itself and its log,
-# so the cause is found without reading 384 logs. A rerun clears it first.
+# so the cause is found without reading 168 logs. A rerun clears it first.
 rm -f "$FAILED/${IDX}.txt"
 trap 'rc=$?; [ "$rc" -eq 0 ] || {
         echo "idx     $IDX"

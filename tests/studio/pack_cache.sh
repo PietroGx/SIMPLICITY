@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=fig2_pack
-#SBATCH --time=00:40:00
+#SBATCH --time=03:00:00
 #SBATCH --mem=4G
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=4
 #SBATCH --partition=main
 #SBATCH --qos=standard
 #SBATCH --output=slurm_logs/fig2_precompute/pack_%j.log
@@ -17,7 +17,7 @@
 # broken grid was an archive that never appeared. It can also be run by hand.
 #
 # It REFUSES to pack a partial grid. The whole point of one file is that what
-# arrives is the whole grid; a tarball holding 300 of 384 builds looks the same
+# arrives is the whole grid; a tarball holding 150 of 168 builds looks the same
 # from the outside and would be found out later, on the wrong machine.
 #
 # Completeness comes from `sweep.py --missing`, which is the same `done()` test
@@ -45,6 +45,7 @@
 #     bash   tests/studio/pack_cache.sh            # submits itself to SLURM
 #     bash   tests/studio/pack_cache.sh --here     # packs in this shell
 #     bash   tests/studio/pack_cache.sh --partial  # pack what exists anyway
+#     bash   tests/studio/pack_cache.sh --no-warm  # skip the panel warm-up
 #     EXP_NUM=3 bash tests/studio/pack_cache.sh    # another experiment's store
 #     sbatch tests/studio/pack_cache.sh            # submit explicitly
 #
@@ -65,10 +66,12 @@ EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
 PARTIAL=0
 HERE=0
+WARM=1
 for a in "$@"; do
     case "$a" in
         --partial) PARTIAL=1 ;;
         --here)    HERE=1 ;;
+        --no-warm) WARM=0 ;;
         *) echo "[pack] unknown argument: $a" >&2; exit 1 ;;
     esac
 done
@@ -144,14 +147,33 @@ fi
 EXTRACT="~/fig2_studio"
 [ "$EXP_REL" != "." ] && EXTRACT="~/fig2_studio/$EXP_REL"
 
+# Warm the panels BEFORE packing, so the archive carries them. The grid is the
+# expensive precomputation but not the whole of it: panel 4 walks every build
+# and memoises a row per (build, m_T, burn-in), ~200 s per m_T value on a
+# 168-build grid. Warming here, where the data already is, costs one core-hour
+# of a compute node and saves that wait on every machine the archive reaches.
+WARMED=no
+if [ "$WARM" -eq 1 ]; then
+    echo "[pack] warming panels before packing"
+    if python -I tests/studio/warm_panels.py --store "$EXP_STORE" \
+             --procs "${SLURM_CPUS_PER_TASK:-4}" 2>&1 | sed 's/^/[pack] /'; then
+        WARMED=yes
+    else
+        echo "[pack] WARNING: the warm-up failed; packing the grid anyway" >&2
+        WARMED=partial
+    fi
+fi
+
 STAMP=$(date +%Y%m%d)
 OUT="$EXP_STORE/fig2_cache_${HASH}_${STAMP}.tar.gz"
 MAN="${OUT%.tar.gz}.manifest.txt"
 
 echo "[pack] writing $OUT"
-# _panels is the local panel cache: derived, keyed on the same hashes, and
-# rebuilt in milliseconds. It is not part of the grid.
-tar -czf "$OUT" -C "$EXP_STORE" --exclude="cache/_panels" cache
+# cache/_panels IS packed. It used to be excluded as "rebuilt in milliseconds",
+# which is true of panels 1 to 3 and wrong about panel 4: that one reads every
+# build in the grid, and a cold value measured 197 s on the 168-build run #2.
+# It is ~13 MB against a 416 MB archive.
+tar -czf "$OUT" -C "$EXP_STORE" cache
 
 SIZE=$(du -h "$OUT" | cut -f1)
 SUM=$(sha256sum "$OUT" | cut -d' ' -f1)
@@ -164,6 +186,7 @@ NFILES=$(find "$CACHE" -maxdepth 2 -type f -path "*__${HASH}/*" 2>/dev/null | wc
     echo "experiment   $EXP_NAME #$EXP_NUM  (the run output these builds read)"
     echo "builds       $HAVE of $WANT finished (sweep.py done(), not dir count)"
     echo "directories  $DIRS at this hash"
+    echo "panels       $WARMED  (cache/_panels is packed with the grid)"
     echo "files        $NFILES"
     echo "archive      $(basename "$OUT")  $SIZE"
     echo "sha256       $SUM"

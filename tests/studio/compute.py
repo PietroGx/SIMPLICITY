@@ -40,17 +40,16 @@ from _scenarios import EXP_NAME, resolve_scenarios, one_sod, scenario_meta
 
 SCEN_ORDER = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"]
 
-DEFAULTS = dict(k=7, mt=1.0, win=15.0, prom=0.10, lo=0.10, hi=0.90)
+DEFAULTS = dict(k=7, mt=0.01, win=15.0, prom=0.10, lo=0.10, hi=0.90)
 # origin-label codes, same as tests/export_fig2_builder.py:39
 LAB = {"standard": 0, "long": 1, "mixed": 2, "founder": 3}
 WINDOWS = ("post", "all")   # "post" = from the burn-in day; "all" = whole record
 
-# The m_T ladder, kept identical to the artifact's runs/formation.json so the
+# The m_T values, kept identical to the artifact's runs/formation.json so the
 # across-the-set tab's axis is unchanged. It lives here rather than in
 # panels.py because m_T became a BUILD parameter in v2.5.5: this is the grid's
 # m_T axis, and the sweep driver and the panels must agree on it.
-MT_LADDER = [0.0, 0.002, 0.003, 0.005, 0.008, 0.012, 0.02, 0.03, 0.05, 0.08,
-             0.12, 0.2, 0.3, 0.5, 1.0, 2.0]
+MT_VALUES = [0.0, 0.001, 0.005, 0.01, 0.02, 0.05, 0.1]
 
 
 def code_hash():

@@ -106,10 +106,12 @@ def section_a():
     ck(cl.transmission_total(ind) == 100,
        f"transmission_total counts transmission events (got "
        f"{cl.transmission_total(ind)}, want 100)")
-    ck(abs(cl.transmission_floor(ind, 1.0) - 1.0) < 1e-9,
-       "transmission_floor turns 1% into 1.0 of 100 transmissions")
+    ck(abs(cl.transmission_floor(ind, 0.01) - 1.0) < 1e-9,
+       "transmission_floor turns the fraction 0.01 into 1.0 of 100 transmissions")
+    ck(abs(cl.transmission_floor(ind, 1.0) - 100.0) < 1e-9,
+       "and the fraction 1.0 into all 100 -- it is a fraction, not a percentage")
     ck(cl.transmission_floor(ind, 0.0) == 0.0,
-       "transmission_floor(0%) is 0, so m_T=0 keeps the divergence-only set")
+       "transmission_floor(0) is 0, so m_T=0 keeps the divergence-only set")
 
 
 # --------------------------------------------------------------- section B
@@ -153,8 +155,8 @@ def section_b(scenarios, nseeds, k):
             recs = [dict(c=r, ntx=int(stx.get(r, 0)), founding=(par.get(r) is None),
                          ndef=len(lin2mut.get(r, frozenset())))
                     for r in walk]
-            kept = cl.keep_clades_by_transmission(recs, n_tx, 1.0)
-            floor = (1.0 / 100.0) * n_tx
+            kept = cl.keep_clades_by_transmission(recs, n_tx, 0.01)
+            floor = 0.01 * n_tx
             bad = [c for c in kept if not c["founding"] and c["ntx"] < floor]
             ck(not bad,
                f"{name}: all {len(kept)} kept clades clear m_T=1% of "

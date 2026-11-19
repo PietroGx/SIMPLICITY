@@ -5,6 +5,62 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.15 — 2026-11-19 — pietro gerletti
+
+m_T is a fraction
+-----------------
+
+It was a percentage everywhere: `MIN_TX_PCT = 1.0` meant one percent, and
+`transmission_floor` divided by 100 on the way in. It is now a FRACTION --
+0.01 for one percent -- stored and passed that way through the pipeline, the
+figure builder and the studio, and converted to a percentage only where a
+slider or a label shows it.
+
+No result changes. `MIN_TX_PCT = 1.0` computed `1.0/100 * total`;
+`MIN_TX_FRAC = 0.01` computes `0.01 * total`. Figures 2 and 3 are numerically
+untouched, so this is a unit refactor and not a recalibration.
+
+The clustering CSV's stored column is renamed with it, `min_tx_pct` ->
+`min_tx_frac`. That is the safety: `_table_matches` requires the column to be
+present, so every table written before this change fails to match and is
+rebuilt, instead of a table built at 1% being served to a caller asking for
+1.0 and getting a hundred times the floor it wanted. Same mechanism v2.5.7
+used when the definition first went into the table.
+
+Five places outside `clustering.py` had their own copy of `mt / 100.0`
+rather than calling `transmission_floor`. Two were live 100x bugs the moment
+the unit moved: `tests/panel_denominators.py:99` and
+`tests/clade_formation_grid.py:84`.
+
+The m_T grid axis
+-----------------
+
+`MT_VALUES` is `[0.0, 0.001, 0.005, 0.01, 0.02, 0.05, 0.1]`, seven values
+rather than sixteen, and the default is 0.01 -- the same operating point the
+old 1.0 percent named. The grid is 3 k x 7 m_T x 4 windows x 2 prominences =
+**168 builds**, and `slurm_precompute.sh`'s array is `0-167`; it was `0-383`,
+which would have failed 216 tasks. Recomputation required: the build hash
+moves and no build on disk is readable.
+
+"ladder" is gone
+----------------
+
+The word named the fixed set of values a swept parameter was built at, and
+was never defined in `GLOSSARY.md`. It is "values" now -- `MT_VALUES`,
+`K_VALUES`, and the across endpoint's `values` / `values_missing` /
+`values_full` in place of `ladder*`. `panels.M_LADDER`, a second name for
+`compute.MT_LADDER`, is gone rather than renamed.
+
+Studio
+------
+
+Tab 2 is "m_T effect on clades"; its six plots tile 3x2, 2x3 and then one
+column instead of leaving a 4+1 orphan row. `/api/index` carries the
+experiment, so the method page's flow diagram names the run being served
+rather than a literal -- it still said `impact_long_shedders_#1` while
+serving #2, and pointed at `cache/_l4`, which has been `cache/_panels` since
+panel 4 moved to one memo per build.
+
 ## Version 2.5.14 — 2026-11-19 — pietro gerletti
 
 The pack job never ran. Two grids were built and neither was ever archived.
