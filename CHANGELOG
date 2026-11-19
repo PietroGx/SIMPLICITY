@@ -5,6 +5,33 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.14 — 2026-11-19 — pietro gerletti
+
+The pack job never ran. Two grids were built and neither was ever archived.
+
+`sbatch` copies the batch script to the node's spool directory and runs it
+from there, so `${BASH_SOURCE[0]}` in `tests/studio/pack_cache.sh` pointed at
+the spool and `cd "$ROOT"` landed outside the repo. It did not fail there --
+that directory exists -- it failed on the next command, the hash heredoc,
+with `ModuleNotFoundError: No module named 'compute'`. Job 26859223 on the
+run #2 grid died that way, and 26853920 before it on the run #1 grid. Both
+grids were complete; only the packer was broken, and the only symptom was an
+archive that never appeared.
+
+`ROOT` now prefers `$SLURM_SUBMIT_DIR`, which is the repo root under `sbatch`
+because `run_precompute.sh` submits from it, and falls back to `BASH_SOURCE`
+for a hand run. A root without `tests/studio/compute.py` is named as such,
+rather than failing six lines later on an unrelated import.
+
+Packing is minutes of CPU and hundreds of MB of I/O, so a hand run on a login
+node now submits itself and prints the job id; `--here` does the work in the
+calling shell instead. That check runs before `conda activate`, so a
+submission does not pay for an environment it never uses.
+`run_precompute.sh` needed no change: its `afterany` pack was always an
+`sbatch`, it simply could never get past line 48.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.13 — 2026-11-19 — pietro gerletti
 
 One command runs the production pipeline and then the studio's clade-build

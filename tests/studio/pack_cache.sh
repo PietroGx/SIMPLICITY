@@ -26,7 +26,8 @@
 # index.json, and a directory count calls that present.
 #
 # Exit codes, so a refusal is not just "FAILED" in sacct:
-#     0  packed
+#     0  packed  (or, on a self-submit, submitted -- the pack job's own
+#                 exit code is then in sacct, not here)
 #     3  refused, the grid is incomplete
 #     1  something else broke
 #
@@ -36,24 +37,55 @@
 # from: nothing inside a build does, because compute.params_key and index.json
 # hold the clade parameters and the code hash and no experiment identity.
 #
+# Packing is minutes of CPU and a few hundred MB of I/O, so it belongs on a
+# compute node. A hand run on a login node SUBMITS ITSELF and prints the job
+# id; --here does the work in the calling shell instead.
+#
 # Usage, from the repo root:
-#     sbatch tests/studio/pack_cache.sh            # the whole grid
+#     bash   tests/studio/pack_cache.sh            # submits itself to SLURM
+#     bash   tests/studio/pack_cache.sh --here     # packs in this shell
 #     bash   tests/studio/pack_cache.sh --partial  # pack what exists anyway
 #     EXP_NUM=3 bash tests/studio/pack_cache.sh    # another experiment's store
+#     sbatch tests/studio/pack_cache.sh            # submit explicitly
 #
 # No 'set -u': conda's activate.d hooks are not nounset-safe.
 # ============================================================================
 set -eo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# sbatch copies this script to the node's spool dir, so BASH_SOURCE points
+# there, not at the repo. SLURM_SUBMIT_DIR is the repo root under sbatch;
+# BASH_SOURCE is the right answer when the script is run by hand.
+ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$ROOT"
+[ -f tests/studio/compute.py ] || { echo "[pack] not a SIMPLICITY checkout: $ROOT" >&2; exit 1; }
 
 STORE="${STORE:-$HOME/fig2_studio}"
 SEEDS="${SEEDS:-50}"
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
 PARTIAL=0
-[ "${1:-}" = "--partial" ] && PARTIAL=1
+HERE=0
+for a in "$@"; do
+    case "$a" in
+        --partial) PARTIAL=1 ;;
+        --here)    HERE=1 ;;
+        *) echo "[pack] unknown argument: $a" >&2; exit 1 ;;
+    esac
+done
+
+# Not already inside a job, and sbatch is reachable: submit rather than pack
+# here. Done before conda, which costs seconds and is only needed for the work.
+if [ -z "$SLURM_JOB_ID" ] && [ "$HERE" -eq 0 ] && command -v sbatch >/dev/null 2>&1; then
+    mkdir -p slurm_logs/fig2_precompute
+    JOB=$(STORE="$STORE" SEEDS="$SEEDS" EXP_NUM="$EXP_NUM" EXP_NAME="$EXP_NAME" \
+          sbatch --parsable tests/studio/pack_cache.sh "$@")
+    echo "[pack] submitted job $JOB"
+    echo "[pack]   watch   squeue -j $JOB"
+    echo "[pack]   log     slurm_logs/fig2_precompute/pack_$JOB.log"
+    echo "[pack]   errors  slurm_logs/fig2_precompute/pack_$JOB.err"
+    echo "[pack]   --here would have packed in this shell instead"
+    exit 0
+fi
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate simplicity
