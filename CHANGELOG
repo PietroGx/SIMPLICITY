@@ -5,6 +5,40 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.13 — 2026-11-19 — pietro gerletti
+
+One command runs the production pipeline and then the studio's clade-build
+grid over the run it just produced, so the cluster works unattended.
+
+`scripts/run_pipeline_and_grid.sh`. Stage 1 is
+`run_impact_long_shedders_pipeline.py --runner slurm`, which submits each
+stage's array and blocks; stage 2 is `tests/studio/run_precompute.sh --yes`
+with `EXP_NUM` exported, and runs ONLY if stage 1 exited 0 -- there is no
+finished run to build a grid from otherwise.
+
+Every check runs before anything is submitted, and one failure submits
+nothing: the tree clean and `HEAD` at the pushed commit (an overnight run whose
+code is not in the repo cannot be attributed afterwards), the three hashed
+files tracked and clean, the experiment number free, `sbatch` present, the
+`simplicity` env active, and **tmux**. The tmux check is not politeness: stage 1
+blocks for hours in this process, and a login session that dies takes the
+orchestrator with it. `nohup` is not the alternative -- it leaves nothing to
+reattach to.
+
+Memory, because the default is wrong for one cohort: `--slurm-mem 3G` reaches
+cal_1, where `edge_case` lives, and the experiment phase; `--slurm-mem-cal2 1G`
+holds cal_2 at the default it profiles comfortably under (301 MB), since
+`cal2_memory` exists to keep that stage small. Neither is hardcoded and both
+appear on the resolved-settings table. The per-seed fit that runs in the
+orchestrator process on the login node is outside Slurm's reach entirely, at
+~1.6 GB per worker; `--cal-workers` is the lever for it.
+
+`--consensus argmax` moves the grid too: `EXP_NAME` follows to
+`impact_long_shedders_amx`, so the builds come from the argmax run rather than
+silently from the distribution one.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.12 — 2026-11-18 — pietro gerletti
 
 A measurement that reports something other than what its name claims is this
