@@ -5,6 +5,57 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.17 — 2026-11-20 — pietro gerletti
+
+The panel warm-up runs as its own Slurm array
+---------------------------------------------
+
+The pack job warmed every panel memo on its own 4 cores before packing:
+10,238 answers, about 4.9 core-hours at the costs measured on run #2
+(`tests/studio/warm_panels.py` header), so roughly an hour of wall clock
+behind a grid that had already finished.
+
+`run_precompute.sh` now submits three jobs: the grid array, then
+`tests/studio/slurm_warm.sh` (afterany on the grid), then the pack job
+(afterany on the warm array). The warm array has `--warm-shards` tasks,
+default 16, 4 cores each; task I runs `warm_panels.py --shard I/N`, every
+N-th job from I, so each shard gets a mix of kinds -- about 1,100
+core-seconds apiece on the 168-build grid, 7 panel-4 passes each. N is read
+from `SLURM_ARRAY_TASK_COUNT`, so the array must be one contiguous range.
+`--warm-shards 0` restores grid -> pack.
+
+The pack job still runs its warm pass. After the array it answers from disk
+and computes only what a failed shard left, so a failed shard costs time,
+not a hole in the archive.
+
+Two shards can build the same memo: a panel-4 pass fills p1/p3 rows another
+shard warms directly. `panels._memo` wrote through a fixed `<file>.tmp`, so
+two nodes could truncate each other's half-written file. The temp name is
+now per writer (host and PID); `os.replace` keeps the final write atomic.
+`_memo` is in `MEMO_INFRA`, outside every key: all `scoped_hash` values and
+the build hash `64d2d3cb9dff` were compared before and after and are
+unchanged, so nothing warmed under v2.5.16 is invalidated.
+
+Not run on Slurm yet. Verified: shard coverage (every job exactly once over
+16 shards, on the 168-build grid fed to `plan()` without data), and the
+submission chain against a stub `sbatch`, with and without warm shards.
+
+`pack_cache.sh` requests `--mem=8G`, up from 4G. That shipped in v2.5.16
+and was left out of its entry.
+
+The whole of `tests/studio/` is tracked
+---------------------------------------
+
+`.gitignore` ignored `tests/studio/*` and whitelisted the files the cluster
+runs, on the grounds that the UI is a local tool. Every new cluster file
+then needed a whitelist line, and the UI (`server.py`, `web/`), its checkers
+and the `test_*` scripts existed on one machine only. The block is gone;
+`fig2_studio/`, the store, stays ignored. A stray `tests/studio/Data/`
+(a `reference.txt` the simulator writes into the working directory) was
+deleted rather than committed.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.16 — 2026-11-20 — pietro gerletti
 
 A clade that sweeps to the end of the record has an episode

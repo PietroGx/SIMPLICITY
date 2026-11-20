@@ -11,7 +11,7 @@ Two rules hold everywhere in this file.
    HIV_low against HIV_high holds duration and moves prevalence -- so a
    statistic that averages across them destroys the experiment.
 """
-import hashlib, json, os
+import hashlib, json, os, socket
 
 import numpy as np
 
@@ -142,7 +142,8 @@ def _memo(store, tag, parts, build):
             pass
     out = build()
     out["cached"] = False
-    tmp = f + ".tmp"
+    # per writer: warm shards on different nodes can build the same key
+    tmp = f"{f}.{socket.gethostname()}.{os.getpid()}.tmp"
     try:
         with open(tmp, "w") as fh:
             json.dump(out, fh)

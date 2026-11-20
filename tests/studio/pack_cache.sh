@@ -152,6 +152,8 @@ EXTRACT="<repo>/fig2_studio"
 # and memoises a row per (build, m_T, burn-in), ~200 s per m_T value on a
 # 168-build grid. Warming here, where the data already is, costs one core-hour
 # of a compute node and saves that wait on every machine the archive reaches.
+# Under run_precompute.sh the slurm_warm.sh array has already done it, so this
+# pass reads every answer from disk and computes only what a failed shard left.
 WARMED=no
 if [ "$WARM" -eq 1 ]; then
     echo "[pack] warming panels before packing"

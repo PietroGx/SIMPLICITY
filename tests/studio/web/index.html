@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Figure 2 studio</title>
+<link rel="stylesheet" href="studio.css"></head><body>
+<!-- One document. Each script below owns one thing and nothing else:
+
+       settings.js   the one copy of every setting
+       api.js        the only place that talks to the server; caches and aborts
+       draw.js       canvas plumbing, palette, number formatting
+       charts.js     the chart forms a panel tab picks between
+       dist.js       per-run values: /api/dist, /api/sens, and their contract
+       rundata.js    a run decoded once; rule B in the browser
+       paint.js      the artifact's charts, ported
+       episodes.js   episode detection in the browser, for the sliders
+       controls.js   rail controls, built from three factories
+       shell.js      the tab bar and the render loop
+       tab_*.js      one tab each, self-registering
+
+     Load order is dependency order. There is no bundler on purpose: the server
+     serves this directory as static files and tests/studio/check_pages.js
+     renders the same sources headlessly. -->
+<script src="settings.js"></script>
+<script src="api.js"></script>
+<script src="draw.js"></script>
+<script src="charts.js"></script>
+<script src="rundata.js"></script>
+<script src="paint.js"></script>
+<script src="episodes.js"></script>
+<script src="dist.js"></script>
+<script src="controls.js"></script>
+<script src="shell.js"></script>
+<script src="tab_method.js"></script>
+<script src="tab_clustering.js"></script>
+<script src="tab_across.js"></script>
+<script src="tab_sweep.js"></script>
+<script src="tab_panel1.js"></script>
+<script src="tab_panel2.js"></script>
+<script src="tab_panel3.js"></script>
+<script src="tab_panel4.js"></script>
+<script src="tab_figure.js"></script>
+<script src="tab_export.js"></script>
+<script>
+/* The rail's build-parameter sliders stop only on the grid's own axes, so the
+   axes have to be in hand before the first rail is built. One local request. */
+wireRiseBand();
+wireCladeSelection();
+loadAxes().then(() => { snapBuildSettings(); startStudio(); });
+</script>
+</body></html>

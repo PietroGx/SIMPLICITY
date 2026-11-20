@@ -36,6 +36,11 @@ cannot warm a key the page does not ask for.
     python tests/studio/warm_panels.py --exp-num 2 --procs 4
     python tests/studio/warm_panels.py --exp-num 2 --what p1,p3,daily
     python tests/studio/warm_panels.py --exp-num 2 --dry-run
+    python tests/studio/warm_panels.py --exp-num 2 --shard 3/16   # 4th of 16
+
+--shard I/N takes every N-th job from I, so each shard gets a mix of kinds.
+tests/studio/slurm_warm.sh runs the N shards as an array; a key two shards
+both reach (panel 4 fills p1/p3 rows) is just computed twice.
 """
 import argparse
 import json
@@ -170,6 +175,8 @@ def main():
     ap.add_argument("--procs", type=int, default=4)
     ap.add_argument("--what", default=",".join(KINDS),
                     help="comma-separated: " + ", ".join(KINDS))
+    ap.add_argument("--shard", default="0/1",
+                    help="I/N: warm only every N-th job from I")
     ap.add_argument("--dry-run", action="store_true",
                     help="say what would be warmed, warm nothing")
     a = ap.parse_args()
@@ -185,14 +192,23 @@ def main():
         print(f"[warm] unknown kind(s): {', '.join(bad)}", file=sys.stderr)
         return 1
 
+    try:
+        si, sn = (int(x) for x in a.shard.split("/"))
+        assert 0 <= si < sn
+    except (ValueError, AssertionError):
+        print(f"[warm] --shard wants I/N with 0 <= I < N, got {a.shard}",
+              file=sys.stderr)
+        return 1
+
     ps, jobs = plan(store, kinds)
+    jobs = jobs[si::sn]
     print(f"[warm] store  {store}")
     print(f"[warm] builds {len(ps)} readable at code {compute.code_hash()}")
     for k in KINDS:
         n = sum(1 for j in jobs if j[0] == k)
         if n:
             print(f"[warm]   {k:9s} {n:6d} jobs")
-    print(f"[warm] {len(jobs)} jobs, {a.procs} processes")
+    print(f"[warm] {len(jobs)} jobs, {a.procs} processes, shard {si}/{sn}")
     if a.dry_run:
         return 0
 

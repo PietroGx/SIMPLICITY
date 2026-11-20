@@ -3,11 +3,15 @@
 # run_precompute.sh -- one command for the whole clade-build grid: check, ask,
 # submit, pack.
 #
-# Runs on the LOGIN node. It submits two jobs and returns:
+# Runs on the LOGIN node. It submits three jobs and returns:
 #
 #   1. the array, one task per build (tests/studio/slurm_precompute.sh)
-#   2. a pack job with --dependency=afterany on the array, which tars the grid
-#      into one downloadable file (tests/studio/pack_cache.sh)
+#   2. the warm array, WARM_SHARDS tasks (default 16, --warm-shards N) that
+#      memoise every panel answer, afterany on 1 (tests/studio/slurm_warm.sh)
+#   3. a pack job, afterany on 2, which tars the grid into one downloadable
+#      file (tests/studio/pack_cache.sh). Its own warm pass then reads from
+#      disk and computes only what a failed shard left. --warm-shards 0 skips
+#      2 and leaves all the warming to the pack job's 4 cores, about an hour.
 #
 # pack_cache.sh still refuses a partial grid, so a partial grid cannot quietly
 # become a file you download. The dependency is afterany, not afterok, because
@@ -28,6 +32,7 @@
 #     bash tests/studio/run_precompute.sh --check-only     # checks, submit nothing
 #     bash tests/studio/run_precompute.sh --calibrate      # time ONE build, then stop
 #     bash tests/studio/run_precompute.sh --resubmit        # only unfinished builds
+#     bash tests/studio/run_precompute.sh --warm-shards 32  # warm on 32 tasks
 #     EXP_NUM=3 bash tests/studio/run_precompute.sh         # another experiment
 #
 # EXP_NUM/EXP_NAME (or --exp-num/--exp-name) pick the run output the builds
@@ -77,6 +82,7 @@ EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
 SEEDS="${SEEDS:-50}"
 STORE="${STORE:-$ROOT/fig2_studio}"
+WARM_SHARDS="${WARM_SHARDS:-16}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -90,10 +96,14 @@ while [ $# -gt 0 ]; do
         --exp-num)    EXP_NUM="$2"; shift ;;
         --exp-name)   EXP_NAME="$2"; shift ;;
         --seeds)      SEEDS="$2"; shift ;;
+        --warm-shards) WARM_SHARDS="$2"; shift ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
     shift
 done
+case "$WARM_SHARDS" in
+    ''|*[!0-9]*) echo "--warm-shards wants a whole number, got '$WARM_SHARDS'" >&2; exit 2 ;;
+esac
 
 HASHED=(tests/studio/compute.py simplicity/clustering.py
         scripts/nature_plots/clade_preprocess.py)
@@ -319,7 +329,7 @@ fi
 
 if [ "$YES" -ne 1 ]; then
     echo
-    read -r -p "Submit ${#SPECS[@]} array job(s) covering $TODO builds, plus the packing job? [y/N] " reply
+    read -r -p "Submit ${#SPECS[@]} array job(s) covering $TODO builds, $WARM_SHARDS warm task(s) and the packing job? [y/N] " reply
     case "$reply" in
         y|Y|yes|YES) ;;
         *) echo "  Nothing submitted."; exit 0 ;;
@@ -343,6 +353,15 @@ done
 
 DEP=""
 [ "${#JOBS[@]}" -gt 0 ] && DEP="--dependency=afterany:$(IFS=:; echo "${JOBS[*]}")"
+WARMJ=""
+if [ "$WARM_SHARDS" -gt 0 ]; then
+    WARMJ=$(STORE="$STORE" EXP_NUM="$EXP_NUM" EXP_NAME="$EXP_NAME" \
+            sbatch --parsable $DEP --array="0-$(( WARM_SHARDS - 1 ))" \
+            tests/studio/slurm_warm.sh)
+    echo "  warm       $WARMJ   ($WARM_SHARDS shards, afterany on the grid)"
+    DEP="--dependency=afterany:$WARMJ"
+    JOBS+=("$WARMJ")
+fi
 PACK=$(STORE="$STORE" SEEDS="$SEEDS" \
        EXP_NUM="$EXP_NUM" EXP_NAME="$EXP_NAME" sbatch --parsable $DEP \
        tests/studio/pack_cache.sh)

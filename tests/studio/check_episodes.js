@@ -1,0 +1,217 @@
+/* Pins the browser's episode detection to compute.py's.
+
+     python -I tests/studio/server.py &
+     node tests/studio/check_episodes.js [http://127.0.0.1:8600]
+
+   web/episodes.js and tests/studio/compute.py both implement one definition --
+   smooth, find the peaks clearing the prominence bar, measure each rise across
+   the band. The browser's copy exists so the sliders answer without a
+   twelve-minute rebuild, which means a drift between them would show the
+   panels one number and the Sweep time tab another, with nothing to say which
+   is right.
+
+   THE 9.2-DAY GAP IS CLOSED (2026-11-18). The browser used to measure on
+   runs/, the clade-explorer export, which samples 120 time points about 9.2
+   days apart: control seed 0 at k=5, win=1, prom=0.1 gave python 275 emergence
+   episodes against the browser's 13, with surviving rise days differing by up
+   to 64 days. It now measures on the daily record served by /api/run_daily,
+   the same axis compute.py reads, and the browser's episode pick was changed
+   to compute.py's rule (the episode containing the clade's own maximum) from
+   the artifact's largest-amplitude one.
+
+   It also compares the two DESIGNATIONS, because the browser does its own.
+   `rundata.computeClades` takes the export's divergence-only `starts[k]` and
+   filters them by subtree transmission support; `compute.run_context`
+   designates under rule B, where refusing a split changes the reference root
+   for every descendant. Those are not obviously the same: a lineage could
+   clear k from the FOLDED root without ever having been a divergence-only
+   start, and the browser would miss it. Measured here, 0 mismatches -- which
+   is evidence, not a proof, so this section exists to notice the day it stops
+   being true.
+
+   So this compares CLADE BY CLADE, not as a set. The join is each clade's root
+   lineage index: the build names clades ("Clade_12") while the browser
+   identifies them by root lineage, and /api/run_daily carries both. Two
+   implementations of one definition agree per clade; a difference in the
+   smoothing, the prominence test, the band or the pick moves one of them.
+*/
+const fs = require("fs"), path = require("path"), vm = require("vm"), http = require("http");
+
+const BASE = (process.argv[2] || "http://127.0.0.1:8600").replace(/\/$/, "");
+const WEB = path.join(__dirname, "web");
+const TOL_DAYS = 0.02;            // compute.py rounds its day values to 2 dp
+
+function httpGet(url) {
+  return new Promise((res, rej) => {
+    http.get(url, r => {
+      let b = "";
+      r.on("data", d => b += d);
+      r.on("end", () => res({ok: r.statusCode < 400, status: r.statusCode, body: b}));
+    }).on("error", rej);
+  });
+}
+
+let pass = 0, fail = 0;
+const ck = (c, m) => { c ? pass++ : fail++; console.log((c ? "  ok   " : "  FAIL ") + m); };
+
+/* Only the modules the detection needs, in a bare context: no DOM, because
+   nothing here draws. */
+const NEED = ["settings.js", "api.js", "draw.js", "rundata.js", "paint.js", "episodes.js"];
+
+function makeContext() {
+  const g = {
+    console, atob: s => Buffer.from(s, "base64").toString("binary"),
+    Int32Array, Uint8Array, Uint16Array, Uint32Array, Float32Array, Float64Array,
+    Math, Map, Set, JSON, Number, String, Array, Object, isFinite, isNaN,
+    Infinity, NaN, parseInt, parseFloat, Error, Promise, URLSearchParams,
+    setTimeout, clearTimeout, AbortController: class {
+      constructor() { this.signal = {aborted: false}; } abort() {} },
+    localStorage: {getItem: () => null, setItem: () => {}, removeItem: () => {}},
+    getComputedStyle: () => ({getPropertyValue: () => "#888"}),
+    document: {documentElement: {}, createElement: () => ({
+      className: "", innerHTML: "", append: () => {}, querySelector: () => null,
+      querySelectorAll: () => [], addEventListener: () => {}})},
+    fetch: async u => {
+      const r = await httpGet(String(u).startsWith("http") ? String(u) : BASE + u);
+      return {ok: r.ok, status: r.status, async json() { return JSON.parse(r.body); }};
+    },
+  };
+  g.window = g;
+  g.globalThis = g;
+  const ctx = vm.createContext(g);
+  for (const f of NEED)
+    new vm.Script(fs.readFileSync(path.join(WEB, f), "utf8"), {filename: f}).runInContext(ctx);
+  return ctx;
+}
+
+const sorted = a => a.slice().sort((x, y) => x - y);
+
+async function main() {
+  const up = await httpGet(BASE + "/api/index").catch(() => null);
+  if (!up || !up.ok) {
+    console.log(`server not answering at ${BASE} -- start tests/studio/server.py first`);
+    process.exit(2);
+  }
+  const index = JSON.parse(up.body);
+  const builds = (index.builds || []).filter(b => b.code === index.code);
+  if (!builds.length) {
+    console.log("no clade build matches the current compute.py -- nothing to compare against");
+    process.exit(2);
+  }
+  const build = builds.find(b => b.params.k === 7) || builds[0];
+  const p = build.params;
+  console.log(`comparing against ${build.key}`);
+  console.log(`  k=${p.k} win=${p.win} prom=${p.prom} band ${p.lo}-${p.hi} ${p.window}`);
+
+  const ctx = makeContext();
+  const run = expr => new vm.Script(`(${expr})`).runInContext(ctx);
+
+  // the browser must be told the build's own parameters, or this compares two
+  // different questions rather than two answers to one
+  const S = {k: p.k, mt: p.mt, win: p.win, prom: p.prom, lo: p.lo, hi: p.hi,
+             window: p.window, burnin: 1};
+  run(`setSettings(${JSON.stringify(S)})`);
+
+  let checked = 0;
+  for (const scen of ["control", "HIV_high"]) {
+    for (const seedIdx of [0, 1]) {
+      const qs = new URLSearchParams(Object.assign({}, S, {
+        scenario: scen, seed: seedIdx})).toString();
+      const got = await httpGet(`${BASE}/api/build_run?${qs}`);
+      if (!got.ok) {
+        console.log(`  (the build has no ${scen} seed ${seedIdx}, skipped)`);
+        continue;
+      }
+      const pyRun = JSON.parse(got.body).run;
+
+      const dgot = await httpGet(`${BASE}/api/run_daily?${qs}`);
+      if (!dgot.ok) {
+        ck(false, `${scen} seed ${seedIdx}: /api/run_daily answered ${dgot.status}`);
+        continue;
+      }
+      const daily = JSON.parse(dgot.body);
+      const label = `${scen} seed ${seedIdx}`;
+
+      // the join: clade name -> root lineage index, which is what the browser keys on
+      const rootOf = new Map(daily.clades.map(c => [c.name, c.root]));
+
+      /* the designations themselves, before any episode is measured */
+      const buildRoots = new Set(daily.clades.filter(c => !c.founding)
+                                             .map(c => c.root));
+      const browserRoots = new Set(await run(
+        `runView("${scen}", ${seedIdx}, ${p.k}, ${S.mt}).then(v =>
+           [...v.C.alive].filter(r => !v.C.info.get(r).isRoot))`));
+      const onlyBuild = [...buildRoots].filter(r => !browserRoots.has(r));
+      const onlyBrowser = [...browserRoots].filter(r => !buildRoots.has(r));
+      ck(!onlyBuild.length && !onlyBrowser.length,
+         `${label}: one designation -- build ${buildRoots.size} non-root `
+         + `clades, browser ${browserRoots.size}`
+         + (onlyBuild.length ? `, build-only ${onlyBuild.slice(0, 5)}` : "")
+         + (onlyBrowser.length ? `, browser-only ${onlyBrowser.slice(0, 5)}` : ""));
+      ck(daily.t.length > 300,
+         `${label}: the daily record is daily (${daily.t.length} points, `
+         + `spacing ${(daily.t[1] - daily.t[0]).toFixed(2)} d)`);
+
+      /* The browser's pool is non-root clades carrying a defining mutation, so
+         match it: the founding clade and definer-less groups are not in it. */
+      const pyClades = pyRun.clades.filter(c => !c.founding && c.ndef > 0);
+      const pyEmgOf = new Map();        // clade index -> emergence rise days
+      const pyEpsOf = new Map();        // clade index -> episode count
+      for (const e of pyRun.episodes) {
+        pyEpsOf.set(e.c, (pyEpsOf.get(e.c) || 0) + 1);
+        if (e.emg) pyEmgOf.set(e.c, e.days);
+      }
+
+      const jsRows = await run(
+        `runView("${scen}", ${seedIdx}, ${p.k}, ${S.mt}).then(async v => {
+           const d = await apiGet("/api/run_daily?${qs}");
+           const prep = prepareEpisodes(v, d);
+           return {daily: prep.daily, unserved: prep.unserved,
+                   rows: prep.rows.map(r => ({id: r.id, neps: r.eps.length,
+                                              days: r.main ? r.main.days : null}))};
+         })`);
+
+      ck(jsRows.daily === true,
+         `${label}: the browser measured on the daily record, not the export`);
+
+      const jsOf = new Map(jsRows.rows.map(r => [r.id, r]));
+      let bothHave = 0, worst = 0, worstName = "", nepsBad = [];
+      for (const c of pyClades) {
+        const root = rootOf.get(c.name);
+        if (root === undefined) continue;          // not served at this m_T
+        const js = jsOf.get(root);
+        const py = pyEmgOf.get(c.c);
+        if (!js || py === undefined || js.days === null) continue;
+        bothHave++;
+        const d = Math.abs(js.days - py);
+        if (d > worst) { worst = d; worstName = c.name; }
+        const pyn = pyEpsOf.get(c.c) || 0;
+        if (js.neps !== pyn) nepsBad.push(`${c.name} (browser ${js.neps}, python ${pyn})`);
+      }
+
+      ck(bothHave > 0, `${label}: ${bothHave} clade(s) measured by both`);
+      ck(worst <= TOL_DAYS,
+         `${label}: every clade's emergence rise agrees `
+         + `(worst ${worst.toFixed(3)} d${worstName ? " on " + worstName : ""} `
+         + `over ${bothHave} clades)`);
+      ck(!nepsBad.length,
+         `${label}: episode counts agree per clade`
+         + (nepsBad.length ? ` -- differ on ${nepsBad.slice(0, 4).join(", ")}` : ""));
+
+      // and the whole multiset, which catches a clade one side dropped
+      const pyRise = sorted([...pyEmgOf.entries()]
+        .filter(([c]) => pyClades.some(x => x.c === c && rootOf.has(x.name)))
+        .map(([, d]) => d));
+      const jsRise = sorted(jsRows.rows.filter(r => r.days !== null).map(r => r.days));
+      ck(Math.abs(jsRise.length - pyRise.length) <= 1,
+         `${label}: emergence-episode count agrees `
+         + `(python ${pyRise.length}, browser ${jsRise.length})`);
+      checked++;
+    }
+  }
+  ck(checked > 0, `${checked} run(s) compared`);
+  console.log(`\n${pass} passed, ${fail} failed`);
+  process.exit(fail ? 1 : 0);
+}
+
+main().catch(e => { console.log("FAIL " + e.message); process.exit(1); });

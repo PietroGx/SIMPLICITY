@@ -49,23 +49,6 @@ tests/slurm_local_setup.md
 tests/artifacts/
 tests/_*.csv
 
-# The figure-2 studio is split. Its COMPUTATION is pipeline code: it runs on
-# the cluster, and a clade build records a hash of compute.py, so that file has
-# to be reproducible from the repo. Its UI is a local tool, served from a dev
-# box over an SSH tunnel, and stays out.
-tests/studio/*
-!tests/studio/compute.py
-!tests/studio/sweep.py
-!tests/studio/slurm_precompute.sh
-!tests/studio/pack_cache.sh
-!tests/studio/run_precompute.sh
-# the warm pass runs on the cluster too (pack_cache.sh), and the build and
-# panel keys are AST digests from codehash.py
-!tests/studio/codehash.py
-!tests/studio/panels.py
-!tests/studio/dist.py
-!tests/studio/warm_panels.py
-
 # The studio store: clade-build grid and per-run exports, GBs, rebuilt by
 # tests/studio/run_precompute.sh. Lives in the repo so one path works on the
 # dev box and the cluster alike.
