@@ -5,6 +5,109 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.16 — 2026-11-20 — pietro gerletti
+
+A clade that sweeps to the end of the record has an episode
+-----------------------------------------------------------
+
+Control seed_0002, clade 212L (`Clade_0.2.0`): frequency exactly 1.0 from
+day 799 to day 1095, a fixation. The studio showed it greyed out, "no
+peak", and panel 3 dropped it. `find_peaks` never returns a plateau that
+touches the last sample, and a trajectory that never comes back down has no
+right-hand descent to give it prominence. So the clades that win outright
+were the ones silently missing from `rise_days`, `latent_days` and every
+count.
+
+`clade_preprocess.episodes_of` now adds one **censored** episode: the
+clade's maximum, when it rose to it by the prominence bar and never falls
+back by that bar before the record ends. It peaks at the first sample within
+`CENSOR_TOL` (1e-9, relative) of the maximum. One whose maximum is the last
+sample is still climbing, has no observed peak, and stays out. The rise is
+fully observed -- both the 10% and 90% crossings fall inside the record --
+so it is counted. Only the peak and amplitude are lower bounds.
+
+A first version padded the series with a 0 and kept the peaks whose right
+base was the pad. On real data it gave 212L two censored episodes: a
+smoothed plateau at 1.0 carries ~1e-16 noise, and every wiggle tied for the
+maximum qualified. Replaced by the direct rule above.
+
+Episodes are now `(start, peak, censored)` triples. Callers updated:
+`tests/studio/compute.py` (stored as `cens` on every build episode),
+`tests/studio/panels.py` `run_daily` (`cens`, plus `n_found` = episodes
+before m_F), `tests/export_fig2_builder.py`. `web/episodes.js` mirrors the
+rule. Its trough test also used prominence 0 where python has used
+`TROUGH_PROM` since v2.5.7; it now uses `TROUGH_PROM`.
+
+Measured: `tests/studio/test_censored_episodes.py` -- 8 synthetic shapes
+land where expected; on 4,842 trajectories read from 150 cached daily
+memos, python and browser agree on every episode, no clade gets more than
+one censored episode, and 115 episodes are censored.
+
+Panel 3 reports `n_censored`, and the Sweep tab says why a clade has no
+episode: "under m_F" only when an episode existed and m_F removed it.
+
+**Rebuild required.** `clade_preprocess.py` is in the build hash, which
+moves from `d018c7a999b4` to `64d2d3cb9dff`. No build on disk is readable
+until the grid is recomputed and the panels re-warmed.
+
+Every share is a fraction
+-------------------------
+
+Follows v2.5.15's m_T change through the panels. `panels.py` and
+`dist.py` serve every share as a fraction (`pct_*` -> `frac_*`,
+`singleton_pct` -> `singleton_frac`, `never_tx_pct` -> `never_tx_frac`;
+`prevalence`, `who_transmits` and the `where` cells keep their names), and
+the studio converts to a percentage only for display (`asPct`,
+`asPctNum`, `asPctRuns` in `web/draw.js`). All tabs read the new
+fields. `test_fraction_refactor.py`: 40,756 numeric comparisons against
+payloads captured before the change, 0 failures.
+
+Panel 3 per run
+---------------
+
+`by_class_rise` and `by_class_latent` are a class's mean over one run's
+clades, bootstrapped over runs. They pooled clades across runs, which
+treated 329 clades as 329 independent draws against 50 runs. `dist.py`
+still served the per-clade arrays, so the distribution overlay drew 68
+points under an interval over 36 runs. It now serves one value per run,
+seed-aligned, and `test_dist_mirrors_panels.py` passes: 2,325 comparisons,
+0 failures. `P4_AXES` pins m_T, and panel 3's counts reconcile:
+`n_with_rise = n_with_latency + n_truncated + n_latency_before_start`.
+
+Code hashes over the AST
+------------------------
+
+`tests/studio/codehash.py`: the build key, the panel memo keys and the
+transmission-table stamp hash the parsed code, not the bytes, so a comment
+or docstring no longer orphans 168 builds. Panel memos are keyed by the
+functions that compute them (`MEMO_DEPS` in `panels.py`).
+
+The studio store is in the repo
+-------------------------------
+
+`fig2_studio/` at the repo root, gitignored, replaces `~/fig2_studio` in
+`run_precompute.sh`, `slurm_precompute.sh`, `pack_cache.sh`,
+`sweep.py`, `server.py`, `scripts/run_pipeline_and_grid.sh` and the
+diagnostics that read it. `run_pipeline_and_grid.sh` passed its own
+`$HOME/fig2_studio` default on explicitly, which would have overridden the
+new one.
+
+`.gitignore` now tracks `tests/studio/codehash.py`, `panels.py`, `dist.py`
+and `warm_panels.py`. `compute.py` imports `codehash`, and `pack_cache.sh`
+runs the warm pass on the cluster, so a cluster checkout without them failed
+at the import.
+
+`pack_cache.sh` now passes `--exp-num`/`--exp-name` to the warm pass. It
+passed only `--store`, so `warm_panels.py` fell back to experiment 1 for
+the `daily` kind, which reads raw run output under a memo key that does not
+name the experiment: experiment 1's trajectories cached in experiment 2's
+store where experiment 1 exists, failed jobs where it does not.
+
+`check_app.js` waits up to 15 s per tab: panel 4 takes about 8 s (panel and
+sensitivity requests at ~4 s each) and failed as empty under the old 4 s.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.15 — 2026-11-19 — pietro gerletti
 
 m_T is a fraction

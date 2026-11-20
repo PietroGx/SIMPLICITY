@@ -59,7 +59,7 @@ SLURM_MEM_CAL2=1G
 SLURM_TIME=""
 CAL_WORKERS=""
 GRID_SEEDS=""
-STORE="${STORE:-$HOME/fig2_studio}"
+STORE="${STORE:-$ROOT/fig2_studio}"
 LIMIT=""
 LOG=""
 YES=0
@@ -81,7 +81,7 @@ Flags (each default is printed in the checks table):
   --cal-workers N       SIMPLICITY_CALIBRATION_WORKERS for the
                         login-node per-seed fit, ~1.6 GB each  [auto, cap 4]
   --grid-seeds N        seeds run_precompute.sh's gate demands [--exp-seeds]
-  --store PATH          studio store for the grid              [~/fig2_studio]
+  --store PATH          studio store for the grid              [<repo>/fig2_studio]
   --limit N             throttle the grid array                [none]
   --log PATH            the one log                            [Data/pipeline_logs/...]
   --no-compress         skip the pipeline's Data_Export packing

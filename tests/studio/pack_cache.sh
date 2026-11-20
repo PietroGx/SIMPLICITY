@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=fig2_pack
 #SBATCH --time=03:00:00
-#SBATCH --mem=4G
+#SBATCH --mem=8G
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=main
 #SBATCH --qos=standard
@@ -60,7 +60,7 @@ ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$ROOT"
 [ -f tests/studio/compute.py ] || { echo "[pack] not a SIMPLICITY checkout: $ROOT" >&2; exit 1; }
 
-STORE="${STORE:-$HOME/fig2_studio}"
+STORE="${STORE:-$ROOT/fig2_studio}"
 SEEDS="${SEEDS:-50}"
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
@@ -144,8 +144,8 @@ fi
 
 # EXP_REL is "." for the default experiment, which extracts into the store
 # itself; any other experiment extracts into its own store under it.
-EXTRACT="~/fig2_studio"
-[ "$EXP_REL" != "." ] && EXTRACT="~/fig2_studio/$EXP_REL"
+EXTRACT="<repo>/fig2_studio"
+[ "$EXP_REL" != "." ] && EXTRACT="<repo>/fig2_studio/$EXP_REL"
 
 # Warm the panels BEFORE packing, so the archive carries them. The grid is the
 # expensive precomputation but not the whole of it: panel 4 walks every build
@@ -155,7 +155,12 @@ EXTRACT="~/fig2_studio"
 WARMED=no
 if [ "$WARM" -eq 1 ]; then
     echo "[pack] warming panels before packing"
+    # --exp-num matters: the daily kind reads the RAW run output, and its memo
+    # key does not name the experiment, so warm_panels' default of 1 would
+    # read experiment 1's runs into experiment 2's store, or fail where there
+    # is no experiment 1
     if python -I tests/studio/warm_panels.py --store "$EXP_STORE" \
+             --exp-num "$EXP_NUM" ${EXP_NAME:+--exp-name "$EXP_NAME"} \
              --procs "${SLURM_CPUS_PER_TASK:-4}" 2>&1 | sed 's/^/[pack] /'; then
         WARMED=yes
     else

@@ -76,7 +76,7 @@ TIMES="slurm_logs/fig2_precompute/timings"
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
 SEEDS="${SEEDS:-50}"
-STORE="${STORE:-$HOME/fig2_studio}"
+STORE="${STORE:-$ROOT/fig2_studio}"
 
 while [ $# -gt 0 ]; do
     case "$1" in

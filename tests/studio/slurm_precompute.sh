@@ -65,11 +65,15 @@
 # ============================================================================
 set -eo pipefail
 
+# sbatch runs this from the node spool dir, so SLURM_SUBMIT_DIR is the repo
+# root; BASH_SOURCE is the right answer for a hand run.
+ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+
 OUT="${1:-}"
 SEEDS="${SEEDS:-50}"
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
-STORE="${STORE:-$HOME/fig2_studio}"
+STORE="${STORE:-$ROOT/fig2_studio}"
 PROCS="${SLURM_CPUS_PER_TASK:-2}"
 IDX="${SLURM_ARRAY_TASK_ID:-0}"
 

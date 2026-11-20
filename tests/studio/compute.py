@@ -26,6 +26,8 @@ import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import codehash as ch
 
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
@@ -62,13 +64,13 @@ def code_hash():
     clade walk (clustering.py, v2.5.3) altered what a clade is while this file
     was untouched, so 24 builds carried the new maths under a key that claimed
     the old. A build now names the code that computed it.
+
+    Over the AST, not the bytes (codehash.py): a comment, a docstring or a
+    reformat is not a change to what a clade is, and hashing the bytes made one
+    cost 168 builds and an HPC array resubmit.
     """
-    h = hashlib.sha256()
-    for f in (os.path.abspath(__file__), os.path.abspath(cl.__file__),
-              os.path.abspath(cp.__file__)):
-        with open(f, "rb") as fh:
-            h.update(fh.read())
-    return h.hexdigest()[:12]
+    return ch.files_hash([os.path.abspath(__file__), os.path.abspath(cl.__file__),
+                          os.path.abspath(cp.__file__)])
 
 
 def params_key(p):
@@ -102,7 +104,8 @@ def run_context(ssod, k, window, mt=0.0):
 
     Clades are designated under RULE B: a lineage founds a clade when it has
     diverged >= k mutations from its clade root AND its subtree carries at
-    least `mt` percent of the run's own transmission events. `mt` = 0 falls
+    least `mt` -- a FRACTION, 0.01 for one percent -- of the run's own
+    transmission events. `mt` = 0 falls
     back to divergence alone.
 
     Rule B FOLDS a lineage that fails the support term into its surviving
@@ -362,7 +365,8 @@ def _one(job):
         h, eps = episodes_of(ys, p["prom"])
         if not eps:
             continue
-        rs = [r for r in (rise_of(ys, t_post, a, b, p["lo"], p["hi"]) for a, b in eps)
+        rs = [dict(r, cens=c) for r, c in
+              ((rise_of(ys, t_post, a, b, p["lo"], p["hi"]), c) for a, b, c in eps)
               if r is not None]
         if not rs:
             continue
@@ -378,7 +382,7 @@ def _one(job):
                              days=round(r["days"], 2),
                              amp=round(r["amp"], 5),
                              top=round(r["top"], 5),
-                             emg=bool(r is emg)))
+                             emg=bool(r is emg), cens=bool(r["cens"])))
 
     rec = dict(seed=seed, phi=None if phi is None else round(phi, 2),
                end=round(end, 2), n_tx_run=n_tx_run,

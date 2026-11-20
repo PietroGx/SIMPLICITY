@@ -64,12 +64,24 @@ def smooth(y, t, win_days):
 
 
 TROUGH_PROM = 1e-4   # an episode start must be this prominent a dip; see episodes_of
+CENSOR_TOL = 1e-9    # relative; "at the maximum" for a censored peak, see episodes_of
 
 
 def episodes_of(ys, prom):
-    """(peak height, [(start index, peak index)]). An episode's start is the
-    local minimum DIRECTLY before its peak -- not the prominence base, which
-    tunnels left to the start of the record on most clades.
+    """(peak height, [(start index, peak index, censored)]). An episode's start
+    is the local minimum DIRECTLY before its peak -- not the prominence base,
+    which tunnels left to the start of the record on most clades.
+
+    CENSORED: the record ends before the clade comes back down. find_peaks
+    never returns a plateau touching the last sample, and a clade that holds
+    high to the end has no descent to give it prominence, so a clade that swept
+    to fixation had no episode at all. So: the clade's maximum, if it rose to
+    it by the prominence bar and never falls back by that bar before the
+    record ends, is one more episode, flagged censored. It peaks at the first
+    sample within CENSOR_TOL of the maximum -- a smoothed plateau at 1.0
+    carries ~1e-16 noise, and a peak finder sees a micro-peak in every wiggle.
+    One reaching its maximum on the last sample has no observed peak and
+    stays out.
 
     A trough counts only if it clears TROUGH_PROM of the clade's peak. Without
     that test every shallow wiggle on a long flat approach was a candidate
@@ -96,18 +108,25 @@ def episodes_of(ys, prom):
     frequency, so it discriminates wiggles from dips rather than reshaping the
     metric.
     """
-    h = float(np.max(ys)) if len(ys) else 0.0
+    ys = np.asarray(ys, float)
+    n = len(ys)
+    h = float(np.max(ys)) if n else 0.0
     if not (h > 0):
         return 0.0, []
     pk, _ = find_peaks(ys, prominence=prom * h)
-    if not len(pk):
+    peaks = [(int(i), False) for i in pk]
+    m = int(np.argmax(ys >= h * (1 - CENSOR_TOL)))
+    if (m < n - 1 and h - ys[:m + 1].min() >= prom * h
+            and h - ys[m:].min() < prom * h):
+        peaks = sorted(peaks + [(m, True)])
+    if not peaks:
         return h, []
-    mins, _ = find_peaks(-np.asarray(ys, float), prominence=TROUGH_PROM * h)
+    mins, _ = find_peaks(-ys, prominence=TROUGH_PROM * h)
     mins = np.concatenate([[0], mins])
     out = []
-    for i in pk:
+    for i, c in peaks:
         before = mins[mins < i]
-        out.append((int(before[-1]) if len(before) else 0, int(i)))
+        out.append((int(before[-1]) if len(before) else 0, i, c))
     return h, out
 
 

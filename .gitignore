@@ -59,3 +59,14 @@ tests/studio/*
 !tests/studio/slurm_precompute.sh
 !tests/studio/pack_cache.sh
 !tests/studio/run_precompute.sh
+# the warm pass runs on the cluster too (pack_cache.sh), and the build and
+# panel keys are AST digests from codehash.py
+!tests/studio/codehash.py
+!tests/studio/panels.py
+!tests/studio/dist.py
+!tests/studio/warm_panels.py
+
+# The studio store: clade-build grid and per-run exports, GBs, rebuilt by
+# tests/studio/run_precompute.sh. Lives in the repo so one path works on the
+# dev box and the cluster alike.
+fig2_studio/
