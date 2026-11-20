@@ -252,7 +252,7 @@ def main():
     ap.add_argument("--exp-name", default=compute.EXP_NAME)
     ap.add_argument("--base-store",
                     default=os.path.join(os.path.dirname(os.path.dirname(HERE)),
-                                         "fig2_studio"))
+                                         "Data", "fig2_studio"))
     a = ap.parse_args()
     store = sweep.store_dir(a.base_store, a.exp_num, a.exp_name)
     print(f"store  {store}")

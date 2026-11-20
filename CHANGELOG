@@ -5,6 +5,57 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.18 — 2026-11-20 — pietro gerletti
+
+The cluster builds panel 2's transmission table
+-----------------------------------------------
+
+The first warm pass on the cluster failed 4 jobs, p2 and d2 at both burn-in
+settings, all `FileNotFoundError: transmissions`. Panel 2 reads the store's
+`tx/`, written by `tests/export_transmissions.py`, which nothing in
+`run_precompute.sh` ran, and `pack_cache.sh` archived `cache/` only. So no
+store built on the cluster had a transmission table, and no archive carried
+one.
+
+`tests/studio/slurm_tx.sh` writes it into `<store>/tx`. It reads the run
+output only, so `run_precompute.sh` submits it alongside the grid; the warm
+array waits on both (afterany) and the pack job on the warm array and it.
+`pack_cache.sh` archives `tx/` with `cache/`, warns when it is absent, and the
+manifest lists what went in.
+
+Faster packing, and a log that shows where it is
+------------------------------------------------
+
+- The warm pass's output reached the pack log through `sed`, which
+  block-buffers into a file, so the log ran several kilobytes -- thousands
+  of jobs -- behind the work. `sed -u`.
+- The archive is compressed with `pigz` on every core of the job when the
+  node has it, plain `tar -z` otherwise.
+- The pack job takes 8 cores and 16 GB (was 4 and 8), for the parallel
+  compression and its catch-up warm pass.
+- `--warm-shards` defaults to 32 (was 16).
+
+Verified against a stub `sbatch`: grid and tx submitted together, warm
+afterany on both, pack afterany on warm and tx; with `--warm-shards 0`, pack
+afterany on grid and tx. Not yet run on Slurm.
+
+The studio store moves to `Data/fig2_studio`
+--------------------------------------------
+
+It sat at the repo root as `fig2_studio/`, with its own `.gitignore` line.
+It is run-derived data like everything else in `Data/`, which `Data/*`
+already keeps untracked. Every default now points there: `sweep.DEFAULT_STORE`,
+`server.BASE_STORE`, `warm_panels --base-store`, `STORE` in the five Slurm
+and submit scripts, the extract hint in the pack manifest, the README, and
+`check_transmissions.py`, `panel_denominators.py` and the studio's `test_*`
+scripts. Nothing that scans `Data/` picks it up: the packager matches
+`*_#<N>` names only, and `dir_manager` lists inside experiments.
+
+An existing store moves with `mv fig2_studio Data/fig2_studio` -- on the
+cluster too, after pulling, or the next grid lands beside the old one.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.17 — 2026-11-20 — pietro gerletti
 
 The panel warm-up runs as its own Slurm array

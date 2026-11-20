@@ -48,8 +48,3 @@ tests/slurm_local_setup.md
 # was built from, and the CSV output of the tests/ diagnostics.
 tests/artifacts/
 tests/_*.csv
-
-# The studio store: clade-build grid and per-run exports, GBs, rebuilt by
-# tests/studio/run_precompute.sh. Lives in the repo so one path works on the
-# dev box and the cluster alike.
-fig2_studio/

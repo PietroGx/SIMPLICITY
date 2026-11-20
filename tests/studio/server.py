@@ -34,8 +34,9 @@ import sweep
 # export scripts, which otherwise default to experiment 1 and would write a
 # different experiment's data into this store under identical directory names
 # -- compute.params_key carries no experiment identity.
-# The store lives in the repo and is gitignored. It used to be ~/fig2_studio.
-BASE_STORE = os.path.join(ROOT, "fig2_studio")
+# The store is Data/fig2_studio, untracked like the rest of Data/. It was
+# ~/fig2_studio, then <repo>/fig2_studio until v2.5.18.
+BASE_STORE = os.path.join(ROOT, "Data", "fig2_studio")
 EXP_NUM = 1
 EXP_NAME = compute.EXP_NAME
 STORE = sweep.store_dir(BASE_STORE, EXP_NUM, EXP_NAME)

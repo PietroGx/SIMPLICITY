@@ -171,7 +171,7 @@ def main():
     ap.add_argument("--exp-name", type=str, default=compute.EXP_NAME)
     ap.add_argument("--store", default=None,
                     help="override; by default the experiment's own store")
-    ap.add_argument("--base-store", default=os.path.join(ROOT, "fig2_studio"))
+    ap.add_argument("--base-store", default=os.path.join(ROOT, "Data", "fig2_studio"))
     ap.add_argument("--procs", type=int, default=4)
     ap.add_argument("--what", default=",".join(KINDS),
                     help="comma-separated: " + ", ".join(KINDS))

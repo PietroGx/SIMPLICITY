@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=fig2_pack
 #SBATCH --time=03:00:00
-#SBATCH --mem=8G
-#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --cpus-per-task=8
 #SBATCH --partition=main
 #SBATCH --qos=standard
 #SBATCH --output=slurm_logs/fig2_precompute/pack_%j.log
@@ -60,7 +60,7 @@ ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$ROOT"
 [ -f tests/studio/compute.py ] || { echo "[pack] not a SIMPLICITY checkout: $ROOT" >&2; exit 1; }
 
-STORE="${STORE:-$ROOT/fig2_studio}"
+STORE="${STORE:-$ROOT/Data/fig2_studio}"
 SEEDS="${SEEDS:-50}"
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
@@ -144,8 +144,8 @@ fi
 
 # EXP_REL is "." for the default experiment, which extracts into the store
 # itself; any other experiment extracts into its own store under it.
-EXTRACT="<repo>/fig2_studio"
-[ "$EXP_REL" != "." ] && EXTRACT="<repo>/fig2_studio/$EXP_REL"
+EXTRACT="<repo>/Data/fig2_studio"
+[ "$EXP_REL" != "." ] && EXTRACT="<repo>/Data/fig2_studio/$EXP_REL"
 
 # Warm the panels BEFORE packing, so the archive carries them. The grid is the
 # expensive precomputation but not the whole of it: panel 4 walks every build
@@ -163,7 +163,7 @@ if [ "$WARM" -eq 1 ]; then
     # is no experiment 1
     if python -I tests/studio/warm_panels.py --store "$EXP_STORE" \
              --exp-num "$EXP_NUM" ${EXP_NAME:+--exp-name "$EXP_NAME"} \
-             --procs "${SLURM_CPUS_PER_TASK:-4}" 2>&1 | sed 's/^/[pack] /'; then
+             --procs "${SLURM_CPUS_PER_TASK:-4}" 2>&1 | sed -u 's/^/[pack] /'; then
         WARMED=yes
     else
         echo "[pack] WARNING: the warm-up failed; packing the grid anyway" >&2
@@ -180,7 +180,16 @@ echo "[pack] writing $OUT"
 # which is true of panels 1 to 3 and wrong about panel 4: that one reads every
 # build in the grid, and a cold value measured 197 s on the 168-build run #2.
 # It is ~13 MB against a 416 MB archive.
-tar -czf "$OUT" -C "$EXP_STORE" cache
+# tx/ is panel 2's transmission table (slurm_tx.sh); without it panel 2 has
+# nothing to read. pigz compresses on every core where gzip uses one.
+PARTS=(cache)
+[ -f "$EXP_STORE/tx/index.json" ] && PARTS+=(tx) \
+    || echo "[pack] WARNING: no $EXP_STORE/tx -- panel 2 will be empty" >&2
+if command -v pigz >/dev/null 2>&1; then
+    tar -cf - -C "$EXP_STORE" "${PARTS[@]}" | pigz -p "${SLURM_CPUS_PER_TASK:-4}" > "$OUT"
+else
+    tar -czf "$OUT" -C "$EXP_STORE" "${PARTS[@]}"
+fi
 
 SIZE=$(du -h "$OUT" | cut -f1)
 SUM=$(sha256sum "$OUT" | cut -d' ' -f1)
@@ -194,6 +203,7 @@ NFILES=$(find "$CACHE" -maxdepth 2 -type f -path "*__${HASH}/*" 2>/dev/null | wc
     echo "builds       $HAVE of $WANT finished (sweep.py done(), not dir count)"
     echo "directories  $DIRS at this hash"
     echo "panels       $WARMED  (cache/_panels is packed with the grid)"
+    echo "contents     ${PARTS[*]}"
     echo "files        $NFILES"
     echo "archive      $(basename "$OUT")  $SIZE"
     echo "sha256       $SUM"

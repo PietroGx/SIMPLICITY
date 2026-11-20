@@ -3,15 +3,18 @@
 # run_precompute.sh -- one command for the whole clade-build grid: check, ask,
 # submit, pack.
 #
-# Runs on the LOGIN node. It submits three jobs and returns:
+# Runs on the LOGIN node. It submits four jobs and returns:
 #
 #   1. the array, one task per build (tests/studio/slurm_precompute.sh)
-#   2. the warm array, WARM_SHARDS tasks (default 16, --warm-shards N) that
-#      memoise every panel answer, afterany on 1 (tests/studio/slurm_warm.sh)
-#   3. a pack job, afterany on 2, which tars the grid into one downloadable
-#      file (tests/studio/pack_cache.sh). Its own warm pass then reads from
-#      disk and computes only what a failed shard left. --warm-shards 0 skips
-#      2 and leaves all the warming to the pack job's 4 cores, about an hour.
+#   2. the transmission table panel 2 reads, alongside 1 -- it needs only the
+#      run output (tests/studio/slurm_tx.sh)
+#   3. the warm array, WARM_SHARDS tasks (default 32, --warm-shards N) that
+#      memoise every panel answer, afterany on 1 and 2
+#      (tests/studio/slurm_warm.sh)
+#   4. a pack job, afterany on 3, which tars the grid and tx/ into one
+#      downloadable file (tests/studio/pack_cache.sh). Its own warm pass then
+#      reads from disk and computes only what a failed shard left.
+#      --warm-shards 0 skips 3 and leaves the warming to the pack job alone.
 #
 # pack_cache.sh still refuses a partial grid, so a partial grid cannot quietly
 # become a file you download. The dependency is afterany, not afterok, because
@@ -81,8 +84,8 @@ TIMES="slurm_logs/fig2_precompute/timings"
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
 SEEDS="${SEEDS:-50}"
-STORE="${STORE:-$ROOT/fig2_studio}"
-WARM_SHARDS="${WARM_SHARDS:-16}"
+STORE="${STORE:-$ROOT/Data/fig2_studio}"
+WARM_SHARDS="${WARM_SHARDS:-32}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -329,7 +332,7 @@ fi
 
 if [ "$YES" -ne 1 ]; then
     echo
-    read -r -p "Submit ${#SPECS[@]} array job(s) covering $TODO builds, $WARM_SHARDS warm task(s) and the packing job? [y/N] " reply
+    read -r -p "Submit ${#SPECS[@]} array job(s) covering $TODO builds, the transmission table, $WARM_SHARDS warm task(s) and the packing job? [y/N] " reply
     case "$reply" in
         y|Y|yes|YES) ;;
         *) echo "  Nothing submitted."; exit 0 ;;
@@ -351,15 +354,18 @@ for spec in "${SPECS[@]}"; do
     echo "  array      $JOB   ($SHOWN)"
 done
 
-DEP=""
-[ "${#JOBS[@]}" -gt 0 ] && DEP="--dependency=afterany:$(IFS=:; echo "${JOBS[*]}")"
+TXJ=$(STORE="$STORE" SEEDS="$SEEDS" EXP_NUM="$EXP_NUM" EXP_NAME="$EXP_NAME" \
+      sbatch --parsable tests/studio/slurm_tx.sh)
+echo "  tx         $TXJ   (transmission table, alongside the grid)"
+JOBS+=("$TXJ")
+DEP="--dependency=afterany:$(IFS=:; echo "${JOBS[*]}")"
 WARMJ=""
 if [ "$WARM_SHARDS" -gt 0 ]; then
     WARMJ=$(STORE="$STORE" EXP_NUM="$EXP_NUM" EXP_NAME="$EXP_NAME" \
             sbatch --parsable $DEP --array="0-$(( WARM_SHARDS - 1 ))" \
             tests/studio/slurm_warm.sh)
-    echo "  warm       $WARMJ   ($WARM_SHARDS shards, afterany on the grid)"
-    DEP="--dependency=afterany:$WARMJ"
+    echo "  warm       $WARMJ   ($WARM_SHARDS shards, afterany on the grid and tx)"
+    DEP="--dependency=afterany:$WARMJ:$TXJ"
     JOBS+=("$WARMJ")
 fi
 PACK=$(STORE="$STORE" SEEDS="$SEEDS" \

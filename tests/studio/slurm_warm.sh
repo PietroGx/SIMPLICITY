@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=fig2_warm
-#SBATCH --array=0-15
+#SBATCH --array=0-31
 #SBATCH --time=01:00:00
 #SBATCH --mem=8G
 #SBATCH --cpus-per-task=4
@@ -16,7 +16,7 @@
 # from disk and computes only what a failed shard left.
 #
 #     EXP_NUM=2 sbatch tests/studio/slurm_warm.sh
-#     EXP_NUM=2 sbatch --array=0-31 tests/studio/slurm_warm.sh    # 32 shards
+#     EXP_NUM=2 sbatch --array=0-63 tests/studio/slurm_warm.sh    # 64 shards
 #
 # N is the array's size, so it must be one contiguous 0-(N-1) range.
 # ============================================================================
@@ -27,7 +27,7 @@ cd "$ROOT"
 
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
-STORE="${STORE:-$ROOT/fig2_studio}"
+STORE="${STORE:-$ROOT/Data/fig2_studio}"
 IDX="${SLURM_ARRAY_TASK_ID:-0}"
 N="${SLURM_ARRAY_TASK_COUNT:-1}"
 

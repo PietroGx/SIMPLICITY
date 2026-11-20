@@ -49,7 +49,7 @@ never leaves the browser.
 ## Data
 
 ```
-fig2_studio/
+Data/fig2_studio/
   runs/     55 MB   phylogeny + sparse lineage frequency, 250 runs (120 time points)
   tx/      2.9 MB   per-day 2x2 transmission counts by host type
   cache/            clade builds + the panel cache, keyed by parameters and
@@ -93,10 +93,10 @@ Both are jobs: one at a time, loopback only, refused rather than queued.
 
 ```bash
 # the transmission table. ~10 min, no phylogeny, no clustering
-python -I tests/export_transmissions.py --out fig2_studio/tx --procs 2
+python -I tests/export_transmissions.py --out Data/fig2_studio/tx --procs 2
 
 # one clade build -- clades, composition, burden, episodes at one k. ~12 min
-python -I tests/studio/compute.py --out fig2_studio/cache --procs 2 \
+python -I tests/studio/compute.py --out Data/fig2_studio/cache --procs 2 \
     --k 7 --win 15 --prom 0.10 --window post
 ```
 
