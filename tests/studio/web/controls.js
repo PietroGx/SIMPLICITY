@@ -146,12 +146,12 @@ function railDistribution(setting, plot) {
   const ok = distAllowed(plot);
   return checkControl({
     setting, disabled: !ok,
-    label: "Show the individual runs",
-    why: "This plot form cannot carry them: a stack of means has no per-run "
-       + "form that stays a stack, and a count of runs is not an estimate.",
+    label: "Show the individual simulations",
+    why: "This plot form cannot carry them: a stack of means has no per-simulation "
+       + "form that stays a stack, and a count of simulations is not an estimate.",
     hint: ok ? "The whiskers are a bootstrap CI of the <strong>mean</strong> "
-             + "(2000 resamples over runs), so they are narrower than the runs "
-             + "themselves by construction. This draws the runs behind them."
+             + "(2000 resamples over simulations), so they are narrower than the simulations "
+             + "themselves by construction. This draws the simulations behind them."
              : "",
   });
 }
@@ -199,7 +199,7 @@ function railSimulation(maxSeed) {
     sliderControl({setting: "seed", label: "Seed", min: 0,
       max: Math.max(0, (maxSeed || 50) - 1), step: 1,
       format: v => String(v).padStart(4, "0"),
-      hint: "One run. The run is the independent unit everywhere in the studio."}),
+      hint: "One simulation. The simulation is the independent unit everywhere in the studio."}),
   ]);
 }
 
@@ -215,7 +215,7 @@ function railClade() {
     sliderControl({setting: "mt", label: "Minimum transmissions <i>m<sub>T</sub></i>",
       values: AXES.mt, format: v => mtPct(v) + "%",
       hint: "…<strong>and</strong> it and its descendants carry at least this "
-          + "share of the run's transmission events. A share, not a "
+          + "share of the simulation's transmission events. A share, not a "
           + "count: the scenarios run 11,846 to 27,510 transmissions, so a "
           + "fixed count would be a different filter in each. Stored as a "
           + "fraction, shown here as a percentage.<br>"
@@ -229,6 +229,40 @@ function railClade() {
       hint: "Clades and their defining mutations are never windowed — a clade's "
           + "defining mutations were laid down once."}),
   ]);
+}
+
+/* The burn-in toggle on its own, for the tabs past Clustering: the clade
+   definition is set there, the window is still read per panel. */
+function railWindow() {
+  return card("Window", [
+    checkControl({setting: "burnin",
+      label: "Exclude the burn-in from frequency and infection counts",
+      hint: "Clades and their defining mutations are never windowed — a clade's "
+          + "defining mutations were laid down once."}),
+  ]);
+}
+
+/* Scenario toggles in each scenario's own colour: the picked ones are drawn in
+   full and the rest faded (scenarioColour). None picked is all in full. */
+function railFocus() {
+  const el = document.createElement("div");
+  el.className = "ctl";
+  el.innerHTML = `
+    <div class="sctog">${SCENARIOS.map(sc => `<button type="button" data-v="${sc}"
+      aria-pressed="${focusSet().has(sc)}" style="--c:${css("--sc" + SCENARIOS.indexOf(sc))}"
+      ><i></i>${SCENARIO_LABEL[sc]}</button>`).join("")}</div>
+    <div class="hint">Pick one or several to make them stand out; the others are
+      faded, not removed. None picked shows every scenario in full.</div>`;
+  const btns = el.querySelectorAll("button");
+  const paint = () => { const f = focusSet();
+    btns.forEach(b => b.setAttribute("aria-pressed", String(f.has(b.dataset.v)))); };
+  btns.forEach(b => b.addEventListener("click", () => {
+    const f = focusSet();
+    f.has(b.dataset.v) ? f.delete(b.dataset.v) : f.add(b.dataset.v);
+    setSetting("focus", SCENARIOS.filter(sc => f.has(sc)).join(","));
+    paint();
+  }));
+  return card("Scenarios", [el]);
 }
 
 /* How a clade's origin is decided. Restored from the artifact: the three rules

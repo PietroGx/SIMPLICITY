@@ -32,7 +32,7 @@ async function render_export(main){
   main.innerHTML = `
   <div class="stats">
     <div class="stat"><div class="k">clade builds</div><div class="v">${(d.builds||[]).length}</div></div>
-    <div class="stat"><div class="k">transmissions</div><div class="v">${tx?Object.values(tx.counts||{}).reduce((a,b)=>a+b,0):0}<small> runs</small></div></div>
+    <div class="stat"><div class="k">transmissions</div><div class="v">${tx?Object.values(tx.counts||{}).reduce((a,b)=>a+b,0):0}<small> simulations</small></div></div>
     <div class="stat"><div class="k">code hash</div><div class="v" style="font-size:.8rem">${d.code}</div></div>
     <div class="stat"><div class="k">job</div><div class="v" style="font-size:.8rem">${running?"running":"idle"}</div></div>
   </div>
@@ -45,14 +45,14 @@ async function render_export(main){
       <button class="wide prim" id="b3" ${running?"disabled":""}>
         Build clades at k=${settings.k}</button>
       <button class="wide" id="btx" ${running?"disabled":""}>
-        Rebuild transmissions — panel 2, ~10 min</button></div>
+        Rebuild transmissions — Figure 3, ~10 min</button></div>
     <div class="cap">The clade pass reads the daily record and clusters with the
-      pipeline's own function; expect roughly ten minutes for 250 runs at two
+      pipeline's own function; expect roughly ten minutes for 250 simulations at two
       processes. A second request is refused, not queued.</div></div>
   <div class="plot"><div class="ph"><h3>Job log</h3></div>
     <pre class="log" id="log">${(j.tail||[]).join("\n") || "no output"}</pre></div>
   <div class="plot"><div class="ph"><h3>Cached clade builds</h3></div>
-    <table class="t"><thead><tr><th>key</th><th>runs</th><th>failed</th><th></th>
+    <table class="t"><thead><tr><th>key</th><th>simulations</th><th>failed</th><th></th>
       </tr></thead><tbody>${builds}</tbody></table></div>`;
   document.getElementById("b3").onclick = async () => {
     /* every build parameter, taken from BUILD_SETTINGS rather than listed
@@ -81,7 +81,7 @@ async function render_export(main){
 
 
 registerTab({
-  id: "export", num: 9, title: "Export", viewId: "viewExp",
+  id: "export", group: "tools", title: "Export", viewId: "viewExp",
   lede: "Runs a compute pass with the current settings and caches the result. These endpoints are loopback-only: a pass takes two of four cores for minutes, and this box also serves production vhosts.",
   rail: rail_export,
   render: render_export,

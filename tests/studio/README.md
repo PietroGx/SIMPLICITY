@@ -1,6 +1,6 @@
 # Figure 2 studio
 
-One local page with ten tabs over the impact-long-shedders runs. Not an
+One local page with eleven tabs over the impact-long-shedders runs. Not an
 artifact: it is served from this box, bound to loopback, and reached over an
 SSH tunnel.
 
@@ -24,21 +24,23 @@ would be a production incident rather than a slow tool.
 
 ## Tabs
 
-`web/index.html` is the only document. It loads 18 scripts in dependency order
-and each tab registers itself, so adding one means adding a file.
+`web/index.html` is the only document. It loads its scripts in dependency
+order and each tab registers itself (`id`, `group`, `num`, `title`), so adding
+one means adding a file.
 
-| # | tab | owns |
-|---|---|---|
-| 0 | Method | the flow and every metric's calculation, cited to file:line |
-| 1 | Clustering | *k* and *m*<sub>T</sub> — the clade definition |
-| 2 | Across the set | the clade definition over all the m<sub>T</sub> values |
-| 3 | Sweep time | every clade of one run, each rise episode highlighted |
-| 4 | Panel 1 | composition class against burden |
-| 5 | Panel 2 | transmission events, all three claims |
-| 6 | Panel 3 | emergence rise time and latent interval |
-| 7 | Panel 4 | sensitivity — the grid, the operating point, one axis at a time |
-| 8 | Figure | the four panels assembled, read-only |
-| 9 | Export | runs a pass, shows the job log and the cache |
+| group | tab | file | reads |
+|---|---|---|---|
+| figures | 1 · Model | (being written) | `fig1/` (`tests/studio/fig1.py`) |
+| figures | 2 · Clustering | `web/tab_clades4.js` | `/api/runs`, `/api/run` |
+| figures | 3 · Transmission | `web/tab_panel2.js` | `/api/panel?n=2` (`tx/`) |
+| figures | 4 · Burden | `web/tab_panel1.js` | `/api/panel?n=1`, `n=1c` |
+| figures | 5 · Rise vs latency | `web/tab_panel3.js` | `/api/panel?n=3` |
+| supplementary | S1 · Clustering sensitivity | `web/tab_panel4.js` | `/api/panel?n=4`, `/api/sens` |
+| data exploration | Clustering | `web/tab_clustering.js` | `/api/runs`, `/api/run` |
+| data exploration | m_T effect on clades | `web/tab_across.js` | `/api/across` |
+| data exploration | Sweep time | `web/tab_sweep.js` | `/api/run_daily` |
+| tools | Method | `web/tab_method.js` | `/api/index` |
+| tools | Export | `web/tab_export.js` | `/api/jobs`, `POST /api/rebuild/*` |
 
 One settings object (`web/settings.js`) mirrored to `localStorage`, so a reload
 starts where you left off. A setting is one of three kinds: **build** (`k`,
@@ -49,9 +51,11 @@ never leaves the browser.
 ## Data
 
 ```
-Data/fig2_studio/
+Data/figures_studio/<store>/           one store per experiment (sweep.py --print-paths)
   runs/     55 MB   phylogeny + sparse lineage frequency, 250 runs (120 time points)
-  tx/      2.9 MB   per-day 2x2 transmission counts by host type
+  tx/               per-day 2x2 transmission counts by host type, and per-day
+                    jump tables per transmitter type (export_transmissions.py)
+  fig1/             fig1.json + index.json, Figure 1's data (fig1.py build)
   cache/            clade builds + the panel cache, keyed by parameters and
                     a hash of the code that produced them
 ```
@@ -92,16 +96,52 @@ those are shapes, not numbers.
 Both are jobs: one at a time, loopback only, refused rather than queued.
 
 ```bash
-# the transmission table. ~10 min, no phylogeny, no clustering
-python -I tests/export_transmissions.py --out Data/fig2_studio/tx --procs 2
+# the transmission table. Reads each run's phylogeny for the jump tables,
+# ~1.5 s a run; 250 runs took 1 min 40 s at --procs 4
+python -I tests/export_transmissions.py --out <store>/tx --procs 2
 
 # one clade build -- clades, composition, burden, episodes at one k. ~12 min
-python -I tests/studio/compute.py --out Data/fig2_studio/cache --procs 2 \
+python -I tests/studio/compute.py --out Data/figures_studio/cache --procs 2 \
     --k 7 --win 15 --prom 0.10 --window post
 ```
 
+`fig1.py build --exp-num N --store <store>` writes `<store>/fig1/`: one
+process, ~5 min, ~1 GB.
+
 Use `--procs 2`. The box has 4 cores and about 4 GB free with swap already in
 use; the exporter costs roughly `0.15 + procs x 0.9` GB.
+
+## Precompute on the HPC
+
+**Staged for the next rebuild:** `pending_compute_ntx_post.patch` adds each
+clade's infections on or after the burn-in day (`ntx_post`) to the clade pass.
+Not applied yet because it changes `compute.py`'s hash and so every build's
+name. Before launching: `git apply -p1 tests/studio/pending_compute_ntx_post.patch`,
+then delete the patch. `run_precompute.sh` refuses to submit while it is unapplied.
+Figure 4's infections bar uses `ntx_post` once the builds carry it.
+
+`run_precompute.sh` runs the login-node checks, asks, then submits:
+
+| job | script | depends on | resources |
+|---|---|---|---|
+| grid array, one build a task | `slurm_precompute.sh` | -- | 1 h, 16G, 4 cpu |
+| transmission table into `tx/` | `slurm_tx.sh` | -- | 30 min, 8G, 4 cpu |
+| Figure 1 data into `fig1/` | `slurm_fig1.sh` | -- | 45 min, 4G, 1 cpu |
+| warm array, `--shard I/N` | `slurm_warm.sh` | afterany grid, tx | 1 h, 8G, 4 cpu |
+| pack | `pack_cache.sh` | afterany warm, tx, fig1 | 3 h, 16G, 8 cpu |
+
+```bash
+EXP_NUM=2 bash tests/studio/run_precompute.sh --dry-run   # print the chain, submit nothing
+EXP_NUM=2 bash tests/studio/run_precompute.sh             # checks, ask, submit
+#   --no-fig1  --warm-shards 0  --resubmit  --limit N  --calibrate  --check-only
+python -I tests/studio/warm_panels.py --exp-num 2 --shard 0/32 --list   # jobs per shard
+```
+
+The pack job tars `cache/` (with `_panels/`), `tx/` and `fig1/` into
+`<store>/fig2_cache_<hash>_<date>.tar.gz`; a missing `tx/` or `fig1/` is a
+warning in the log and the manifest, a partial grid is a refusal (exit 3).
+The warm pass skips a memo only if its file exists, and the file name carries
+the hash of the code that computes it, so a changed panel re-warms itself.
 
 ## Checks
 
@@ -116,7 +156,7 @@ node    tests/artifacts/check_sentinel.js       # 11  "not measurable" survives 
 # with the server up
 python -I tests/check_transmissions.py          # 18  the transmission table, against a separate script
 python -I tests/check_studio_api.py             #     the API a page actually receives
-node    tests/studio/check_app.js               # 76  all ten tabs rendered headlessly
+node    tests/studio/check_app.js               #     every tab rendered headlessly
 node    tests/studio/check_episodes.js          # 25  the tab's episodes against the build's
 ```
 

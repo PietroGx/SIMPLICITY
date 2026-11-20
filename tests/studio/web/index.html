@@ -1,6 +1,8 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Figure 2 studio</title>
+<title>Paper figures studio</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <link rel="stylesheet" href="studio.css"></head><body>
 <!-- One document. Each script below owns one thing and nothing else:
 
@@ -13,8 +15,8 @@
        paint.js      the artifact's charts, ported
        episodes.js   episode detection in the browser, for the sliders
        controls.js   rail controls, built from three factories
-       shell.js      the tab bar and the render loop
-       tab_*.js      one tab each, self-registering
+       shell.js      the tab bar, its groups, and the render loop
+       tab_*.js      one tab each, self-registering into a group
 
      Load order is dependency order. There is no bundler on purpose: the server
      serves this directory as static files and tests/studio/check_pages.js
@@ -29,15 +31,16 @@
 <script src="dist.js"></script>
 <script src="controls.js"></script>
 <script src="shell.js"></script>
-<script src="tab_method.js"></script>
 <script src="tab_clustering.js"></script>
 <script src="tab_across.js"></script>
 <script src="tab_sweep.js"></script>
-<script src="tab_panel1.js"></script>
+<script src="tab_fig1.js"></script>
+<script src="tab_clades4.js"></script>
 <script src="tab_panel2.js"></script>
+<script src="tab_panel1.js"></script>
 <script src="tab_panel3.js"></script>
 <script src="tab_panel4.js"></script>
-<script src="tab_figure.js"></script>
+<script src="tab_method.js"></script>
 <script src="tab_export.js"></script>
 <script>
 /* The rail's build-parameter sliders stop only on the grid's own axes, so the

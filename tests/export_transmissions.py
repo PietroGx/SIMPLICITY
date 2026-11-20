@@ -10,8 +10,11 @@ individual's `parent` (who infected me) and once from each individual's
 are the same events seen from opposite ends, so a divergence is a finding about
 the run data, not a rounding detail.
 
-Reads only individuals_data; no phylogeny, no clustering, no lineage
-frequencies. ~0.85 s per run.
+Also records, per transmission, the number of distinct genome positions
+between the lineage the transmitter was infected with and the one it passed on
+-- fig3_preprocess_data.get_fig2_divergence_data's quantity, same filters, same
+hamming_iw -- as per-day counts by that number, one table per transmitter type.
+This is the one read of the phylogeny.
 
 No windowed twins: with per-day counts the burn-in cut is a sum range, which
 makes it exact and lets a panel show any window.
@@ -30,10 +33,12 @@ import codehash as ch
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 import fig2_preprocess_data as pre
+from simplicity.phenotype.distance import hamming_iw
 from _scenarios import EXP_NAME, resolve_scenarios, one_sod, scenario_meta
 
 SCEN_ORDER = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"]
 CELLS = ["ll", "ls", "sl", "ss"]          # transmitter -> recipient, l=long s=standard
+JUMP_TYPES = ("long_shedder", "standard")  # individuals_data `type`, as fig3 filters it
 
 
 def code_hash():
@@ -55,6 +60,7 @@ def _one(job):
     seed = os.path.basename(ssod)
     try:
         ind = om.read_individuals_data(ssod)
+        phylo = om.read_phylogenetic_data(ssod)
         phi = pre.phi_day(ssod)
         end = float(om.read_final_time(ssod))
     except Exception as exc:
@@ -96,6 +102,31 @@ def _one(job):
             if 0 <= d < nd:
                 B[cell(lg[j], lg[r])][d] += 1
 
+    # the jump a transmitter adds to what it passes on (fig3 row 3's violin)
+    lin2gen = dict(zip(phylo["Lineage_name"], phylo["Genome"])) if not phylo.empty else {}
+    dist, J = {}, {t: ([], []) for t in JUMP_TYPES}
+    for typ, inh, evs in zip(ind["type"], ind["inherited_lineage"], ind["new_infections"]):
+        typ = str(typ)
+        if typ not in J or inh not in lin2gen or not isinstance(evs, list):
+            continue
+        for e in evs:
+            tl = e.get("transmitted_lineage") if isinstance(e, dict) else None
+            if tl in lin2gen:
+                if (inh, tl) not in dist:
+                    dist[(inh, tl)] = hamming_iw(lin2gen[inh], lin2gen[tl])
+                J[typ][0].append(int(np.floor(float(e.get("time_infection")))))
+                J[typ][1].append(dist[(inh, tl)])
+    jumps = {}
+    for t, (jd, jv) in J.items():
+        jd, jv = np.array(jd, int), np.array(jv, int)
+        ok = (jd >= 0) & (jd < nd)
+        D = int(jv.max()) + 1 if len(jv) else 0
+        H = np.zeros((nd, D), np.int64)
+        np.add.at(H, (jd[ok], jv[ok]), 1)
+        if H.size and H.max() > 65535:
+            return scenario, seed, None, f"{t} jump count overflows uint16"
+        jumps[t] = dict(D=D, n=int(ok.sum()), h=_b64(H.astype(np.uint16)))
+
     bad = [c for c in CELLS if not np.array_equal(A[c], B[c])]
     if bad:
         gap = {c: int(np.abs(A[c] - B[c]).sum()) for c in bad}
@@ -112,7 +143,8 @@ def _one(job):
                end=round(end, 2), n_days=nd,
                n_infected=int(len(ind)), n_long=int(lg.sum()),
                n_standard=int((~lg).sum()), n_seeded=seeded, n_events=tot,
-               **{c: _b64(A[c].astype(np.uint16)) for c in CELLS})
+               **{c: _b64(A[c].astype(np.uint16)) for c in CELLS},
+               jumps=jumps)
     return scenario, seed, rec, None
 
 

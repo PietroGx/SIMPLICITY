@@ -9,6 +9,7 @@ not on disk is a wait in the middle of dragging a slider.
 Measured cold, run #2, 168 builds:
 
     panel 1     0.12 s   key [build, m_T, burn-in]        336 keys
+    panel 1c  not timed  key [build, m_T, burn-in]        336 keys  (Figure 4 points)
     panel 2        ~0 s  key [burn-in]                      2 keys
     panel 3     0.18 s   key [build, m_T, m_F]           1,344 keys
     episodes    0.04 s   key [build, m_T, m_F]           1,344 keys
@@ -31,12 +32,15 @@ build's own m_T, not at the cross product. Panel 4 is the exception -- it walks
 every build at the slider's m_T -- which is why it is the long pole.
 
 Requests go through panels.panel() and the other server entry points, so this
-cannot warm a key the page does not ask for.
+cannot warm a key the page does not ask for. A key is skipped only if its file
+exists, and the file name hashes the code that computes it (panels.scoped_hash),
+so an edit to panel1 re-warms p1, p4 rows and d1 without being told to.
 
     python tests/studio/warm_panels.py --exp-num 2 --procs 4
     python tests/studio/warm_panels.py --exp-num 2 --what p1,p3,daily
     python tests/studio/warm_panels.py --exp-num 2 --dry-run
     python tests/studio/warm_panels.py --exp-num 2 --shard 3/16   # 4th of 16
+    python tests/studio/warm_panels.py --exp-num 2 --shard 0/32 --list  # jobs per shard
 
 --shard I/N takes every N-th job from I, so each shard gets a mix of kinds.
 tests/studio/slurm_warm.sh runs the N shards as an array; a key two shards
@@ -69,7 +73,7 @@ BURNIN = (True, False)
 BASE = {"k": "7", "win": "15", "prom": "0.1", "lo": "0.1", "hi": "0.9",
         "window": "post"}
 
-KINDS = ("p2", "p1", "p3", "d2", "d1", "d3", "episodes", "across",
+KINDS = ("p2", "p1", "p1c", "p3", "d2", "d1", "d3", "episodes", "across",
          "daily", "p4")
 
 
@@ -109,6 +113,8 @@ def plan(store, kinds):
         jobs += [("p2", dict(n="2", burnin=int(b), **BASE)) for b in BURNIN]
     if "p1" in kinds:
         jobs += [("p1", _q(p, n=1, burnin=int(b))) for p in ps for b in BURNIN]
+    if "p1c" in kinds:
+        jobs += [("p1c", _q(p, n="1c", burnin=int(b))) for p in ps for b in BURNIN]
     if "p3" in kinds:
         jobs += [("p3", _q(p, n=3, mf=mf)) for p in ps for mf in MF_VALUES]
     # the per-run arrays behind the same CIs, keyed as their panels are. /api/sens
@@ -141,7 +147,7 @@ def _one(job):
     kind, q = job
     t0 = time.time()
     try:
-        if kind in ("p1", "p2", "p3", "p4"):
+        if kind in ("p1", "p1c", "p2", "p3", "p4"):
             panels.panel(STORE, q)
         elif kind in ("d1", "d2", "d3"):
             dist.dist(STORE, q)
@@ -171,7 +177,7 @@ def main():
     ap.add_argument("--exp-name", type=str, default=compute.EXP_NAME)
     ap.add_argument("--store", default=None,
                     help="override; by default the experiment's own store")
-    ap.add_argument("--base-store", default=os.path.join(ROOT, "Data", "fig2_studio"))
+    ap.add_argument("--base-store", default=os.path.join(ROOT, "Data", "figures_studio"))
     ap.add_argument("--procs", type=int, default=4)
     ap.add_argument("--what", default=",".join(KINDS),
                     help="comma-separated: " + ", ".join(KINDS))
@@ -179,6 +185,8 @@ def main():
                     help="I/N: warm only every N-th job from I")
     ap.add_argument("--dry-run", action="store_true",
                     help="say what would be warmed, warm nothing")
+    ap.add_argument("--list", action="store_true",
+                    help="jobs per kind in each of the N shards, warm nothing")
     a = ap.parse_args()
 
     store = (os.path.expanduser(a.store) if a.store else
@@ -201,6 +209,17 @@ def main():
         return 1
 
     ps, jobs = plan(store, kinds)
+    if a.list:
+        ks = [k for k in KINDS if any(j[0] == k for j in jobs)]
+        print(f"[warm] {len(ps)} builds, {len(jobs)} jobs over {sn} shard(s)")
+        print("shard " + " ".join(f"{k:>8s}" for k in ks) + "    total")
+        for i in range(sn):
+            sh = jobs[i::sn]
+            print(f"{i:5d} " + " ".join(f"{sum(j[0] == k for j in sh):8d}" for k in ks)
+                  + f" {len(sh):8d}")
+        print("total " + " ".join(f"{sum(j[0] == k for j in jobs):8d}" for k in ks)
+              + f" {len(jobs):8d}")
+        return 0
     jobs = jobs[si::sn]
     print(f"[warm] store  {store}")
     print(f"[warm] builds {len(ps)} readable at code {compute.code_hash()}")

@@ -24,12 +24,12 @@ in the studio is a clade in the figure.</p>
 <p>The second half of the clade definition, and part of the definition rather than
 a display filter. A group of lineages is a clade when it has diverged at least
 <i>k</i> mutations from its clade root <strong>and</strong> it and its descendants
-carry at least <i>m</i><sub>T</sub> of the run's transmission events.</p>
+carry at least <i>m</i><sub>T</sub> of the simulation's transmission events.</p>
 <pre>n_tx_run    = number of individuals carrying an inherited_lineage
 ntx(clade)  = sum of that count over the clade's member lineages
 floor       = (m_T / 100) * n_tx_run
 keep        = ntx >= floor</pre>
-<p><i>m</i><sub>T</sub> is a percentage of that run's own transmissions, never an
+<p><i>m</i><sub>T</sub> is a percentage of that simulation's own transmissions, never an
 absolute count: a fixed count would be a different filter in each scenario. Kept
 regardless of the floor: the founding clade. Dropped: any group that has a parent
 and no defining mutations, which is not a clade.</p>
@@ -39,7 +39,7 @@ and no defining mutations, which is not a clade.</p>
 <p>Times down, clades across. A clade's frequency on a day is the sum of its
 member lineages' frequencies that day.</p>
 <pre>F[t, clade] = sum over the clade's lineages of Frequency_at_t</pre>
-<p>Read at <strong>daily</strong> resolution from the raw run output. The
+<p>Read at <strong>daily</strong> resolution from the raw simulation output. The
 clade-explorer export is downsampled to 120 time points about 9 days apart, and
 rise times land at a few tens of days, so on that axis a whole rise would be three
 or four samples.</p>
@@ -47,7 +47,7 @@ or four samples.</p>
 <b>tests/export_fig2_builder.py:190-209</b></p></div>
 </div>
 
-<div class="sec" id="burden"><h2>Burden and composition — panel 1</h2>
+<div class="sec" id="burden"><h2>Burden and composition — Figure 4</h2>
 
 <div class="def"><h3>Burden <span class="u">days</span></h3>
 <p>A clade's frequency integrated over time. Frequency is a proportion and so
@@ -58,7 +58,7 @@ for 10 days and 10% for 100 days both score 10 days.</p>
        = np.trapezoid(y, t)        # trapezoidal rule on the day axis</pre>
 <p>Two values are stored per clade: <code>burden</code> over the post-burn-in
 window and <code>burden_all</code> over the whole record. The burn-in checkbox
-picks which one every panel-1 percentage is formed from.</p>
+picks which one every Figure 4 percentage is formed from.</p>
 <p class="src"><b>tests/studio/compute.py:186-188</b></p></div>
 
 <div class="def"><h3>Composition class</h3>
@@ -76,11 +76,11 @@ not zero but has no value at all — it is labelled rather than merged into clas
 <code>n_defining</code> counts mutation events while <i>k</i> thresholds genome
 divergence, so the segment can overshoot and a handful carry 8 at <i>k</i>=7. That
 is the clustering rule working, not a defect. Together with 0…<i>k</i> the two
-account for every clade, which is why the classes sum to 100% of a run.</p>
+account for every clade, which is why the classes sum to 100% of a simulation.</p>
 <p class="src"><b>tests/studio/compute.py:180-182</b> · <b>tests/studio/panels.py:138-152</b></p></div>
 
-<div class="def"><h3>The three measures panel 1 plots</h3>
-<p>Each is formed <strong>inside one run</strong>, then averaged over runs.</p>
+<div class="def"><h3>The three measures Figure 4 plots</h3>
+<p>Each is formed <strong>inside one simulation</strong>, then averaged over simulations.</p>
 <pre>frac_burden[class] = burden(class) / burden(all kept clades)   [fraction]
 frac_clades[class] = count(class)  / count(all kept clades)    [fraction]
 per_clade[class]   = burden(class) / count(class)              [days]</pre>
@@ -94,7 +94,7 @@ the page rather than the first alone.</p>
 <p class="src"><b>tests/studio/panels.py:205-207</b></p></div>
 </div>
 
-<div class="sec" id="tx"><h2>Transmission events — panel 2</h2>
+<div class="sec" id="tx"><h2>Transmission events — Figure 3</h2>
 
 <div class="def"><h3>The 2x2 table</h3>
 <p>One transmission event is one infection: a transmitter, a recipient, a day and
@@ -104,7 +104,7 @@ each side.</p>
 sl  standard -> long        ss  standard -> standard</pre>
 <p>The initial seeded infections have <code>parent</code> = <code>root</code>: they
 have no transmitter, so they are not transmission events. They are counted
-separately per run and excluded from every percentage.</p>
+separately per simulation and excluded from every percentage.</p>
 <p class="src"><b>tests/export_transmissions.py:35,66-90</b></p></div>
 
 <div class="def"><h3>The three claims, from that one table</h3>
@@ -123,14 +123,14 @@ intensities are manipulation checks with answers the config already implies. The
 <b>scripts/experiments/impact_long_shedders_config.py:105-109</b></p></div>
 
 <div class="def"><h3>Why this table is trusted</h3>
-<p>It is assembled twice per run — once from each individual's <code>parent</code>
+<p>It is assembled twice per simulation — once from each individual's <code>parent</code>
 (who infected me) and once from each individual's <code>new_infections</code> (who
-I infected) — and the run fails unless the two agree on every cell and every day.
+I infected) — and the simulation fails unless the two agree on every cell and every day.
 The totals must also close: events plus seeded equals the number infected.</p>
 <p class="src"><b>tests/export_transmissions.py:92-99</b></p></div>
 </div>
 
-<div class="sec" id="epi"><h2>Episodes, rise and latency — panel 3</h2>
+<div class="sec" id="epi"><h2>Episodes, rise and latency — Figure 5</h2>
 
 <div class="def"><h3>Smoothing <span class="u">days</span></h3>
 <p>A centred moving average whose window is given in days and converted to samples
@@ -189,14 +189,14 @@ appearance is outside the window, so its latency cannot be measured — but its
 rise, which happens inside the window, still can.</p>
 <pre>trunc = phi exists  and  start_time &lt; phi  and  F[phi, clade] &gt; 1e-4</pre>
 <p>Such a clade keeps its rise time and loses its latent interval. Rise and
-latency therefore have <strong>different denominators</strong>, and panel 3 reports
+latency therefore have <strong>different denominators</strong>, and Figure 5 reports
 both counts alongside the number truncated rather than quietly dividing by the
 same n twice.</p>
 <p class="src"><b>tests/studio/compute.py:190-192</b></p></div>
 
 <div class="def"><h3>Burn-in day <span class="u">φ</span></h3>
 <p>The first day on which <code>(diagnosed + recovered) / N</code> reaches 1, read
-per run from that run's own trajectory. Some runs never reach it and have no φ.</p>
+per simulation from that simulation's own trajectory. Some simulations never reach it and have no φ.</p>
 <p>It matters because selection strength scales with the fraction of the population
 already infected and reaches full weight there. Before φ a clade's trajectory is
 substantially drift; after it, the fitness term is doing work. The window control
@@ -208,18 +208,18 @@ been dropped.</p>
 <b>simplicity/phenotype/update.py:39-42</b></p></div>
 </div>
 
-<div class="sec" id="agg"><h2>Aggregating over runs</h2>
+<div class="sec" id="agg"><h2>Aggregating over simulations</h2>
 
 <div class="def"><h3>Interval</h3>
-<p>A percentile bootstrap over runs. The per-run values go in; the interval comes
-from resampling those run values, never the clades inside them.</p>
-<pre>v      = the per-run values, one number per run
+<p>A percentile bootstrap over simulations. The per-simulation values go in; the interval comes
+from resampling those simulation values, never the clades inside them.</p>
+<pre>v      = the per-simulation values, one number per simulation
 means  = 2000 resamples of v, with replacement, each of size len(v),
          each reduced to its mean
 mean   = v.mean()
 lo, hi = 2.5th and 97.5th percentile of means</pre>
 <p>The resampler is seeded (20261116), so reloading a page gives the same interval
-rather than a slightly different one each time. Below three runs no interval is
+rather than a slightly different one each time. Below three simulations no interval is
 quoted at all — with one or two there is nothing to quote and a number would
 invent precision.</p>
 <p class="src"><b>tests/studio/panels.py:22-23,123-134</b></p></div>
@@ -227,11 +227,11 @@ invent precision.</p>
 
 <div class="sec" id="rules"><h2>Two rules that hold everywhere</h2>
 
-<div class="def"><h3>The run is the independent unit</h3>
-<p>Every percentage is formed inside a run and then averaged across runs, and every
-interval bootstraps over runs. A run that happens to produce 3000 clades does not
-outvote one that produces 300. Pooling clades across runs would treat each clade as
-an independent observation, which it is not: clades within a run share a history,
+<div class="def"><h3>The simulation is the independent unit</h3>
+<p>Every percentage is formed inside a simulation and then averaged across simulations, and every
+interval bootstraps over simulations. A simulation that happens to produce 3000 clades does not
+outvote one that produces 300. Pooling clades across simulations would treat each clade as
+an independent observation, which it is not: clades within a simulation share a history,
 a burn-in and a population.</p></div>
 
 <div class="def"><h3>Scenarios are never pooled</h3>
@@ -254,7 +254,7 @@ toc.innerHTML = `<h2>Contents</h2><div class="toc">
   <a href="#burden">Burden and composition</a>
   <a href="#tx">Transmission events</a>
   <a href="#epi">Episodes, rise, latency</a>
-  <a href="#agg">Aggregating over runs</a>
+  <a href="#agg">Aggregating over simulations</a>
   <a href="#rules">Two rules that hold everywhere</a>
 </div>`;
 rail.append(toc);
@@ -277,7 +277,7 @@ async function render_method(main){
     state = `<div class="stats">
       <div class="stat"><div class="k">clade passes cached</div>
         <div class="v">${b3.length}</div></div>
-      <div class="stat"><div class="k">runs per pass</div>
+      <div class="stat"><div class="k">simulations per pass</div>
         <div class="v">${runs} <small>of 250</small></div></div>
       <div class="stat"><div class="k">transmission export</div>
         <div class="v">${tx ? txruns + " " : "—"}<small>${tx ? "scenarios" : "missing"}</small></div></div>
@@ -291,45 +291,45 @@ async function render_method(main){
   /* Paths come from /api/index, never a literal: this diagram named
      impact_long_shedders_#1 for a day after the studio moved to #2. */
   const store = ix ? ix.store : "the store";
-  const src = (ix && ix.experiment) ? ix.experiment.source : "the run output";
+  const src = (ix && ix.experiment) ? ix.experiment.source : "the simulation output";
 
   flow = `<div class="flow">
-    <div class="step cold"><div class="hd"><h3>1 · Raw run output</h3>
+    <div class="step cold"><div class="hd"><h3>1 · Raw simulation output</h3>
       <span class="when">read only during a rebuild</span></div>
       <p>The simulation's own output, one directory per seed. Nothing in the studio
       reads this while you click: it is opened only by a rebuild, which is why a
       rebuild takes minutes and a page takes milliseconds.</p>
       <div class="io"><span>reads</span><span>${src}</span>
-      <span>per run</span><span>phylogenetic_data · lineage_frequency · individuals_data</span></div></div>
+      <span>per simulation</span><span>phylogenetic_data · lineage_frequency · individuals_data</span></div></div>
 
     <div class="step"><div class="hd"><h3>2 · Transmission export</h3>
       <span class="when">about 10 min · no phylogeny, no clustering</span></div>
-      <p>Counts every transmission event into the 2x2 table, per day, per run.
+      <p>Counts every transmission event into the 2x2 table, per day, per simulation.
       Independent of <i>k</i> and of the episode rules, so it is built once and
       never rebuilt when you move a slider.</p>
-      <div class="io"><span>runs</span><span>tests/export_transmissions.py</span>
+      <div class="io"><span>simulations</span><span>tests/export_transmissions.py</span>
       <span>writes</span><span>${store}/tx/</span>
-      <span>feeds</span><span>panel 2</span></div></div>
+      <span>feeds</span><span>Figure 3</span></div></div>
 
     <div class="step"><div class="hd"><h3>3 · Clade pass</h3>
       <span class="when">about 12 min per parameter set</span></div>
-      <p>Clusters each run's lineages at one <i>k</i>, builds the daily frequency
+      <p>Clusters each simulation's lineages at one <i>k</i>, builds the daily frequency
       frame, and records every clade's composition, burden and episodes. One pass
       per parameter set; the cache key carries the parameters <strong>and a hash of
       the computing code</strong>, so a change to the maths cannot be served out of
       a stale build.</p>
-      <div class="io"><span>runs</span><span>tests/studio/compute.py</span>
+      <div class="io"><span>simulations</span><span>tests/studio/compute.py</span>
       <span>writes</span><span>${store}/cache/&lt;key&gt;/l3_&lt;scenario&gt;.json</span>
       <span>key</span><span>k · smoothing window · prominence · rise band · window · code hash</span>
-      <span>feeds</span><span>the Frequency page and panels 1, 3, 4</span></div></div>
+      <span>feeds</span><span>the Sweep time tab and Figures 4, 5 and S1</span></div></div>
 
     <div class="step"><div class="hd"><h3>4 · Panel aggregation</h3>
       <span class="when">milliseconds warm · a few seconds cold</span></div>
-      <p>Applies the transmission floor, forms each percentage inside a run,
-      bootstraps over runs, and answers the page. Cached on disk too, keyed by the
-      request, the code hash and <strong>which clade passes exist</strong> — panel 4
+      <p>Applies the transmission floor, forms each percentage inside a simulation,
+      bootstraps over simulations, and answers the page. Cached on disk too, keyed by the
+      request, the code hash and <strong>which clade passes exist</strong> — Figure S1
       reads every pass, so adding one has to invalidate it.</p>
-      <div class="io"><span>runs</span><span>tests/studio/panels.py, in the server process</span>
+      <div class="io"><span>simulations</span><span>tests/studio/panels.py, in the server process</span>
       <span>writes</span><span>${store}/cache/_panels/</span>
       <span>serves</span><span>/api/panel · /api/episodes · /api/index</span></div></div>
   </div>
@@ -349,8 +349,8 @@ async function render_method(main){
 }
 
 registerTab({
-  id: "method", num: 0, title: "Method", viewId: "viewMethod",
-  lede: "The flow from a run's raw output to a panel, and every metric with the calculation that produces it. Each definition names the file and line that computes it, so a definition here can be checked against the code rather than trusted.",
+  id: "method", group: "tools", title: "Method", viewId: "viewMethod",
+  lede: "The flow from a simulation's raw output to a panel, and every metric with the calculation that produces it. Each definition names the file and line that computes it, so a definition here can be checked against the code rather than trusted.",
   rail: rail_method,
   render: render_method,
 });

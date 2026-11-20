@@ -91,11 +91,11 @@ def dist1(store, p, burnin):
         seeds[sc] = [r["seed"] for r in runs]
         for r in runs:
             ks = cl.keep_designated_clades(r["clades"])
-            if not ks:
+            tb = sum(c[bkey] for c in ks)
+            if not ks or tb <= 0:                         # as panels.panel1
                 for key in series:
                     series[key][sc].append(None)
                 continue
-            tb = sum(c[bkey] for c in ks)
             tn = len(ks)
             series["total_burden"][sc].append(tb)
             series["total_clades"][sc].append(tn)
@@ -107,8 +107,7 @@ def dist1(store, p, burnin):
                 sel = byc.get(cls, [])
                 b = sum(c[bkey] for c in sel)
                 bsum[cls] = b
-                series[f"frac_burden.{cls}"][sc].append(
-                    b / tb if tb > 0 else None)
+                series[f"frac_burden.{cls}"][sc].append(b / tb)
                 series[f"frac_clades.{cls}"][sc].append(
                     len(sel) / tn if tn else None)
                 series[f"per_clade.{cls}"][sc].append(
@@ -116,7 +115,7 @@ def dist1(store, p, burnin):
             # summed INSIDE the run: a class CI cannot be added to another's
             for key, grp in (("frac_burden_long", jlong),
                              ("frac_burden_majority_long", maj)):
-                v = None if (tb <= 0 or not grp) else \
+                v = None if not grp else \
                     sum(bsum[c] for c in grp) / tb
                 series[key][sc].append(v)
     return dict(kind="dist", n=1, params=p, mt=p["mt"], burnin=burnin,

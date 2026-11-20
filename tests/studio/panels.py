@@ -42,7 +42,10 @@ def code_hash():
 MEMO_DEPS = {
     "p1": ("panel1", "_load_builds", "_build_dir", "classes_for", "class_of",
            "_boot", "_prev", "_dur"),
-    "p2": ("panel2", "_boot"),
+    "p1c": ("panel1_clades", "_load_builds", "_build_dir", "_prev", "_dur"),
+    "p3b": ("panel3_breakouts", "_load_builds", "_build_dir", "_prev", "_dur"),
+    "p1h": ("panel1_hosts", "_load_builds", "_build_dir", "_boot", "_prev", "_dur"),
+    "p2": ("panel2", "_boot", "_jump_summary"),
     "p3": ("panel3", "_load_builds", "_build_dir", "classes_for", "class_of",
            "emergence_of", "_boot", "_prev", "_dur"),
     "p4row": ("_panel4_row", "panel1_cached", "panel3_cached", "@p1", "@p3"),
@@ -70,7 +73,7 @@ MEMO_DEPS = {
 #                           are ALREADY in the key, so a change to them shows
 #                           up as a different key by itself.
 MEMO_INFRA = ("_memo", "_panel_cache_path", "scoped_hash", "_deps",
-              "code_hash", "clean_params", "read_mf")
+              "code_hash", "clean_params", "read_mf", "tx_stamp")
 
 # Module constants no function's source carries. NBOOT and SEED decide every
 # interval, so they belong in every key.
@@ -111,6 +114,18 @@ def tx_code_hash():
     """What the transmission exporter hashes to RIGHT NOW, so a table stamped by
     older code shows up as such instead of being trusted silently."""
     return ch.files_hash([os.path.join(compute.ROOT, "tests", "export_transmissions.py")])
+
+
+def tx_stamp(store):
+    """The transmission table's own identity, for panel 2's key: re-exporting
+    it with other code or another seed count must not serve the old answer.
+    No mtime: tar keeps whole seconds, so a store warmed on the cluster would
+    miss every key after unpacking."""
+    f = os.path.join(store, "tx", "index.json")
+    if not os.path.exists(f):
+        return None
+    idx = json.load(open(f))
+    return [idx.get("code"), idx.get("counts")]
 
 
 def _panel_cache_path(store, tag, parts):
@@ -266,9 +281,11 @@ def panel1(store, p, mt, burnin):
         tot_b, tot_n = [], []
         for r in runs:
             ks = cl.keep_designated_clades(r["clades"])
-            if not ks:
-                continue
             tb = sum(c[bkey] for c in ks)
+            # no burden in the window (the run never reaches the burn-in): out
+            # of every share, so %burden and %clades average the same runs
+            if not ks or tb <= 0:
+                continue
             tn = len(ks)
             tot_b.append(tb)
             tot_n.append(tn)
@@ -278,7 +295,7 @@ def panel1(store, p, mt, burnin):
             for cls in classes:
                 sel = byc.get(cls, [])
                 b = sum(c[bkey] for c in sel)
-                per[cls]["frac_burden"].append(b / tb if tb > 0 else None)
+                per[cls]["frac_burden"].append(b / tb)
                 per[cls]["frac_clades"].append(len(sel) / tn if tn else None)
                 per[cls]["per_clade"].append(b / len(sel) if sel else None)
         out[sc] = dict(
@@ -293,6 +310,91 @@ def panel1(store, p, mt, burnin):
                 note="fractions are of the run's clades as defined; the "
                      "founding clade is the `wt` class, so the classes sum "
                      "to 1")
+
+
+def panel1_clades(store, p, burnin):
+    """One point per designated clade: x the share of its defining mutations
+    that arose in a long shedder (nlong/ndef), y its share of its simulation's
+    burden. The founding clade has no defining mutations, so x is 0/0; it is
+    reported apart, as its burden share per run, never placed on the x axis."""
+    idx, data = _load_builds(store, p)
+    bkey = "burden" if burnin else "burden_all"
+    out = {}
+    for sc in SCEN_ORDER:
+        pts, wt, nrun = [], [], 0
+        for i, r in enumerate(data.get(sc) or []):
+            ks = cl.keep_designated_clades(r["clades"])
+            tb = sum(c[bkey] for c in ks)
+            if not ks or tb <= 0:
+                continue
+            nrun += 1
+            for c in ks:
+                if c["founding"]:
+                    wt.append(c[bkey] / tb)
+                elif int(c["ndef"]) > 0:
+                    pts.append([round(int(c["nlong"]) / int(c["ndef"]), 6),
+                                round(c[bkey] / tb, 6), i,
+                                int(c["nlong"]), int(c["ndef"])])
+        out[sc] = dict(runs=nrun, points=pts, wt=wt,
+                       prevalence=_prev(idx, sc), duration=_dur(idx, sc))
+    return dict(kind="panel1_clades", params=p, burnin=burnin, scenarios=out,
+                cols=["x_long_share", "y_burden_share", "run", "nlong", "ndef"])
+
+
+def panel1_hosts(store, p, burnin):
+    """Share of hosts that are long shedders against share of burden by clade
+    origin, per run, then bootstrapped over runs. Origin is x = nlong/ndef:
+    founding (no definers), standard (x = 0), partly (0 < x <= 1/2), mostly
+    (x > 1/2). Hosts are n_long / n_infected from the transmission table.
+    Infections split the same way by `ntx` -- every infection, seeded ones
+    included, carrying one of the clade's lineages -- or by `ntx_post`, those
+    on or after the burn-in day, when the build has it (pending patch) and the
+    burn-in is excluded."""
+    idx, data = _load_builds(store, p)
+    bkey = "burden" if burnin else "burden_all"
+    tx = os.path.join(store, "tx")
+    out = {}
+    for sc in SCEN_ORDER:
+        f = os.path.join(tx, f"tx_{sc}.json")
+        hosts = ({r["seed"]: r["n_long"] / r["n_infected"]
+                  for r in json.load(open(f))["runs"] if r["n_infected"]}
+                 if os.path.exists(f) else {})
+        G = ("founding", "standard", "partly", "mostly", "any_long")
+        per, pin = {g: [] for g in G}, {g: [] for g in G}
+        hs = []
+        runs = data.get(sc) or []
+        nkey = ("ntx_post" if burnin and runs and all(
+            "ntx_post" in c for r in runs for c in r["clades"]) else "ntx")
+        for r in runs:
+            ks = cl.keep_designated_clades(r["clades"])
+            tb = sum(c[bkey] for c in ks)
+            if not ks or tb <= 0 or r["seed"] not in hosts:
+                continue
+            tn = sum(int(c[nkey]) for c in ks)
+            b = dict.fromkeys(G[:4], 0.0)
+            n = dict.fromkeys(G[:4], 0.0)
+            for c in ks:
+                x = int(c["nlong"]) / int(c["ndef"]) if int(c["ndef"]) else None
+                g = ("founding" if c["founding"] or x is None else "standard" if x == 0
+                     else "partly" if x <= 0.5 else "mostly")
+                b[g] += c[bkey] / tb
+                if tn:
+                    n[g] += int(c[nkey]) / tn
+            b["any_long"] = b["partly"] + b["mostly"]
+            n["any_long"] = n["partly"] + n["mostly"]
+            for g in G:
+                per[g].append(b[g])
+                if tn:
+                    pin[g].append(n[g])
+            hs.append(hosts[r["seed"]])
+        out[sc] = dict(runs=len(hs), hosts=_boot(hs),
+                       burden={g: _boot(v) for g, v in per.items()},
+                       infections={g: _boot(v) for g, v in pin.items()},
+                       infections_window="post" if nkey == "ntx_post" else "whole",
+                       prevalence=_prev(idx, sc), duration=_dur(idx, sc))
+    return dict(kind="panel1_hosts", params=p, burnin=burnin, scenarios=out,
+                note="hosts: long shedders among infected individuals, whole "
+                     "simulation; burden: shares of each simulation's burden")
 
 
 def _prev(idx, sc):
@@ -323,6 +425,9 @@ def panel2(store, burnin):
     for sc in idx["scenarios"]:
         runs = json.load(open(os.path.join(d, f"tx_{sc}.json")))["runs"]
         who, cells, inten = [], {c: [] for c in CELLS}, dict(long=[], standard=[])
+        # by transmitter type, as individuals_data spells it and fig3 filters it
+        jumps = {t: ([], []) for t in ("long_shedder", "standard")}
+        has_jump = False
         acc = None
         for r in runs:
             nd = r["n_days"]
@@ -333,6 +438,14 @@ def panel2(store, burnin):
                 if r["phi"] is None:
                     continue
                 d0 = int(np.floor(float(r["phi"])))
+            for t, j in (r.get("jumps") or {}).items():
+                has_jump = True
+                if not j["D"]:
+                    continue
+                hr = np.frombuffer(base64.b64decode(j["h"]), np.uint16).reshape(nd, j["D"])[d0:].sum(0).astype(np.int64)
+                jumps[t][0].append(hr)
+                if hr.sum():
+                    jumps[t][1].append(float((hr * np.arange(len(hr))).sum() / hr.sum()))
             tot = {c: float(ser[c][d0:].sum()) for c in CELLS}
             all_ev = sum(tot.values())
             if all_ev <= 0:
@@ -357,7 +470,9 @@ def panel2(store, burnin):
             runs=len(who),
             who_transmits=_boot(who),
             where=({c: _boot(cells[c]) for c in CELLS}),
-            intensity={h: _boot(v) for h, v in inten.items()})
+            intensity={h: _boot(v) for h, v in inten.items()},
+            jump=({t.split("_")[0]: _jump_summary(*v) for t, v in jumps.items()}
+                  if has_jump else None))
         if acc is not None:
             with np.errstate(invalid="ignore", divide="ignore"):
                 mean = np.where(cnt > 0, acc / np.maximum(cnt, 1), 0.0)
@@ -368,6 +483,27 @@ def panel2(store, burnin):
                 series=series,
                 note="seeded infections have no transmitter and are excluded; "
                      "they are counted separately per run")
+
+
+def _jump_summary(hists, means):
+    """fig3 row 3's violin data: per-run counts by jump, pooled over runs, with
+    np.percentile's quartiles of the pooled events and the per-run mean
+    bootstrapped over runs."""
+    D = max((len(h) for h in hists), default=0)
+    hist = np.zeros(D, np.int64)
+    for h in hists:
+        hist[:len(h)] += h
+    n = int(hist.sum())
+    if not n:
+        return dict(n=0, runs=len(means), hist=[], q=None, mean=_boot(means))
+    cum = np.cumsum(hist)
+    at = lambda i: int(np.searchsorted(cum, i, side="right"))
+    def pct(p):
+        x = p / 100 * (n - 1)
+        lo, hi = int(np.floor(x)), int(np.ceil(x))
+        return float(at(lo) + (at(hi) - at(lo)) * (x - lo))
+    return dict(n=n, runs=len(means), hist=hist.tolist(),
+                q=[pct(p) for p in (25, 50, 75)], mean=_boot(means))
 
 
 # ------------------------------------------------------------------ panel 3
@@ -390,6 +526,31 @@ def emergence_of(r, ks, mf):
            (e["emg"] == cur["emg"] and e["amp"] > cur["amp"]):
             out[e["c"]] = e
     return out
+
+
+def panel3_breakouts(store, p):
+    """Every designated, non-founding clade with its episodes, for the browser
+    to find each clade's first sweep over a chosen peak and time it from the
+    clade's first appearance. Clades already above trace at the burn-in day
+    (`trunc`) are left out: their first appearance is outside the window.
+    Per clade: [nlong, ndef, tem, [[a_day, top, amp, days], ...]]."""
+    idx, data = _load_builds(store, p)
+    out = {}
+    for sc in SCEN_ORDER:
+        runs = []
+        for r in data.get(sc) or []:
+            ks = {c["c"]: c for c in cl.keep_designated_clades(r["clades"])
+                  if not c["founding"] and int(c["ndef"]) > 0 and not c["trunc"]}
+            eps = {}
+            for e in r["episodes"]:
+                if e["c"] in ks:
+                    eps.setdefault(e["c"], []).append(
+                        [e["a_day"], e["top"], e["amp"], e["days"]])
+            runs.append(dict(seed=r["seed"], phi=r["phi"], end=r["end"], clades=[
+                [int(c["nlong"]), int(c["ndef"]), round(float(c["tem"]), 2),
+                 sorted(eps.get(ci, []))] for ci, c in ks.items()]))
+        out[sc] = dict(runs=runs, prevalence=_prev(idx, sc), duration=_dur(idx, sc))
+    return dict(kind="panel3_breakouts", params=p, scenarios=out)
 
 
 def panel3(store, p, mt, mf=0.0):
@@ -681,8 +842,19 @@ def panel(store, q):
         raise ValueError("m_T is a fraction of the run's transmissions")
     burnin = str(q.get("burnin", "1")) not in ("0", "false", "")
     mf = read_mf(q)
+    if which == "3b":
+        p = clean_params(q)
+        return _memo(store, "p3b", [p], lambda: panel3_breakouts(store, p))
+    if which == "1h":
+        p = clean_params(q)
+        return _memo(store, "p1h", [p, mt, burnin, tx_stamp(store)],
+                     lambda: panel1_hosts(store, p, burnin))
+    if which == "1c":
+        p = clean_params(q)
+        return _memo(store, "p1c", [p, mt, burnin],
+                     lambda: panel1_clades(store, p, burnin))
     if which == "2":
-        return _memo(store, "p2", [burnin], lambda: panel2(store, burnin))
+        return _memo(store, "p2", [burnin, tx_stamp(store)], lambda: panel2(store, burnin))
     p = clean_params(q)
     if which == "1":
         return panel1_cached(store, p, mt, burnin)

@@ -5,6 +5,122 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.19 — 2026-11-20 — pietro gerletti
+
+The studio holds the paper's figures
+------------------------------------
+
+The navigation is grouped (`tests/studio/web/shell.js`, `TAB_GROUPS`):
+Data exploration (Clustering, m_T effect, Sweep time); Figures (1 Model,
+2 Clustering, 3 Transmission, 4 Burden, 5 Rise vs latency / breakouts);
+Supplementary (S1 Clustering sensitivity, the former panel 4); Tools (Method,
+Export). A tab joins a group by `registerTab({group})`. The Figure tab that
+assembled the old panels 1-4 is gone. With no `#hash` the studio opens on
+Clustering.
+
+The store moved to `Data/figures_studio` (was `Data/fig2_studio`). On the
+cluster: `mv Data/fig2_studio Data/figures_studio` before the next precompute,
+or it starts an empty store.
+
+Figure 1 · Model
+----------------
+
+`tests/studio/fig1.py build --exp-num N --store <store>` runs
+`fig1_save.build_figure_1` with saving suppressed and records what each
+`fig1_plots` painter drew -- nothing re-derived. The build stops if a clock
+slope, band or annotation differs from the figure's.
+`test_fig1_mirrors_pipeline.py` rebuilds the figure and compares every slope,
+R² and n: 0 failures on experiment 2. `/api/fig1` serves it; the tab draws the
+original's 2x3 grid. Reported, not changed: Figure 1's "HIV" is HIV_low alone
+(`fig1_preprocess_data.duration_groups` keeps one scenario per label), and
+the patient x axis is shifted to start at 0 before the through-origin fit
+(`fig1_plots.py:306`).
+
+Figure 2 · Clustering
+---------------------
+
+`tab_clades4.js`: tree and clade frequency for the four scenarios with long
+shedders at one shared seed index (seed_000i in every scenario).
+
+Figure 3 · Transmission
+-----------------------
+
+- One subpanel per scenario: an arrow graph (standard and long nodes, the four
+  transmitter->recipient shares, width proportional to sqrt(share)) beside
+  fig3's row-3 violin for standard and long transmitters. Long shedders take
+  the scenario's colour. Each subpanel has its own violin scale.
+- `tests/export_transmissions.py` now also stores, per simulation and
+  transmitter type, per-day counts of the jump -- positions at which the
+  transmitted genome differs from the transmitter's inherited one, fig3's
+  `hamming_iw` and filters. `test_jump_mirrors_fig3.py`: event for event
+  against `get_fig2_divergence_data`, both types. Exporter ~1.5 s/simulation.
+- The matrix, stacked and intensity forms are gone; intensity stays in the
+  summary table. Panel 2's memo key includes the tx table's code and counts
+  (`tx_stamp`).
+
+Figure 4 · Burden
+-----------------
+
+- Four subpanels, one per scenario with long shedders.
+- New form, per clade (`/api/panel?n=1c`): share of defining mutations
+  long-born against share of the simulation's burden, with one mean ± SD
+  marker per composition class.
+- New form, hosts / infections / burden (`n=1h`): share of infected
+  individuals that are long shedders against the share of infections (`ntx`)
+  and of burden held by clades by origin (founding, standard-born, partly,
+  mostly long-born).
+- `panels.panel1` and `dist.dist1` drop a simulation whose windowed burden is
+  0 (never reaches the burn-in) from every share: %clades had kept it while
+  %burden could not. Invalidates every p1, p4-row and d1 memo.
+
+Figure 5 · breakouts
+--------------------
+
+Three forms on `/api/panel?n=3b` (each clade's episodes), thresholds F, H, f
+on the rail: breakout curves (Kaplan-Meier, standard- vs long-born), cryptic
+breakouts per simulation, hidden time against launch frequency. A breakout is
+a clade's first episode peaking at >= F; cryptic, hidden >= H days and
+launched below f. The sweep start is clamped at first appearance: an
+episode's start is the dip before its peak, which for a clade at zero until
+it appears lands at the start of the run of zeros -- up to ~250 days before
+the clade exists, about a quarter of breakouts. Rise vs latency still drops
+those clades from its latency (counted, not clamped).
+
+Clade pass: infections after the burn-in -- rebuild required
+-------------------------------------------------------------
+
+`compute.py` records `ntx_post` per clade, infections on or after the
+burn-in day, windowed as burden is. Checked on one simulation each of SOT
+and edge case: per-clade sums equal all infections after the burn-in. The
+build hash changes, so **every clade build must be rebuilt** (168 at
+experiment 2). Figure 4's infections bar uses `ntx_post` once the builds
+carry it, `ntx` (whole simulation) until then.
+
+Precompute chain
+----------------
+
+- `slurm_fig1.sh`, submitted alongside the grid; the pack job waits on it
+  (afterany) and archives `fig1/`. `--no-fig1` skips it.
+- `run_precompute.sh --dry-run` prints the chain without submitting;
+  `warm_panels.py --list` prints the jobs per shard; `p1c` is warmed.
+- `run_precompute.sh` refuses to submit while a `tests/studio/pending_*.patch`
+  still applies.
+- `tests/check_clustering_module.py` read experiment 1 whatever was being
+  built, so a precompute of another experiment failed its gate when the
+  cluster had no experiment 1. It takes `--exp-num/--exp-name`, passed by
+  `run_precompute.sh`.
+
+Studio, other
+-------------
+
+- `codehash.ast_digest` is cached on (path, mtime, size): a panel-4 request
+  made 337 `compute.code_hash()` calls, 8.3 s; now 0.2 s.
+- Axis labels bold with hover explanations and KaTeX formulas; "run" reads
+  "simulation" in the studio; scenario toggles fade the others; composition
+  shades green->red as the Clustering tab.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.18 — 2026-11-20 — pietro gerletti
 
 The cluster builds panel 2's transmission table

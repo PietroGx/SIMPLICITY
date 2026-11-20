@@ -17,7 +17,7 @@ const P4_AXIS_OPTS = [
    + "It moves the partition AND the class labels, so it is the one axis that "
    + "changes what the majority-long classes are."],
   ["mt", "minimum transmissions m_T",
-   "The share of the run's transmissions a lineage's subtree must carry to "
+   "The share of the simulation's transmissions a lineage's subtree must carry to "
    + "found a clade. A refused lineage folds into its ancestor, so this merges "
    + "clades rather than relabelling them."],
   ["win", "smoothing window",
@@ -42,7 +42,8 @@ const p4Label = (M, m) => String(M[m] || m).replace("(fraction)", "(%)");
 const p4KeyMt = key => (String(key).match(/_m([0-9.]+)_/) || [])[1];
 
 function rail_panel4(rail) {
-rail.append(railClade());
+rail.append(railFocus());
+rail.append(railWindow());
 rail.append(card("Sensitivity", [
   pickControl({setting: "axis4", label: "Axis to vary",
     options: P4_AXIS_OPTS,
@@ -72,7 +73,7 @@ function p4SensNote(ax) {
     <code>_panel4_row</code> (<code>panels.py:388-393</code>) drops.`;
 }
 
-async function render_panel4(main){
+async function render_panel4(main, rail, {idp = "p4", compact = false} = {}){
 
   let d; try { d = await apiGetSlot("/api/panel?n=4&" + buildQuery()); }
   catch(e){ main.innerHTML=""; main.append(errorBox(e.message)); return; }
@@ -117,7 +118,7 @@ async function render_panel4(main){
       .map(([k2, v]) => `${P4_AXIS_NAME[k2] || k2}=${p4Level(k2, v)}`).join(" · ");
     const facets = mKeys.map((m, i) => `<div class="ph"><h3>${p4Label(M, m)}</h3>
       <span class="sub">${i === mKeys.length - 1 ? nm + " along the bottom" : ""}</span></div>
-      <canvas id="p4s${i + 1}"></canvas>`).join("");
+      <canvas id="${idp}s${i + 1}"></canvas>`).join("");
     return `<div class="plot"><div class="ph">
       <h3>Sensitivity over ${nm}</h3>
       <span class="sub">${pin ? pin + " pinned" : "nothing pinned"}
@@ -127,7 +128,7 @@ async function render_panel4(main){
       <div class="cap">Three facets over one x axis, not fifteen lines on one:
         burden is a percentage and the other two are days, so a shared y would
         be meaningless. The dashed rule is the operating point. The band is the
-        bootstrap CI of the mean over runs — without it a two-day wiggle
+        bootstrap CI of the mean over simulations — without it a two-day wiggle
         invites being read as a real shift, which is the whole reason the
         intervals matter here. The other build parameters are pinned at the
         operating point (${pin || "—"}), so this is a one-at-a-time
@@ -144,13 +145,14 @@ async function render_panel4(main){
        levels, so 15 and 15.0 are the same stop. */
     const mark = p4Level(ax, SETTING_DEFAULTS[ax]);
     mKeys.forEach((m, i) => {
-      const cv = document.getElementById("p4s" + (i + 1));
+      const cv = document.getElementById(idp + "s" + (i + 1));
       if (!cv) return;
       const pct = m === P4_SHARE;
       linesOverLevels(cv, {
         levels, mark, ribbon: true, height: 190, zero: pct, pct,
         xlab: i === mKeys.length - 1 ? (P4_AXIS_NAME[ax] || ax) : "",
-        ylab: pct ? "% of run burden" : "days",
+        ylab: pct ? "% of simulation burden, majority-long classes"
+          : m === "rise_days" ? "mean rise time (days)" : "mean latent interval (days)",
         fmtY: v => fmt(v, 0),
         series: SCENARIOS.map(s => ({
           colour: scenarioColour(s), label: SCENARIO_LABEL[s],
@@ -197,8 +199,9 @@ async function render_panel4(main){
 
   const opMt = p4KeyMt(d.operating_point);
 
+  if (compact) { main.innerHTML = sensBlock().replace(/<div class="cap">[\s\S]*?<\/div>/g, ""); drawSens(); return; }
   main.innerHTML = `
-  <div class="note">${d.note}</div>
+  <div class="note">${simWords(d.note)}</div>
   ${sensBlock()}
   <div class="plot"><div class="ph"><h3>At the operating point, and across the grid</h3>
     <span class="sub">${d.operating_point
@@ -219,20 +222,20 @@ async function render_panel4(main){
       k, win and prom only, so it returns whichever m_T sorts first —
       <code>${d.operating_point}</code>.`}</div></div>
   ${["k", "win", "prom"].map(axisBlock).join("")}
-  <div class="plot"><div class="ph"><h3>Panel 1 — burden in the majority-long classes</h3>
-    <span class="sub">% of the run's burden</span></div>
+  <div class="plot"><div class="ph"><h3>Figure 4 — burden in the majority-long classes</h3>
+    <span class="sub">% of the simulation's burden</span></div>
     <table class="t"><thead>${head}</thead><tbody>${body(P4_SHARE)}</tbody></table>
     <div class="cap">Majority-long means more than half of a clade's defining
       mutations arose in a long shedder, so the classes summed depend on k.</div></div>
-  <div class="plot"><div class="ph"><h3>Panel 3 — emergence rise time</h3>
+  <div class="plot"><div class="ph"><h3>Figure 5 — emergence rise time</h3>
     <span class="sub">days</span></div>
     <table class="t"><thead>${head}</thead><tbody>${body("rise_days")}</tbody></table></div>
-  <div class="plot"><div class="ph"><h3>Panel 3 — latent interval</h3>
+  <div class="plot"><div class="ph"><h3>Figure 5 — latent interval</h3>
     <span class="sub">days</span></div>
     <table class="t"><thead>${head}</thead><tbody>${body("latent_days")}</tbody></table></div>
-  <div class="plot"><div class="ph"><h3>Runs contributing</h3></div>
+  <div class="plot"><div class="ph"><h3>Simulations contributing</h3></div>
     <table class="t"><thead>${head}</thead><tbody>${body("runs")}</tbody></table>
-    <div class="cap">A row with fewer runs is not a weaker effect, it is a
+    <div class="cap">A row with fewer simulations is not a weaker effect, it is a
       different sample — check this before comparing rows.</div></div>`;
   drawSens();
 
@@ -240,8 +243,8 @@ async function render_panel4(main){
 
 
 registerTab({
-  id: "panel4", num: 7, title: "Panel 4", viewId: "viewP4",
-  lede: "Does anything on panels 1 and 3 survive changing the clade definition or the episode rules? One row per cached clade build. This panel is not an independent choice — it is the other panels re-run.",
+  id: "panel4", group: "supp", num: "S1", title: "Clustering sensitivity", viewId: "viewP4",
+  lede: "Does anything on Figures 4 and 5 survive changing the clade definition or the episode rules? One row per cached clade build. This is not an independent choice — it is those figures, recomputed per build.",
   rail: rail_panel4,
   render: render_panel4,
 });

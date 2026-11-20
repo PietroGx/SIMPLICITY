@@ -73,7 +73,7 @@ OUT="${1:-}"
 SEEDS="${SEEDS:-50}"
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
-STORE="${STORE:-$ROOT/Data/fig2_studio}"
+STORE="${STORE:-$ROOT/Data/figures_studio}"
 PROCS="${SLURM_CPUS_PER_TASK:-2}"
 IDX="${SLURM_ARRAY_TASK_ID:-0}"
 

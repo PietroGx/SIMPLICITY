@@ -23,7 +23,7 @@ const ACROSS_PANELS = [
    cap: "Member lineages in the middle clade."},
   {key: "max_div", label: "Max divergence",
    cap: "Mutations between the furthest member and its clade root. A bound, "
-      + "so the run's worst case rather than its typical one."},
+      + "so the simulation's worst case rather than its typical one."},
   {key: "never_tx_frac", label: "Never transmitted", pct: true,
    cap: "Clades that infected nobody. Non-zero only at m_T = 0: above it the "
       + "definition refuses them, which is the whole point of the minimum."},
@@ -31,11 +31,12 @@ const ACROSS_PANELS = [
 
 function acrossRail(rail) {
   rail.append(railClade());
+  rail.append(railFocus());
   rail.append(card("Reading these", [
     (() => { const d = document.createElement("div");
       d.className = "hint";
-      d.innerHTML = `Each faint line is one run across the m<sub>T</sub> values;
-        the bold line is the median <strong>over runs</strong>. The dashed rule
+      d.innerHTML = `Each faint line is one simulation across the m<sub>T</sub> values;
+        the bold line is the median <strong>over simulations</strong>. The dashed rule
         is where m<sub>T</sub> is set now. Scenarios are never pooled — five
         bold lines, one per scenario, never one average.<br>
         Every value is its own clade build: under rule B, m<sub>T</sub> is part
@@ -64,7 +65,7 @@ function paintValuesPanel(cv, panel, data) {
       if (v > hi) hi = v;
     })));
   if (!isFinite(lo)) { lo = 0; hi = 1; }
-  if (panel.pct) { lo = 0; hi = Math.max(hi, 1); }
+  if (panel.pct) { lo = 0; hi = 100; }
   const logY = panel.log && lo > 0;
   if (logY) lo = Math.max(lo, 1); else if (!panel.pct) lo = Math.min(lo, 0);
   if (hi <= lo) hi = lo + 1;
@@ -177,7 +178,7 @@ function whatIsLeftTable(data) {
       <td class="n">${fmt(asPctNum(off.singleton_frac), 1)}% → ${fmt(asPctNum(on.singleton_frac), 1)}%</td></tr>`;
   }).join("");
   return `<div class="plot"><div class="ph"><h3>What is left</h3>
-    <span class="sub">median over runs · m_T = ${mtPct(settings.mt)}% (value ${data.values[mi]})</span></div>
+    <span class="sub">median over simulations · m_T = ${mtPct(settings.mt)}% (value ${data.values[mi]})</span></div>
     <table class="t"><thead><tr><th>scenario</th><th>groups at m_T = 0</th>
       <th>clades now</th><th>kept</th><th>singleton share</th></tr></thead>
       <tbody>${rows}</tbody></table>
@@ -208,7 +209,7 @@ async function renderAcross(main) {
       <div class="cap">Share of clades at or above n lineages. The only panel
         here whose x axis is not m<sub>T</sub>.</div></div>` + ACROSS_PANELS.map(p =>
       `<div class="plot"><div class="ph"><h3>${p.label}</h3>
-        <span class="sub">x: m_T · per run</span></div>
+        <span class="sub">x: m_T · per simulation</span></div>
         <canvas data-panel="${p.key}"></canvas>
         <div class="cap">${p.cap}</div></div>`).join("") + `</div>
     ${keyRow(SCENARIOS.map(sc => [scenarioColour(sc), SCENARIO_LABEL[sc]]))}`;
@@ -219,9 +220,9 @@ async function renderAcross(main) {
 }
 
 registerTab({
-  id: "across", num: 2, title: "m_T effect on clades", viewId: "viewSet",
-  lede: "The same clustering over all 250 runs, across the m_T values. One "
-      + "faint line per run, the median over runs in bold.",
+  id: "across", group: "explore", title: "m_T effect on clades", viewId: "viewSet",
+  lede: "The same clustering over all 250 simulations, across the m_T values. One "
+      + "faint line per simulation, the median over simulations in bold.",
   rail: acrossRail,
   render: renderAcross,
 });

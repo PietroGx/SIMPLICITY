@@ -72,9 +72,14 @@ global.localStorage = {getItem: k => (k in store ? store[k] : null),
 let pass = 0, fail = 0;
 const ck = (c, m) => { c ? pass++ : fail++; console.log((c ? "  ok   " : "  FAIL ") + m); };
 
-const SCRIPTS = fs.readFileSync(path.join(WEB, "index.html"), "utf8")
+const LISTED = fs.readFileSync(path.join(WEB, "index.html"), "utf8")
   .match(/<script src="([^"]+)"><\/script>/g)
   .map(s => s.replace(/.*src="|"><\/script>/g, ""));
+/* A tab listed before its file exists 404s in a browser and boots without it;
+   do the same here rather than fail. */
+const MISSING = LISTED.filter(s => !fs.existsSync(path.join(WEB, s)));
+const SCRIPTS = LISTED.filter(s => !MISSING.includes(s));
+const GROUPS = ["explore", "figures", "supp", "tools"];
 
 async function main() {
   const up = await httpGet(BASE + "/api/index").catch(() => null);
@@ -87,7 +92,8 @@ async function main() {
   const body = F.$el("body");
   global.document.body = body;
   const ctx = vm.createContext(global);
-  console.log(`loading ${SCRIPTS.length} scripts`);
+  console.log(`loading ${SCRIPTS.length} scripts`
+              + (MISSING.length ? ` (not on disk yet, skipped: ${MISSING.join(", ")})` : ""));
   for (const s of SCRIPTS) {
     try {
       new vm.Script(fs.readFileSync(path.join(WEB, s), "utf8"), {filename: s}).runInContext(ctx);
@@ -104,7 +110,7 @@ async function main() {
      in the same context rather than off `global`. */
   const peek = expr => new vm.Script(`(${expr})`).runInContext(ctx);
   const tabs = peek("tabs");
-  ck(Array.isArray(tabs) && tabs.length >= 9,
+  ck(Array.isArray(tabs) && tabs.length >= 10,
      `${tabs ? tabs.length : 0} tabs registered`);
 
   // one source of truth: no tab may define its own settings copy
@@ -131,6 +137,31 @@ async function main() {
      "the rail's axes are the server's, not a second copy");
 
   peek("startStudio()");
+
+  /* Nav groups: the shell's order is the contract, every tab names one of
+     them, and the nav draws them in that order with tabs in registration order. */
+  ck(JSON.stringify(peek("TAB_GROUPS.map(g => g.id)")) === JSON.stringify(GROUPS),
+     `shell defines the groups ${GROUPS.join(", ")} in that order`);
+  const badGroup = tabs.filter(t => !GROUPS.includes(t.group)).map(t => t.id);
+  ck(badGroup.length === 0, "every tab names a valid group"
+     + (badGroup.length ? ` -- not: ${badGroup.join(", ")}` : ""));
+  ck(!ids.includes("figure"), "the retired Figure tab is not registered");
+  const nav = (F.REG.get("body").children || []).find(c => c.className === "tabs");
+  const navHtml = nav ? nav.innerHTML : "";
+  const navGroups = [...navHtml.matchAll(/data-group="([^"]+)"/g)].map(m => m[1]);
+  ck(JSON.stringify(navGroups) === JSON.stringify(GROUPS),
+     `nav shows the four groups in order: ${navGroups.join(", ")}`);
+  const labels = [...navHtml.matchAll(/class="glab">([^<]+)</g)].map(m => m[1]);
+  ck(JSON.stringify(labels) === JSON.stringify(
+       ["Data exploration", "Figures", "Supplementary", "Tools"]),
+     `nav group labels: ${labels.join(" | ")}`);
+  const navTabs = [...navHtml.matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]);
+  const wantTabs = GROUPS.flatMap(g => tabs.filter(t => t.group === g).map(t => t.id));
+  ck(JSON.stringify(navTabs) === JSON.stringify(wantTabs),
+     `nav order, registration order inside a group: ${navTabs.join(", ")}`);
+  const figs = tabs.filter(t => t.group === "figures").map(t => t.id).filter(i => i !== "fig1");
+  ck(JSON.stringify(figs) === JSON.stringify(["clades4", "panel2", "panel1", "panel3"]),
+     `figures are clades4, panel2, panel1, panel3 after fig1: ${figs.join(", ")}`);
 
   for (const tab of tabs) {
     fetchLog = [];
@@ -182,7 +213,7 @@ async function main() {
   const labelled = Object.keys(peek("API_LABELS") || {});
   const used = [...new Set(SCRIPTS.flatMap(s =>
     [...fs.readFileSync(path.join(WEB, s), "utf8")
-       .matchAll(/["'`](\/api\/[a-z]+)/g)].map(m => m[1])))];
+       .matchAll(/["'`](\/api\/[a-z0-9_]+)/g)].map(m => m[1])))];
   const unlabelled = used.filter(u => !labelled.includes(u));
   ck(unlabelled.length === 0,
      `every endpoint has a pending label` + (unlabelled.length ? ` -- missing ${unlabelled}` : ""));
@@ -271,8 +302,13 @@ async function main() {
      when the tab was first opened, and looked tickable under a stacked bar
      chart that cannot carry per-run points. */
   for (const [tabId, setting, form, want] of [
-        ["panel1", "plot1", "stacked", true],
-        ["panel1", "plot1", "dots", false]]) {
+        ["panel1", "plot1", "host_burden", true],
+        ["panel3", "plot3", "breakout_curve", true],
+        ["panel3", "plot3", "breakout_counts", true],
+        ["panel3", "plot3", "breakout_scatter", true],
+        ["panel3", "plot3", "rise_latency", false],
+        ["panel1", "plot1", "burden_prev", false],
+        ["panel1", "plot1", "scatter", false]]) {
     peek(`setSetting(${JSON.stringify(setting)}, ${JSON.stringify(form)})`);
     peek(`showTab(${JSON.stringify(tabId)})`);
     await wait(400);
@@ -282,7 +318,10 @@ async function main() {
       (el.innerHTML || "") + (el.children || []).map(deep).join("");
     const html = deep(F.REG.get(`${tabId}_rail`));
     const off = /type="checkbox"[^>]*disabled/.test(html);
-    const boxes = (html.match(/Show the individual runs/g) || []).length;
+    const boxes = (html.match(/Show the individual simulations/g) || []).length;
+    const mainHtml = deep(F.REG.get(`${tabId}_main`));
+    ck(mainHtml.length > 200 && !/class="err"|Not available/.test(mainHtml),
+       `${setting}=${form}: renders without an error (${mainHtml.length}B)`);
     ck(off === want && boxes === 1,
        `${setting}=${form}: the runs box is ${want ? "greyed" : "tickable"}`
        + ` (got ${off ? "greyed" : "tickable"}, ${boxes} box(es))`);

@@ -54,7 +54,7 @@ async function runView(scenario, seedIndex, k, mt) {
   if (runViewCache.has(key)) return runViewCache.get(key);
   const D = await loadRun(scenario, seedIndex);
   if (!D.starts || !(String(k) in D.starts))
-    throw new Error(`this run carries no clade starts at k=${k} `
+    throw new Error(`this simulation carries no clade starts at k=${k} `
                   + `(it has ${Object.keys(D.starts || {}).join(", ")})`);
   const T = buildTopology(D);
   const C = computeClades(D, T, k, mt);

@@ -38,7 +38,7 @@ PROM = [0.10, 0.20]
 # its own partition. The values come from compute, which the panels also read.
 MT = compute.MT_VALUES
 LO, HI, WINDOW = 0.10, 0.90, "post"
-DEFAULT_STORE = os.path.join(ROOT, "Data", "fig2_studio")
+DEFAULT_STORE = os.path.join(ROOT, "Data", "figures_studio")
 
 
 def exp_tag(exp_num, exp_name):

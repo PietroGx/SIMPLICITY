@@ -19,11 +19,36 @@ let activeTabId = null;
 const staleTabs = new Set();
 let renderTimer = null;
 
+/* Nav groups, in nav order. A tab names its group in registerTab; inside a
+   group tabs keep registration order, so a new figure joins by registering. */
+const TAB_GROUPS = [
+  {id: "explore", label: "Data exploration"},
+  {id: "figures", label: "Figures", heading: n => `Figure ${n} · `},
+  {id: "supp", label: "Supplementary", heading: n => `${n} · `},
+  {id: "tools", label: "Tools"},
+];
+
 function registerTab(tab) {
+  if (!TAB_GROUPS.some(g => g.id === tab.group))
+    console.warn(`tab ${tab.id}: unknown group ${tab.group}, shown under Tools`);
   tabs.push(Object.assign({railBuilt: false, everRendered: false}, tab));
 }
 
 function tabById(id) { return tabs.find(t => t.id === id); }
+
+function groupOf(t) {
+  return TAB_GROUPS.find(g => g.id === t.group) || TAB_GROUPS[TAB_GROUPS.length - 1];
+}
+
+/* Tabs in nav order: group order first, registration order inside a group. */
+function navOrder() {
+  return TAB_GROUPS.flatMap(g => tabs.filter(t => groupOf(t) === g));
+}
+
+function tabHeading(t) {
+  const g = groupOf(t), pre = g.heading && t.num != null ? g.heading(t.num) : "";
+  return pre && !t.title.startsWith(pre.replace(/ · $/, "")) ? pre + t.title : t.title;
+}
 
 /* ---------------------------------------------------------------- chrome */
 
@@ -31,9 +56,14 @@ function buildNav() {
   const nav = document.createElement("nav");
   nav.className = "tabs";
   nav.setAttribute("role", "tablist");
-  nav.innerHTML = tabs.map(t =>
-    `<button type="button" role="tab" data-tab="${t.id}" aria-selected="false">` +
-    `<span class="num">${t.num}</span>${t.title}</button>`).join("")
+  nav.innerHTML = TAB_GROUPS.map(g => {
+    const ts = tabs.filter(t => groupOf(t) === g);
+    return !ts.length ? "" :
+      `<div class="tgrp" data-group="${g.id}"><span class="glab">${g.label}</span>` +
+      ts.map(t => `<button type="button" role="tab" data-tab="${t.id}" aria-selected="false">` +
+        (t.num != null && t.num !== "" ? `<span class="num">${t.num}</span>` : "") +
+        `${t.title}</button>`).join("") + `</div>`;
+  }).join("")
     + `<span class="sp" id="busy" hidden></span>`
     + `<span class="sp" id="stateLine"></span>`;
   nav.addEventListener("click", ev => {
@@ -80,7 +110,7 @@ function viewElement(tab) {
   el.id = tab.viewId;
   el.hidden = true;
   el.innerHTML = `<div class="wrap">
-    <h1>${tab.title}</h1><p class="lede">${tab.lede || ""}</p>
+    <h1>${tabHeading(tab)}</h1><p class="lede">${tab.lede || ""}</p>
     <div class="cols">
       <div class="main" id="${tab.id}_main"><div class="loading">loading…</div></div>
       <div class="rail" id="${tab.id}_rail"></div></div></div>`;
@@ -149,7 +179,7 @@ function startStudio() {
   startBusyTicker();
   paintStateLine();
   const wanted = location.hash.slice(1);
-  showTab(tabById(wanted) ? wanted : tabs[0].id);
+  showTab(tabById(wanted) ? wanted : navOrder()[0].id);
   window.addEventListener("hashchange", () => {
     const id = location.hash.slice(1);
     if (tabById(id) && id !== activeTabId) showTab(id);

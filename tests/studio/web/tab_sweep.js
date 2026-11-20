@@ -7,7 +7,7 @@
    The stacked plot at the top is drawn from the per-seed export; the cells
    below are measured and drawn on the daily record. Both cover the same days,
    so a peak in a cell is the same day as a peak above it -- but they are not
-   the same sample grid, and only the cells carry panel 3's numbers.
+   the same sample grid, and only the cells carry Figure 5's numbers.
 */
 
 const SWEEP_MULLER_H = 184;
@@ -110,14 +110,14 @@ async function renderSweep(main) {
   const gridMode = settings.episodeView === "grid";
 
   const axisNote = prep.daily
-    ? `<div class="note"><strong>These are panel 3's numbers.</strong> The
+    ? `<div class="note"><strong>These are Figure 5's numbers.</strong> The
        episodes here are measured on the daily record, the same axis
        <code>compute.py</code> uses, so a rise day on this tab is the rise day
-       panel 3 reports. The stacked plot below is still drawn from the per-seed
+       Figure 5 reports. The stacked plot below is still drawn from the per-seed
        export, which samples about every 9.2 days — a shape, not a number — and
        both cover the same days.
        ${prep.unserved ? `<br>${prep.unserved} clade${prep.unserved === 1 ? "" : "s"}
-       of this run carry no daily series and are not shown: the build packs the
+       of this simulation carry no daily series and are not shown: the build packs the
        largest ${DAILY_CAP} that clear m<sub>T</sub>.` : ""}</div>`
     : `<div class="note err"><strong>Falling back to the 9.2-day export.</strong>
        The daily record comes from the clade build, and no build matches the
@@ -125,7 +125,7 @@ async function renderSweep(main) {
        quantised to roughly 9 days and a 30-day rise is 3 samples. Measured gap,
        control seed 0 at win=1: 275 emergence episodes on the daily record
        against 13 here. Rebuild on the <strong>Export</strong> tab, then these
-       become panel 3's numbers.</div>`;
+       become Figure 5's numbers.</div>`;
   main.innerHTML = axisNote + sweepStats(prep) + `
     <div class="plot"><div class="ph"><h3>Lineage frequency by clade</h3>
       <span class="sub" id="rl_mullerSub"></span></div>
@@ -183,8 +183,8 @@ async function renderSweep(main) {
   document.getElementById("rl_mX0").textContent = `day ${m.day0}`;
   document.getElementById("rl_mX1").textContent = `day ${m.day1}`;
   document.getElementById("rl_mXmid").textContent = settings.burnin && prep.phi !== null
-    ? "the whole run, washed out where the metric does not look — the cells below share this axis"
-    : "the whole run — the cells below share this axis";
+    ? "the whole simulation, washed out where the metric does not look — the cells below share this axis"
+    : "the whole simulation — the cells below share this axis";
 
   if (gridMode) {
     const grid = document.getElementById("rl_grid");
@@ -267,9 +267,9 @@ async function renderSweep(main) {
 }
 
 registerTab({
-  id: "sweep", num: 3, title: "Sweep time", viewId: "viewRise",
-  lede: "Every clade of one run, with each rise episode highlighted. The "
-      + "episode rules set here are what panel 3 reads.",
+  id: "sweep", group: "explore", title: "Sweep time", viewId: "viewRise",
+  lede: "Every clade of one simulation, with each rise episode highlighted. The "
+      + "episode rules set here are what Figure 5 reads.",
   rail: sweepRail,
   render: renderSweep,
 });

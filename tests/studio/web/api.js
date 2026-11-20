@@ -121,11 +121,11 @@ async function apiPost(url, body) {
 const API_LABELS = {
   "/api/panel": "computing the panel", "/api/across": "reading the clade build",
   "/api/episodes": "measuring episodes", "/api/index": "reading the cache state",
-  "/api/jobs": "checking the job", "/api/run": "loading the run",
-  "/api/runs": "reading the run index",
+  "/api/jobs": "checking the job", "/api/run": "loading the simulation",
+  "/api/runs": "reading the simulation index",
   "/api/run_daily": "reading the daily record",
   "/api/rebuild": "starting the pass",
-  "/api/dist": "reading the individual runs",
+  "/api/dist": "reading the individual simulations",
   "/api/sens": "walking the build grid",
 };
 function apiGetSlot(url, opts) {

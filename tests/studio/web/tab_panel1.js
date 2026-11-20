@@ -4,36 +4,29 @@
    shell calls render_panel1 when a setting it reads changes, and every
    fetch goes through apiGetSlot so a repeat costs nothing.
 
-   The three fixed bar charts are now five forms selected through
-   settings.plot1. The table and the note are on every form; the captions are
-   the panel's argument and travel with the metric, not with the form.
+   Two forms selected through settings.plot1, each ONE chart. The line, dot
+   and stacked forms are gone (v2.5.19): the first two drew a chart per
+   metric, and the stack was hard to read. The table and the note are on
+   every form.
 */
 
 const P1_PLOTS = [
+  ["host_burden", "Share of hosts against infections and burden",
+   "Per scenario, three bars: what share of infected individuals are long "
+   + "shedders, and what share of infections and of burden belongs to clades "
+   + "whose defining mutations arose in them."],
+  ["clade_points", "Burden % against long-born %",
+   "One point per clade, pooled over simulations: the share of its defining "
+   + "mutations that arose in a long shedder against its share of the "
+   + "simulation's burden."],
   ["burden_prev", "Burden against prevalence",
-   "One point per scenario: how rare long shedders are against how much of the "
-   + "run's burden traces to them. The x value is a design value, so it has no "
+   "One subpanel per scenario with long shedders: how rare long shedders are against how much of the "
+   + "simulation's burden traces to them. The x value is a design value, so it has no "
    + "interval."],
   ["scatter", "Burden % against clade %",
-   "One point per scenario and class, against the diagonal. Above the line a "
+   "One subpanel per scenario with long shedders, one point per class, against the diagonal. Above the line a "
    + "class holds more of the burden than of the count — many small clades "
    + "rather than individually fitter ones."],
-  ["across", "Line across j",
-   "One line per scenario over the classes, with the bootstrap interval as a "
-   + "ribbon. The shape across j is easier to read than fifty bars."],
-  ["dots", "Dot and interval",
-   "The forest plot: the mean and its bootstrap interval, one offset per "
-   + "scenario, so two intervals in one class do not sit on top of each other."],
-  ["stacked", "100% stacked bars",
-   "One bar per scenario, divided by class. Shares only — burden per clade is "
-   + "in days and is not a share of anything, so it has no bar here."],
-];
-
-/* title, y label, percentage */
-const P1_METRICS = [
-  ["frac_burden", "Percentage of the run's burden", "% of run burden", true],
-  ["frac_clades", "Percentage of the run's clades", "% of run clades", true],
-  ["per_clade", "Burden per clade", "days per clade", false],
 ];
 
 /* the shares arrive as fractions; asPct makes them percentages for display */
@@ -42,7 +35,7 @@ const P1_SHARE = new Set(["frac_burden", "frac_clades"]);
 const P1_CAPS = {
   frac_burden:
     `Burden is in days — how many days' worth of the entire viral population a
-     clade accounts for. The classes sum to 100% of the run because the founding
+     clade accounts for. The classes sum to 100% of the simulation because the founding
      clade is kept as <strong>wild type</strong>.`,
   frac_clades:
     `This is the comparison the panel was asked for: the percentage of burden
@@ -51,10 +44,6 @@ const P1_CAPS = {
      clades and <em>how big each one is</em>, and those pull in opposite
      directions here. A class holding far more of the burden than of the count is
      made of many small clades, not individually fitter ones.`,
-  per_clade:
-    `The decomposition: this is the second factor, and it is what stops the
-     burden chart being read as "long-born clades are fitter". Days, not a
-     share.`,
 };
 
 function rail_panel1(rail) {
@@ -62,21 +51,14 @@ function rail_panel1(rail) {
     pickControl({setting: "plot1", label: "Form", options: P1_PLOTS}),
     railDistribution("dist1", settings.plot1),
   ]));
-  rail.append(railClade());
+  rail.append(railWindow());
 }
 
-async function render_panel1(main){
-
-  let d; try { d = await apiGetSlot("/api/panel?n=1&" + buildQuery()); }
-  catch(e){ main.innerHTML=""; main.append(errorBox(e.message + " — build this k on the Export page.")); return; }
+/* Figure 4's chart in the form picked on its tab (settings.plot1). `idp`/`compact`
+   are unused since the Figure tab went; `compact` drops the caption. */
+async function panel1Form(d, {idp = "p1", compact = false} = {}) {
   const cls = d.classes;
-  const lab = c => c === "wt" ? "wild type" : c === "other" ? "ndef≠k" : c;
   const isJ = c => /^\d+$/.test(c);
-  const jmax = Math.max(1, ...cls.filter(isJ).map(Number));
-  /* the j ramp is sequential, pale at j=0 and dark at j=k; the two classes that
-     are not a j are grey, so they cannot be read off the ramp as a level */
-  const clsColour = c => c === "wt" ? css("--ink-2") : c === "other" ? css("--ink-3")
-    : `hsl(214 44% ${78 - 56 * Number(c) / jmax}%)`;
   const of = sc => d.scenarios[sc] || {};
   const cell = (sc, c, m) => {
     const b = ((of(sc).classes || {})[c] || {})[m];
@@ -86,12 +68,16 @@ async function render_panel1(main){
   const pts = !!settings.dist1 && distAllowed(plot);
   const dist = pts ? await distFor(1) : null;
   const runs1 = (sc, key) => ((distRuns(dist, sc, [0], key) || [])[0] || []).map(asPctNum);
-  const runsM = (sc, m) => {
-    const r = distRuns(dist, sc, cls, c => m + "." + c);
-    return P1_SHARE.has(m) ? asPctRuns(r) : r;
+  const SUBS = SUB_SCENARIOS, raw = scenarioRaw;
+  const scTip = (sc, c) => {
+    const t = classShare(c, settings.k);
+    return {text: `${SCENARIO_LABEL[sc]} · ${classLabel(c, settings.k)}`,
+      math: `long-born share  ${t !== null ? `${c}/${settings.k} = ${fmt(100 * t, 0)}%`
+               : c === "wt" ? "0/0, undefined" : "n/a, ndef≠k"}\n`
+        + `% of burden      ${ci(cell(sc, c, "frac_burden"), 1, "%")}\n`
+        + `% of clades      ${ci(cell(sc, c, "frac_clades"), 1, "%")}`};
   };
-  const scKey = keyRow(SCENARIOS.map(sc => [scenarioColour(sc), SCENARIO_LABEL[sc]]));
-  const sub = `k=${settings.k} · m_T=${mtPct(settings.mt)}% · ${settings.burnin?"post burn-in":"whole run"}`;
+  const sub = `k=${settings.k} · m_T=${mtPct(settings.mt)}% · ${settings.burnin?"post burn-in":"whole simulation"}`;
 
   /* The long-born share: the sum over classes j >= 1. Summing the class MEANS
      is a correct point; summing their CIs is not one, so it is not done. */
@@ -104,121 +90,240 @@ async function render_panel1(main){
     return asPctNum(t);
   };
 
-  const box = (id, title, subtitle, key, cap) => `<div class="plot">
-    <div class="ph"><h3>${title}</h3><span class="sub">${subtitle}</span></div>
-    <canvas id="${id}"></canvas>
-    ${key || ""}<div class="cap">${cap}</div></div>`;
+  const scNote = sc => `${fmt(asPctNum(of(sc).prevalence), 1)}% · ${of(sc).duration ?? "—"}d`;
+  const box = (tag, title, key, cap, note = scNote) => `<div class="plot">
+    <div class="ph"><h3>${title}</h3><span class="sub">${sub}</span></div>
+    <div class="scgrid">${SUBS.map(sc => `<div>
+      ${scenarioHead(sc, note(sc))}
+      <canvas id="${idp}${tag}_${sc}"></canvas></div>`).join("")}</div>
+    ${key || ""}${compact ? "" : `<div class="cap">${cap}</div>`}</div>`;
+  const each = (tag, f) => () => SUBS.forEach(sc => f(document.getElementById(`${idp}${tag}_${sc}`), sc));
+  const H = compact ? 170 : 230;
 
-  const perMetric = (id, note, mk) => ({
-    html: P1_METRICS.map(([m, title]) =>
-      box(id + m, title, m === "per_clade" ? "days, mean over runs" : sub,
-          m === "frac_burden" ? scKey : "", P1_CAPS[m] + " " + note)).join(""),
-    draw: () => P1_METRICS.forEach(([m, title, ylab, pct]) =>
-      mk(document.getElementById(id + m), m, ylab, pct)),
-  });
+  /* per clade, from /api/panel?n=1c; only this form needs it */
+  const pc = plot === "clade_points"
+    ? await apiGetSlot("/api/panel?n=1c&" + buildQuery()).catch(e => ({error: e.message}))
+    : null;
+  const pcOf = sc => ((pc || {}).scenarios || {})[sc] || {points: [], wt: [], runs: 0};
+  const mean = v => v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  const sd = v => { const m = mean(v);
+    return v.length > 1 ? Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1)) : null; };
+  const clip = v => Math.max(0, Math.min(100, v));
+  /* the composition classes: j long-born of exactly k definers, or ndef≠k */
+  const K = Number(settings.k);
+  const PC_CLASSES = [...Array.from({length: K + 1}, (_, j) => String(j)), "other"];
+  const pcClass = ([, , , nl, nd]) => nd === K ? String(nl) : "other";
+  const byClass = sc => { const m = {};
+    pcOf(sc).points.forEach(p => (m[pcClass(p)] = m[pcClass(p)] || []).push(p));
+    return m; };
+  const shown = PC_CLASSES.filter(c => SUBS.some(sc => (byClass(sc)[c] || []).length));
+  const pcTable = compact || !pc ? "" : `<div style="overflow-x:auto"><table class="t" style="margin-top:8px">
+      <thead><tr><th>scenario</th>${shown.map(c => `<th>${c === "other" ? "ndef≠k" : `${c}/${K}`}</th>`).join("")}</tr></thead>
+      <tbody>${SUBS.map(sc => { const bc = byClass(sc);
+        return `<tr><td>${SCENARIO_LABEL[sc]}</td>${shown.map(c => { const ys = (bc[c] || []).map(p => 100 * p[1]);
+          return `<td class="n">${ys.length ? `${fmt(mean(ys), 1)}${ys.length > 1 ? ` ± ${fmt(sd(ys), 1)}` : ""}<br><small style="color:var(--ink-3)">n=${ys.length}</small>` : "—"}</td>`; }).join("")}</tr>`; }).join("")}
+      </tbody></table></div><div class="cap">Clade burden share by class, mean ± SD over the class's clades, in %.</div>`;
+
+  const ph = plot === "host_burden"
+    ? await apiGetSlot("/api/panel?n=1h&" + buildQuery()).catch(e => ({error: e.message}))
+    : null;
+  const phOf = sc => ((ph || {}).scenarios || {})[sc] || {};
+  const HB = [["founding", "founding clade", () => css("--founder")],
+              ["standard", "all definers standard-born", () => jShade(0)],
+              ["partly", "partly long-born (≤ half)", () => jShade(0.5)],
+              ["mostly", "mostly long-born (> half)", () => jShade(1)]];
+  const infWhole = SUBS.some(sc => phOf(sc).infections_window !== "post");
+  const infWin = infWhole ? "whole simulation" : "on or after the burn-in day";
+  const pctTxt = v => !isNum(v) ? "—" : v < 1 && v > 0 ? fmt(v, 1) + "%" : fmt(v, 0) + "%";
+
+  const prevMax = Math.max(...SUBS.map(sc => asPctNum(of(sc).prevalence)).filter(isNum), 0);
 
   const FORMS = {
 
+  host_burden: () => ({
+    html: box("hb", "Long shedders: share of hosts against share of infections and burden",
+      keyRow([[jShade(1), "long shedders (hosts bar)"], [jShade(0), "standard hosts (hosts bar)"]]
+        .concat(HB.map(([, t, c]) => [c(), t]))),
+      `Three bars per scenario, each out of 100%. <strong>Hosts:</strong> the share
+       of infected individuals who are long shedders, in each simulation as
+       realized. <strong>Infections:</strong> every infection in the simulation,
+       split by the clade of the lineage it passed on — the plainest measure of
+       spread. ${infWhole
+         ? "These clade builds count infections over the whole simulation only, so this bar ignores the burn-in setting until the next rebuild."
+         : "Counted on or after the burn-in day, as burden is."} <strong>Burden:</strong> each
+       simulation's burden (the clade's share of infected hosts, summed over the
+       days in the window) split by where
+       the clade's defining mutations arose — the founding clade (it has none),
+       clades whose definers all arose in standard hosts, clades with some
+       (at most half) long-born definers, and clades with mostly long-born ones.
+       Infections and burden share the same four segments. The headline compares
+       the hosts share with the infections carried by clades with <em>at least
+       one</em> long-born definer (the two orange-red segments).
+       Means over simulations; hover a segment for its 95% interval.
+       A long shedder stays infected far longer than a standard host, so part
+       of the over-representation is longer infection itself, not fitter
+       mutations.${(ph || {}).error ? ` <strong>Not available:</strong> ${ph.error}` : ""}`,
+      sc => scNote(sc)),
+    draw: each("hb", (cv, sc) => {
+      const v = phOf(sc), b = v.burden || {}, inf = v.infections || {}, hm = asPctNum((v.hosts || {}).mean);
+      const {g, w, h} = fit(cv, compact ? 132 : 146);
+      const L = 62, R = 6, bh = 20, y1 = 26, y2 = 58, y3 = 90;
+      const W = w - L - R, any = asPctNum((inf.any_long || {}).mean);
+      g.font = "600 11px " + css("--f-ui"); g.fillStyle = css("--ink"); g.textAlign = "left";
+      g.fillText(isNum(hm) && isNum(any)
+        ? `${pctTxt(hm)} of hosts → ${pctTxt(any)} of infections${hm > 0 ? ` · ${fmt(any / hm, 0)}×` : ""}`
+        : "not available", 0, 13);
+      const hits = [];
+      const bar = (y, label, segs) => {
+        g.font = "600 10px " + css("--f-ui"); g.fillStyle = css("--ink-2"); g.textAlign = "right";
+        g.fillText(label, L - 6, y + bh / 2 + 4);
+        let x = L;
+        segs.forEach(([val, col, name, ci]) => {
+          if (!isNum(val) || val <= 0) return;
+          const sw = Math.max(2, W * val / 100);
+          g.fillStyle = col; g.fillRect(x, y, sw, bh);
+          g.strokeStyle = css("--panel"); g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, sw - 1, bh - 1);
+          if (sw > 30) { g.fillStyle = "#fff"; g.font = "600 10px " + css("--f-num"); g.textAlign = "center";
+            g.fillText(pctTxt(val), x + sw / 2, y + bh / 2 + 4); }
+          hits.push({x0: x, x1: x + sw, y0: y, y1: y + bh, text: {text: `${SCENARIO_LABEL[sc]} · ${name}`,
+            math: `mean over ${v.runs} simulations  ${pctTxt(val)}` + (ci ? `\n95% interval  ${ci}` : "")}});
+          x += sw;
+        });
+        g.strokeStyle = css("--line"); g.strokeRect(L + 0.5, y + 0.5, W - 1, bh - 1);
+      };
+      const ciOf = o => o && isNum(o.lo) ? `${pctTxt(asPctNum(o.lo))} – ${pctTxt(asPctNum(o.hi))}` : null;
+      bar(y1, "hosts", [[hm, jShade(1), "long shedders among infected", ciOf(v.hosts)],
+                        [isNum(hm) ? 100 - hm : null, jShade(0), "standard hosts", null]]);
+      bar(y2, "infections", HB.map(([k, t, c]) => [asPctNum((inf[k] || {}).mean), c(), `${t} · share of infections, ${infWin}`, ciOf(inf[k])]));
+      bar(y3, "burden", HB.map(([k, t, c]) => [asPctNum((b[k] || {}).mean), c(), `${t} · share of burden`, ciOf(b[k])]));
+      g.font = "9px " + css("--f-num"); g.fillStyle = css("--ink-3");
+      g.textAlign = "left"; g.fillText("0%", L, y3 + bh + 13);
+      g.textAlign = "right"; g.fillText("100%", L + W, y3 + bh + 13); g.textAlign = "left";
+      cv._axHit = hits; axisTip(cv);
+    }),
+  }),
+
+  clade_points: () => ({
+    html: box("cp", "Clade burden against long-born share of its substitutions",
+      jShadeBar(settings.k).replace("long-born share of defining mutations (j/k)",
+        "long-born share of the clade's defining mutations")
+        + keyRow([[css("--ink-3"), "long-shedder prevalence"],
+                  [css("--ink"), "class mean ± SD over its clades"]]) + pcTable,
+      `One subpanel per scenario with long shedders, <strong>one point per
+       clade</strong>, pooled over the scenario's simulations. x is the share of
+       the clade's defining mutations — the substitutions that found it — that
+       arose in a long shedder: <code>nlong / ndef</code>, so a clade with more
+       defining mutations than k sits between the j/k steps. y is the clade's
+       burden as a percentage of its own simulation's total burden, so the points
+       of one simulation sum to 100% with its founding clade. The founding clade
+       has no defining mutations, its x is 0/0, and it is left off the axis; the
+       mean share it holds is printed above each subpanel.
+       ${(pc || {}).error ? `<strong>Not available:</strong> ${pc.error}` : ""}
+       Colour is x again, on the Clustering tab's green→red ramp. Hover a point
+       for its simulation and counts.
+       The grey rule is the scenario's long-shedder prevalence, what x would be
+       if substitutions arose in proportion to headcount. Each large marker is
+       one composition class — j of the k defining mutations long-born, or
+       ndef≠k — at its mean x and mean y, arms ±1 SD over the class's clades,
+       clipped to the axes.`,
+      sc => { const v = pcOf(sc), w = mean(v.wt);
+        return `${scNote(sc)} · ${v.points.length.toLocaleString()} clades, ${v.runs} simulations`
+          + ` · founding clade ${w === null ? "—" : fmt(100 * w, 1) + "%"} of burden`; }),
+    draw: each("cp", (cv, sc) => scatterCI(cv, {
+        height: H, zero: true, pctX: true, pctY: true,
+        xlab: "% of defining mutations long-born", ylab: "% of simulation burden",
+        fmtX: v => fmt(v, 0) + "%", fmtY: v => fmt(v, 0),
+        vlines: [{x: asPctNum(pcOf(sc).prevalence), colour: css("--ink-3"),
+          label: `prevalence ${fmt(asPctNum(pcOf(sc).prevalence), 1)}%`}],
+        groups: pcOf(sc).points.map(([x, y, run, nl, nd]) => ({
+          colour: jShade(x), fill: jShade(x), stroke: css("--ink-3"), r: 2.6, alpha: 0.7,
+          x: {mean: 100 * x}, y: {mean: 100 * y},
+          tip: {text: `${SCENARIO_LABEL[sc]} · seed_${String(run).padStart(4, "0")}`,
+            math: `long-born defining  ${nl}/${nd} = ${fmt(100 * x, 0)}%\n`
+              + `share of burden     ${fmt(100 * y, 2)}%`},
+        })).concat(Object.entries(byClass(sc)).map(([c, pts]) => {
+          const xs = pts.map(p => 100 * p[0]), ys = pts.map(p => 100 * p[1]);
+          const mx = mean(xs), my = mean(ys), sx = sd(xs) || 0, sy = sd(ys) || 0;
+          return {colour: css("--ink"), fill: jShade(mx / 100), stroke: css("--ink"), r: 5.5,
+            arm: css("--ink"),
+            x: {mean: mx, lo: clip(mx - sx), hi: clip(mx + sx)},
+            y: {mean: my, lo: clip(my - sy), hi: clip(my + sy)},
+            tip: {text: `${SCENARIO_LABEL[sc]} · class ${c === "other" ? "ndef≠k" : `${c}/${K}`} · ${pts.length.toLocaleString()} clades`,
+              math: `x  ${fmt(mx, 1)} ± ${fmt(sx, 1)}%\ny  ${fmt(my, 2)} ± ${fmt(sy, 2)}%`}};
+        })),
+      })),
+  }),
+
   burden_prev: () => ({
-    html: box("p1bp", "Long-born burden against long-shedder prevalence",
-      sub, scKey,
-      `x is the long-shedder prevalence the scenario is configured with — one
-       number fixed by config, so it carries no interval. y is the percentage of
-       the run's burden held by clades with at least one defining mutation that
-       arose in a long shedder, i.e. the sum over classes j ≥ 1.
+    html: box("bp", "Long-born burden against long-shedder prevalence", "",
+      `One subpanel per scenario with long shedders; the x axis is shared, so
+       the subpanels can be read across. x is the long-shedder prevalence the
+       scenario is configured with — one number fixed by config, so it carries
+       no interval. y is the percentage of the simulation's burden held by
+       clades with at least one defining mutation that arose in a long shedder,
+       i.e. the sum over classes j ≥ 1.
        <strong>y is drawn without an interval on purpose.</strong> Summing the
        class means gives a correct point, but a bootstrap CI of one class cannot
        be added to another's — the long-born share has to be formed inside each
-       run and bootstrapped from there, which is <code>frac_burden_long</code> in
+       simulation and bootstrapped from there, which is <code>frac_burden_long</code> in
        <code>/api/dist</code>. Until that is in hand, no interval rather than a
-       wrong one${dist ? ", and the cloud behind each point is that key's runs" : ""}.
-       Prevalence is also the scenario's whole identity here, so a point's
-       position on x is not an estimate of anything.`),
-    draw: () => scatterCI(document.getElementById("p1bp"), {
-      height: 300, points: pts, zero: true,
+       wrong one${dist ? ", and the cloud behind each point is that key's simulations" : ""}.`),
+    draw: each("bp", (cv, sc) => scatterCI(cv, {
+      height: H, points: pts, zero: true, pctY: true,
+      xlim: [0, (prevMax || 1) * 1.15],
       xlab: "long-shedder prevalence (% of individuals)",
-      ylab: "% of run burden, classes j ≥ 1",
+      ylab: "% of simulation burden, classes j ≥ 1",
       fmtX: v => fmt(v, 1) + "%",
-      groups: SCENARIOS.map(sc => ({
-        colour: scenarioColour(sc), label: SCENARIO_LABEL[sc],
+      groups: [{
+        colour: raw(sc), shape: SCENARIO_SHAPE[sc], label: SCENARIO_LABEL[sc],
         x: {mean: asPctNum(of(sc).prevalence), lo: null, hi: null},
         y: {mean: longPct(sc), lo: null, hi: null},
         yruns: pts ? runs1(sc, "frac_burden_long") : [],
-      })),
-    }),
+      }],
+    })),
   }),
 
   scatter: () => ({
-    html: box("p1sc", "Percentage of burden against percentage of clades",
-      sub, scKey,
-      `The diagonal is the point. A class <em>above</em> the line holds more of
-       the run's burden than of its clade count — many small clades, not
+    html: box("sc", "Percentage of burden against percentage of clades",
+      jShadeBar(settings.k),
+      `One subpanel per scenario with long shedders, one point per class. The
+       diagonal is the point. A class <em>above</em> the line holds more of
+       the simulation's burden than of its clade count — many small clades, not
        individually fitter ones; below it, the opposite. ${P1_CAPS.frac_clades}
-       One point per scenario and class, coloured by scenario; the class is not
-       written on the chart, so read it off the table below. Both arms are each
-       axis's own bootstrap interval${pts ? ", and the cloud is one run on both axes" : ""}.`),
-    draw: () => scatterCI(document.getElementById("p1sc"), {
-      height: 320, points: pts, diagonal: true, zero: true,
-      xlab: "% of the run's clades", ylab: "% of the run's burden",
+       A marker's <strong>shade</strong> is the class — the long-born share
+       of the clade's k defining mutations, j/k, from green at 0% to red at 100%, as the Clustering tab colours origin.
+       Wild type (the founding clade, whose share is 0/0, undefined) and ndef≠k
+       (clades whose defining-mutation count is not k, so j/k does not apply) sit
+       off the ramp: wild type in the founder purple the Clustering tab uses, ndef≠k in grey. Hover a point for its class and values. Both
+       arms are each axis's own bootstrap interval${pts ? ", and the cloud, in the class's shade, is one simulation on both axes" : ""}.`),
+    draw: each("sc", (cv, sc) => scatterCI(cv, {
+      height: H, points: pts, diagonal: true, zero: true, pctX: true, pctY: true,
+      xlab: "% of the simulation's clades", ylab: "% of the simulation's burden",
       fmtX: v => fmt(v, 0) + "%", fmtY: v => fmt(v, 0),
-      groups: SCENARIOS.flatMap(sc => cls.map(c => ({
-        colour: scenarioColour(sc),
+      groups: cls.map(c => ({
+        colour: raw(sc), shape: SCENARIO_SHAPE[sc],
+        fill: classShade(c, settings.k), stroke: css("--ink-2"), arm: css("--ink-3"),
+        tip: scTip(sc, c),
         x: cell(sc, c, "frac_clades"), y: cell(sc, c, "frac_burden"),
         xruns: pts ? runs1(sc, "frac_clades." + c) : [],
         yruns: pts ? runs1(sc, "frac_burden." + c) : [],
-      }))),
-    }),
+      })),
+    })),
   }),
-
-  across: () => perMetric("p1ln",
-    "The ribbon is the bootstrap interval over runs. The classes are ordered but"
-    + " not spaced, so read the shape across j, not the slope.",
-    (cv, m, ylab, pct) => linesOverLevels(cv, {
-      levels: cls.map(lab), ribbon: true, points: pts, pct,
-      xlab: "j long of k", ylab, fmtY: v => fmt(v, 0),
-      series: SCENARIOS.map(sc => ({
-        colour: scenarioColour(sc), label: SCENARIO_LABEL[sc],
-        vals: cls.map(c => cell(sc, c, m) || null),
-        runs: pts ? runsM(sc, m) : undefined,
-      })),
-    })),
-
-  dots: () => perMetric("p1dt",
-    "The whiskers are the bootstrap interval of the mean over runs, one offset"
-    + " per scenario.",
-    (cv, m, ylab, pct) => dots(cv, {
-      cats: cls.map(lab), points: pts, pct, zero: true, ylab,
-      fmtY: v => fmt(v, 0),
-      series: SCENARIOS.map(sc => ({
-        colour: scenarioColour(sc), label: SCENARIO_LABEL[sc],
-        vals: cls.map(c => cell(sc, c, m) || null),
-        runs: pts ? runsM(sc, m) : undefined,
-      })),
-    })),
-
-  stacked: () => {
-    const clsKey = keyRow(cls.map(c => [clsColour(c), lab(c)]));
-    const two = P1_METRICS.filter(([m]) => m !== "per_clade");
-    return {
-      html: two.map(([m, title]) => box("p1st" + m, title, sub, clsKey,
-        P1_CAPS[m] + ` Each bar is one scenario's whole run, divided by class;
-        bands reaching 6% of the bar carry their number.
-        <strong>Burden per clade is not here.</strong> It is days, not a share of
-        anything, so stacking it would draw a total that does not exist — pick
-        the line or the dot form to see it. No interval can be drawn on a stack
-        either, which is why the distribution box is disabled on this form rather
-        than quietly ignored.`)).join(""),
-      draw: () => two.forEach(([m]) => stacked(document.getElementById("p1st" + m), {
-        cats: SCENARIOS.map(sc => SCENARIO_LABEL[sc]), pct: true,
-        parts: cls.map(c => ({colour: clsColour(c), label: lab(c),
-          vals: SCENARIOS.map(sc => (cell(sc, c, m) || {}).mean)})),
-      })),
-    };
-  },
 
   };
 
-  const form = (FORMS[plot] || FORMS.burden_prev)();
+  return (FORMS[plot] || FORMS.burden_prev)();
+}
+
+async function render_panel1(main){
+
+  let d; try { d = await apiGetSlot("/api/panel?n=1&" + buildQuery()); }
+  catch(e){ main.innerHTML=""; main.append(errorBox(e.message + " — build this k on the Export page.")); return; }
+  const cls = d.classes;
+  const lab = c => c === "wt" ? "wild type" : c === "other" ? "ndef≠k" : c;
+  const of = sc => d.scenarios[sc] || {};
+  const form = await panel1Form(d);
   const tbl = SCENARIOS.map(sc => {
     const s = of(sc);
     const cc = s.classes || {};
@@ -227,8 +332,9 @@ async function render_panel1(main){
       + `</tr>`;
   }).join("");
   main.innerHTML = `
-  <div class="note">${d.note}. Percentages are formed inside each run and then
-    averaged over runs; whiskers are a bootstrap over runs, never over clades.</div>
+  <div class="note">${simWords(d.note)}.
+    Percentages are formed inside each simulation and then averaged over
+    simulations; whiskers are a bootstrap over simulations, never over clades.</div>
   ${form.html}
   <div class="plot"><div class="ph"><h3>Percentage of burden, by class</h3></div>
     <table class="t"><thead><tr><th>scenario</th>
@@ -240,8 +346,8 @@ async function render_panel1(main){
 
 
 registerTab({
-  id: "panel1", num: 4, title: "Panel 1", viewId: "viewP1",
-  lede: "How much of the viral population's history traces to mutations that arose in long shedders, against how rare long shedders are. The x axis is <strong>j long of k</strong>: how many of a clade's defining mutations arose in a long-shedder host.",
+  id: "panel1", group: "figures", num: "4", title: "Burden", viewId: "viewP1",
+  lede: "How much of the viral population's history traces to mutations that arose in long shedders, against how rare long shedders are.",
   rail: rail_panel1,
   render: render_panel1,
 });

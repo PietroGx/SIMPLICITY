@@ -45,7 +45,7 @@ import simplicity.clustering as cl
 import compute
 import panels as P
 
-STORE = os.path.join(ROOT, "Data", "fig2_studio")
+STORE = os.path.join(ROOT, "Data", "figures_studio")
 
 
 def pick_build(cache, want_key):

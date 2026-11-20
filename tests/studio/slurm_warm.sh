@@ -27,7 +27,7 @@ cd "$ROOT"
 
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
-STORE="${STORE:-$ROOT/Data/fig2_studio}"
+STORE="${STORE:-$ROOT/Data/figures_studio}"
 IDX="${SLURM_ARRAY_TASK_ID:-0}"
 N="${SLURM_ARRAY_TASK_COUNT:-1}"
 

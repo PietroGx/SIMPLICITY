@@ -24,6 +24,7 @@ get wrong is prose.
 import ast
 import hashlib
 import inspect
+import os
 import textwrap
 
 
@@ -42,9 +43,21 @@ def _strip_docstrings(tree):
     return tree
 
 
+_digests = {}
+
+
 def ast_digest(path):
     """One file's behaviour as a string, free of comments, docstrings, blank
-    lines and formatting."""
+    lines and formatting. Cached on (mtime, size): parsing costs ~25 ms and
+    panel 4 asks once per build row, 8 s a request uncached."""
+    st = os.stat(path)
+    key = (os.path.realpath(path), st.st_mtime_ns, st.st_size)
+    if key not in _digests:
+        _digests[key] = _ast_digest(path)
+    return _digests[key]
+
+
+def _ast_digest(path):
     with open(path, "rb") as fh:
         src = fh.read()
     tree = _strip_docstrings(ast.parse(src))

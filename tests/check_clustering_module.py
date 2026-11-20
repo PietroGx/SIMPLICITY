@@ -117,14 +117,14 @@ def section_a():
 # --------------------------------------------------------------- section B
 # the two walks over rule B, measured on real runs
 
-def section_b(scenarios, nseeds, k):
+def section_b(scenarios, nseeds, k, exp_num=1, exp_name=EXP_NAME):
     print(f"\nB. designate_clades against cluster_lin_into_clades_with_meta "
           f"(k={k})")
     checked = 0
     for sc in scenarios:
         try:
             ssods = dm.get_seeded_simulation_output_dirs(
-                one_sod(EXP_NAME, sc, 1))[:nseeds]
+                one_sod(exp_name, sc, exp_num))[:nseeds]
         except Exception as exc:
             print(f"  ({sc} unavailable: {exc})")
             continue
@@ -183,10 +183,12 @@ if __name__ == "__main__":
                     default=["control", "HIV_high", "edge_case"])
     ap.add_argument("--seeds", type=int, default=2)
     ap.add_argument("-k", type=int, default=7)
+    ap.add_argument("--exp-num", type=int, default=1)
+    ap.add_argument("--exp-name", default=EXP_NAME)
     a = ap.parse_args()
     sys.setrecursionlimit(300000)
 
     section_a()
-    section_b(a.scenarios, a.seeds, a.k)
+    section_b(a.scenarios, a.seeds, a.k, a.exp_num, a.exp_name)
     print(f"\n{PASS[0]} passed, {FAIL[0]} failed")
     sys.exit(1 if FAIL[0] else 0)

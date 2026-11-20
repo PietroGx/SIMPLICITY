@@ -9,9 +9,11 @@
 #SBATCH --error=slurm_logs/fig2_precompute/pack_%j.err
 
 # ============================================================================
-# pack_cache.sh -- the clade-build grid as ONE downloadable file.
+# pack_cache.sh -- the clade-build grid as ONE downloadable file, with tx/
+# (slurm_tx.sh) and fig1/ (slurm_fig1.sh) beside it when they exist.
 #
-# `run_precompute.sh` submits this with --dependency=afterany on the array, so
+# `run_precompute.sh` submits this with --dependency=afterany on the array
+# (through the warm array) and on the tx and fig1 jobs, so
 # it runs even when tasks failed and SAYS which builds are missing. It used to
 # be afterok, which cancelled this job on any failure: the only sign of a
 # broken grid was an archive that never appeared. It can also be run by hand.
@@ -60,7 +62,7 @@ ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$ROOT"
 [ -f tests/studio/compute.py ] || { echo "[pack] not a SIMPLICITY checkout: $ROOT" >&2; exit 1; }
 
-STORE="${STORE:-$ROOT/Data/fig2_studio}"
+STORE="${STORE:-$ROOT/Data/figures_studio}"
 SEEDS="${SEEDS:-50}"
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
@@ -144,8 +146,8 @@ fi
 
 # EXP_REL is "." for the default experiment, which extracts into the store
 # itself; any other experiment extracts into its own store under it.
-EXTRACT="<repo>/Data/fig2_studio"
-[ "$EXP_REL" != "." ] && EXTRACT="<repo>/Data/fig2_studio/$EXP_REL"
+EXTRACT="<repo>/Data/figures_studio"
+[ "$EXP_REL" != "." ] && EXTRACT="<repo>/Data/figures_studio/$EXP_REL"
 
 # Warm the panels BEFORE packing, so the archive carries them. The grid is the
 # expensive precomputation but not the whole of it: panel 4 walks every build
@@ -185,6 +187,13 @@ echo "[pack] writing $OUT"
 PARTS=(cache)
 [ -f "$EXP_STORE/tx/index.json" ] && PARTS+=(tx) \
     || echo "[pack] WARNING: no $EXP_STORE/tx -- panel 2 will be empty" >&2
+FIG1="ABSENT -- the Figure 1 tab will be empty"
+if [ -f "$EXP_STORE/fig1/fig1.json" ] && [ -f "$EXP_STORE/fig1/index.json" ]; then
+    PARTS+=(fig1)
+    FIG1="$(du -sh "$EXP_STORE/fig1" | cut -f1), fig1.json of $(date -r "$EXP_STORE/fig1/fig1.json" -Is)"
+else
+    echo "[pack] WARNING: no $EXP_STORE/fig1/fig1.json + index.json -- Figure 1 will be empty" >&2
+fi
 if command -v pigz >/dev/null 2>&1; then
     tar -cf - -C "$EXP_STORE" "${PARTS[@]}" | pigz -p "${SLURM_CPUS_PER_TASK:-4}" > "$OUT"
 else
@@ -204,6 +213,7 @@ NFILES=$(find "$CACHE" -maxdepth 2 -type f -path "*__${HASH}/*" 2>/dev/null | wc
     echo "directories  $DIRS at this hash"
     echo "panels       $WARMED  (cache/_panels is packed with the grid)"
     echo "contents     ${PARTS[*]}"
+    echo "fig1         $FIG1"
     echo "files        $NFILES"
     echo "archive      $(basename "$OUT")  $SIZE"
     echo "sha256       $SUM"

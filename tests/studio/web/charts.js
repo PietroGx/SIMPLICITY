@@ -33,6 +33,9 @@ const isNum = v => v !== null && v !== undefined && isFinite(v);
 /* The y window, over the intervals AND over the points when they are shown --
    a cloud clipped by the frame reads as no cloud at all. */
 function yWindow(series, {points, zero, pct}) {
+  /* a share is read against the whole: 0-100%. pct "fit" (panel 2) is 0 to
+     10% above the largest value drawn, for shares too small to read on 0-100 */
+  if (pct && pct !== "fit") return [0, 100];
   let lo = Infinity, hi = -Infinity;
   const see = v => { if (isNum(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } };
   series.forEach(s => {
@@ -41,7 +44,7 @@ function yWindow(series, {points, zero, pct}) {
   });
   if (!isFinite(lo)) return [0, 1];
   if (zero) lo = Math.min(0, lo);
-  if (pct) hi = Math.max(hi, 5);
+  if (pct === "fit") return [0, hi > 0 ? hi * 1.1 : 1];
   const m = (hi - lo) * 0.08 || Math.abs(hi) * 0.1 || 1;
   return [zero ? lo : lo - m, hi + m];
 }
@@ -110,9 +113,12 @@ function dots(cv, {cats, series, ylab, fmtY, height, points, zero, pct}) {
    which is what makes "above the line" a readable claim.
 
    groups: [{colour, label, x: CI, y: CI, xruns: [], yruns: []}] -- xruns and
-   yruns are index-aligned by run, so a point is one run on both axes. */
+   yruns are index-aligned by run, so a point is one run on both axes.
+   Optional per group, each defaulting to the scenario-coloured dot: `shape`
+   (draw.js SCENARIO_SHAPE values), `fill`, `stroke` (outline), `arm` (whisker
+   colour), `alpha` (faded groups are drawn first), `tip` ({text, math} on hover). */
 function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
-                        diagonal, zero}) {
+                        diagonal, zero, pctX, pctY, xlim, ylim, vlines, hlines}) {
   const {g, w, h} = fit(cv, height || CHART_H);
   const pad = {l: 46, r: 12, t: 12, b: 34};
   const win = (pick, runs) => {
@@ -130,6 +136,10 @@ function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
   };
   let [x0, x1] = win("x", "xruns");
   let [y0, y1] = win("y", "yruns");
+  if (pctX) [x0, x1] = [0, 100];
+  if (pctY) [y0, y1] = [0, 100];
+  if (xlim) [x0, x1] = xlim;
+  if (ylim) [y0, y1] = ylim;
   if (diagonal) {
     const lo = Math.min(x0, y0), hi = Math.max(x1, y1);
     x0 = y0 = lo; x1 = y1 = hi;
@@ -142,10 +152,43 @@ function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
     g.beginPath(); g.moveTo(X(x0), Y(y0)); g.lineTo(X(x1), Y(y1)); g.stroke();
     g.setLineDash([]);
   }
-  groups.forEach(gr => {
+  /* reference x values: a dashed rule, an optional band, a label at the top */
+  (vlines || []).forEach(v => {
+    if (!isNum(v.x)) return;
+    g.strokeStyle = g.fillStyle = v.colour || css("--ink-3");
+    if (v.band && isNum(v.band[0]) && isNum(v.band[1])) {
+      g.globalAlpha = 0.12;
+      g.fillRect(X(v.band[0]), pad.t, Math.max(1, X(v.band[1]) - X(v.band[0])), h - pad.b - pad.t);
+      g.globalAlpha = 1;
+    }
+    g.lineWidth = 1.2; g.setLineDash(v.dash || [5, 3]);
+    g.beginPath(); g.moveTo(X(v.x), pad.t); g.lineTo(X(v.x), h - pad.b); g.stroke();
+    g.setLineDash([]);
+    if (v.label) {
+      g.font = "600 9px " + css("--f-ui");
+      const tw = g.measureText(v.label).width || 0;
+      const right = X(v.x) + 3 + tw < w - pad.r;
+      g.textAlign = right ? "left" : "right";
+      g.fillText(v.label, X(v.x) + (right ? 3 : -3), pad.t + 9 + (v.row || 0) * 11);
+      g.textAlign = "left";
+    }
+  });
+  (hlines || []).forEach(v => {
+    if (!isNum(v.y)) return;
+    g.strokeStyle = g.fillStyle = v.colour || css("--ink-3");
+    g.lineWidth = 1.2; g.setLineDash(v.dash || [5, 3]);
+    g.beginPath(); g.moveTo(pad.l, Y(v.y)); g.lineTo(w - pad.r, Y(v.y)); g.stroke();
+    g.setLineDash([]);
+    if (v.label) { g.font = "600 9px " + css("--f-ui"); g.textAlign = "right";
+      g.fillText(v.label, w - pad.r - 2, Y(v.y) - 3); g.textAlign = "left"; }
+  });
+  const hits = [];
+  const al = gr => isNum(gr.alpha) ? gr.alpha : 1;
+  [...groups.filter(gr => al(gr) < 1), ...groups.filter(gr => al(gr) >= 1)].forEach(gr => {
+    const a = al(gr), fill = gr.fill || gr.colour;
     if (points) {
       const xs = gr.xruns || [], ys = gr.yruns || [];
-      g.fillStyle = gr.colour; g.globalAlpha = 0.25;
+      g.fillStyle = fill; g.globalAlpha = (gr.fill ? 0.35 : 0.25) * a;
       for (let i = 0; i < Math.max(xs.length, ys.length); i++) {
         const xv = xs.length ? xs[i] : (gr.x || {}).mean;
         const yv = ys.length ? ys[i] : (gr.y || {}).mean;
@@ -156,15 +199,21 @@ function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
     }
     const bx = gr.x, by = gr.y;
     if (!bx || !by || !isNum(bx.mean) || !isNum(by.mean)) return;
-    g.strokeStyle = gr.colour; g.lineWidth = 1.3;
+    g.globalAlpha = a;
+    g.strokeStyle = gr.arm || gr.colour; g.lineWidth = 1.3;
     if (isNum(bx.lo)) { g.beginPath(); g.moveTo(X(bx.lo), Y(by.mean));
                         g.lineTo(X(bx.hi), Y(by.mean)); g.stroke(); }
     if (isNum(by.lo)) { g.beginPath(); g.moveTo(X(bx.mean), Y(by.lo));
                         g.lineTo(X(bx.mean), Y(by.hi)); g.stroke(); }
-    g.fillStyle = gr.colour;
-    g.beginPath(); g.arc(X(bx.mean), Y(by.mean), 4, 0, 6.2832); g.fill();
-    g.strokeStyle = css("--panel"); g.lineWidth = 1.2; g.stroke();
+    g.fillStyle = fill;
+    if (gr.shape) traceShape(g, gr.shape, X(bx.mean), Y(by.mean), gr.r || 4.5);
+    else { g.beginPath(); g.arc(X(bx.mean), Y(by.mean), gr.r || 4, 0, 6.2832); }
+    g.fill();
+    g.strokeStyle = gr.stroke || css("--panel"); g.lineWidth = gr.r ? 0.5 : gr.stroke ? 1 : 1.2; g.stroke();
+    g.globalAlpha = 1;
+    if (gr.tip) hits.push({x: X(bx.mean), y: Y(by.mean), faded: a < 1, text: gr.tip});
   });
+  cv._ptHit = hits;
   g.fillStyle = css("--ink-3"); g.font = "10px " + css("--f-num");
   const f = fmtX || (v => fmt(v, 1));
   g.fillText(f(x0), pad.l, h - 16);
@@ -261,7 +310,7 @@ function stacked(cv, {cats, parts, height, pct, fmtV}) {
   const tot = cats.map((c, i) =>
     parts.reduce((a, p) => a + (isNum(p.vals[i]) ? p.vals[i] : 0), 0));
   const hi = pct ? 100 : Math.max(1, ...tot) * 1.05;
-  axes(g, w, h, pad, "", pct ? "% of the run" : "", 0, hi, v => fmt(v, 0));
+  axes(g, w, h, pad, "", pct ? "% of the simulation" : "", 0, hi, v => fmt(v, 0));
   const slot = (w - pad.l - pad.r) / Math.max(cats.length, 1);
   const bw = Math.min(slot - 10, 54);
   const Y = v => h - pad.b - (h - pad.b - pad.t) * (v / (hi || 1));

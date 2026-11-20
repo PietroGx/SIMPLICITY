@@ -22,13 +22,13 @@ function clusteringRail(rail) {
     segmentControl({setting: "colourBy", label: "Colour by",
       options: [["clade", "Clade"], ["origin", "Origin"]],
       hint: "Colour by <em>Origin</em> to compare against the panels — clade "
-          + "colours are per-run and mean nothing across runs."}),
+          + "colours are per-simulation and mean nothing across simulations."}),
     segmentControl({setting: "treeAxis", label: "Tree x axis",
       options: [["time", "Time"], ["div", "Divergence"]],
       hint: "Divergence is the lineage's mutation count, so a long flat branch "
           + "in time can be a short one here."}),
-    checkControl({setting: "overview", label: "Overview: every run as a small tree",
-      hint: "All 50 runs of this scenario, drawn with the settings above."}),
+    checkControl({setting: "overview", label: "Overview: every simulation as a small tree",
+      hint: "All 50 simulations of this scenario, drawn with the settings above."}),
     buttonControl({label: "Reset to defaults", onClick: () =>
       resetSettings(["k", "mt", "originRule", "colourBy", "treeAxis", "burnin"])}),
   ]));
@@ -53,7 +53,7 @@ function clusteringStats(view) {
 function cladeKeyRow(view) {
   if (settings.colourBy === "clade")
     return `<div class="cap">One colour per clade, ordered down the tree. Clade
-      colours are per-run: the same hue in two runs is not the same clade.</div>`;
+      colours are per-simulation: the same hue in two simulations is not the same clade.</div>`;
   if (settings.originRule === "frac")
     return keyRow([[css("--std"), "all definers standard-born"],
                    [css("--long"), "all definers long-born"],
@@ -71,11 +71,11 @@ async function renderClustering(main) {
 
   if (settings.overview) {
     main.innerHTML = clusteringStats(view) + `
-      <div class="plot"><div class="ph"><h3>Every run of ${SCENARIO_LABEL[settings.scenario]}</h3>
+      <div class="plot"><div class="ph"><h3>Every simulation of ${SCENARIO_LABEL[settings.scenario]}</h3>
         <span class="sub">k = ${settings.k} · m_T = ${mtPct(settings.mt)}%</span></div>
         <div class="ovgrid" id="cl_ovGrid"></div>
-        <div class="cap">Each cell is one run's phylogeny at these settings.
-          Click a cell to open that run on its own.</div></div>`;
+        <div class="cap">Each cell is one simulation's phylogeny at these settings.
+          Click a cell to open that simulation on its own.</div></div>`;
     await paintOverviewGrid(document.getElementById("cl_ovGrid"));
     return;
   }
@@ -129,7 +129,7 @@ async function renderClustering(main) {
 /* The overview grid. Runs are loaded one at a time and painted as each arrives,
    so the grid fills in rather than blocking on fifty fetches. */
 async function paintOverviewGrid(host) {
-  const runs = (await apiGet("/api/runs", {slot: "runs", label: "run index"}))
+  const runs = (await apiGet("/api/runs", {slot: "runs", label: "simulation index"}))
     .scenarios[settings.scenario] || [];
   host.innerHTML = runs.map((r, i) =>
     `<div class="ovcell pending" data-seed="${i}" title="${r.seed}">
@@ -156,8 +156,8 @@ async function paintOverviewGrid(host) {
 }
 
 registerTab({
-  id: "clustering", num: 1, title: "Clustering", viewId: "viewCl",
-  lede: "One run as a phylogeny and as clade frequency. The clade definition "
+  id: "clustering", group: "explore", title: "Clustering", viewId: "viewCl",
+  lede: "One simulation as a phylogeny and as clade frequency. The clade definition "
       + "set here is what every panel downstream reads.",
   rail: clusteringRail,
   render: renderClustering,

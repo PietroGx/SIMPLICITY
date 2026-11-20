@@ -325,6 +325,9 @@ def _one(job):
     lin2host = ctx['lin2host']
     tx_all = ctx['tx_all']
     vote_of = ctx['vote_of']
+    # infections on or after the burn-in day, windowed as burden is
+    tinf = ind["t_infection"].astype(float).to_numpy()
+    tx_post = ind["inherited_lineage"][tinf >= cutoff].value_counts().to_dict()
 
     crec, erec = [], []
     for ci, c in enumerate(cols):
@@ -338,6 +341,7 @@ def _one(job):
                      .str.startswith("long")).sum()) if d is not None and len(d) else 0
         mem = c2l.get(c, [])
         ntx = int(sum(int(tx_all.get(m, 0)) for m in mem))
+        ntx_post = int(sum(int(tx_post.get(m, 0)) for m in mem))
         rootlin = root_of.get(c)
         max_div = cl.clade_max_divergence(mem, rootlin, lin2mut)
         y_all = np.nan_to_num(F[c].to_numpy(float))
@@ -350,6 +354,7 @@ def _one(job):
         trunc = bool(phi is not None and tem < cutoff and len(y) and y[0] > 1e-4)
 
         crec.append(dict(c=ci, name=str(c), ndef=nd, nlong=nlong, ntx=ntx,
+                         ntx_post=ntx_post,
                          tem=tem, founding=is_founding, trunc=trunc,
                          burden=round(burden, 4), burden_all=round(burden_all, 4),
                          nlin=len(mem), max_div=int(max_div),

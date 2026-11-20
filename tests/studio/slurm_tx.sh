@@ -24,7 +24,7 @@ cd "$ROOT"
 EXP_NUM="${EXP_NUM:-1}"
 EXP_NAME="${EXP_NAME:-}"
 SEEDS="${SEEDS:-50}"
-STORE="${STORE:-$ROOT/Data/fig2_studio}"
+STORE="${STORE:-$ROOT/Data/figures_studio}"
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate simplicity

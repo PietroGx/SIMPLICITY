@@ -30,7 +30,7 @@ def main():
     ap.add_argument("--exp-name", default=compute.EXP_NAME)
     ap.add_argument("--base-store",
                     default=os.path.join(os.path.dirname(os.path.dirname(HERE)),
-                                         "Data", "fig2_studio"))
+                                         "Data", "figures_studio"))
     ap.add_argument("--n", type=int, default=5, help="cold keys per kind")
     a = ap.parse_args()
     store = sweep.store_dir(a.base_store, a.exp_num, a.exp_name)

@@ -32,20 +32,21 @@ const SETTING_DEFAULTS = {
   clade: null,
   treeAxis: "time", episodeView: "grid", episodeCols: 3, showRaw: 1,
   overview: 0, yScale: "shared",
-  // which plot each panel tab draws, and panel 2's metric. The metric gates
-  // the plot list: who_transmits has no 2x2 to put in a heat-map.
-  plot1: "burden_prev", metric2: "intensity", plot2: "ratio",
-  plot3: "forest", axis4: "k",
+  // which plot each panel tab draws
+  focus: "",
+  plot1: "clade_points",
+  plot3: "rise_latency", axis4: "k",
+  // Figure 5 breakouts: peak that makes a sweep big, hidden days, launch ceiling
+  brkF: 0.05, brkH: 60, brkLo: 0.001,
   // the per-run points behind the interval, one box per panel -- per panel and
   // not one global switch, because each figure subpanel is captioned alone.
   dist1: 0, dist2: 0, dist3: 0, dist4: 0,
 };
 
 /* Settings whose value changes what the rail OFFERS, not just what it shows:
-   the plot form decides whether the distribution box can be ticked at all, and
-   panel 2's metric decides which forms exist. A rail is built once per tab so
+   the plot form decides whether the distribution box can be ticked at all. A rail is built once per tab so
    that dragging a slider cannot lose its focus, so these ask for a rebuild. */
-const RAIL_SETTINGS = ["plot1", "plot2", "plot3", "metric2", "axis4"];
+const RAIL_SETTINGS = ["plot1", "plot3", "axis4", "focus"];
 
 const BUILD_SETTINGS = ["k", "mt", "win", "prom", "lo", "hi", "window"];
 const READ_SETTINGS = ["burnin", "mf"];

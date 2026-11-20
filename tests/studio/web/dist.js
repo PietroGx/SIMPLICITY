@@ -149,7 +149,7 @@ async function sensFor(axis) {
    means has no per-run form that stays a stack, and a count is not an estimate,
    so those forms disable the box instead of ignoring it. */
 const DIST_CAPABLE = {
-  stacked: false, denominators: false, days: false, heatmap: false,
+  arrows: false, clade_points: false, breakout_curve: false, breakout_counts: false, breakout_scatter: false, host_burden: false, stacked: false, denominators: false, days: false, heatmap: false,
 };
 
 function distAllowed(plot) {

@@ -4,7 +4,9 @@
    shell calls render_panel3 when a setting it reads changes, and every
    fetch goes through apiGetSlot so a repeat costs nothing.
 
-   The four fixed bar charts became one picked form, settings.plot3.
+   The four fixed bar charts became one picked form, settings.plot3. The
+   line-across-j, three-counts and dot-and-interval forms are gone (v2.5.19);
+   rise against latency is the only one.
 
    Canvas ids carry a p3_ prefix. The shell builds every tab view in ONE
    document (shell.js, `tabs.forEach(viewElement)`), so a bare "c1" resolved to
@@ -18,21 +20,19 @@
 */
 
 const P3_PLOTS = [
-  ["forest", "Dot and interval",
-   "Both metrics as a mean with its bootstrap interval, the five scenarios on "
-   + "one day axis. The standard form for a mean, and it does not imply a zero "
-   + "the way a bar does."],
+  ["breakout_curve", "Breakout curves",
+   "Per scenario, the share of clades that have had their first big sweep, by "
+   + "days since the clade first appeared: standard-born against long-born."],
+  ["breakout_counts", "Cryptic breakouts per simulation",
+   "Per scenario, how many clades per simulation stayed hidden for H days at "
+   + "under f of the population and then swept past F."],
+  ["breakout_scatter", "Hidden time against launch frequency",
+   "One point per breakout: how long the clade was around before its sweep "
+   + "against how rare it was when the sweep began."],
   ["rise_latency", "Rise against latency",
    "One point per scenario: the latent interval on x against the rise time on "
    + "y, each arm that axis's own interval. Puts the waiting time and the "
    + "sweep speed on one pair of axes."],
-  ["across", "Line across j",
-   "Both metrics over the composition classes, one line per scenario with its "
-   + "interval as a ribbon. <i>j</i> is how many of a clade's <i>k</i> defining "
-   + "mutations arose in a long shedder."],
-  ["denominators", "The three counts",
-   "Clades with a rise, clades with a latency, and clades truncated at the "
-   + "burn-in day. Counts of clades, not estimates, so they carry no interval."],
 ];
 
 function rail_panel3(rail) {
@@ -42,15 +42,25 @@ function rail_panel3(rail) {
      cards have to leave the child list too, or a rebuilt rail shows two of
      every control to check_app.js. */
   if (Array.isArray(rail.children)) rail.children.length = 0;
-  rail.append(card("Plot", [
-    pickControl({setting: "plot3", label: "Plot", options: P3_PLOTS}),
-    railDistribution("dist3", settings.plot3),
+  rail.append(card("Plot", [pickControl({setting: "plot3", label: "Form", options: P3_PLOTS}),
+    railDistribution("dist3", settings.plot3)]));
+  if (String(settings.plot3).startsWith("breakout")) rail.append(card("Breakout", [
+    sliderControl({setting: "brkF", label: "Big sweep: peak at least <i>F</i>", values: BRK_F,
+      format: v => fmt(100 * v, 0) + "%",
+      hint: "A clade's breakout is its FIRST episode peaking at or above F of infected hosts."}),
+    sliderControl({setting: "brkH", label: "Cryptic: hidden at least <i>H</i> days", values: BRK_H,
+      format: v => v + " d",
+      hint: "Days from the clade's first appearance to the start of its breakout sweep."}),
+    sliderControl({setting: "brkLo", label: "Cryptic: launched below <i>f</i>", values: BRK_LO,
+      format: v => fmt(100 * v, 2) + "%",
+      hint: "The clade's frequency when the breakout sweep began."}),
   ]));
-  rail.append(railClade());
+  rail.append(railFocus());
+  rail.append(railWindow());
   const r = document.createElement("div");
   r.className = "card";
   r.innerHTML = `<h2>Episode rules</h2><div class="hint">Set on the
-  <a href="frequency.html">Frequency</a> page. Currently
+  <a href="#sweep">Sweep time</a> tab. Currently
   <code>win=${settings.win}d prom=${settings.prom} ${settings.lo}–${settings.hi} ${settings.window}</code>.</div>`;
   rail.append(r);
 }
@@ -66,7 +76,211 @@ function p3_runsBySc(dist, key) {
 
 const p3_classLab = c => c === "wt" ? "wild type" : c === "other" ? "ndef≠k" : c;
 
-async function render_panel3(main, rail){
+/* ------------------------------------------------------------ breakouts */
+
+const BRK_F = [0.01, 0.02, 0.05, 0.1, 0.2];
+const BRK_H = [0, 15, 30, 60, 90, 120, 180];
+const BRK_LO = [0.0001, 0.0003, 0.001, 0.003, 0.01];
+const P3_ORIG = [["std", "standard-born", () => jShade(0)], ["long", "long-born", () => jShade(1)]];
+
+/* Per scenario and origin: one record per clade, and per-simulation counts.
+   The sweep start is clamped at first appearance: an episode's start is the
+   dip before its peak, which for a clade at zero until it appears lands at the
+   start of the run of zeros, up to ~250 days before the clade exists. */
+function p3Breakouts(d) {
+  const F = +settings.brkF, H = +settings.brkH, LO = +settings.brkLo;
+  const out = {};
+  SUB_SCENARIOS.forEach(sc => {
+    const S = {std: {cl: [], runs: []}, long: {cl: [], runs: []}};
+    ((d.scenarios[sc] || {}).runs || []).forEach(r => {
+      const cnt = {std: {n: 0, brk: 0, cry: 0}, long: {n: 0, brk: 0, cry: 0}};
+      r.clades.forEach(([nl, nd, tem, eps]) => {
+        const o = nl > 0 ? "long" : "std", e = eps.find(x => x[1] >= F);
+        const rec = {o, seed: r.seed, nl, nd};
+        cnt[o].n++;
+        if (e) {
+          Object.assign(rec, {ev: 1, t: Math.max(e[0], tem) - tem, clamped: e[0] < tem,
+            launch: Math.max(0, e[1] - e[2]), rise: e[3], top: e[1]});
+          rec.cry = rec.t >= H && rec.launch < LO;
+          cnt[o].brk++; if (rec.cry) cnt[o].cry++;
+        } else Object.assign(rec, {ev: 0, t: Math.max(0, r.end - tem)});
+        S[o].cl.push(rec);
+      });
+      S.std.runs.push(cnt.std); S.long.runs.push(cnt.long);
+    });
+    out[sc] = S;
+  });
+  return out;
+}
+
+/* Kaplan-Meier: share broken out by day t, a clade that never breaks out
+   counting until its simulation ends and no further. */
+function p3KM(cl) {
+  const a = cl.slice().sort((x, y) => x.t - y.t || y.ev - x.ev);
+  let n = a.length, S = 1;
+  const pts = [[0, 0]];
+  for (let i = 0; i < a.length;) {
+    const t = a[i].t; let dd = 0, cc = 0;
+    while (i < a.length && a[i].t === t) { a[i].ev ? dd++ : cc++; i++; }
+    if (dd) { S *= 1 - dd / n; pts.push([t, 100 * (1 - S)]); }
+    n -= dd + cc;
+  }
+  return pts;
+}
+const p3At = (pts, t) => { let v = 0; for (const [x, y] of pts) { if (x > t) break; v = y; } return v; };
+
+/* mean over simulations with a seeded bootstrap interval: the simulation is the unit */
+function p3Boot(vals) {
+  const v = vals.filter(isNum);
+  if (!v.length) return {n: 0, mean: null, lo: null, hi: null};
+  const m = v.reduce((a, b) => a + b, 0) / v.length;
+  let seed = 12345;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const bs = [];
+  for (let b = 0; b < 1000; b++) { let t = 0; for (let i = 0; i < v.length; i++) t += v[Math.floor(rnd() * v.length)]; bs.push(t / v.length); }
+  bs.sort((a, b) => a - b);
+  return {n: v.length, mean: m, lo: bs[24], hi: bs[974]};
+}
+const p3Med = v => { const a = v.filter(isNum).sort((x, y) => x - y);
+  return a.length ? (a.length % 2 ? a[a.length >> 1] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2) : null; };
+
+async function p3RenderBreakout(main, idp, compact) {
+  let d; try { d = await apiGetSlot("/api/panel?n=3b&" + buildQuery()); }
+  catch (e) { main.innerHTML = ""; main.append(errorBox(e.message)); return; }
+  const plot = settings.plot3, B = p3Breakouts(d);
+  const F = +settings.brkF, H = +settings.brkH, LO = +settings.brkLo;
+  const fPct = v => v < 0.01 ? fmt(100 * v, 2) + "%" : fmt(100 * v, 0) + "%";
+  const H_ = compact ? 200 : 240;
+  const sumOf = (sc, o, k) => B[sc][o].runs.reduce((a, r) => a + r[k], 0);
+  const km = {};
+  SUB_SCENARIOS.forEach(sc => P3_ORIG.forEach(([o]) => { km[sc + o] = p3KM(B[sc][o].cl); }));
+  const tmax = Math.ceil(Math.max(100, ...SUB_SCENARIOS.flatMap(sc => P3_ORIG.flatMap(([o]) =>
+    B[sc][o].cl.map(c => c.t)))) / 100) * 100;
+  const rule = `first sweep peaking ≥ ${fPct(F)} · cryptic = hidden ≥ ${H} d and launched < ${fPct(LO)}`;
+
+  const notes = {
+    breakout_curve: sc => P3_ORIG.map(([o, t]) => `${t} ${fmt(p3At(km[sc + o], 1e9), 0)}% ever`).join(" · "),
+    breakout_counts: sc => P3_ORIG.map(([o, t]) => `${t} ${sumOf(sc, o, "cry")}/${sumOf(sc, o, "brk")} cryptic`).join(" · "),
+    breakout_scatter: sc => P3_ORIG.map(([o, t]) => `${t} ${sumOf(sc, o, "cry")}/${sumOf(sc, o, "brk")} cryptic`).join(" · "),
+  };
+  const titles = {
+    breakout_curve: "Share of clades broken out, by days since first appearance",
+    breakout_counts: "Cryptic breakouts per simulation",
+    breakout_scatter: "Hidden time against launch frequency, one point per breakout",
+  };
+  const caps = {
+    breakout_curve: `A clade's <strong>breakout</strong> is its first sweep whose peak
+      reaches ${fPct(F)} of infected hosts. Each curve is the share of clades that have
+      broken out by a given number of days after they first appeared — green for
+      clades whose defining mutations all arose in standard hosts, red for clades
+      with at least one long-born definer. A curve that lags means clades of that
+      origin stay hidden longer; its end height is how many ever break out. A clade
+      that never breaks out counts only until its simulation ends (Kaplan–Meier),
+      so late-appearing clades are not read as failures. Clades pooled over the
+      scenario's simulations. The dashed rule is H = ${H} d.`,
+    breakout_counts: `Per simulation, the number of <strong>cryptic breakouts</strong>:
+      clades that existed for at least ${H} days, were under ${fPct(LO)} of infected
+      hosts when their breakout sweep began, and then peaked at ${fPct(F)} or more.
+      Bars are the mean over simulations with a 95% bootstrap interval over
+      simulations; the label is how many of all breakouts of that origin were
+      cryptic. Long-born clades are more numerous in most scenarios, so read the
+      share as well as the count.`,
+    breakout_scatter: `One point per breakout. x: days from the clade's first
+      appearance to the start of its breakout sweep. y: the clade's frequency when
+      the sweep began, on a log scale (a clade that rose the moment it appeared sits
+      at the floor, 0.001%). The cryptic corner is right of H = ${H} d and below
+      f = ${fPct(LO)}. Hover a point for its simulation and numbers.`,
+  };
+  const scHead = sc => scenarioHead(sc, notes[plot](sc));
+  const tbl = compact ? "" : `<div class="plot"><div class="ph"><h3>Breakouts by origin</h3>
+    <span class="sub">${rule}</span></div>
+    <table class="t"><thead><tr><th>scenario</th><th>origin</th><th>clades</th><th>broke out</th>
+      <th>hidden days, median</th><th>launch frequency, median</th><th>rise days, median</th>
+      <th>cryptic per simulation</th><th>cryptic share of breakouts</th><th>start clamped</th></tr></thead><tbody>
+    ${SUB_SCENARIOS.flatMap(sc => P3_ORIG.map(([o, t]) => {
+      const cl = B[sc][o].cl, ev = cl.filter(c => c.ev), br = sumOf(sc, o, "brk");
+      if (!cl.length) return "";
+      return `<tr><td>${SCENARIO_LABEL[sc]}</td><td>${t}</td><td class="n">${cl.length}</td>
+        <td class="n">${fmt(100 * ev.length / cl.length, 0)}%</td>
+        <td class="n">${fmt(p3Med(ev.map(c => c.t)), 0)}</td>
+        <td class="n">${ev.length ? fPct(p3Med(ev.map(c => c.launch))) : "—"}</td>
+        <td class="n">${fmt(p3Med(ev.map(c => c.rise)), 0)}</td>
+        <td class="n">${ci(p3Boot(B[sc][o].runs.map(r => r.cry)), 2)}</td>
+        <td class="n">${br ? fmt(100 * sumOf(sc, o, "cry") / br, 0) + "%" : "—"}</td>
+        <td class="n">${ev.filter(c => c.clamped).length}</td></tr>`; })).join("")}</tbody></table>
+    <div class="cap"><strong>Start clamped</strong> counts breakouts whose sweep start
+      the build placed before the clade existed — the dip before the peak, for a
+      clade at zero until it appears, lands at the start of its run of zeros. Their
+      start is set to the first appearance, so their hidden time is 0: they rose as
+      soon as they appeared.</div></div>`;
+
+  main.innerHTML = `<div class="note">${rule}. Clades already circulating at the
+    burn-in day are left out: their first appearance is outside the window.</div>
+    <div class="plot"><div class="ph"><h3>${titles[plot]}</h3><span class="sub">k=${settings.k} · m_T=${mtPct(settings.mt)}%</span></div>
+    <div class="scgrid">${SUB_SCENARIOS.map(sc => `<div>${scHead(sc)}<canvas id="${idp}_bo_${sc}"></canvas></div>`).join("")}</div>
+    ${keyRow(P3_ORIG.map(([, t, c]) => [c(), t + " clades"]))}
+    ${compact ? "" : `<div class="cap">${caps[plot]}</div>`}</div>${tbl}`;
+
+  SUB_SCENARIOS.forEach(sc => {
+    const cv = document.getElementById(`${idp}_bo_${sc}`);
+    if (plot === "breakout_curve") {
+      const {g, w, h} = fit(cv, H_);
+      const pad = {l: 46, r: 10, t: 10, b: 34};
+      axes(g, w, h, pad, "days since the clade first appeared", "% of clades broken out", 0, 100, v => v.toFixed(0));
+      const X = t => pad.l + (w - pad.l - pad.r) * t / tmax, Y = v => h - pad.b - (h - pad.b - pad.t) * v / 100;
+      g.fillStyle = css("--ink-3"); g.font = "10px " + css("--f-num"); g.textAlign = "center";
+      for (let t = 0; t <= tmax; t += tmax > 600 ? 200 : 100) g.fillText(String(t), X(t), h - pad.b + 12);
+      g.textAlign = "left";
+      g.strokeStyle = css("--ink-3"); g.setLineDash([4, 3]); g.lineWidth = 1;
+      g.beginPath(); g.moveTo(X(H), pad.t); g.lineTo(X(H), h - pad.b); g.stroke(); g.setLineDash([]);
+      P3_ORIG.forEach(([o, , c]) => {
+        const pts = km[sc + o]; if (pts.length < 2 && !B[sc][o].cl.length) return;
+        g.strokeStyle = c(); g.lineWidth = 2; g.beginPath(); g.moveTo(X(0), Y(0));
+        let yv = 0;
+        pts.forEach(([t, v]) => { g.lineTo(X(t), Y(yv)); g.lineTo(X(t), Y(v)); yv = v; });
+        g.lineTo(X(Math.max(...B[sc][o].cl.map(x => x.t), 0)), Y(yv)); g.stroke();
+      });
+    } else if (plot === "breakout_counts") {
+      const {g, w, h} = fit(cv, H_);
+      const pad = {l: 46, r: 10, t: 16, b: 30};
+      const bs = P3_ORIG.map(([o]) => p3Boot(B[sc][o].runs.map(r => r.cry)));
+      const top = Math.max(1, ...bs.map(b => b.hi ?? b.mean ?? 0)) * 1.15;
+      axes(g, w, h, pad, "", "cryptic breakouts per simulation", 0, top, v => v.toFixed(1));
+      const slot = (w - pad.l - pad.r) / 2, Y = v => h - pad.b - (h - pad.b - pad.t) * v / top;
+      P3_ORIG.forEach(([o, t, c], i) => {
+        const b = bs[i], x = pad.l + slot * (i + 0.5), bw = Math.min(56, slot * 0.5);
+        g.fillStyle = css("--ink-2"); g.font = "600 10px " + css("--f-ui"); g.textAlign = "center";
+        g.fillText(t, x, h - pad.b + 13);
+        if (!isNum(b.mean)) return;
+        g.fillStyle = c(); g.fillRect(x - bw / 2, Y(b.mean), bw, Y(0) - Y(b.mean));
+        if (isNum(b.lo)) { g.strokeStyle = css("--ink"); g.lineWidth = 1.2;
+          g.beginPath(); g.moveTo(x, Y(b.lo)); g.lineTo(x, Y(b.hi)); g.stroke(); }
+        const br = sumOf(sc, o, "brk");
+        g.fillStyle = css("--ink"); g.font = "600 10px " + css("--f-num");
+        g.fillText(`${fmt(b.mean, 2)} · ${br ? fmt(100 * sumOf(sc, o, "cry") / br, 0) : "—"}% of breakouts`, x, Math.max(pad.t + 2, Y(b.hi ?? b.mean) - 5));
+      });
+      g.textAlign = "left";
+    } else {
+      const floor = 1e-5;
+      scatterCI(cv, {height: H_, zero: true, xlim: [0, tmax], ylim: [-5, 0],
+        xlab: "hidden days before the breakout sweep", ylab: "frequency at sweep start",
+        fmtX: v => fmt(v, 0) + " d", fmtY: v => fPct(Math.pow(10, v)),
+        vlines: [{x: H, colour: css("--ink-3"), label: `H ${H} d`}],
+        hlines: [{y: Math.log10(LO), colour: css("--ink-3"), label: `f ${fPct(LO)}`}],
+        groups: P3_ORIG.flatMap(([o, t, c]) => B[sc][o].cl.filter(x => x.ev).map(x => ({
+          colour: c(), fill: c(), stroke: css("--ink-3"), r: 2.4, alpha: 0.6,
+          x: {mean: x.t}, y: {mean: Math.log10(Math.max(floor, x.launch))},
+          tip: {text: `${SCENARIO_LABEL[sc]} · ${x.seed} · ${t} (${x.nl}/${x.nd} long-born)`,
+            math: `hidden      ${fmt(x.t, 0)} d${x.clamped ? " (start clamped)" : ""}\n`
+              + `launched at ${fPct(x.launch)}\npeak        ${fPct(x.top)}\nrise        ${fmt(x.rise, 0)} d`
+              + (x.cry ? "\ncryptic breakout" : "")}}))),
+      });
+    }
+  });
+}
+
+async function render_panel3(main, rail, {idp = "p3", compact = false} = {}){
+  if (String(settings.plot3).startsWith("breakout")) return p3RenderBreakout(main, idp, compact);
 
   let d; try { d = await apiGetSlot("/api/panel?n=3&" + buildQuery()); }
   catch(e){ main.innerHTML=""; main.append(errorBox(e.message +
@@ -92,10 +306,10 @@ async function render_panel3(main, rail){
       <td class="n">${s.n_truncated ?? 0}</td>
       <td class="n">${s.n_censored ?? "—"}</td></tr>`; }).join("");
 
-  const head = `<div class="note">${d.note}</div>`;
+  const head = `<div class="note">${simWords(d.note)}</div>`;
   const table = `
   <div class="plot"><div class="ph"><h3>Summary</h3></div>
-    <table class="t"><thead><tr><th>scenario</th><th>runs</th><th>rise</th>
+    <table class="t"><thead><tr><th>scenario</th><th>simulations</th><th>rise</th>
       <th>clades with a rise</th><th>latency</th><th>clades with a latency</th>
       <th>truncated at burn-in</th><th>still high at the end</th></tr></thead><tbody>${tbl}</tbody></table>
     <div class="cap">The truncation columns are why the two metrics cannot share
@@ -106,135 +320,40 @@ async function render_panel3(main, rail){
       counted; only their peak is a lower bound. A dash means the build predates
       the flag.</div></div>`;
 
-  if (plot === "rise_latency") {
+  {
     const groups = SCENARIOS.map(sc => ({colour: scenarioColour(sc),
       label: SCENARIO_LABEL[sc], x: S(sc).latent_days, y: S(sc).rise_days,
       xruns: p3_runs(dist, sc, "latent_days") || [],
       yruns: p3_runs(dist, sc, "rise_days") || []}));
-    main.innerHTML = head + `
+    const box = `
   <div class="plot"><div class="ph"><h3>Rise time against latent interval</h3>
     <span class="sub">one point per scenario · arms are each axis's own bootstrap CI of the mean</span></div>
-    <canvas id="p3_c1"></canvas>
+    <canvas id="${idp}_c1"></canvas>
     ${scKey}
     <div class="cap"><strong>Measured:</strong> two means per scenario — days
       from first appearance to the start of the sweep on x, days from 10% to 90%
       of that episode's own amplitude on y — each with a bootstrap interval over
-      runs.<br>
+      simulations.<br>
       <strong>Read:</strong> down and to the right would be a clade that waited
       longer <em>and then</em> swept faster, which is what chronic shedding
       predicts: more time inside one host accumulating divergence, then a
       lineage that arrives already fit. That is the reading, not the
       measurement. Five scenarios are five design points, not a trend, and the
       two axes do not share a denominator — x is over clades with a latency,
-      y over clades with a rise (Summary below).</div></div>` + table;
-    scatterCI(document.getElementById("p3_c1"), {groups, points, height: 300,
+      y over clades with a rise (Summary below).</div></div>`;
+    main.innerHTML = compact ? box.replace(/<div class="cap">[\s\S]*?<\/div><\/div>$/, "</div>")
+                             : head + box + table;
+    scatterCI(document.getElementById(idp + "_c1"), {groups, points, height: compact ? 260 : 300,
       xlab: "latent interval (days) · clades with a latency",
       ylab: "rise time (days) · clades with a rise"});
 
-  } else if (plot === "across") {
-    const mk = key => SCENARIOS.map(sc => ({colour: scenarioColour(sc),
-      label: SCENARIO_LABEL[sc],
-      vals: classes.map(c => (S(sc)[key] || {})[c]),
-      runs: distRuns(dist, sc, classes, c => `${key}.${c}`)}));
-    const levels = classes.map(p3_classLab);
-    main.innerHTML = head + `
-  <div class="plot"><div class="ph"><h3>Rise time by composition class</h3>
-    <span class="sub">days from 10% to 90% of the episode's own amplitude</span></div>
-    <canvas id="p3_c1"></canvas>
-    ${scKey}
-    <div class="cap">Classes run 0…${settings.k}, then <strong>ndef≠k</strong>
-      (clades whose defining-mutation count is not <i>k</i>) and
-      <strong>wild type</strong> (the founding clade), the order
-      <code>panels.classes_for</code> defines. A class a scenario never produced
-      has no point and the line breaks there rather than being interpolated
-      across it.</div></div>
-  <div class="plot"><div class="ph"><h3>Latent interval by composition class</h3>
-    <span class="sub">days from first appearance to the start of the sweep</span></div>
-    <canvas id="p3_c2"></canvas>
-    <div class="cap">The waiting time is what chronic shedding would plausibly
-      lengthen: more time inside one host accumulating divergence before the
-      lineage ever competes in the population. Drawn over clades with a latency,
-      a smaller set than the chart above — a truncated clade keeps its rise time
-      and loses its latency.</div></div>` + table;
-    linesOverLevels(document.getElementById("p3_c1"), {levels, points,
-      series: mk("by_class_rise"), ribbon: true, height: 260,
-      xlab: `j long of ${settings.k}`, ylab: "days"});
-    linesOverLevels(document.getElementById("p3_c2"), {levels, points,
-      series: mk("by_class_latent"), ribbon: true, height: 260,
-      xlab: `j long of ${settings.k}`, ylab: "days"});
-
-  } else if (plot === "denominators") {
-    const series = [
-      {colour: css("--accent"), label: "clades with a rise",
-       vals: SCENARIOS.map(sc => S(sc).n_with_rise)},
-      {colour: css("--wt"), label: "clades with a latency",
-       vals: SCENARIOS.map(sc => S(sc).n_with_latency)},
-      {colour: css("--warn"), label: "truncated at the burn-in day",
-       vals: SCENARIOS.map(sc => S(sc).n_truncated)},
-      {colour: css("--ink-3"), label: "still high at the end",
-       vals: SCENARIOS.map(sc => S(sc).n_censored ?? null)},
-    ];
-    main.innerHTML = head + `
-  <div class="plot"><div class="ph"><h3>The four counts</h3>
-    <span class="sub">clades, pooled over the runs of each scenario</span></div>
-    <canvas id="p3_c1"></canvas>
-    ${chartKey(series)}
-    <div class="cap"><strong>Clades with a rise</strong>: clades whose emergence
-      episode yielded a 10–90% rise.
-      <strong>Clades with a latency</strong>: those that also have a measurable
-      wait before that sweep.
-      <strong>Truncated at the burn-in day</strong>: designated clades already
-      under way at the burn-in day, so their first appearance is not in the
-      window — the latency has no start to measure from, and the clade is
-      dropped from the latency only. It keeps its rise time, which is measured
-      inside the episode and needs no origin. That is why the first two counts
-      differ, and why this panel has to state both rather than let one stand in
-      for the other.<br>
-      These are <strong>counts of clades</strong>, not estimates over runs:
-      there is nothing to bootstrap, so no bar carries an interval and the
-      distribution overlay is greyed out. The <i>n</i> behind the two intervals
-      elsewhere on this tab is a count of <strong>runs</strong> (the Summary's
-      runs column), and it differs between the two metrics as well.</div></div>`
-      + table;
-    countBars(document.getElementById("p3_c1"), {cats: scLabs, series,
-      ylab: "clades", height: 260});
-
-  } else {
-    const series = [
-      {colour: css("--accent"), label: "rise time · clades with a rise",
-       vals: SCENARIOS.map(sc => S(sc).rise_days),
-       runs: p3_runsBySc(dist, "rise_days")},
-      {colour: css("--wt"), label: "latent interval · clades with a latency",
-       vals: SCENARIOS.map(sc => S(sc).latent_days),
-       runs: p3_runsBySc(dist, "latent_days")},
-    ];
-    main.innerHTML = head + `
-  <div class="plot"><div class="ph"><h3>Rise time and latent interval</h3>
-    <span class="sub">days · mean over runs, whiskers a bootstrap CI of the mean</span></div>
-    <canvas id="p3_c1"></canvas>
-    ${chartKey(series)}
-    <div class="cap">A day count has no meaningful zero — neither quantity is a
-      share of anything — so the axis does not start at one, and a bar, whose
-      length is read from zero, would imply it did. A dot with its interval puts
-      the difference between two scenarios in the gap between two dots instead
-      of in the difference between two bar lengths.<br>
-      <strong>Rise time</strong> is days from 10% to 90% of the emergence
-      episode's own amplitude. The <strong>latent interval</strong> is days from
-      the clade's first appearance to the start of that sweep — the waiting time
-      is what chronic shedding would plausibly lengthen: more time inside one
-      host accumulating divergence before the lineage ever competes in the
-      population. The two series do not share a denominator: rise is over clades
-      with a rise, latency over clades with a latency, and the Summary below
-      gives both per scenario.</div></div>` + table;
-    dots(document.getElementById("p3_c1"), {cats: scLabs, series, points,
-      ylab: "days", height: 260});
   }
 
 }
 
 
 registerTab({
-  id: "panel3", num: 6, title: "Panel 3", viewId: "viewP3",
+  id: "panel3", group: "figures", num: "5", title: "Rise vs latency", viewId: "viewP3",
   lede: "How long a clade lurked, then how fast it went. The <strong>emergence episode</strong> is the one containing the clade's highest frequency; its rise is measured from the dip immediately before the sweep, which is what makes it the speed of a growth event rather than a disguised lifetime.",
   rail: rail_panel3,
   render: render_panel3,
