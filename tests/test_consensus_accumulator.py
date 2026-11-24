@@ -27,7 +27,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments_pipeline'))
 
 import numpy as np
 

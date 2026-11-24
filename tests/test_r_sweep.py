@@ -31,12 +31,12 @@ Usage on the HPC, from the repo root:
                         fixed regardless of population size)
     --r-values A B C    R values to test                 (default 1.05 1.1)
     --seeds N           seeds per scenario per R         (default 10)
-    --table-exp-num N   frozen table to reuse            (default 3)
-    --exp-num N         experiment number to write under (default 904)
+    --table-stamp N   frozen table to reuse            (default 3)
+    --stamp N         experiment number to write under (default 904)
     --analyse-only      skip the runs, re-print the report
     --sequential        one experiment at a time
 
-Runs land in Data/rtest_<R>_N<pop>_<scenario>_#<exp-num>, so sweeps at
+Runs land in Data/rtest_<R>_N<pop>_<scenario>_#<stamp>, so sweeps at
 different populations never collide. The R=1.03 baseline column comes from run
 #3 at population 1000: completion rates stay comparable across populations,
 absolute counts do not.
@@ -56,7 +56,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments_pipeline'))
 
 import pandas as pd
 
@@ -85,12 +85,12 @@ def exp_name(r, scenario, pop):
 
 # ---------------------------------------------------------------- running
 
-def rows_from_table(table_exp_num):
-    path = frozen_table_path(table_exp_num)
+def rows_from_table(table_stamp):
+    path = frozen_table_path(table_stamp)
     if not os.path.isfile(path):
         raise SystemExit(
             f'No frozen table at {path}.\n'
-            f'Point --table-exp-num at a completed calibration.')
+            f'Point --table-stamp at a completed calibration.')
     df = pd.read_csv(path)
     order = {n: i for i, n in enumerate(SCENARIO_ORDER)}
     rows = [r for _, r in df.iterrows()]
@@ -119,7 +119,7 @@ def with_overrides(builder, extra):
     return make_settings
 
 
-def run_all(rows, r_values, exp_num, runner, n_seeds, parallel, overrides, pop):
+def run_all(rows, r_values, stamp, runner, n_seeds, parallel, overrides, pop):
     jobs = [(r, row) for r in r_values for row in rows]
 
     def one(r, row):
@@ -127,7 +127,7 @@ def run_all(rows, r_values, exp_num, runner, n_seeds, parallel, overrides, pop):
         settings = with_overrides(
             build_exp_scenario_settings(with_r(row, r), n_seeds,
                                         consensus=CONSENSUS), overrides)
-        run_experiment_script(runner, exp_num, settings, name)
+        run_experiment_script(runner, stamp, settings, name)
 
     if runner != 'slurm' or not parallel or len(jobs) == 1:
         for r, row in jobs:
@@ -171,9 +171,9 @@ def run_all(rows, r_values, exp_num, runner, n_seeds, parallel, overrides, pop):
 
 # ---------------------------------------------------------------- measuring
 
-def seed_dirs(name, exp_num):
+def seed_dirs(name, stamp):
     return sorted(glob.glob(
-        f'Data/{name}_#{exp_num}/04_Output/*/seed_*/simulation_trajectory.csv'))
+        f'Data/{name}_#{stamp}/04_Output/*/seed_*/simulation_trajectory.csv'))
 
 
 def measure(paths, pop_size):
@@ -224,24 +224,24 @@ def measure(paths, pop_size):
     return m
 
 
-def task_seconds(name, exp_num):
+def task_seconds(name, stamp):
     '''Per-simulation wall time, from the .started and .completed signal files
     the Slurm runner drops next to each seeded params file. This is the real
     cost of one task, which is what a longer run scales by -- the sweep's own
     wall clock also carries queue wait and the concurrency cap.'''
     out = []
-    experiment = f'{name}_#{exp_num}'
+    experiment = f'{name}_#{stamp}'
     for seconds in repeat_wall_seconds(experiment).values():
         out.extend(seconds)
     return out
 
 
-def by_r_seconds(r_values, exp_num, pop):
+def by_r_seconds(r_values, stamp, pop):
     '''Per-task seconds, kept separate per R. Pooling them hides the thing you
     need: a configuration whose runs die early looks cheap, and the slow
     configuration is the one you would actually commit to.'''
     return {r: [t for s in SCENARIO_ORDER
-                for t in task_seconds(exp_name(r, s, pop), exp_num)]
+                for t in task_seconds(exp_name(r, s, pop), stamp)]
             for r in r_values}
 
 
@@ -295,7 +295,7 @@ def fmt(x, nd=0):
     return '-' if x != x else f'{x:.{nd}f}'
 
 
-def collect(r_values, exp_num, table_exp_num, pop):
+def collect(r_values, stamp, table_stamp, pop):
     '''{(R, scenario): metrics}, with the R=1.03 baseline from run #3. The
     baseline ran at BASELINE_POP, the sweep at pop -- phi is normalised by
     whichever applies.'''
@@ -303,13 +303,13 @@ def collect(r_values, exp_num, table_exp_num, pop):
     base_prefix = exp_name(CONSENSUS)
     for s in SCENARIO_ORDER:
         paths = sorted(glob.glob(
-            f'Data/{base_prefix}_{s}_#{table_exp_num}/04_Output/*/seed_*/'
+            f'Data/{base_prefix}_{s}_#{table_stamp}/04_Output/*/seed_*/'
             f'simulation_trajectory.csv'))
         if paths:
             out[(BASELINE_R, s)] = measure(paths, BASELINE_POP)
     for r in r_values:
         for s in SCENARIO_ORDER:
-            paths = seed_dirs(exp_name(r, s, pop), exp_num)
+            paths = seed_dirs(exp_name(r, s, pop), stamp)
             if paths:
                 out[(r, s)] = measure(paths, pop)
     return out
@@ -317,7 +317,7 @@ def collect(r_values, exp_num, table_exp_num, pop):
 
 # ---------------------------------------------------------------- report
 
-def report(data, r_values, exp_num, table_exp_num, n_seeds, pop, timing=None):
+def report(data, r_values, stamp, table_stamp, n_seeds, pop, timing=None):
     L = []
     w = L.append
     rs = [BASELINE_R] + list(r_values)
@@ -326,7 +326,7 @@ def report(data, r_values, exp_num, table_exp_num, n_seeds, pop, timing=None):
     w('=' * 78)
     w('R SWEEP — does raising R stop the epidemics fizzling out?')
     w('=' * 78)
-    w(f'frozen table      : {frozen_table_path(table_exp_num)}'
+    w(f'frozen table      : {frozen_table_path(table_stamp)}'
       f'  (calibrated at R={BASELINE_R})')
     w(f'consensus         : {CONSENSUS} only')
     w(f'population        : {pop}'
@@ -334,7 +334,7 @@ def report(data, r_values, exp_num, table_exp_num, n_seeds, pop, timing=None):
          else f'   (baseline ran at {BASELINE_POP} — completion is still'
               f' comparable, absolute counts are not)'))
     w(f'R = R_long        : {", ".join(str(r) for r in r_values)}'
-      f'   (baseline R={BASELINE_R}, R_long=1.1 from run #{table_exp_num})')
+      f'   (baseline R={BASELINE_R}, R_long=1.1 from run #{table_stamp})')
     w(f'seeds per scenario: {n_seeds} swept, baseline as run')
     w('')
     w('NOTE: the NSR in the table was fitted at R=1.03 and is wrong for the')
@@ -457,8 +457,8 @@ def report(data, r_values, exp_num, table_exp_num, n_seeds, pop, timing=None):
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--table-exp-num', type=int, default=3)
-    p.add_argument('--exp-num', type=int, default=904)
+    p.add_argument('--table-stamp', type=int, default=3)
+    p.add_argument('--stamp', type=int, default=904)
     p.add_argument('--population-size', type=int, default=BASELINE_POP,
                    help='population for the swept runs (default %(default)s)')
     p.add_argument('--i0', type=int, default=None,
@@ -481,7 +481,7 @@ def main():
     add_slurm_resource_args(p)
     args = p.parse_args()
 
-    table_path, rows = rows_from_table(args.table_exp_num)
+    table_path, rows = rows_from_table(args.table_stamp)
     wall = None
 
     # Initial infected is held at production's absolute value, not scaled with
@@ -500,9 +500,9 @@ def main():
         print(f'[rtest] scenarios  : {[r["scenario_name"] for r in rows]}')
         print(f'[rtest] seeds each : {args.seeds}')
         print(f'[rtest] writing to : '
-              f'Data/rtest_<R>_N{pop}_<scenario>_#{args.exp_num}')
+              f'Data/rtest_<R>_N{pop}_<scenario>_#{args.stamp}')
         t0 = time.monotonic()
-        errors = run_all(rows, args.r_values, args.exp_num, args.runner,
+        errors = run_all(rows, args.r_values, args.stamp, args.runner,
                          args.seeds, parallel=not args.sequential,
                          overrides=overrides, pop=pop)
         wall = time.monotonic() - t0
@@ -510,11 +510,11 @@ def main():
         for r, s, exc in errors:
             print(f'[rtest][FAILED] R={r} {s}: {type(exc).__name__}: {exc}')
 
-    data = collect(args.r_values, args.exp_num, args.table_exp_num, pop)
+    data = collect(args.r_values, args.stamp, args.table_stamp, pop)
     if not data:
         raise SystemExit('No output found to measure. Did the runs complete?')
 
-    by_r = by_r_seconds(args.r_values, args.exp_num, pop)
+    by_r = by_r_seconds(args.r_values, args.stamp, pop)
     per_task = [t for v in by_r.values() for t in v]
     timing = {
         'wall': wall,
@@ -527,11 +527,11 @@ def main():
                            args.project_cal1_tasks, args.project_cal2_tasks),
     }
 
-    text = report(data, args.r_values, args.exp_num, args.table_exp_num,
+    text = report(data, args.r_values, args.stamp, args.table_stamp,
                   args.seeds, pop, timing)
     print('\n' + text)
 
-    out = os.path.join('Data', f'rtest_report_N{pop}_#{args.exp_num}.txt')
+    out = os.path.join('Data', f'rtest_report_N{pop}_#{args.stamp}.txt')
     try:
         os.makedirs('Data', exist_ok=True)
         with open(out, 'w') as fh:

@@ -42,7 +42,7 @@ The two clocks are NOT the same measurement and are not treated alike:
      itself against the shared function row for row.
 
 Run from the repo root:
-    python tests/test_slope_pooling_and_effort.py --exp-num 3
+    python tests/test_slope_pooling_and_effort.py --stamp 3
 """
 import os
 import sys
@@ -53,7 +53,7 @@ import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, os.pardir))
-sys.path.insert(0, os.path.join(HERE, os.pardir, 'scripts', 'experiments'))
+sys.path.insert(0, os.path.join(HERE, os.pardir, 'scripts', 'experiments_pipeline'))
 sys.path.insert(0, HERE)
 
 import simplicity.dir_manager as dm
@@ -209,14 +209,16 @@ def panel_e(experiment, ratio, reps, rng0, scenarios):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--exp-num', type=int, required=True)
+    p.add_argument('--stamp', default='latest')
     p.add_argument('--ratio', type=float, default=0.10)
     p.add_argument('--reps', type=int, default=20)
     p.add_argument('--seed0', type=int, default=9000)
     p.add_argument('--panels', nargs='+', default=['D', 'E'])
     args = p.parse_args()
+    from impact_long_shedders_config import resolve_stamp
+    args.stamp = resolve_stamp(args.stamp, 'impact_long_shedders')
 
-    experiment = f"{cfg.exp_name(cfg.DEFAULT_CONSENSUS)}_#{args.exp_num}"
+    experiment = f"{cfg.exp_name(cfg.DEFAULT_CONSENSUS)}_#{args.stamp}"
     print(f"experiment : {experiment}")
     print(f"ratio      : {args.ratio}   reps per seed: {args.reps}")
 

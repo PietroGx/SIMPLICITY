@@ -39,7 +39,7 @@ TWO READINGS, reported side by side:
              SHAPE of the scatter is compared.
 
 Run from the repo root:
-    python tests/test_kl_root_to_tip.py --exp-num 3
+    python tests/test_kl_root_to_tip.py --stamp 3
 """
 import os
 import sys
@@ -51,7 +51,7 @@ import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, os.pardir))
-sys.path.insert(0, os.path.join(HERE, os.pardir, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.join(HERE, os.pardir, 'figures_gui', 'prep'))
 sys.path.insert(0, HERE)
 
 import simplicity.dir_manager as dm
@@ -87,10 +87,10 @@ def patient_frame():
     return out, res
 
 
-def model_seeds(exp_num):
+def model_seeds(stamp):
     """[(seed, rows)] for the control scenario's standard individuals, with the
     host index attached so a host-level draw is possible."""
-    experiment = f"{EXP_NAME}_#{exp_num}"
+    experiment = f"{EXP_NAME}_#{stamp}"
     out = []
     for sod in dm.get_simulation_output_dirs(experiment, group='exp__control'):
         for ssod in dm.get_seeded_simulation_output_dirs(sod):
@@ -288,7 +288,7 @@ def make_plot(results, path):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--exp-num', type=int, required=True)
+    p.add_argument('--stamp', default='latest')
     p.add_argument('--ratios', type=float, nargs='+', default=[0.10, 0.50, 1.0])
     p.add_argument('--bin-scales', type=float, nargs='+', default=[1.0])
     p.add_argument('--reps', type=int, default=2)
@@ -296,9 +296,11 @@ def main():
     p.add_argument('--json-out', default='')
     p.add_argument('--plot-out', default='')
     args = p.parse_args()
+    from _scenarios import resolve_stamp
+    args.stamp = resolve_stamp(args.stamp, 'impact_long_shedders')
 
     pat, res = patient_frame()
-    seeds = model_seeds(args.exp_num)
+    seeds = model_seeds(args.stamp)
     if not seeds:
         raise SystemExit("no model seeds")
 

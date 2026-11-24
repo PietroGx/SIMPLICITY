@@ -117,7 +117,7 @@ def get_clustering_for_ssod(
     # 'clade' as a COLUMN, so the indexed frame raised KeyError('clade') on
     # every call and the bare handler turned that into no labels at all.
     # Definer-less NON-root clades are withheld from the vote, as
-    # tests/export_fig2_builder.py and tests/studio/compute.py do -- at low k
+    # the retired tests/export_fig2_builder.py and figures_gui/compute.py do -- at low k
     # the function refuses them by design and they carry n_defining = 0. Every
     # other refusal, an unknown host_type above all, propagates.
     par_of = dict(zip(clade_meta_df["clade"], clade_meta_df["parent_clade"]))
@@ -225,8 +225,8 @@ def transmission_floor(individuals_df, min_tx_frac):
 def normalise_host_type(h):
     """Host type as one of "long" or "standard".
 
-    Was written four times -- _host_of in tests/export_fig2_builder.py,
-    _is_long in tests/studio/compute.py, _norm_host inside the clade builder,
+    Was written four times -- _host_of in the retired tests/export_fig2_builder.py,
+    _is_long in figures_gui/compute.py, _norm_host inside the clade builder,
     and inline in the browser. Every copy tested the same "long" prefix, which
     is the only thing that makes them agree; this is the one that is allowed to
     change.
@@ -363,7 +363,7 @@ def clade_max_divergence(member_lineages, root_lineage, lin2mut):
     """Mutations between the clade's furthest member and its own root.
 
     A bound, so it is the clade's worst case, not its typical one. Derived
-    independently in tests/export_fig2_builder.py and tests/studio/compute.py
+    independently in the retired tests/export_fig2_builder.py and figures_gui/compute.py
     before this.
     """
     rmut = lin2mut.get(root_lineage, frozenset())

@@ -21,7 +21,7 @@ shape; the KL is computed on the histograms, never on them.
 Everything upstream of the plot -- loading, coverage filter, time-matching --
 is imported from test_kl_root_to_tip so the panel cannot drift from the number.
 
-    python tests/plot_kl_distributions.py --exp-num 1 --out kl_panel.png
+    python tests/plot_kl_distributions.py --stamp 1 --out kl_panel.png
 """
 import argparse
 import os
@@ -71,7 +71,7 @@ def kde(values, grid, lattice=None):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--exp-num', type=int, required=True)
+    p.add_argument('--stamp', default='latest')
     p.add_argument('--out', required=True)
     p.add_argument('--xmax', type=float, default=4.5,
                    help="x limit in substitutions per 1000 sites")
@@ -82,13 +82,15 @@ def main():
     p.add_argument('--rng-seed', type=int, default=4242)
     p.add_argument('--no-kde', action='store_true')
     args = p.parse_args()
+    from _scenarios import resolve_stamp
+    args.stamp = resolve_stamp(args.stamp, 'impact_long_shedders')
 
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
     pat, res = K.patient_frame()
-    seeds = K.model_seeds(args.exp_num)
+    seeds = K.model_seeds(args.stamp)
     if not seeds:
         raise SystemExit("no model seeds")
 

@@ -45,7 +45,7 @@ from pathlib import Path
 # skip: the file is absent/unreadable, or its content is empty/truncated.
 # Anything structural -- a missing column, a type error -- is a defect of this
 # code and must propagate. Mirrors
-# scripts/experiments/long_nsr_calibration_plot.EXPECTED_SEED_SKIPS; a library
+# scripts/experiments_pipeline/long_nsr_calibration_plot.EXPECTED_SEED_SKIPS; a library
 # cannot import a script, so the tuple is repeated rather than imported.
 EXPECTED_READ_SKIPS = (OSError,
                        pd.errors.EmptyDataError,

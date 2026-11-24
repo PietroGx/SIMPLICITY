@@ -7,7 +7,7 @@ byte breakdown, extrande event counters and sampled call stacks, and this script
 pools them per cell and prints what moved.
 
     cd ~/SIMPLICITY && git pull
-    python tests/test_profile_grid.py --runner slurm --seeds 10 --exp-num 910
+    python tests/test_profile_grid.py --runner slurm --seeds 10 --stamp 910
 
     # one knob at a time
     python tests/test_profile_grid.py --populations 1000 5000 --consensus distribution
@@ -58,7 +58,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments_pipeline'))
 
 import pandas as pd
 
@@ -127,8 +127,8 @@ def p95(values):
 
 # ---------------------------------------------------------------- building
 
-def rows_from_table(table_exp_num):
-    path = frozen_table_path(table_exp_num)
+def rows_from_table(table_stamp):
+    path = frozen_table_path(table_stamp)
     if not os.path.isfile(path):
         raise SystemExit(f'No frozen table at {path}.')
     frame = pd.read_csv(path)
@@ -245,7 +245,7 @@ def enable_profiling(profile_dir, interval, stack_interval, tracemalloc):
     return profile_dir
 
 
-def run_grid(rows, cells, exp_num, runner, n_seeds, max_array_tasks, r,
+def run_grid(rows, cells, stamp, runner, n_seeds, max_array_tasks, r,
              i0_fraction):
     groups, base_fixed = build_groups(rows, cells, n_seeds, r, i0_fraction)
     chunks = chunk_groups(groups, n_seeds, max_array_tasks)
@@ -257,25 +257,25 @@ def run_grid(rows, cells, exp_num, runner, n_seeds, max_array_tasks, r,
 
         print(f'[profile] --- {name}: {len(chunk)} groups, '
               f'{len(chunk) * n_seeds} tasks ---')
-        run_experiment_script(runner, exp_num, make_settings, name)
+        run_experiment_script(runner, stamp, make_settings, name)
 
 
 # ---------------------------------------------------------------- collecting
 
-def experiment_names(exp_num):
-    names = [f'{GRID_EXP_NAME}_#{exp_num}']
+def experiment_names(stamp):
+    names = [f'{GRID_EXP_NAME}_#{stamp}']
     names += sorted(os.path.basename(path) for path in
-                    glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{exp_num}'))
+                    glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{stamp}'))
     return [name for name in names if os.path.isdir(os.path.join('Data', name))]
 
 
-def seeds_on_disk(exp_num, fallback):
+def seeds_on_disk(stamp, fallback):
     """The seed count the grid was RUN with, read from the experiment rather
     than from --seeds, which has its own default under --analyse-only."""
     for name in ([GRID_EXP_NAME]
                  + [f'{GRID_EXP_NAME}_part{i}' for i in range(1, 100)]):
         try:
-            return int(sm.read_n_seeds_file(f'{name}_#{exp_num}')['n_seeds'])
+            return int(sm.read_n_seeds_file(f'{name}_#{stamp}')['n_seeds'])
         except (OSError, KeyError, ValueError):
             continue
     return fallback
@@ -292,12 +292,12 @@ def repeat_key(group, record):
     return f"{group}/{record['stem']}/seed_{record['seed']:04d}"
 
 
-def task_cells(exp_num, rows):
+def task_cells(stamp, rows):
     '''repeat_key -> (cell, scenario), from the parameters file each simulation
     actually wrote.'''
     lookup = scenario_lookup(rows)
     out = {}
-    for name in experiment_names(exp_num):
+    for name in experiment_names(stamp):
         for params_file in glob.glob(
                 f'Data/{name}/{dm.SIMULATIONS_DIRNAME}/*.json'):
             try:
@@ -327,12 +327,12 @@ def _repeats(experiment):
         return []
 
 
-def task_wall_seconds(exp_num):
+def task_wall_seconds(stamp):
     '''Per-repeat seconds, from its state record (updated - started). Covers
     repeats whose profile is missing, so completion and cost can be reported
     even where the profiler wrote nothing.'''
     out = {}
-    for name in experiment_names(exp_num):
+    for name in experiment_names(stamp):
         for group, record in _repeats(name):
             seconds = jobs.wall_seconds(name, group, record['index'])
             if seconds is not None:
@@ -340,9 +340,9 @@ def task_wall_seconds(exp_num):
     return out
 
 
-def signal_counts(exp_num):
+def signal_counts(stamp):
     started = completed = failed = total = 0
-    for name in experiment_names(exp_num):
+    for name in experiment_names(stamp):
         repeats = _repeats(name)
         total += len(repeats)
         counts = jobs.count_states(name) if repeats else {}
@@ -356,17 +356,17 @@ def signal_counts(exp_num):
             'failed': failed}
 
 
-def attach_cells(tasks, exp_num, rows):
+def attach_cells(tasks, stamp, rows):
     '''Give every profile its cell and scenario, through the slurm id map that
     slurm.job() writes under the same job/task ids the profile is named by.'''
-    mapping = task_cells(exp_num, rows)
-    walls = task_wall_seconds(exp_num)
+    mapping = task_cells(stamp, rows)
+    walls = task_wall_seconds(stamp)
     for task in tasks:
         task['cell'] = None
         task['scenario'] = None
         task['wall_signal'] = None
         found = None
-        for name in experiment_names(exp_num):
+        for name in experiment_names(stamp):
             candidate = os.path.join('Data', name, 'slurm', 'job_id_mapping',
                                      f"{name}_{task['tag']}.csv")
             if os.path.isfile(candidate):
@@ -431,12 +431,12 @@ def task_metrics(task):
 
 # ---------------------------------------------------------------- reporting
 
-def section_header(exp_num, table_path, seeds, cells, counts, profiled, traced):
+def section_header(stamp, table_path, seeds, cells, counts, profiled, traced):
     rule('=')
     print('MEMORY AND CPU PROFILE GRID')
     rule('=')
     print(f'frozen table : {table_path}')
-    print(f'experiment   : {GRID_EXP_NAME}_#{exp_num}')
+    print(f'experiment   : {GRID_EXP_NAME}_#{stamp}')
     print(f'seeds        : {seeds} per scenario per cell')
     print(f'cells        : {len(cells)}   (population x consensus x horizon)')
     print()
@@ -706,8 +706,8 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--table-exp-num', type=int, default=3)
-    parser.add_argument('--exp-num', type=int, default=910)
+    parser.add_argument('--table-stamp', type=int, default=3)
+    parser.add_argument('--stamp', type=int, default=910)
     parser.add_argument('--populations', type=int, nargs='+',
                         default=[1000, 2500, 5000])
     parser.add_argument('--consensus', nargs='+', default=['distribution'],
@@ -744,12 +744,12 @@ def main():
                              'timings from the untraced tasks.')
     parser.add_argument('--profile-dir', default=None,
                         help='where tasks write profiles (default '
-                             'Data/profiles_#<exp-num>, which Data/* already '
+                             'Data/profiles_#<stamp>, which Data/* already '
                              'gitignores)')
     add_slurm_resource_args(parser)
     args = parser.parse_args()
 
-    table_path, all_rows = rows_from_table(args.table_exp_num)
+    table_path, all_rows = rows_from_table(args.table_stamp)
     if args.scenarios == ['all']:
         rows = all_rows
     else:
@@ -764,7 +764,7 @@ def main():
 
     cells = build_cells(args.populations, args.consensus, args.final_times)
     profile_dir = args.profile_dir or os.path.join(
-        'Data', f'profiles_#{args.exp_num}')
+        'Data', f'profiles_#{args.stamp}')
 
     if not args.analyse_only:
         if args.runner != 'slurm' and not _PRESET:
@@ -814,27 +814,27 @@ def main():
             else:
                 print(f'[profile] MaxArraySize: {limit}, each array fits')
         start = time.monotonic()
-        run_grid(rows, cells, args.exp_num, args.runner, args.seeds,
+        run_grid(rows, cells, args.stamp, args.runner, args.seeds,
                  args.max_array_tasks, args.r, args.i0_fraction)
         print(f'[profile] wall clock : {hms(time.monotonic() - start)}')
 
     if not os.path.isdir(profile_dir):
         raise SystemExit(f'No profiles at {profile_dir}. '
                          f'Pass --profile-dir if they went elsewhere.')
-    tasks = attach_cells(load(profile_dir), args.exp_num, all_rows)
+    tasks = attach_cells(load(profile_dir), args.stamp, all_rows)
     metrics = [task_metrics(task) for task in tasks]
-    counts = signal_counts(args.exp_num)
-    seeds = seeds_on_disk(args.exp_num, args.seeds)
+    counts = signal_counts(args.stamp)
+    seeds = seeds_on_disk(args.stamp, args.seeds)
 
-    out_path = os.path.join('Data', f'profile_grid_report_{args.exp_num}.txt')
-    csv_path = os.path.join('Data', f'profile_grid_tasks_{args.exp_num}.csv')
+    out_path = os.path.join('Data', f'profile_grid_report_{args.stamp}.txt')
+    csv_path = os.path.join('Data', f'profile_grid_tasks_{args.stamp}.csv')
 
     import io
     buffer = io.StringIO()
     stdout = sys.stdout
     sys.stdout = buffer
     try:
-        section_header(args.exp_num, table_path, seeds, cells, counts,
+        section_header(args.stamp, table_path, seeds, cells, counts,
                        len(tasks), sum(1 for t in tasks if t['allocs']))
         if tasks:
             section_cost(metrics, cells)

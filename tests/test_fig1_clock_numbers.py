@@ -12,7 +12,7 @@ so a number here cannot drift from the number in the figure. Nothing is
 re-derived; in particular the intra-host clock still comes from
 evolutionary_rate.extract_ih_regression_data via the preprocessor.
 
-    python tests/test_fig1_clock_numbers.py --exp-num 1
+    python tests/test_fig1_clock_numbers.py --stamp 1
 """
 import argparse
 import os
@@ -22,7 +22,7 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-sys.path.insert(0, os.path.join(ROOT, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.join(ROOT, 'figures_gui', 'prep'))
 
 import fig1_preprocess_data as preproc          # noqa: E402
 import fig1_plots as plots                      # noqa: E402
@@ -77,9 +77,11 @@ def patient_rate(df, xcol, ycol):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--exp-num', type=int, required=True)
+    p.add_argument('--stamp', default='latest')
     p.add_argument('--exp-name', default=EXP_NAME)
     args = p.parse_args()
+    from _scenarios import resolve_stamp
+    args.stamp = resolve_stamp(args.stamp, args.exp_name)
 
     df_real_std, df_real_long = preproc.get_patient_clock_data()
 
@@ -87,7 +89,7 @@ def main():
     pr, pr2, pn = patient_rate(df_real_std, 'days_since_ref',
                                'hamming_per_overlap')
     print(f"  patient      n={pn}  {pr:.6f} s/s/y (R2={pr2:.3f})")
-    g = preproc.get_model_global_clock(exp_num=args.exp_num,
+    g = preproc.get_model_global_clock(stamp=args.stamp,
                                        exp_name=args.exp_name)
     for cohort in sorted(set(g.get('cohort', []))):
         report(cohort, g[g['cohort'] == cohort], pr)
@@ -96,7 +98,7 @@ def main():
     pr, pr2, pn = patient_rate(df_real_long, 'time_point',
                                'hamming_distance_per_overlap')
     print(f"  patient      n={pn}  {pr:.6f} s/s/y (R2={pr2:.3f})")
-    ih = preproc.get_model_intrahost_clock(exp_num=args.exp_num,
+    ih = preproc.get_model_intrahost_clock(stamp=args.stamp,
                                     exp_name=args.exp_name)
     for cohort in sorted(set(ih.get('cohort', []))):
         report(cohort, ih[ih['cohort'] == cohort], pr)

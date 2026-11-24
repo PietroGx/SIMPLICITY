@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# This file is part of SIMPLICITY
+# Copyright (C) 2025 Pietro Gerletti
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ============================================================================
+# impact_long_shedders -- STAGE 1: LONG SHEDDERS ALONE
+# ----------------------------------------------------------------------------
+# 100% long-shedder population, sweeps NSR_long, fits each seed's intra-host
+# clock and inverts at target_osr_long. Same measurement as the bound
+# pipeline's cal_1 -- it calls the same plot_and_fit_long_nsr_calibration, so
+# the two can never disagree about what the intra-host clock is.
+#
+# Independent of stage 2: nothing here reads or waits for the standard side.
+#
+# Runs things; builds nothing. Parameter construction lives in
+# impact_long_shedders_config.build_cal1_settings.
+# ============================================================================
+
+import argparse
+
+import simplicity.dir_manager as dm
+
+from experiment_script_runner import run_experiment_phase_script
+from impact_long_shedders_config import (
+    SETTINGS, check_stamp,
+    SCENARIOS, EXP_NAME, NSR_RANGES, CAL1_FINAL_TIME,
+    CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS,
+    build_cal1_settings, CONSENSUS_MODES, DEFAULT_CONSENSUS,
+    add_slurm_resource_args, set_slurm_resource_env,
+    set_calibration_output_env,
+    print_fixed_params,
+)
+from long_nsr_calibration_plot import plot_and_fit_long_nsr_calibration
+
+
+def run_long_calibration(stamp, runner, seeds, target_osr_long, R,
+                         ih_virus_emergence_rate, model_type='exp',
+                         min_seq=30, min_len=100,
+                         consensus=DEFAULT_CONSENSUS):
+    print("\n=========================================================")
+    print(f" STAGE 1: LONG SHEDDERS ALONE "
+         f"(R={R}, R_long per SCENARIOS, 100% LS, "
+         f"k_v={ih_virus_emergence_rate}, final_time={CAL1_FINAL_TIME}, "
+         f"consensus={consensus})")
+    print("=========================================================\n")
+
+    ranges = NSR_RANGES['cal_long']
+    settings_func = build_cal1_settings(
+        seeds, ranges, R=R, ih_virus_emergence_rate=ih_virus_emergence_rate,
+        consensus=consensus)
+
+    varying_params, fixed_params, n_seeds = settings_func()
+    print_fixed_params(fixed_params)
+    print(f"Seeds per grid point: {n_seeds}")
+    print("Per (tau_3_long, R_long) group:")
+    for g in varying_params['_scenario_groups']:
+        nsr_vals = g['nucleotide_substitution_rate_long']
+        print(f"  tau_3_long={g['tau_3_long']:7.2f}  R_long={g['R_long']:7.4f}  "
+             f"NSR_long grid: {len(nsr_vals)} pts "
+             f"[{min(nsr_vals):.6f} .. {max(nsr_vals):.6f}]")
+
+    numbered = f"{EXP_NAME}_#{stamp}"
+    # Idempotent, and the stage can be run standalone: whoever gets here
+    # first records the start, and a sealed experiment is refused here rather
+    # than after its simulations have run.
+    dm.mark_experiment_started(numbered)
+    print(f"\nDispatching the long-calibration phase of {numbered} to "
+          f"{runner}...")
+    # append=False: cal_1 is the FIRST phase of a run, so it writes the
+    # experiment rather than adding to one. Re-running it against an existing
+    # experiment is what --skip-cal1 is for.
+    groups = run_experiment_phase_script(runner, stamp, settings_func,
+                                         EXP_NAME, append=False)
+
+    print(f"\n[Plot] Fitting + plotting long-NSR calibration for {numbered}...")
+    # the groups THIS phase just ran: the experiment also holds the other
+    # phases' groups, and every one of them carries a tau_3_long/R_long the
+    # fit would otherwise read as another cohort
+    plot_and_fit_long_nsr_calibration(numbered, target_osr_long,
+                                      model_type=model_type,
+                                      min_seq=min_seq, min_len=min_len,
+                                      groups=groups)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Stage 1: calibrate NSR_long in a 100% "
+                    "long-shedder population.")
+    parser.add_argument('--stamp', type=check_stamp, required=True)
+    parser.add_argument('--runner', type=str,
+                        choices=['serial', 'multiprocessing', 'slurm'], default='slurm')
+    parser.add_argument('--seeds', type=int, default=SETTINGS['seeds']['cal'])
+    parser.add_argument('--target-osr-long', type=float,
+                        default=SETTINGS['targets']['osr_long'])
+    parser.add_argument('--R', type=float, default=CAL1_ISOLATED_FIXED_PARAMS['R'])
+    parser.add_argument('--ih-virus-emergence-rate', type=float,
+                        default=USER_FIXED_PARAMS['IH_virus_emergence_rate'])
+    parser.add_argument('--model', type=str, default='exp',
+                        choices=['lin', 'log', 'exp', 'tan'])
+    parser.add_argument('--min-seq', type=int, default=30)
+    parser.add_argument('--min-len', type=int, default=100)
+    parser.add_argument('--consensus', type=str, choices=list(CONSENSUS_MODES),
+                        default=SETTINGS['consensus'],
+                        help=f"Consensus mode to CALIBRATE under (default: "
+                            f"{SETTINGS['consensus']}). Must match the mode the "
+                            f"experiment phase will run, or these rates do "
+                            f"not transfer.")
+    add_slurm_resource_args(parser)
+    args = parser.parse_args()
+
+    set_slurm_resource_env(args.slurm_mem, args.slurm_time)
+    # calibration reads four files; do not write the other three
+    set_calibration_output_env()
+    run_long_calibration(args.stamp, args.runner, args.seeds,
+                         args.target_osr_long, args.R,
+                         args.ih_virus_emergence_rate, args.model,
+                         args.min_seq, args.min_len, args.consensus)
+
+
+if __name__ == "__main__":
+    main()

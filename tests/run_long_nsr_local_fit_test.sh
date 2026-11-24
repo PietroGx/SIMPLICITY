@@ -101,13 +101,13 @@
 # orchestrator job.
 #
 # Usage, from the repo root:
-#   bash tests/run_long_nsr_local_fit_test.sh --exp-num 1 --check-only
-#   bash tests/run_long_nsr_local_fit_test.sh --exp-num 1
-#   bash tests/run_long_nsr_local_fit_test.sh --exp-num 1 --yes
-#   bash tests/run_long_nsr_local_fit_test.sh --exp-num 1 --seeds 50 --steps 7
-#   bash tests/run_long_nsr_local_fit_test.sh --exp-num 1 --scenario edge_case
-#   bash tests/run_long_nsr_local_fit_test.sh --exp-num 1,2,3 --scenario all
-#   bash tests/run_long_nsr_local_fit_test.sh --exp-num 1 --workers 2
+#   bash tests/run_long_nsr_local_fit_test.sh --stamp 1 --check-only
+#   bash tests/run_long_nsr_local_fit_test.sh --stamp 1
+#   bash tests/run_long_nsr_local_fit_test.sh --stamp 1 --yes
+#   bash tests/run_long_nsr_local_fit_test.sh --stamp 1 --seeds 50 --steps 7
+#   bash tests/run_long_nsr_local_fit_test.sh --stamp 1 --scenario edge_case
+#   bash tests/run_long_nsr_local_fit_test.sh --stamp 1,2,3 --scenario all
+#   bash tests/run_long_nsr_local_fit_test.sh --stamp 1 --workers 2
 #
 # --check-only runs every gate AND rehearses both phases of every cohort with
 # the dispatch stubbed out, printing the exact grids and fixed params that
@@ -150,7 +150,7 @@ set -eo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-EXP_NUMS=""
+STAMPS=""
 SEEDS=30
 STEPS=6
 SPAN=1.5
@@ -174,7 +174,7 @@ SIM_TIME="${SIMPLICITY_SLURM_TIME:-}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --exp-num)     EXP_NUMS="$2"; shift ;;
+        --stamp)     STAMPS="$2"; shift ;;
         --seeds)       SEEDS="$2"; shift ;;
         --steps)       STEPS="$2"; shift ;;
         --span)        SPAN="$2"; shift ;;
@@ -212,7 +212,7 @@ resolve_python
 
 # the one threshold, read from the module that applies it -- never a second copy
 MIN_SEP=$("$PY" -c "import sys
-sys.path[:0] = ['.', 'tests', 'scripts/experiments']
+sys.path[:0] = ['.', 'tests', 'scripts/experiments_pipeline']
 import analyze_long_nsr_local_fit as la
 print(f'{la.MIN_SEPARATION_SEM:g}')")
 
@@ -227,7 +227,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-sys.path[:0] = ['.', 'tests', 'scripts/experiments']
+sys.path[:0] = ['.', 'tests', 'scripts/experiments_pipeline']
 
 import simplicity.runners.serial
 import simplicity.runners.multiprocessing
@@ -476,7 +476,7 @@ def at_value(df, nsr):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--exp-num', type=int, default=None)
+    p.add_argument('--stamp', type=int, default=None)
     p.add_argument('--seeds', type=int, default=30)
     p.add_argument('--steps', type=int, default=6)
     p.add_argument('--span', type=float, default=1.5)
@@ -501,15 +501,15 @@ def main():
         for c in cohorts(sp):
             print(c['cohort'])
         return 0
-    if args.exp_num is None:
-        raise SystemExit("--exp-num is required")
+    if args.stamp is None:
+        raise SystemExit("--stamp is required")
 
     # calibration reads four files; do not write the other three
     set_calibration_output_env()
     # per-SIMULATION resources, like every stage script's two flags; the
     # orchestrator job's own --time/--mem are set in the shell around this.
     set_slurm_resource_env(args.slurm_mem, args.slurm_time)
-    numbered = f'{EXP_NAME}_#{args.exp_num}'
+    numbered = f'{EXP_NAME}_#{args.stamp}'
 
     cohort = resolve_cohort(args.scenario, sp)
     tau_3_long, r_long = cohort['pair']
@@ -849,7 +849,7 @@ PYEOF
 
 # ============================== the submitted job ===========================
 # One cohort per job: the re-exec below and the sbatch wrap both name a single
-# cohort and a single --exp-num, so this branch never sees 'all'.
+# cohort and a single --stamp, so this branch never sees 'all'.
 if [ -n "${SIMPLICITY_LOCALFIT_JOB:-}" ]; then
     if [ "$SCENARIO" = "all" ]; then
         echo "internal error: a job was given --scenario all" >&2; exit 2
@@ -859,7 +859,7 @@ if [ -n "${SIMPLICITY_LOCALFIT_JOB:-}" ]; then
     echo "started     : $(date -Is)"
     # 'rc=$?' on its own line never runs under set -e: a failing driver would
     # take the script with it and the finish line would not print.
-    if driver --exp-num "$EXP_NUMS" --scenario "$SCENARIO" "${OPT_ARGS[@]}"
+    if driver --stamp "$STAMPS" --scenario "$SCENARIO" "${OPT_ARGS[@]}"
     then
         rc=0
     else
@@ -877,7 +877,7 @@ else
     COHORT_LIST="$SCENARIO"
 fi
 mapfile -t COHORTS < <(printf '%s\n' "$COHORT_LIST")
-IFS=',' read -r -a EXP_NUM_ARR <<< "$EXP_NUMS"
+IFS=',' read -r -a STAMP_ARR <<< "$STAMPS"
 
 # ================================== checks ==================================
 echo
@@ -894,33 +894,33 @@ note "repo root" "$ROOT"
 
 note "cohorts" "${#COHORTS[@]}: ${COHORTS[*]}"
 
-# ONE --exp-num PER COHORT. Each cohort is its own experiment because phase 1
+# ONE --stamp PER COHORT. Each cohort is its own experiment because phase 1
 # dispatches with append=False, which rewrites the experiment from simulation
 # id 0: cohorts sharing a number would make the first one wipe the others, and
 # re-running a single cohort would have to append into an experiment that
 # already carries state -- which write_repeats refuses. Separate numbers keep
 # each cohort independently re-runnable and keep the gate below meaningful per
 # cohort. The script still picks no number: a local Data/ is not the cluster's.
-if [ -z "$EXP_NUMS" ]; then
-    bad "--exp-num" "MISSING -- you choose it; this script will not"
+if [ -z "$STAMPS" ]; then
+    bad "--stamp" "MISSING -- you choose it; this script will not"
     echo "      A local Data/ is not the cluster's Data/, so nothing here can"
-    echo "      know which experiment numbers are free. Pass --exp-num N"
-    echo "      (one per cohort, comma-separated: --exp-num 1,2,3)."
-elif [ "${#EXP_NUM_ARR[@]}" -ne "${#COHORTS[@]}" ]; then
-    bad "--exp-num" "${#EXP_NUM_ARR[@]} given, ${#COHORTS[@]} cohorts to run"
-    echo "      One experiment per cohort. Pass --exp-num with"
+    echo "      know which experiment numbers are free. Pass --stamp N"
+    echo "      (one per cohort, comma-separated: --stamp 1,2,3)."
+elif [ "${#STAMP_ARR[@]}" -ne "${#COHORTS[@]}" ]; then
+    bad "--stamp" "${#STAMP_ARR[@]} given, ${#COHORTS[@]} cohorts to run"
+    echo "      One experiment per cohort. Pass --stamp with"
     echo "      ${#COHORTS[@]} comma-separated numbers, one for each of:"
     echo "      ${COHORTS[*]}"
-elif [ "$(printf '%s\n' "${EXP_NUM_ARR[@]}" | sort -u | wc -l)" \
-       -ne "${#EXP_NUM_ARR[@]}" ]; then
-    bad "--exp-num" "repeated: $EXP_NUMS"
+elif [ "$(printf '%s\n' "${STAMP_ARR[@]}" | sort -u | wc -l)" \
+       -ne "${#STAMP_ARR[@]}" ]; then
+    bad "--stamp" "repeated: $STAMPS"
     echo "      One experiment per cohort means one NUMBER per cohort;"
     echo "      a repeat would make one cohort overwrite another."
-elif printf '%s\n' "${EXP_NUM_ARR[@]}" | grep -qv '^[0-9][0-9]*$'; then
-    bad "--exp-num" "not all integers: $EXP_NUMS"
+elif printf '%s\n' "${STAMP_ARR[@]}" | grep -qv '^[0-9][0-9]*$'; then
+    bad "--stamp" "not all integers: $STAMPS"
 else
     for i in "${!COHORTS[@]}"; do
-        note "experiment" "test_long_nsr_local_fit_#${EXP_NUM_ARR[$i]}  (${COHORTS[$i]})"
+        note "experiment" "test_long_nsr_local_fit_#${STAMP_ARR[$i]}  (${COHORTS[$i]})"
     done
 fi
 
@@ -931,7 +931,7 @@ esac
 # Nothing may be appended to an experiment that already exists: phase 1 writes
 # it from scratch (append=False) and would renumber a group that already
 # carries state.
-if [ -n "$EXP_NUMS" ] && [ "${#EXP_NUM_ARR[@]}" -eq "${#COHORTS[@]}" ]; then
+if [ -n "$STAMPS" ] && [ "${#STAMP_ARR[@]}" -eq "${#COHORTS[@]}" ]; then
     DATA_DIR=$("$PY" -I -c "
 import sys; sys.path.insert(0, '.')
 import simplicity.dir_manager as dm
@@ -941,11 +941,11 @@ print(dm.get_data_dir())" 2>/dev/null) || DATA_DIR=""
     else
         # Not dm.get_experiment_dir: that raises unless the directory is
         # already there, which is the case this is checking for.
-        for n in "${EXP_NUM_ARR[@]}"; do
+        for n in "${STAMP_ARR[@]}"; do
             EXP_DIR="$DATA_DIR/test_long_nsr_local_fit_#$n"
             if [ -d "$EXP_DIR" ]; then
                 bad "experiment number free" "ALREADY EXISTS: $EXP_DIR"
-                echo "      Pick another --exp-num, or move that directory aside."
+                echo "      Pick another --stamp, or move that directory aside."
             else
                 note "experiment number free" "yes (no $EXP_DIR)"
             fi
@@ -1008,7 +1008,7 @@ if [ "$fail" -eq 0 ]; then
     for i in "${!COHORTS[@]}"; do
         echo
         echo "------- rehearsal (dispatch stubbed): ${COHORTS[$i]} -------"
-        if out=$(driver --exp-num "${EXP_NUM_ARR[$i]}" \
+        if out=$(driver --stamp "${STAMP_ARR[$i]}" \
                         --scenario "${COHORTS[$i]}" "${OPT_ARGS[@]}" --rehearse \
                         2>&1); then
             echo "$out"
@@ -1063,19 +1063,19 @@ fi
 # One cohort per invocation, whichever way it runs: the cohorts are independent
 # and each one's phase 2 depends only on its own phase 1.
 mkdir -p Data/test_logs
-STAMP="$(date +%Y%m%d_%H%M%S)"
+LOG_TIME="$(date +%Y%m%d_%H%M%S)"
 
 if [ "$RUNNER" != "slurm" ]; then
     echo
     echo "  runner=$RUNNER: running here, in the foreground, cohort by cohort."
     rc=0
     for i in "${!COHORTS[@]}"; do
-        LOGFILE="$ROOT/Data/test_logs/long_nsr_local_fit_${STAMP}_${EXP_NUM_ARR[$i]}.log"
+        LOGFILE="$ROOT/Data/test_logs/long_nsr_local_fit_${LOG_TIME}_${STAMP_ARR[$i]}.log"
         echo
         echo "=================== ${COHORTS[$i]} ==================="
         echo "  log $LOGFILE"
         if ! SIMPLICITY_LOCALFIT_JOB=1 bash "$0" \
-                --exp-num "${EXP_NUM_ARR[$i]}" --scenario "${COHORTS[$i]}" \
+                --stamp "${STAMP_ARR[$i]}" --scenario "${COHORTS[$i]}" \
                 --seeds "$SEEDS" --steps "$STEPS" --span "$SPAN" \
                 --target-osr "$TARGET" --source-exp "$SOURCE_EXP" \
                 --runner "$RUNNER" --boot "$BOOT" \
@@ -1098,11 +1098,11 @@ if [ "$RUNNER" != "slurm" ]; then
         cohort experiment "stored-root" "[1]" "[2]" "cal vs tgt" \
         "old pred" "old meas"
     for i in "${!COHORTS[@]}"; do
-        LOGFILE="$ROOT/Data/test_logs/long_nsr_local_fit_${STAMP}_${EXP_NUM_ARR[$i]}.log"
+        LOGFILE="$ROOT/Data/test_logs/long_nsr_local_fit_${LOG_TIME}_${STAMP_ARR[$i]}.log"
         line=$(grep '^VERDICT|' "$LOGFILE" 2>/dev/null | tail -1)
         if [ -z "$line" ]; then
             printf "  %-22s %-12s %s\n" "${COHORTS[$i]}" \
-                "#${EXP_NUM_ARR[$i]}" "no VERDICT line -- it did not finish"
+                "#${STAMP_ARR[$i]}" "no VERDICT line -- it did not finish"
             rc=1
             continue
         fi
@@ -1162,14 +1162,14 @@ fi
 echo
 for i in "${!COHORTS[@]}"; do
     COH="${COHORTS[$i]}"
-    N="${EXP_NUM_ARR[$i]}"
-    OUT="$ROOT/Data/test_logs/long_nsr_local_fit_${STAMP}_${N}_%j.log"
+    N="${STAMP_ARR[$i]}"
+    OUT="$ROOT/Data/test_logs/long_nsr_local_fit_${LOG_TIME}_${N}_%j.log"
     JOB=$(sbatch --parsable \
         --job-name="long_nsr_local_fit_$N" \
         --time="$JOB_TIME" --mem="$JOB_MEM" --cpus-per-task=1 \
         --output="$OUT" --error="$OUT" \
         --wrap "cd '$ROOT' && SIMPLICITY_PYTHON='$PY' SIMPLICITY_LOCALFIT_JOB=1 \
-                bash tests/run_long_nsr_local_fit_test.sh --exp-num $N \
+                bash tests/run_long_nsr_local_fit_test.sh --stamp $N \
                 --scenario '$COH' \
                 --seeds $SEEDS --steps $STEPS --span $SPAN --target-osr $TARGET \
                 --source-exp '$SOURCE_EXP' --runner $RUNNER --boot $BOOT \
@@ -1189,7 +1189,7 @@ for i in "${!COHORTS[@]}"; do
     JOBS="${JOBS:+$JOBS,}$JOB"
 done
 echo
-echo "  watch      tail -f $ROOT/Data/test_logs/long_nsr_local_fit_${STAMP}_*"
+echo "  watch      tail -f $ROOT/Data/test_logs/long_nsr_local_fit_${LOG_TIME}_*"
 echo "  cancel     scancel $JOBS"
 echo "  result     per cohort, the [1] and [2] lines and the VERDICT line at"
 echo "             the end of its log. [2] is directional: the displacement"

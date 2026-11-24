@@ -2,9 +2,9 @@
 '''Re-fit a finished calibration with the refactored code and compare it to
 what that run actually produced. Run this ON THE CLUSTER, where the output is.
 
-    python tests/check_calibration_unchanged.py --exp-num 2
-    python tests/check_calibration_unchanged.py --exp-num 2 --keep
-    python tests/check_calibration_unchanged.py --exp-num 2 --only 1
+    python tests/check_calibration_unchanged.py --stamp 2
+    python tests/check_calibration_unchanged.py --stamp 2 --keep
+    python tests/check_calibration_unchanged.py --stamp 2 --only 1
 
 WHY
 
@@ -47,7 +47,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts'))
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments_pipeline'))
 
 import simplicity.dir_manager as dm
 from impact_long_shedders_config import (
@@ -109,11 +109,11 @@ def experiment_exists(name):
 
 
 # ===========================================================================
-def stage_1(names, exp_num, rtol, keep):
+def stage_1(names, stamp, rtol, keep):
     '''cal_1: the calibrated NSR_long per long-shedder cohort.'''
     import long_nsr_calibration_plot as plot
 
-    name = f"{names['cal_1']}_#{exp_num}"
+    name = f"{names['cal_1']}_#{stamp}"
     print(f'\n=== stage 1: {name}')
     if not experiment_exists(name):
         skipped.append(f'stage 1: no experiment {name}')
@@ -167,10 +167,10 @@ def stage_1(names, exp_num, rtol, keep):
 
 
 # ===========================================================================
-def stage_2(names, exp_num, target_osr_std, rtol, keep):
+def stage_2(names, stamp, target_osr_std, rtol, keep):
     '''cal_2: the calibrated standard NSR, against the frozen table.'''
-    name = f"{names['cal_2']}_#{exp_num}"
-    table_path = frozen_table_path(exp_num)
+    name = f"{names['cal_2']}_#{stamp}"
+    table_path = frozen_table_path(stamp)
     print(f'\n=== stage 2: {name}')
     if not experiment_exists(name):
         skipped.append(f'stage 2: no experiment {name}')
@@ -227,7 +227,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--exp-num', type=int, required=True)
+    parser.add_argument('--stamp', default='latest')
     parser.add_argument('--target-osr-std', type=float, default=0.0013,
                         help='the pipeline default; not recorded in the table')
     parser.add_argument('--rtol', type=float, default=1e-9,
@@ -240,18 +240,20 @@ def main():
                              'place instead of restoring the originals')
     parser.add_argument('--only', choices=['1', '2'], default=None)
     args = parser.parse_args()
+    from impact_long_shedders_config import resolve_stamp
+    args.stamp = resolve_stamp(args.stamp, 'impact_long_shedders')
 
     if not os.path.isdir('Data'):
         print('error: no Data/ here. Run this from the repo root, on the '
               'machine that holds the run.', file=sys.stderr)
         sys.exit(2)
 
-    print(f'run #{args.exp_num}, rtol={args.rtol:g}')
+    print(f'run #{args.stamp}, rtol={args.rtol:g}')
 
     if args.only != '2':
-        stage_1(NAMES, args.exp_num, args.rtol, args.keep)
+        stage_1(NAMES, args.stamp, args.rtol, args.keep)
     if args.only != '1':
-        stage_2(NAMES, args.exp_num, args.target_osr_std, args.rtol, args.keep)
+        stage_2(NAMES, args.stamp, args.target_osr_std, args.rtol, args.keep)
 
     print('\n' + '=' * 70)
     for line in skipped:

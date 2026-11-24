@@ -43,7 +43,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts'))
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments_pipeline'))
 
 import simplicity.dir_manager as dm
 
@@ -116,7 +116,8 @@ def test_artifacts_archive():
             run = cfg.run_exp_name(num, mode)
             plant(root, run,
                   f'05_Plots/{run}_long_nsr_calibration_fit.png',
-                  f'05_Plots/{run}_std_nsr_calibration_fit.png')
+                  f'05_Plots/{run}_std_nsr_calibration_fit.png',
+                  f'setup_data/{pipeline.es.RUN_SETTINGS_FILENAME}')
             rel = os.path.relpath(cfg.sanity_plot_path(num, mode),
                                   dm.get_data_dir())
             plant(root, os.path.dirname(rel), os.path.basename(rel))
@@ -129,7 +130,9 @@ def test_artifacts_archive():
             zpath = os.path.join(root, f'artifacts_{mode}.zip')
             pipeline.write_artifacts_archive(zpath, num, log, [mode])
             names = sorted(zipfile.ZipFile(zpath).namelist())
-            check(f'{mode}: four artifacts', len(names), 4)
+            check(f'{mode}: five artifacts', len(names), 5)
+            check(f'{mode}: the run\'s settings file is in',
+                  pipeline.es.RUN_SETTINGS_FILENAME in names, True)
             check(f'{mode}: its own grid is in',
                   os.path.basename(cfg.sanity_plot_path(num, mode)) in names,
                   True)

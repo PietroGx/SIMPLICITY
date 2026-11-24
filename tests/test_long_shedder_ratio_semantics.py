@@ -79,7 +79,7 @@ import simplicity.dir_manager as dm
 import simplicity.output_manager as om
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                '..', 'scripts', 'experiments'))
+                                '..', 'scripts', 'experiments_pipeline'))
 from impact_long_shedders_config import (
     SCENARIOS, TAU_ROUND, USER_FIXED_PARAMS, derive_scenario_params,
 )

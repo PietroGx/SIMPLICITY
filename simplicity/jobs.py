@@ -188,7 +188,7 @@ def write_repeats(experiment_name):
                     f"them: index i no longer means the same (simulation, "
                     f"seed). Resuming would keep state attached to the WRONG "
                     f"repeats.\n"
-                    f"Run at a fresh --exp-num, or delete "
+                    f"Launch a new experiment (a new --stamp), or delete "
                     f"{state_dir(experiment_name, name)} to start this group "
                     f"over.")
 

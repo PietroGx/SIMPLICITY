@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.join(ROOT, 'figures_gui', 'prep'))
 
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
@@ -127,16 +127,18 @@ def check(ssod, ct):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--exp-num", type=int, default=1)
+    ap.add_argument("--stamp", default="latest")
     ap.add_argument("--exp-name", type=str, default=EXP_NAME)
     ap.add_argument("--scenarios", nargs="+", default=["control", "HIV_high"])
     ap.add_argument("--seeds", type=int, default=2)
     ap.add_argument("--thresholds", type=int, nargs="+", default=[5, 10])
     a = ap.parse_args()
+    from _scenarios import resolve_stamp
+    a.stamp = resolve_stamp(a.stamp, a.exp_name)
 
     rows = []
     for sc in a.scenarios:
-        sod = one_sod(a.exp_name, sc, a.exp_num)
+        sod = one_sod(a.exp_name, sc, a.stamp)
         for ss in dm.get_seeded_simulation_output_dirs(sod)[:a.seeds]:
             for ct in a.thresholds:
                 r = check(ss, ct)

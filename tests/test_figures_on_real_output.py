@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 '''Do the paper figures read the output tree, and do they read ALL of it?
 
-    python tests/test_figures_on_real_output.py --exp-num 2
-    python tests/test_figures_on_real_output.py --exp-num 2 --exp-name impact_long_shedders
-    python tests/test_figures_on_real_output.py --exp-num 2 --heavy --traceback
+    python tests/test_figures_on_real_output.py --stamp 2
+    python tests/test_figures_on_real_output.py --stamp 2 --exp-name impact_long_shedders
+    python tests/test_figures_on_real_output.py --stamp 2 --heavy --traceback
 
 WHY
 
@@ -48,7 +48,7 @@ import traceback
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.join(REPO, 'figures_gui', 'prep'))
 
 import matplotlib
 matplotlib.use('Agg')
@@ -172,7 +172,7 @@ def probe(name, call, coverage=None, required_inputs=None):
 
 # ----------------------------------------------------------- the record
 
-def survey(exp_name, exp_num, scenarios):
+def survey(exp_name, stamp, scenarios):
     """What settings.json, repeats.json and the disk each say is there.
 
     Printed first because every check below is measured against it, and
@@ -184,7 +184,7 @@ def survey(exp_name, exp_num, scenarios):
           f'{"seed dirs":>11}  groups')
     present = {}
     for scenario in scenarios:
-        experiment = f'{exp_name}_{scenario}_#{exp_num}'
+        experiment = f'{exp_name}_{scenario}_#{stamp}'
         try:
             sims = sm.read_simulations(experiment)
             groups = [g['name'] for g in sm.read_groups(experiment)]
@@ -217,7 +217,7 @@ def seed_dirs(present, scenario):
 
 # ------------------------------------------------------------- figures
 
-def figure_1(exp_num, exp_name, present):
+def figure_1(stamp, exp_name, present):
     print('\nfigure 1')
     import fig1_preprocess_data as f1
     # each of these loops scenarios with `except Exception: continue`, so a
@@ -225,14 +225,14 @@ def figure_1(exp_num, exp_name, present):
     expected = {f1.get_clinical_label(s) for s in present}
 
     probe('fig1.get_panel_a_data',
-          lambda: f1.get_panel_a_data(exp_num=exp_num, exp_name=exp_name),
+          lambda: f1.get_panel_a_data(stamp=stamp, exp_name=exp_name),
           coverage=lambda df: (set(df['cohort']), expected))
     # this one DOES loop every scenario, and drops any that raises, so a
     # missing cohort is either a broken read or an empty input -- and those
     # look identical from the outside. Count the input per scenario so an
     # `incomplete` says which.
     panel_b = probe('fig1.get_panel_b_data',
-                    lambda: f1.get_panel_b_data(exp_num=exp_num,
+                    lambda: f1.get_panel_b_data(stamp=stamp,
                                                 exp_name=exp_name),
                     coverage=lambda df: (set(df['cohort']) if 'cohort' in df
                                          else set(), expected))
@@ -255,11 +255,11 @@ def figure_1(exp_num, exp_name, present):
     # from the outbreak root". Expecting every cohort here would be the test
     # being wrong, not the function.
     probe('fig1.get_model_global_clock',
-          lambda: f1.get_model_global_clock(exp_num=exp_num, exp_name=exp_name),
+          lambda: f1.get_model_global_clock(stamp=stamp, exp_name=exp_name),
           coverage=lambda df: (set(df['cohort']) if 'cohort' in df else set(),
                                {'Control'} if 'control' in present else set()))
     probe('fig1.get_model_intrahost_clock',
-          lambda: f1.get_model_intrahost_clock(exp_num=exp_num,
+          lambda: f1.get_model_intrahost_clock(stamp=stamp,
                                                exp_name=exp_name))
     # these two read Data/RealWorldData -- tracked files, and the ones that
     # went missing in the quota cleanup. Empty here is a missing checkout,
@@ -272,63 +272,6 @@ def figure_1(exp_num, exp_name, present):
                            rw('patient_intrahost_clock.csv')])
 
 
-def figure_2(exp_num, exp_name, present, heavy):
-    print('\nfigure 2')
-    import fig3_preprocess_data as f2
-    scenarios = sorted(present)
-    if 'control' not in present:
-        print('  [n/a       ] fig2 selects its seeds from `control`, which has '
-              'no output here')
-        notapplicable.append(('fig2', 'no control experiment'))
-        return
-    control_seeds = seed_dirs(present, 'control')
-
-    seeds = probe(
-        'fig2.get_shared_valid_seeds',
-        lambda: f2.get_shared_valid_seeds(exp_num, scenarios, exp_name=exp_name),
-        # it samples from control's repeats that ran long enough, so it must be
-        # a SUBSET of control's seeds -- a seed it returns that does not exist
-        # on disk means it is reading the wrong tree
-        coverage=lambda got: (set(got), set(got) & control_seeds))
-    if not seeds:
-        return
-    print(f'        control has {len(control_seeds)} seed dir(s); '
-          f'{len(seeds)} passed the run-length filter')
-
-    seed, scenario = sorted(seeds)[0], scenarios[0]
-    probe('fig2.get_target_seed_dir',
-          lambda: f2.get_target_seed_dir(exp_num, scenario, seed,
-                                         exp_name=exp_name),
-          coverage=lambda p: ({os.path.basename(str(p))},
-                              {f'seed_{seed:04d}'}))
-    probe('fig2.get_fig2_freq_data',
-          lambda: f2.get_fig2_freq_data(exp_num, scenario, seed,
-                                        exp_name=exp_name))
-    if heavy:
-        probe('fig2.get_fig2_clustered_data',
-              lambda: f2.get_fig2_clustered_data(exp_num, scenario, seed,
-                                                 exp_name=exp_name))
-        probe('fig2.get_fig2_divergence_data',
-              lambda: f2.get_fig2_divergence_data(exp_num, scenario, [seed],
-                                                  exp_name=exp_name))
-
-
-def figure_3(exp_num, exp_name, present, heavy):
-    print('\nfigure 3')
-    import fig2_preprocess_data as f3
-    scenario = sorted(present)[0]
-    known = set(present[scenario]['sods'])
-    probe('fig3._experiment_sod',
-          lambda: f3._experiment_sod(exp_num, scenario, exp_name=exp_name),
-          # it must hand back one of the simulation directories that exist,
-          # not a path it built and never checked
-          coverage=lambda p: ({str(p)}, {str(p)} & known))
-    probe('fig3.get_panel_a_data', lambda: f3.get_panel_a_data(exp_num, scenario))
-    if heavy:
-        probe('fig3.get_panel_b_data',
-              lambda: f3.get_panel_b_data(exp_num, sorted(present)))
-
-
 def experiment_exists(name):
     try:
         return bool(dm.get_groups(name))
@@ -336,11 +279,11 @@ def experiment_exists(name):
         return False
 
 
-def library(exp_name, exp_num, present):
+def library(exp_name, stamp, present):
     print('\nplots_manager / output_manager, against one production experiment')
     import simplicity.plots_manager as pm
     scenario = sorted(present)[0]
-    experiment = f'{exp_name}_{scenario}_#{exp_num}'
+    experiment = f'{exp_name}_{scenario}_#{stamp}'
     # no coverage check: this returns one row per intra-host LINEAGE, not per
     # simulation, so comparing its row indices against the simulation count
     # (which an earlier version did) compares two unrelated things and reports
@@ -358,27 +301,27 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--exp-num', type=int, required=True)
+    parser.add_argument('--stamp', default='latest')
     parser.add_argument('--exp-name', default='impact_long_shedders')
     parser.add_argument('--heavy', action='store_true',
                         help='also the SNP-matrix panels (minutes)')
     parser.add_argument('--traceback', action='store_true')
     args = parser.parse_args()
+    from _scenarios import resolve_stamp
+    args.stamp = resolve_stamp(args.stamp, args.exp_name)
     if args.traceback:
         os.environ['FIGTEST_TRACEBACK'] = '1'
 
     import _scenarios
     scenarios = _scenarios.scenario_names(args.exp_name)
     print(f'scenarios in the config: {scenarios}')
-    present = survey(args.exp_name, args.exp_num, scenarios)
+    present = survey(args.exp_name, args.stamp, scenarios)
     if not present:
-        print('\nNo production output. Run the pipeline, or check --exp-num.')
+        print('\nNo production output. Run the pipeline, or check --stamp.')
         sys.exit(1)
 
-    for stage in (lambda: figure_1(args.exp_num, args.exp_name, present),
-                  lambda: figure_2(args.exp_num, args.exp_name, present, args.heavy),
-                  lambda: figure_3(args.exp_num, args.exp_name, present, args.heavy),
-                  lambda: library(args.exp_name, args.exp_num, present)):
+    for stage in (lambda: figure_1(args.stamp, args.exp_name, present),
+                  lambda: library(args.exp_name, args.stamp, present)):
         try:
             stage()
         except Exception as exc:

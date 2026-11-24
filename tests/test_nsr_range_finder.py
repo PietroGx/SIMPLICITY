@@ -96,7 +96,7 @@ import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                '..', 'scripts', 'experiments'))
+                                '..', 'scripts', 'experiments_pipeline'))
 from impact_long_shedders_config import (
     SCENARIOS, TAU_ROUND, USER_FIXED_PARAMS, CAL1_ISOLATED_FIXED_PARAMS,
     CAL2_FINAL_TIME, CAL2_GROUP_NAME, phase_offset, derive_scenario_params,

@@ -21,7 +21,7 @@
 # calibration -- the Stage 2 (cal_2) counterpart to
 # test_long_shedder_r_long_grid.py's Stage 1 (cal_1) check.
 #
-# Real pipeline run #1 (exp-num 1, 2026-08) got past Stage 1 cleanly (its
+# Real pipeline run #1 (stamp 1, 2026-08) got past Stage 1 cleanly (its
 # widened NSR_RANGES['cal1_long_nsr']=0.01-0.5 worked exactly as validated),
 # then Stage 2 aborted: SOT's standard-NSR fit came back essentially flat
 # (R2=0.0003) within the OLD NSR_RANGES['cal2_standard_nsr']=1e-5-3e-4,
@@ -73,7 +73,7 @@ import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                '..', 'scripts', 'experiments'))
+                                '..', 'scripts', 'experiments_pipeline'))
 from impact_long_shedders_config import (
     SCENARIOS, TAU_ROUND, derive_tau_3_long, USER_FIXED_PARAMS,
 )

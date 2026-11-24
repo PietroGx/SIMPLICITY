@@ -4,7 +4,7 @@
 import argparse
 import numpy as np
 
-from experiments.experiment_script_runner import run_experiment_script
+from experiments_pipeline.experiment_script_runner import run_experiment_script
 import simplicity.plots_manager as pm 
 import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
@@ -75,7 +75,7 @@ def main():
     parser = argparse.ArgumentParser(description="Simplicity Experiment Manager Pipeline")
     parser.add_argument('--name', type=str, required=True, help="Experiment Name")
     parser.add_argument('--runner', type=str, required=True, help="slurm, serial, or multiprocessing")
-    parser.add_argument('--exp-num', type=int, default=1)
+    parser.add_argument('--stamp', default='1')
     parser.add_argument('--min', type=float, required=True, help="Min NSR")
     parser.add_argument('--max', type=float, required=True, help="Max NSR")
     parser.add_argument('--steps', type=int, default=15)
@@ -88,11 +88,11 @@ def main():
 
     # 2. Run Simulations
     print(f"\n[Manager] Launching Simulations for {args.name}...")
-    run_experiment_script(args.runner, args.exp_num, settings_func, args.name)
+    run_experiment_script(args.runner, args.stamp, settings_func, args.name)
 
     # 3. Run Fitting (Immediately follows because step 2 waited)
     print("\n[Manager] Simulations complete. Starting Fitting...")
-    run_fitting(args.name, args.exp_num)
+    run_fitting(args.name, args.stamp)
 
 if __name__ == "__main__":
     main()

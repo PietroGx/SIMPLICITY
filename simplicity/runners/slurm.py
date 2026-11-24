@@ -216,7 +216,7 @@ def find_stale_state(experiment_name, groups=None):
     """{state: count} of repeat states already on disk for this experiment.
 
     poll_simulations_status reads these, not Slurm. A set left behind by an
-    earlier attempt at the same --exp-num therefore decides the run before it
+    earlier attempt at the same --stamp therefore decides the run before it
     starts: with COMPLETED present, `left` is 0 on the first poll, the polling
     loop never runs, release_simulations is never called -- it is only reached
     from inside that loop -- and the held array sits in the queue forever while
@@ -250,7 +250,7 @@ def raise_on_stale_state(experiment_name, groups=None):
         f"Status is read from these files, so submitting now would either "
         f"skip the run entirely (if any are completed) or miscount it. "
         f"Nothing has been submitted.\n"
-        f"Either run at an --exp-num with nothing under it, or clear them:\n"
+        f"Either launch a new experiment (a new --stamp), or clear them:\n"
         f"  rm -rf {os.path.join(repeats_dir, '*', 'state')}")
 
 

@@ -27,7 +27,7 @@ import simplicity.output_manager as om
 import simplicity.tree.tree_builder as tb
 import simplicity.clustering as clustering
 import simplicity.plots_manager as pm
-def get_grid_sod(M, ratio, tau, R, exp_num):
+def get_grid_sod(M, ratio, tau, R, stamp):
     """The SOD of one cell of the old long_shedders_exp grid.
 
     Inlined from scripts/long_paper_figures/long_shedders_preprocess.py in
@@ -36,7 +36,7 @@ def get_grid_sod(M, ratio, tau, R, exp_num):
     impact_long_shedders one.
     """
     exp_name = (f"long_shedders_exp_M{float(M)}_lsr{float(ratio)}"
-                f"_tau{float(tau)}_R{float(R)}_#{int(exp_num)}")
+                f"_tau{float(tau)}_R{float(R)}_#{stamp}")
     sods = dm.get_simulation_output_dirs(exp_name)
     if not sods:
         raise RuntimeError(f"No SOD found for {exp_name}")
@@ -268,7 +268,7 @@ def main():
     ap.add_argument("--ratio", type=float, default=0.12, help="Grid parameter long_shedders_ratio")
     ap.add_argument("--tau", type=float, default=90.0, help="Grid parameter tau_3_long")
     ap.add_argument("--seed", type=int, help="Specific seed number")
-    ap.add_argument("--exp-num", type=int, default=1, help="Experiment run iteration")
+    ap.add_argument("--stamp", default="1", help="Experiment stamp")
 
     ap.add_argument("--start-date", default="2020-01-01", type=str,
                     help="Simulation start date (YYYY-MM-DD)")
@@ -309,7 +309,7 @@ def main():
     # RESOLVE SINGLE SSOD (Either manually provided OR built from parameters)
     if args.M is not None and args.seed is not None:
         print(f"[*] Building path for M={args.M}, tau={args.tau}, R={args.R}, ratio={args.ratio}, seed={args.seed}...")
-        sod = get_grid_sod(args.M, args.ratio, args.tau, args.R, args.exp_num)
+        sod = get_grid_sod(args.M, args.ratio, args.tau, args.R, args.stamp)
         ssod = dm.get_ssod(sod, args.seed)
     elif args.ssod:
         ssod = args.ssod

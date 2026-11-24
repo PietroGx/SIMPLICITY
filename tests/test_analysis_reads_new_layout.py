@@ -112,12 +112,15 @@ def build(root, name):
 
     import simplicity.runme as runme
     import simplicity.runners.serial as serial
+    # Sized so every seed diagnoses someone whatever the RNG stream: at 60/6/20
+    # a seed sequenced or not by luck, and the reservoir's size is part of the
+    # stream (population.py RESERVOIR_PER_CAPITA), so resizing it broke this.
     runme.run_experiment(
         name,
         lambda: ({'R': [1.05, 1.3]},
-                 {'population_size': 60,
-                  'infected_individuals_at_start': 6,
-                  'final_time': 20,
+                 {'population_size': 100,
+                  'infected_individuals_at_start': 20,
+                  'final_time': 40,
                   'long_shedders_ratio': 0.2,
                   'sequence_long_shedders': True}, 2),
         simplicity_runner=serial, archive_experiment=False)
@@ -134,8 +137,8 @@ def scoped_reads(root):
     runme.run_experiment(
         name,
         lambda: ({'_scenario_groups': groups},
-                 {'population_size': 50, 'infected_individuals_at_start': 5,
-                  'final_time': 15, 'long_shedders_ratio': 0.2,
+                 {'population_size': 100, 'infected_individuals_at_start': 20,
+                  'final_time': 40, 'long_shedders_ratio': 0.2,
                   'sequence_long_shedders': True}, 2),
         simplicity_runner=serial, archive_experiment=False)
 

@@ -7,7 +7,7 @@ test, the picture by the figure. This exercises the FIGURE's own functions --
 fig1_plots._lattice / _time_match / _density -- rather than reimplementing
 them, so the two cannot drift apart silently.
 
-    python tests/test_fig1_panel_e.py --exp-num 1
+    python tests/test_fig1_panel_e.py --stamp 1
 """
 import argparse
 import os
@@ -18,7 +18,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, os.pardir))
-sys.path.insert(0, os.path.join(HERE, os.pardir, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.join(HERE, os.pardir, 'figures_gui', 'prep'))
 
 import fig1_plots as plots              # noqa: E402
 import fig1_preprocess_data as preproc  # noqa: E402
@@ -39,11 +39,13 @@ def modes(centres, y, min_prom=0.15):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--exp-num', type=int, required=True)
+    p.add_argument('--stamp', default='latest')
     args = p.parse_args()
+    from _scenarios import resolve_stamp
+    args.stamp = resolve_stamp(args.stamp, 'impact_long_shedders')
 
     real, _ = preproc.get_patient_clock_data()
-    model = preproc.get_model_global_clock(exp_num=args.exp_num)
+    model = preproc.get_model_global_clock(stamp=args.stamp)
     real = real.dropna(subset=['days_since_ref', 'hamming_per_overlap'])
 
     tp = real['days_since_ref'].astype(float).values

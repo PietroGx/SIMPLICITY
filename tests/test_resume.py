@@ -180,7 +180,7 @@ def test_renumbering_under_state_is_refused():
             raised = str(exc)
         check('renumbering under live state is refused', bool(raised), True)
         check('and it says why', 'WRONG repeats' in raised, True)
-        check('and how to proceed', '--exp-num' in raised, True)
+        check('and how to proceed', '--stamp' in raised, True)
         check('the repeat list on disk is unchanged',
               jobs.repeat_identity(jobs.read_repeats(exp.name, 'main')), before)
 

@@ -31,7 +31,7 @@ Nothing is written into the experiment: the shared fitter persists nothing,
 and this diagnostic adds no write of its own.
 
 Run from the repo root:
-    python tests/test_ih_clock_seq_effort.py --exp-num 3
+    python tests/test_ih_clock_seq_effort.py --stamp 3
 """
 import io
 import os
@@ -45,7 +45,7 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 os.pardir))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                os.pardir, 'scripts', 'experiments'))
+                                os.pardir, 'scripts', 'experiments_pipeline'))
 
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
@@ -128,7 +128,7 @@ def draw(hosts, ratio, rng):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--exp-num', type=int, required=True)
+    p.add_argument('--stamp', default='latest')
     p.add_argument('--ratios', type=float, nargs='+', default=[1.0, 0.5, 0.25, 0.10])
     p.add_argument('--reps', type=int, default=10)
     p.add_argument('--target', type=float, default=0.00205)
@@ -136,8 +136,10 @@ def main():
     p.add_argument('--seeds-per-point', type=int, default=0,
                    help="0 = every seed.")
     args = p.parse_args()
+    from impact_long_shedders_config import resolve_stamp
+    args.stamp = resolve_stamp(args.stamp, 'impact_long_shedders')
 
-    experiment = f"{cfg.exp_name(cfg.DEFAULT_CONSENSUS)}_#{args.exp_num}"
+    experiment = f"{cfg.exp_name(cfg.DEFAULT_CONSENSUS)}_#{args.stamp}"
     groups = [g for g in dm.get_groups(experiment) if g.startswith('calib_long__')]
     print(f"experiment : {experiment}")
     print(f"groups     : {groups}")

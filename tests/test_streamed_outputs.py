@@ -21,7 +21,7 @@ What is checked, and why each one is here rather than assumed:
                     differ between the two writers and are read by nothing.
 
   the rename        a run killed mid-flight must not leave a file under its real
-                    name: scripts/check_completed_simulations.py:32 reads the
+                    name: scripts/checks/check_completed_simulations.py:32 reads the
                     presence of lineage_frequency.csv as "this simulation
                     finished". Streaming without the rename would make every
                     killed run look complete.

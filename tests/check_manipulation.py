@@ -27,7 +27,7 @@ fails this check instead of silently invalidating it.
 
 Read-only, runs no simulation. Run from the repo root:
 
-    python -I tests/check_manipulation.py [--exp-num 1]
+    python -I tests/check_manipulation.py [--stamp 1]
 """
 import os
 import sys
@@ -37,7 +37,7 @@ import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-sys.path.insert(0, os.path.join(ROOT, "scripts", "experiments"))
+sys.path.insert(0, os.path.join(ROOT, "scripts", "experiments_pipeline"))
 
 import impact_long_shedders_config as C
 import simplicity.population_model as pm
@@ -144,12 +144,14 @@ def section_c():
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--exp-num", type=int, default=1)
+    ap.add_argument("--stamp", default="latest")
     a = ap.parse_args()
+    from impact_long_shedders_config import resolve_stamp
+    a.stamp = resolve_stamp(a.stamp, 'impact_long_shedders')
 
-    table = os.path.join(ROOT, C.table_path(a.exp_num))
+    table = os.path.join(ROOT, C.table_path(a.stamp))
     if not os.path.isfile(table):
-        print(f"no frozen table at {table} -- run --exp-num with a run that is "
+        print(f"no frozen table at {table} -- run --stamp with a run that is "
               f"present locally")
         sys.exit(2)
     print(f"frozen table: {os.path.relpath(table, ROOT)}")

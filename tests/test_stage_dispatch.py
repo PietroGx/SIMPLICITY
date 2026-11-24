@@ -48,7 +48,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts'))
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments_pipeline'))
 
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm
@@ -58,7 +58,7 @@ import simplicity.settings_manager as sm
 # so owning the name means setting it on the config AND on the stage module --
 # see install(), which is the one place every stage goes through.
 FIXTURE_NAME = 'test_stage_dispatch'
-EXP_NUM = 1
+STAMP = 1
 failures = []
 
 
@@ -89,7 +89,7 @@ class Dispatch:
     def __init__(self):
         self.calls = []
 
-    def __call__(self, runner, exp_num, settings_func, experiment_name,
+    def __call__(self, runner, stamp, settings_func, experiment_name,
                  *extra, **kw):
         varying, fixed, n_seeds = settings_func()
         self.calls.append({'experiment': experiment_name,
@@ -142,7 +142,7 @@ def frozen_rows(scenarios, sp, derive):
 
 
 def write_frozen_table(setup_dir_for, filename, rows):
-    directory = setup_dir_for(EXP_NUM)
+    directory = setup_dir_for(STAMP)
     os.makedirs(directory, exist_ok=True)
     pd.DataFrame(rows).to_csv(os.path.join(directory, filename), index=False)
 
@@ -153,7 +153,7 @@ def stage_cal_1(module_name, config_name):
         module = __import__(module_name)
         install(module, dispatch)
         module.plot_and_fit_long_nsr_calibration = lambda *a, **k: {}
-        sys.argv = [module_name, '--exp-num', str(EXP_NUM),
+        sys.argv = [module_name, '--stamp', str(STAMP),
                     '--runner', 'serial', '--seeds', '2']
         module.main()
     return run
@@ -166,7 +166,7 @@ def stage_cal_2():
         module.read_calibrated_long_nsr = lambda *a, **k: long_nsr_table()
         module.compute_standard_nsr = lambda *a, **k: 1.4e-4
         sys.argv = ['impact_long_shedders_cal_2',
-                    '--exp-num', str(EXP_NUM), '--runner', 'serial',
+                    '--stamp', str(STAMP), '--runner', 'serial',
                     '--seeds', '2', '--target-osr-long', '0.00205']
         module.main()
     return run
@@ -182,7 +182,7 @@ def stage_exp(module_name, config_name, extra_argv=()):      # noqa: ARG001
                            frozen_rows(config.SCENARIOS, sp,
                                        config.derive_scenario_params))
         install(module, dispatch)
-        sys.argv = [module_name, '--exp-num', str(EXP_NUM),
+        sys.argv = [module_name, '--stamp', str(STAMP),
                     '--runner', 'serial', '--seeds', '2', *extra_argv]
         module.main()
     return run

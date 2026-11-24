@@ -92,7 +92,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                '..', 'scripts', 'experiments'))
+                                '..', 'scripts', 'experiments_pipeline'))
 
 import simplicity.dir_manager as dm
 import simplicity.settings_manager as sm

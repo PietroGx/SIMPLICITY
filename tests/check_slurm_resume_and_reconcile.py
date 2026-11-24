@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 '''Resume and reconciliation, against a real Slurm. Run this ON THE CLUSTER.
 
-    python tests/check_slurm_resume_and_reconcile.py --exp-num 90
-    python tests/check_slurm_resume_and_reconcile.py --exp-num 90 --skip-kill
+    python tests/check_slurm_resume_and_reconcile.py --stamp 90
+    python tests/check_slurm_resume_and_reconcile.py --stamp 90 --skip-kill
 
 WHY
 
@@ -47,7 +47,7 @@ Phase 3  submits a second experiment whose repeats cannot finish inside a
 Phase 3 deliberately produces FAILED repeats and burns a couple of minutes of
 walltime on 4000 individuals. --skip-kill leaves it out.
 
-It writes into Data/ under its own experiment names, so pick an --exp-num
+It writes into Data/ under its own experiment names, so pick an --stamp
 nothing else is using. Everything it creates is left on disk for inspection.
 '''
 import argparse
@@ -106,8 +106,8 @@ def output_mtimes(name):
     return out
 
 
-def phase_1_and_2(exp_num):
-    name = f'slurm_resume_check_#{exp_num}'
+def phase_1_and_2(stamp):
+    name = f'slurm_resume_check_#{stamp}'
     print(f'\n=== phase 1: a clean run of four repeats  ({name})')
     submit(name, final_time=10)
 
@@ -157,8 +157,8 @@ def phase_1_and_2(exp_num):
               if p in now and p in before), True)
 
 
-def phase_3(exp_num):
-    name = f'slurm_kill_check_#{exp_num}'
+def phase_3(stamp):
+    name = f'slurm_kill_check_#{stamp}'
     print(f'\n=== phase 3: tasks the scheduler kills  ({name})')
     print('    A 2-minute walltime against a population large enough that one')
     print('    repeat cannot finish inside it. Slurm then terminates the task,')
@@ -220,7 +220,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--exp-num', type=int, required=True)
+    parser.add_argument('--stamp', type=int, required=True)
     parser.add_argument('--skip-kill', action='store_true',
                         help='skip phase 3, which burns a minute of walltime '
                              'and leaves failed repeats behind')
@@ -230,9 +230,9 @@ def main():
     os.environ.setdefault('SIMPLICITY_SLURM_MEM', '2G')
     os.environ.setdefault('SIMPLICITY_SLURM_TIME', '00:20:00')
 
-    phase_1_and_2(args.exp_num)
+    phase_1_and_2(args.stamp)
     if not args.skip_kill:
-        phase_3(args.exp_num)
+        phase_3(args.stamp)
 
     print('\n' + '=' * 70)
     if inconclusive:

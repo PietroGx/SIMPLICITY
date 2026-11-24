@@ -1,0 +1,79 @@
+{
+  "schema": 2,
+  "description": "Production configuration of impact_long_shedders runs #2-#3: calibrated grid cell #118 (N=3000, I0=90, R=1.05). NSR ranges hand-calibrated for this cell from run #3's grid.",
+  "population": {
+    "population_size": 10000,
+    "infected_individuals_at_start": 90,
+    "R": 1.05,
+    "IH_virus_emergence_rate": 0.1,
+    "final_time": 1825
+  },
+  "scenarios": [
+    {
+      "name": "control",
+      "inf_duration_long": null,
+      "long_shedders_ratio": 0.0,
+      "R_long": null,
+      "susceptibility_long": 1.0
+    },
+    {
+      "name": "SOT",
+      "inf_duration_long": 63.0,
+      "long_shedders_ratio": 0.01,
+      "R_long": 1.05,
+      "susceptibility_long": 1.0
+    },
+    {
+      "name": "HIV_low",
+      "inf_duration_long": 109.0,
+      "long_shedders_ratio": 0.01,
+      "R_long": 1.05,
+      "susceptibility_long": 1.0
+    },
+    {
+      "name": "HIV_high",
+      "inf_duration_long": 109.0,
+      "long_shedders_ratio": 0.12,
+      "R_long": 1.05,
+      "susceptibility_long": 1.0
+    },
+    {
+      "name": "edge_case",
+      "inf_duration_long": 365.0,
+      "long_shedders_ratio": 0.001,
+      "R_long": 1.05,
+      "susceptibility_long": 1.0
+    }
+  ],
+  "cal_1": {
+    "R": 1.0,
+    "final_time": 365,
+    "min_cycles": 3,
+    "nsr_long": {
+      "min": 0.00036,
+      "max": 0.0036,
+      "steps": 10
+    }
+  },
+  "cal_2": {
+    "nsr_std": {
+      "min": 4.8e-05,
+      "max": 0.00048,
+      "steps": 10
+    }
+  },
+  "targets": {
+    "osr_std": 0.0013,
+    "osr_long": 0.00205
+  },
+  "seeds": {
+    "cal": 25,
+    "exp": 50
+  },
+  "consensus": "distribution",
+  "slurm": {
+    "mem": "4G",
+    "mem_cal2": "2G",
+    "time": "7-00:00:00"
+  }
+}

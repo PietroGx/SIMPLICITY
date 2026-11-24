@@ -24,11 +24,11 @@ from multiprocessing import Pool
 import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.join(ROOT, 'figures_gui', 'prep'))
 
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
-import fig2_preprocess_data as pre
+import burnin as pre
 from _scenarios import EXP_NAME, resolve_scenarios, one_sod
 
 SCEN_ORDER = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"]
@@ -68,20 +68,22 @@ def _one(job):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exp-name", default=EXP_NAME)
-    ap.add_argument("--exp-num", type=int, default=1)
+    ap.add_argument("--stamp", default="latest")
     ap.add_argument("--seeds", type=int, default=50)
     ap.add_argument("--procs", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     ap.add_argument("--out", default=os.path.join(ROOT, "tests", "artifacts", "fig2b", "prevalence.json"))
     ap.add_argument("--csv", default=os.path.join(ROOT, "tests", "_prevalence_window.csv"))
     a = ap.parse_args()
+    from _scenarios import resolve_stamp
+    a.stamp = resolve_stamp(a.stamp, a.exp_name)
 
-    present, missing = resolve_scenarios(a.exp_name, a.exp_num,
+    present, missing = resolve_scenarios(a.exp_name, a.stamp,
                                          required=SCEN_ORDER, verbose=True)
     jobs = []
     for sc in SCEN_ORDER:
         if sc not in present:
             continue
-        sod = one_sod(a.exp_name, sc, a.exp_num)
+        sod = one_sod(a.exp_name, sc, a.stamp)
         for s in dm.get_seeded_simulation_output_dirs(sod)[:a.seeds]:
             jobs.append((sc, s))
     print(f"[prev] {len(jobs)} seeds", flush=True)
@@ -101,7 +103,7 @@ def main():
 
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     with open(a.out, "w") as f:
-        json.dump({"exp_name": a.exp_name, "exp_num": a.exp_num,
+        json.dump({"exp_name": a.exp_name, "stamp": a.stamp,
                    "runs": rows}, f, separators=(",", ":"))
     pd.DataFrame(rows).to_csv(a.csv, index=False)
     print(f"[prev] {len(rows)} runs -> {a.out}")

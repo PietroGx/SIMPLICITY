@@ -43,8 +43,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts'))
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'checks'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments_pipeline'))
+sys.path.insert(0, os.path.join(REPO, 'figures_gui', 'prep'))
 
 import simplicity.dir_manager as dm
 import simplicity.jobs as jobs
@@ -61,8 +62,8 @@ import impact_long_shedders_config as cfg
 # The fixture is named for this test and numbered from 1 inside that name:
 # a scratch experiment must never be able to collide with a production run.
 BASE = 'test_merged_experiment'
-EXP_NUM = 1
-NAME = f'{BASE}_#{EXP_NUM}'
+STAMP = 1
+NAME = f'{BASE}_#{STAMP}'
 CAL_SEEDS, EXP_SEEDS = 2, 3
 RANGES = {'min': 1e-4, 'max': 1e-2, 'steps': 3}
 
@@ -163,7 +164,7 @@ def test_figures_read_only_their_scenario():
     print('\n=== a scenario resolves to its own group and nothing else')
     for scenario in (s['name'] for s in cfg.SCENARIOS):
         group = cfg.exp_group(scenario)
-        sods = cfg.scenario_output_dirs(BASE, scenario, EXP_NUM)
+        sods = cfg.scenario_output_dirs(BASE, scenario, STAMP)
         check(f'{scenario}: every directory is in its group',
               all(group in sod.split(os.sep) for sod in sods), True)
         check(f'{scenario}: one grid point, as the frozen table has one row',
@@ -171,7 +172,7 @@ def test_figures_read_only_their_scenario():
 
     # the calibration cohorts share SOT's and edge_case's names after the
     # prefix; without it they would be the same group
-    sot = cfg.scenario_output_dirs(BASE, 'SOT', EXP_NUM)
+    sot = cfg.scenario_output_dirs(BASE, 'SOT', STAMP)
     calib = dm.get_simulation_output_dirs(NAME,
                                           group=cfg.calib_long_group('SOT'))
     check('the SOT scenario and the SOT cohort are different directories',
@@ -179,9 +180,9 @@ def test_figures_read_only_their_scenario():
     check('and the cohort is the one with the swept grid', len(calib), 3)
 
     check('an unknown scenario resolves to nothing, rather than everything',
-          cfg.scenario_output_dirs(BASE, 'not_a_scenario', EXP_NUM), [])
+          cfg.scenario_output_dirs(BASE, 'not_a_scenario', STAMP), [])
     check('has_output agrees',
-          [cfg.scenario_output_dirs(BASE, 'SOT', EXP_NUM) != [],
+          [cfg.scenario_output_dirs(BASE, 'SOT', STAMP) != [],
            cfg.scenario_output_dirs(BASE, 'SOT', 999) != []],
           [True, False])
 

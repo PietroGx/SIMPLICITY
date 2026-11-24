@@ -73,7 +73,7 @@ To execute an experiment, use the `runme.py` script with the following parameter
   
 You can run an example via:
 ```bash
-python scripts/experiments/00_example_experiment_runme.py
+python scripts/experiments_pipeline/00_example_experiment_runme.py
 ```
 
 ### The Calibration Pipeline
@@ -123,6 +123,7 @@ Each seeded simulation generates:
 
 ```plaintext
 SIMPLICITY/
+├── figures_gui/            # The studio: explores the runs and draws/exports the paper's figures
 ├── scripts/                # Experiments and calibration tools
 │   └── archive/            # Legacy code from the original publication
 ├── simplicity/             # Core framework modules
@@ -134,68 +135,26 @@ SIMPLICITY/
 ```
 
 ---
-## 📊 Long Shedders Plotting Suite (`long_paper_figures/plot_figures.py`)
+## 📊 Figures (`figures_gui/`)
 
-This script generates publication-ready figures from SIMPLICITY long shedders experiments. It reads `master_grid_log.csv`, finds the correct simulation folders, processes the data, and saves the plots directly to `Data/`.
-
-### 🚀 Quick Start
-
-To generate **all available figures** using the default parameters (M=2, R=1, ratio=0.01), run:
+The paper's figures are made in one place, the studio in `figures_gui/`. It
+reads a run's output plus a precomputed cache of clade builds:
 
 ```bash
-python scripts/long_paper_figures/plot_figures.py --figure all --exp-num 1
+bash figures_gui/run_precompute.sh            # on the HPC login node: builds and packs the cache
+python -I figures_gui/server.py --stamp N     # serves the studio on http://127.0.0.1:8600/
 ```
 
-### ⚙️ Command-Line Arguments
+* **Data exploration** tabs set every data rule (clade definition, burn-in,
+  breakout detection) and save/load named sets of them.
+* **Figures** tabs only change how each figure looks.
+* **Export** writes a figure as PNG, JPEG or PDF at a journal column width
+  and resolution.
 
-You can control what gets plotted and which of the grid is used by passing arguments in the terminal.
-
-#### **Targeting & Execution**
-* `--figure`: Which figure to generate. Choices are `"1"`, `"2"`, `"4"`, or `"all"`. *(Default: "all")*
-* `--exp-num`: The run iteration number of your experiment. This ensures the script pulls from `calibration_run_#X` and `long_shedders_exp_..._#X`. *(Default: 1)*
-
-#### **Grid Slicing (For Figures 1 & 2)**
-Because the grid has 24 combinations, Figures 1 and 2 need to look at a specific parameters combination to isolate the effect of the long-shedder infectious window (`tau_3_long`). 
-* `--M`: The mutation rate multiplier. *(Default: 2.0)*
-* `--R`: The target reproduction number for long shedders. *(Default: 1.0)*
-* `--ratio`: The prevalence of long shedders. *(Default: 0.01)*
-
-#### **Specifics (For Figures 2 & 4)**
-* `--tau`: Isolates a `tau_3_long` timeline for Figure 2. *(Default: 60.0)*
-* `--seed`: Selects which simulation seed to visualize for single-run plots (like Figure 2). *(Default: 1)*
-* `--cluster-threshold`: The shared mutation threshold used to define clades in Figure 4. *(Default: 5)*
-* `--min-days`: The minimum simulation length required to include a seed in the Figure 4 pie charts. *(Default: 100)*
+`figures_gui/README.md` has the details.
 
 ---
 
-### 📈 Figures (long shedders experiment)
-
-#### **Figure 1: Intra-Host Dynamics & Empirical Durations**
-Generates the theoretical probability curves and empirical violin plots for baseline vs. long-shedders across all `tau` values in the specified slice.
-```bash
-python plot_long_shedders.py --figure 1 --M 2 --R 1 --ratio 0.01 --exp-num 1
-```
-
-#### **Figure 2: Individual Infection Timelines**
-Draws the segmented timeline of lineage infections for a specific simulation seed. Requires a `tau` value.
-```bash
-python plot_long_shedders.py --figure 2 --M 2 --R 1 --ratio 0.01 --tau 60 --seed 1 --exp-num 1
-```
-
-#### **Figure 4: Clade Winner Grid**
-Builds the 2x2 pie chart grid comparing peak frequency, burden, survival, and growth. This loops over all `tau`, `R`, and ratios for a given `M`, automatically sorting the highest `tau` to the top and descending ratios to the left.
-```bash
-python plot_long_shedders.py --figure 4 --M 2 --cluster-threshold 5 --exp-num 1
-```
-
----
-
-### 💡 Troubleshooting Notes
-* **Missing Data Errors:** If the script prints *"Missing Data"*, it means the specific folder it assembled (e.g., `long_shedders_exp_M2.0_lsr0.01_tau90.0_R1.0_#1`) does not exist or the cluster hasn't finished calculating it yet. 
-* **Master Log:** The script fundamentally relies on `Data/master_grid_log.csv` existing.
-
----
----
 ## Contributing
 
 Contributions are welcome! If you’d like to report a bug or propose a feature contact me!

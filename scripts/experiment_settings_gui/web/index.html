@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Experiment settings</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar">
+  <div class="title">
+    <h1>Experiment settings</h1>
+    <span class="sub" id="dir">impact_long_shedders pipeline</span>
+  </div>
+  <div class="filebar">
+    <label for="files">Start from</label>
+    <select id="files"></select>
+    <button id="load" type="button">Load</button>
+    <span class="dirty" id="dirty" hidden>unsaved changes</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="cols">
+    <main id="form"></main>
+    <aside class="rail">
+      <section class="card" id="check-card">
+        <h2>Check</h2>
+        <div id="check"><p class="muted">Checking…</p></div>
+      </section>
+      <section class="card">
+        <h2>Simulations submitted</h2>
+        <div id="sims"></div>
+      </section>
+      <section class="card">
+        <h2>Save</h2>
+        <label class="stack" for="fname">File in <code id="dir2"></code></label>
+        <input id="fname" type="text" spellcheck="false" autocomplete="off">
+        <label class="inline"><input id="overwrite" type="checkbox"> overwrite an existing file</label>
+        <button id="save" type="button" class="primary">Save settings file</button>
+        <div id="saved"></div>
+      </section>
+      <details class="card">
+        <summary>JSON preview</summary>
+        <pre id="json"></pre>
+      </details>
+    </aside>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

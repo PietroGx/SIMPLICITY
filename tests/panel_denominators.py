@@ -37,8 +37,8 @@ import argparse
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in ("", "tests", os.path.join("tests", "studio"),
-           os.path.join("scripts", "nature_plots")):
+for _p in ("", "tests", "figures_gui",
+           os.path.join("figures_gui", "prep")):
     sys.path.insert(0, os.path.join(ROOT, _p))
 
 import simplicity.clustering as cl

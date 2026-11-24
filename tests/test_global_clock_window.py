@@ -26,7 +26,7 @@ output_manager.save_sequencing_dataset, in the same order. The join is
 asserted, not assumed.
 
 Run from the repo root:
-    python tests/test_global_clock_window.py --exp-num 3
+    python tests/test_global_clock_window.py --stamp 3
 """
 import os
 import sys
@@ -41,7 +41,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 os.pardir))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                os.pardir, 'scripts', 'experiments'))
+                                os.pardir, 'scripts', 'experiments_pipeline'))
 
 import simplicity.dir_manager as dm
 import simplicity.sequencing as sq
@@ -86,10 +86,10 @@ def seed_points(ssod):
     return reg
 
 
-def load_scenario(exp_name, exp_num, scenario, individual_type):
+def load_scenario(exp_name, stamp, scenario, individual_type):
     """Every seed of one experiment-phase scenario, as lists of row dicts --
     the shape sq.subsample consumes."""
-    experiment = f"{cfg.exp_name(cfg.DEFAULT_CONSENSUS)}_#{exp_num}"
+    experiment = f"{cfg.exp_name(cfg.DEFAULT_CONSENSUS)}_#{stamp}"
     group = cfg.exp_group(scenario)
     seeds = []
     for sod in dm.get_simulation_output_dirs(experiment, group=group):
@@ -185,7 +185,7 @@ def scatter_and_fits(ax, seeds, window_days, ratios, target, min_seq):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--exp-num', type=int, required=True)
+    p.add_argument('--stamp', default='latest')
     p.add_argument('--scenarios', nargs='+', default=SCENARIOS)
     p.add_argument('--windows', type=float, nargs='+',
                    default=[cfg.CAL2_FINAL_TIME, 1095.0])
@@ -202,9 +202,11 @@ def main():
     p.add_argument('--out', default=os.path.join('Data', 'figures',
                                                  'global_clock_window.png'))
     args = p.parse_args()
+    from impact_long_shedders_config import resolve_stamp
+    args.stamp = resolve_stamp(args.stamp, 'impact_long_shedders')
 
     itype = None if args.individual_type == 'all' else args.individual_type
-    print(f"experiment  : {cfg.exp_name(cfg.DEFAULT_CONSENSUS)}_#{args.exp_num}")
+    print(f"experiment  : {cfg.exp_name(cfg.DEFAULT_CONSENSUS)}_#{args.stamp}")
     print(f"individuals : {args.individual_type}")
     print(f"windows     : {args.windows} d    ratios: {args.ratios}")
     print(f"gate        : >= {args.min_seq} sequences per seed, after "
@@ -212,7 +214,7 @@ def main():
 
     results, loaded = {}, {}
     for scenario in args.scenarios:
-        seeds = load_scenario(cfg.EXP_NAME, args.exp_num, scenario, itype)
+        seeds = load_scenario(cfg.EXP_NAME, args.stamp, scenario, itype)
         if not seeds:
             print(f"{scenario}: no usable seeds")
             continue
@@ -272,7 +274,7 @@ def main():
 
     fig.suptitle(f"Standard global clock: analysis window and sequencing "
                  f"effort  ({cfg.exp_name(cfg.DEFAULT_CONSENSUS)}"
-                 f"_#{args.exp_num}, {args.individual_type} individuals)",
+                 f"_#{args.stamp}, {args.individual_type} individuals)",
                  fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     os.makedirs(os.path.dirname(args.out), exist_ok=True)

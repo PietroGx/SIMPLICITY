@@ -66,7 +66,7 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'scripts'))
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments_pipeline'))
 
 import simplicity.dir_manager as dm
 import simplicity.jobs as jobs

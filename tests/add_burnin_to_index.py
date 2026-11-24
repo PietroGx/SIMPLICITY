@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Add each seed's burn-in day to the clade explorer's index.json.
 
-The cutoff is read from fig2_preprocess_data.phi_day, not re-derived here, so
+The cutoff is read from figures_gui/prep/burnin.phi_day, not re-derived here, so
 the explorer's line and the figure's window cannot disagree about what burn-in
 means. Only index.json is rewritten; the 250 per-seed files are untouched.
 """
@@ -13,18 +13,18 @@ import argparse
 from multiprocessing import Pool
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.join(ROOT, 'figures_gui', 'prep'))
 
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
-import fig2_preprocess_data as pre
+import burnin as pre
 from _scenarios import one_sod
 
 
 def _one(job):
-    exp_name, exp_num, scenario, seed = job
+    exp_name, stamp, scenario, seed = job
     try:
-        sods = dm.get_seeded_simulation_output_dirs(one_sod(exp_name, scenario, exp_num))
+        sods = dm.get_seeded_simulation_output_dirs(one_sod(exp_name, scenario, stamp))
         ssod = next(s for s in sods if os.path.basename(s) == seed)
     except Exception as exc:
         return scenario, seed, None, None, f"no dir: {exc}"
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     with open(a.index) as f:
         idx = json.load(f)
     rows = idx["seeds"]
-    jobs = [(idx["exp_name"], idx["exp_num"], r["scenario"], r["seed"]) for r in rows]
+    jobs = [(idx["exp_name"], idx["stamp"], r["scenario"], r["seed"]) for r in rows]
     print(f"[burnin] {len(jobs)} seeds, window={pre.BURNIN_WINDOW}, "
           f"MIN_FINAL_TIME={pre.MIN_FINAL_TIME}, MIN_WINDOW_DAYS={pre.MIN_WINDOW_DAYS}")
 

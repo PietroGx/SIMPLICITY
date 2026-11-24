@@ -51,7 +51,7 @@ from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-SCRIPTS = os.path.join(REPO, 'scripts', 'experiments')
+SCRIPTS = os.path.join(REPO, 'scripts', 'experiments_pipeline')
 sys.path.insert(0, REPO)
 sys.path.insert(0, HERE)
 sys.path.insert(0, SCRIPTS)
@@ -101,14 +101,14 @@ def assign_numbers(cells, exp_base):
     return {cell: exp_base + index for index, cell in enumerate(cells)}
 
 
-def cell_is_complete(cell, exp_num, args):
+def cell_is_complete(cell, stamp, args):
     """A cell counts as done when it has a calibration table AND the full
     production run. A partial production has to be redone: pooling it with
     complete cells is the survival bias the grid exists to avoid."""
-    if not os.path.isfile(table_path(exp_num)):
+    if not os.path.isfile(table_path(stamp)):
         return False
     expected = len(SCENARIOS) * args.exp_seeds * len(args.consensus)
-    return len(production_paths_any(exp_num, args.consensus)) >= expected
+    return len(production_paths_any(stamp, args.consensus)) >= expected
 
 
 def cell_label(cell):
@@ -148,10 +148,10 @@ def cell_env(cell, args, cap_per_cell):
     return env
 
 
-def cell_command(cell, exp_num, args):
+def cell_command(cell, stamp, args):
     _, _, r = cell
     command = [sys.executable, PIPELINE,
-               '--exp-num', str(exp_num),
+               '--stamp', str(stamp),
                '--runner', args.runner,
                '--cal-seeds', str(args.cal_seeds),
                '--exp-seeds', str(args.exp_seeds),
@@ -177,10 +177,10 @@ def run_cells(cells, numbers, args):
     lock = threading.Lock()
 
     def worker(cell):
-        exp_num = numbers[cell]
+        stamp = numbers[cell]
         with gate:
-            command = cell_command(cell, exp_num, args)
-            log_path = os.path.join(log_dir, f'calibrated_grid_#{exp_num}.log')
+            command = cell_command(cell, stamp, args)
+            log_path = os.path.join(log_dir, f'calibrated_grid_#{stamp}.log')
             start = time.monotonic()
             with open(log_path, 'w') as handle:
                 handle.write(' '.join(command) + '\n\n')
@@ -190,9 +190,9 @@ def run_cells(cells, numbers, args):
                                        stdout=handle,
                                        stderr=subprocess.STDOUT)
             with lock:
-                outcomes[cell] = (code, time.monotonic() - start, exp_num)
+                outcomes[cell] = (code, time.monotonic() - start, stamp)
             print(f'  [{"ok " if code == 0 else "FAIL"}] {cell_label(cell)}  '
-                  f'#{exp_num}  {hms(time.monotonic() - start)}  -> {log_path}',
+                  f'#{stamp}  {hms(time.monotonic() - start)}  -> {log_path}',
                   flush=True)
 
     threads = [threading.Thread(target=worker, args=(c,), daemon=False)
@@ -206,20 +206,20 @@ def run_cells(cells, numbers, args):
 
 # ----------------------------------------------------------------- collecting
 
-def table_path(exp_num):
-    return cfg.table_path(exp_num)
+def table_path(stamp):
+    return cfg.table_path(stamp)
 
 
-def read_table(exp_num):
-    path = table_path(exp_num)
+def read_table(stamp):
+    path = table_path(stamp)
     if not os.path.isfile(path):
         return None
     with open(path) as handle:
         return list(csv.DictReader(handle))
 
 
-def production_paths(exp_num, consensus):
-    root = os.path.join(cfg.run_dir(exp_num, consensus), '04_Output')
+def production_paths(stamp, consensus):
+    root = os.path.join(cfg.run_dir(stamp, consensus), '04_Output')
     found = []
     for dirpath, _, files in os.walk(root):
         if 'simulation_trajectory.csv' in files:
@@ -227,16 +227,16 @@ def production_paths(exp_num, consensus):
     return found
 
 
-def production_paths_any(exp_num, consensus_modes):
+def production_paths_any(stamp, consensus_modes):
     """Production lives under one experiment per consensus mode; the scenarios
     are split across sibling directories named by scenario."""
     paths = []
     for consensus in consensus_modes:
-        paths += production_paths(exp_num, consensus)
+        paths += production_paths(stamp, consensus)
         for scenario in SCENARIOS:
             root = os.path.join(
                 'Data',
-                f'{exp_name(consensus)}_{scenario["name"]}_#{exp_num}',
+                f'{exp_name(consensus)}_{scenario["name"]}_#{stamp}',
                 '04_Output')
             for dirpath, _, files in os.walk(root):
                 if 'simulation_trajectory.csv' in files:
@@ -248,12 +248,12 @@ def production_paths_any(exp_num, consensus_modes):
 def collect(cells, numbers, args):
     data = {}
     for cell in cells:
-        exp_num = numbers[cell]
+        stamp = numbers[cell]
         pop = cell[0]
-        rows = read_table(exp_num)
-        paths = production_paths_any(exp_num, args.consensus)
+        rows = read_table(stamp)
+        paths = production_paths_any(stamp, args.consensus)
         data[cell] = {
-            'exp_num': exp_num,
+            'stamp': stamp,
             'table': rows,
             'n_production': len(paths),
             'metrics': measure(paths, pop) if paths else None,
@@ -274,7 +274,7 @@ def section_completeness(cells, data, outcomes, args):
         failed = [c for c in cells if outcomes.get(c, (1,))[0] != 0]
         print(f'  pipelines exiting non-zero : {len(failed)}')
         for cell in failed:
-            print(f'      {cell_label(cell)}  #{data[cell]["exp_num"]}  '
+            print(f'      {cell_label(cell)}  #{data[cell]["stamp"]}  '
                   f'see Data/pipeline_logs/')
     print()
     print(f'  seeds: {args.cal_seeds} per calibration grid point, '
@@ -488,11 +488,11 @@ def main():
         cap_per_cell = max(1, args.cap // max(1, min(args.concurrency,
                                                      len(cells))))
         for index, cell in enumerate(all_cells, 1):
-            exp_num = numbers[cell]
+            stamp = numbers[cell]
             env = cell_env(cell, args, cap_per_cell)
             mark = ' ' if (not args.cells or index in set(args.cells)) else '-'
-            print(f'{mark} {index:>3}. {cell_label(cell)}  -> #{exp_num}')
-            print('     ' + ' '.join(cell_command(cell, exp_num, args)))
+            print(f'{mark} {index:>3}. {cell_label(cell)}  -> #{stamp}')
+            print('     ' + ' '.join(cell_command(cell, stamp, args)))
             print('     ' + '  '.join(
                 f'{k}={env[k]}' for k in sorted(env)
                 if k.startswith('SIMPLICITY_CELL')
@@ -529,7 +529,7 @@ def main():
     try:
         os.makedirs('Data', exist_ok=True)
         with open(out, 'w') as handle:
-            json.dump({cell_short(c): {'exp_num': numbers[c],
+            json.dump({cell_short(c): {'stamp': numbers[c],
                                        'n_production': data[c]['n_production']}
                        for c in cells}, handle, indent=1)
         print(f'[grid] per-cell index written to {out}')

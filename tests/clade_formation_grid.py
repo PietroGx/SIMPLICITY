@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'scripts', 'nature_plots'))
+sys.path.insert(0, os.path.join(ROOT, 'figures_gui', 'prep'))
 
 import simplicity.dir_manager as dm
 import simplicity.output_manager as om
@@ -92,7 +92,7 @@ def _one(job):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--exp-num", type=int, default=1)
+    ap.add_argument("--stamp", default="latest")
     ap.add_argument("--scenarios", nargs="+", default=SCEN)
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--procs", type=int, default=8)
@@ -101,10 +101,12 @@ if __name__ == "__main__":
     ap.add_argument("--json", default="")
     ap.add_argument("--perseed", default="")
     a = ap.parse_args()
+    from _scenarios import resolve_stamp
+    a.stamp = resolve_stamp(a.stamp, 'impact_long_shedders')
 
     jobs = []
     for sc in a.scenarios:
-        for ss in dm.get_seeded_simulation_output_dirs(one_sod(EXP_NAME, sc, a.exp_num))[:a.seeds]:
+        for ss in dm.get_seeded_simulation_output_dirs(one_sod(EXP_NAME, sc, a.stamp))[:a.seeds]:
             jobs.append((sc, ss))
     print(f"[grid] {len(jobs)} seeds x {len(KS)} k x {len(MS)} m", flush=True)
 

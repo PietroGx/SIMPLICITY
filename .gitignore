@@ -11,8 +11,9 @@ structure.txt
 # Data/ holds simulation outputs and machine-local reference parameter files
 # (standard_values.json, parameter_specs.json, ...) -- all machine-local,
 # none versioned. Pipeline-specific config (e.g. impact_long_shedders'
-# SCENARIOS/NSR_RANGES) lives in scripts/experiments/impact_long_shedders_config.py
-# instead, as plain code -- not a Data/ reference file.
+# SCENARIOS/NSR_RANGES) lives in scripts/experiments_settings/*.json, loaded by
+# scripts/experiments_pipeline/impact_long_shedders_config.py -- not a Data/
+# reference file.
 Data/*
 # ...except the real-world inputs Figure 1 reads. These are hand-curated study
 # data, not simulation output, and Figure 1 is not reproducible from a clean

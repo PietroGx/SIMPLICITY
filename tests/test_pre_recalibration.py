@@ -2,7 +2,7 @@
 '''Everything that has to be settled before recalibrating, in one run.
 
     cd ~/SIMPLICITY && git pull
-    python tests/test_pre_recalibration.py --exp-num 909
+    python tests/test_pre_recalibration.py --stamp 909
 
 Two independent stages. Either can be run alone with --stages, and a failure in
 one does not stop the other -- the report says what ran.
@@ -87,7 +87,7 @@ def stage_grid(args):
     heading('STAGE grid      2% seeding at N=5000, R=1.06')
     command = [sys.executable, os.path.join(HERE, 'test_config_grid.py'),
                '--runner', args.runner, '--seeds', str(args.seeds),
-               '--exp-num', str(args.exp_num),
+               '--stamp', str(args.stamp),
                '--populations', '5000', '--i0-fractions', '0.02',
                '--r-values', '1.06']
     if args.slurm_mem:
@@ -100,7 +100,7 @@ def stage_grid(args):
     elapsed = time.monotonic() - start
     results['grid'] = ('ok' if code == 0 else f'FAILED (exit {code})', elapsed)
     print(f'\n  stage grid: exit {code} in {hms(elapsed)}')
-    print(f'  report: Data/config_grid_report_#{args.exp_num}.txt')
+    print(f'  report: Data/config_grid_report_#{args.stamp}.txt')
     return code == 0
 
 
@@ -288,7 +288,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--stages', nargs='+', default=['grid', 'consensus'],
                         choices=['grid', 'consensus'])
-    parser.add_argument('--exp-num', type=int, default=909)
+    parser.add_argument('--stamp', type=int, default=909)
     parser.add_argument('--seeds', type=int, default=50)
     parser.add_argument('--runner', default='slurm',
                         choices=['serial', 'multiprocessing', 'slurm'])

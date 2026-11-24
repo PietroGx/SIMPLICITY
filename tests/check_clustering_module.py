@@ -30,7 +30,7 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-sys.path.insert(0, os.path.join(ROOT, "scripts", "nature_plots"))
+sys.path.insert(0, os.path.join(ROOT, "figures_gui", "prep"))
 sys.path.insert(0, os.path.join(ROOT, "tests"))
 
 import simplicity.dir_manager as dm
@@ -117,14 +117,14 @@ def section_a():
 # --------------------------------------------------------------- section B
 # the two walks over rule B, measured on real runs
 
-def section_b(scenarios, nseeds, k, exp_num=1, exp_name=EXP_NAME):
+def section_b(scenarios, nseeds, k, stamp=1, exp_name=EXP_NAME):
     print(f"\nB. designate_clades against cluster_lin_into_clades_with_meta "
           f"(k={k})")
     checked = 0
     for sc in scenarios:
         try:
             ssods = dm.get_seeded_simulation_output_dirs(
-                one_sod(exp_name, sc, exp_num))[:nseeds]
+                one_sod(exp_name, sc, stamp))[:nseeds]
         except Exception as exc:
             print(f"  ({sc} unavailable: {exc})")
             continue
@@ -183,12 +183,14 @@ if __name__ == "__main__":
                     default=["control", "HIV_high", "edge_case"])
     ap.add_argument("--seeds", type=int, default=2)
     ap.add_argument("-k", type=int, default=7)
-    ap.add_argument("--exp-num", type=int, default=1)
+    ap.add_argument("--stamp", default="latest")
     ap.add_argument("--exp-name", default=EXP_NAME)
     a = ap.parse_args()
+    from _scenarios import resolve_stamp
+    a.stamp = resolve_stamp(a.stamp, a.exp_name)
     sys.setrecursionlimit(300000)
 
     section_a()
-    section_b(a.scenarios, a.seeds, a.k, a.exp_num, a.exp_name)
+    section_b(a.scenarios, a.seeds, a.k, a.stamp, a.exp_name)
     print(f"\n{PASS[0]} passed, {FAIL[0]} failed")
     sys.exit(1 if FAIL[0] else 0)

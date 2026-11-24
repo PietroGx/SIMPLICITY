@@ -141,7 +141,7 @@ fi
 # The bounds a run would actually use, straight from the config.
 BOUNDS="$("$PY" - <<'PY'
 import sys
-sys.path[:0] = ['.', 'scripts', 'scripts/experiments']
+sys.path[:0] = ['.', 'scripts', 'scripts/experiments_pipeline']
 from impact_long_shedders_config import NSR_RANGES as R
 print(R['cal_long']['min'], R['cal_long']['max'],
       R['cal_std']['min'], R['cal_std']['max'])

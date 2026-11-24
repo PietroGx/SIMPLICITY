@@ -138,19 +138,19 @@ fi
 # re-fits a finished calibration and diffs it against what that run froze
 if [ -n "$CALIB" ]; then
     run_test "calibration unchanged (#$CALIB)" \
-        tests/check_calibration_unchanged.py --exp-num "$CALIB"
+        tests/check_calibration_unchanged.py --stamp "$CALIB"
 fi
 
 # needs real production output
 if [ -n "$FIGURES" ]; then
     run_test "paper figures (#$FIGURES)" \
-        tests/test_figures_on_real_output.py --exp-num "$FIGURES"
+        tests/test_figures_on_real_output.py --stamp "$FIGURES"
 fi
 
 # submits its own Slurm jobs, from inside this one
 if [ -n "$SLURM_NUM" ]; then
     run_test "slurm resume + reconcile (#$SLURM_NUM)" \
-        tests/check_slurm_resume_and_reconcile.py --exp-num "$SLURM_NUM"
+        tests/check_slurm_resume_and_reconcile.py --stamp "$SLURM_NUM"
 fi
 
 if [ "$WITH_LOCAL" = "1" ]; then

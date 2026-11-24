@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# This file is part of SIMPLICITY
+# Copyright (C) 2025 Pietro Gerletti
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ============================================================================
+# Shared scenario resolution + output paths for the paper figures.
+# ----------------------------------------------------------------------------
+# The four figures must agree on which scenarios exist, so the list comes from
+# the pipeline's OWN config rather than being repeated in each script:
+#
+#   impact_long_shedders      -> 5 scenarios, including edge_case,
+#                                distributional consensus (the default)
+#   impact_long_shedders_amx  -> the same 5, run with argmax consensus
+#
+# Both names are one pipeline and one config: the consensus mode changes the
+# model, not the scenario list, so they must stay the same five scenarios for
+# the comparison to mean anything. The bound pipeline, which had four
+# scenarios and no edge_case, was deleted in v2.4.90.
+#
+# resolve_scenarios also reports which of those have no output on disk. A
+# scenario is DROPPED but WARNED about -- never silently omitted. Discovering
+# the list from disk instead would turn a half-finished run into a smaller
+# figure with no indication anything was missing, which is the failure mode
+# this repo has been bitten by before (see BACKLOG).
+# ============================================================================
+
+import os
+import sys
+
+import simplicity.dir_manager as dm
+import simplicity.output_manager as om
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                os.pardir, os.pardir, 'scripts', 'experiments_pipeline'))
+
+from impact_long_shedders_config import (
+    exp_group, scenario_experiment, scenario_output_dirs, scenario_label,
+    resolve_stamp)
+
+# The DEFAULT consensus mode owns the bare name. v2.4.92 made that
+# distribution; before it, a bare name meant argmax and "_dist" meant
+# distribution. Older runs on disk still carry the old convention.
+EXP_NAME = "impact_long_shedders"
+# impact_long_shedders_config.CONSENSUS_SUFFIX['argmax']
+ARGMAX_EXP_NAME = "impact_long_shedders_amx"
+
+# exp_name -> the module holding the SCENARIOS
+_CONFIG_MODULES = {
+    EXP_NAME: "impact_long_shedders_config",
+    ARGMAX_EXP_NAME: "impact_long_shedders_config",
+}
+
+# exp_name -> short label for output filenames. The label names the consensus
+# mode, which is the only thing that differs between the two.
+_PIPELINE_LABELS = {
+    EXP_NAME: "distribution",
+    ARGMAX_EXP_NAME: "argmax",
+}
+
+
+def scenario_names(exp_name=EXP_NAME):
+    """Every scenario this pipeline defines, in config order."""
+    module_name = _CONFIG_MODULES.get(exp_name)
+    if module_name is None:
+        raise SystemExit(
+            f"No scenario config known for --exp-name {exp_name!r}. "
+            f"Known: {sorted(_CONFIG_MODULES)}.")
+    module = __import__(module_name)
+    return [s["name"] for s in module.SCENARIOS]
+
+
+def scenario_meta(exp_name):
+    """{scenario: {duration, ratio}} from the pipeline config -- infection
+    duration (days) and long-shedder prevalence, used to explain the
+    conversion-efficiency gradient."""
+    module_name = _CONFIG_MODULES.get(exp_name)
+    if module_name is None:
+        return {}
+    module = __import__(module_name)
+    return {s["name"]: {"duration": s.get("inf_duration_long"),
+                        "ratio": s.get("long_shedders_ratio", 0.0)}
+            for s in module.SCENARIOS}
+
+
+def has_output(exp_name, scenario, stamp):
+    """True if this scenario's group produced output."""
+    return bool(scenario_output_dirs(exp_name, scenario, stamp))
+
+
+def one_sod(exp_name, scenario, stamp):
+    """The ONE simulation output dir of an experiment-phase scenario.
+
+    None when the scenario has not been run. Raises when the group holds more
+    than one: every figure here assumes a scenario is a single parameter
+    point, and `sods[0]` silently plotted the first and dropped the rest. The
+    day the experiment phase sweeps anything inside a scenario -- the duration
+    sweep at fixed prevalence is the obvious one -- that produces a plausible
+    wrong panel instead of a stop. Call this OUTSIDE any `except Exception`,
+    or the guard is swallowed and buys nothing.
+    """
+    sods = scenario_output_dirs(exp_name, scenario, stamp)
+    if not sods:
+        return None
+    if len(sods) > 1:
+        raise RuntimeError(
+            f"{scenario}: {len(sods)} simulation dirs in this group, expected "
+            f"1. The panel would use only {os.path.basename(sods[0])} and "
+            f"silently drop {len(sods) - 1}. Scope it to the parameter point "
+            "you mean.\n  " + "\n  ".join(os.path.basename(s) for s in sods))
+    return sods[0]
+
+
+def resolve_scenarios(exp_name, stamp, required=None, verbose=True):
+    """(present, missing) for this pipeline at this stamp.
+
+    `required` optionally restricts to a subset of the config's scenarios --
+    used by panels that deliberately plot only some of them.
+    """
+    names = scenario_names(exp_name)
+    if required is not None:
+        names = [n for n in names if n in set(required)]
+
+    present = [n for n in names if has_output(exp_name, n, stamp)]
+    missing = [n for n in names if n not in present]
+
+    if verbose:
+        print(f"[scenarios] {exp_name} #{stamp}: "
+              f"{len(present)}/{len(names)} with output -> {present}")
+        for n in missing:
+            print(f"[scenarios][warn] '{n}' is defined in the config but has no "
+                  f"output for #{stamp} -- it will be left out of the figure.")
+    return present, missing
+
+
+def pipeline_label(exp_name):
+    """Short label for the pipeline, for output filenames."""
+    return _PIPELINE_LABELS.get(exp_name, exp_name)
+
+
+def figures_dir():
+    """Data/figures -- created on demand."""
+    path = os.path.join(dm.get_data_dir(), "figures")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def figure_path(number, exp_name, stamp, fmt, seed=None, subdir=None,
+                group=None):
+    """Data/figures/Figure_<n>_<pipeline>_#<stamp>[_seed<s>].<fmt>.
+
+    The pipeline and run number are in the name so no two pipelines can
+    overwrite each other. `seed` is included for the seed-dependent figures
+    (3, 4) so rendering a second seed no longer silently overwrites the
+    first -- which made comparing seeds impossible.
+    """
+    out = figures_dir()
+    if subdir:
+        out = os.path.join(out, subdir)
+        os.makedirs(out, exist_ok=True)
+    tail = f"_{group}" if group else ""
+    tail += f"_seed{seed}" if seed is not None else ""
+    return os.path.join(
+        out,
+        f"Figure_{number}_{pipeline_label(exp_name)}_#{stamp}{tail}.{fmt}")
+
+
+# ----------------------------------------------------------------- skip accounting
+# A per-seed read fails for two unrelated reasons and only one is a reason to
+# skip: the repeat produced no output, or its output cannot be read/parsed.
+# Anything structural -- a missing column, a type error -- is a defect of the
+# figure code, and absorbing it reported "no data" for a run that had plenty.
+# Same contract as scripts/experiments_pipeline/long_nsr_calibration_plot's helpers.
+# The tuple itself comes from output_manager rather than being repeated: that
+# module runs matplotlib.use("Agg") at import time and no figure script here
+# picks a backend, so it cannot be imported from.
+EXPECTED_SEED_SKIPS = om.EXPECTED_READ_SKIPS
+
+
+def record_seed_skip(skips, exc):
+    name = type(exc).__name__
+    skips[name] = skips.get(name, 0) + 1
+
+
+def format_seed_skips(skips):
+    if not skips:
+        return 'no seed was skipped'
+    return (f"{sum(skips.values())} skipped: "
+            + ', '.join(f'{name} x{n}' for name, n in sorted(skips.items())))

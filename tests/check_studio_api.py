@@ -1,6 +1,6 @@
 """Checks the studio server end to end against a running instance.
 
-    python -I tests/studio/server.py &
+    python -I figures_gui/server.py &
     python -I tests/check_studio_api.py [http://127.0.0.1:8600]
 
 Deliberately goes through HTTP rather than importing the modules: the thing

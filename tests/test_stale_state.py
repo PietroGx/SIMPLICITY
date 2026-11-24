@@ -66,7 +66,7 @@ def test_completed_state_refuses():
               'Nothing has been submitted' in message, True)
         check('names the counts', f'{len(exp.pairs)}x completed' in message, True)
         check('offers a way out',
-              '--exp-num' in message and 'rm -rf' in message, True)
+              '--stamp' in message and 'rm -rf' in message, True)
 
 
 def test_a_single_leftover_refuses():

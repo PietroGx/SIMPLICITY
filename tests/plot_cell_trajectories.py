@@ -2,7 +2,7 @@
 '''Infected-vs-time for every simulation of one or more configuration cells.
 
     cd ~/SIMPLICITY && git pull
-    python tests/plot_cell_trajectories.py --exp-nums 122 134 --slurm
+    python tests/plot_cell_trajectories.py --stamps 122 134 --slurm
 
 The decision table gives a cell one number per column, and two cells with the
 same horizon fraction can look nothing alike: an epidemic that runs flat to
@@ -31,7 +31,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-SCRIPTS = os.path.join(REPO, 'scripts', 'experiments')
+SCRIPTS = os.path.join(REPO, 'scripts', 'experiments_pipeline')
 sys.path.insert(0, REPO)
 sys.path.insert(0, HERE)
 sys.path.insert(0, SCRIPTS)
@@ -69,11 +69,11 @@ NAME_CANDIDATES = ('ils_grid', 'impact_long_shedders')
 
 
 def burnin_cutoff():
-    """fig3_preprocess_data.BURNIN_CUTOFF_DAYS, read rather than re-spelled.
+    """burnin.BURNIN_CUTOFF_DAYS (figures_gui/prep/burnin.py), read rather than re-spelled.
 
     Imported it would drag in _scenarios and clade_preprocess through
     two sibling-directory sys.path tricks; the constant is what is wanted."""
-    path = os.path.join(REPO, 'scripts', 'nature_plots', 'fig3_preprocess_data.py')
+    path = os.path.join(REPO, 'figures_gui', 'prep', 'burnin.py')
     try:
         m = re.search(r'^BURNIN_CUTOFF_DAYS\s*=\s*(\d+)', open(path).read(), re.M)
         return float(m.group(1))
@@ -83,7 +83,7 @@ def burnin_cutoff():
 
 # ------------------------------------------------------------------ locating
 
-def resolve_run(exp_num, consensus):
+def resolve_run(stamp, consensus):
     """(experiment name, run directory) for a cell, or (None, None).
 
     cfg.EXP_NAME is what every path helper derives from, so rebinding it is
@@ -91,7 +91,7 @@ def resolve_run(exp_num, consensus):
     to put the cells under ils_grid."""
     for base in NAME_CANDIDATES:
         cfg.EXP_NAME = base
-        run_dir = cfg.run_dir(exp_num, consensus)
+        run_dir = cfg.run_dir(stamp, consensus)
         if os.path.isdir(run_dir):
             return base, run_dir
     return None, None
@@ -326,7 +326,7 @@ def report_phi(cell, cutoff):
 def submit(args):
     os.makedirs(os.path.join('slurm_logs', 'trajectories'), exist_ok=True)
     inner = [sys.executable, os.path.abspath(__file__),
-             '--exp-nums', *[str(n) for n in args.exp_nums],
+             '--stamps', *[str(n) for n in args.stamps],
              '--consensus', args.consensus]
     cmd = ['sbatch', '--job-name=traj_plot', '--cpus-per-task=1',
            '--mem=8G', '--time=01:00:00',
@@ -341,7 +341,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--exp-nums', type=int, nargs='+', required=True)
+    parser.add_argument('--stamps', type=int, nargs='+', required=True)
     parser.add_argument('--consensus', default=DEFAULT_CONSENSUS)
     parser.add_argument('--out-dir', default=OUT_DIR)
     parser.add_argument('--slurm', action='store_true',
@@ -359,16 +359,16 @@ def main():
     cutoff = burnin_cutoff()
     os.makedirs(args.out_dir, exist_ok=True)
     missing = []
-    for exp_num in args.exp_nums:
-        base, run_dir = resolve_run(exp_num, args.consensus)
+    for stamp in args.stamps:
+        base, run_dir = resolve_run(stamp, args.consensus)
         if run_dir is None:
-            missing.append(exp_num)
-            print(f'#{exp_num}: not on disk under any of {NAME_CANDIDATES}')
+            missing.append(stamp)
+            print(f'#{stamp}: not on disk under any of {NAME_CANDIDATES}')
             continue
-        print(f'#{exp_num}: {run_dir}')
+        print(f'#{stamp}: {run_dir}')
         paths = trajectories(run_dir)
         if not paths:
-            missing.append(exp_num)
+            missing.append(stamp)
             print(f'  no simulation_trajectory.csv under {run_dir}/04_Output')
             continue
         params = cell_params(run_dir)
@@ -378,7 +378,7 @@ def main():
             print(f'  WARNING: settings say N={any_run["pop"]:.0f}, the '
                   f'trajectory starts with {any_run["pop_seen"]:.0f} in '
                   f'susceptibles+infected. phi is scaled by the former.')
-        title = (f'{base} #{exp_num}   N={any_run["pop"]:.0f}  '
+        title = (f'{base} #{stamp}   N={any_run["pop"]:.0f}  '
                  f'I0={any_run["i0"]:.0f}'
                  + (f'  R={params["R"]}' if 'R' in params else ''))
         tally = {}
@@ -388,7 +388,7 @@ def main():
         print('  stop reasons: '
               + '  '.join(f'{k} {v}' for k, v in sorted(tally.items())))
         report_phi(cell, cutoff)
-        stem = os.path.join(args.out_dir, f'{base}_{exp_num}_infected')
+        stem = os.path.join(args.out_dir, f'{base}_{stamp}_infected')
         draw_by_scenario(cell, title, stem + '_by_scenario.png', cutoff)
         draw_per_simulation(cell, title, stem + '_per_simulation.png', cutoff)
 

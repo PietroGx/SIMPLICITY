@@ -92,7 +92,7 @@ import simplicity.output_manager as om
 import simplicity.tuning.evolutionary_rate as er
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                'experiments'))
+                                'experiments_pipeline'))
 from impact_long_shedders_config import (
     CAL1_ISOLATED_FIXED_PARAMS, USER_FIXED_PARAMS, phase_offset,
     add_slurm_resource_args, set_slurm_resource_env,

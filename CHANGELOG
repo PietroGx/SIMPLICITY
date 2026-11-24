@@ -5,6 +5,81 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.20 — 2026-11-24 — pietro gerletti
+
+The studio is the only source of the figures
+--------------------------------------------
+
+`tests/studio` moved to `figures_gui/`. `scripts/nature_plots` and
+`submit_plots.sh` are deleted. What the studio ran on moved with it into
+`figures_gui/prep/`: `_scenarios.py`, `clade_preprocess.py` (the clade build's
+episode rules) and the three Figure 1 modules (`fig1_save.py`, `fig1_plots.py`,
+`fig1_preprocess_data.py`, which `figures_gui/fig1.py` runs). The burn-in day
+(`phi_day`, the run-length gates) is now `figures_gui/prep/burnin.py`; it was
+`fig2_preprocess_data.py`, of which nothing else was read.
+`tests/export_transmissions.py` is `figures_gui/export_transmissions.py`, and
+`tests/artifacts/fakedom.js` is `figures_gui/fakedom.js`. Deleted with the code
+they tested: `tests/test_figure_pipelines.py`, `tests/export_fig2_builder.py`,
+`tests/test_jump_mirrors_fig3.py`, and the Figure 2/3 stages of
+`tests/test_figures_on_real_output.py`.
+
+**Recalibration required** for the studio cache: the move changed
+`figures_gui/compute.py`'s imports, so the build hash is now `83607fd0aa7e` and
+no build on disk is read (one local build, k=7 m_T=1%, exists). Rerun
+`figures_gui/run_precompute.sh`. The maths of a build is unchanged.
+
+The tabs split data from looks
+------------------------------
+
+* Data exploration tabs set every data rule. Clustering and m_T effect carry the
+  clade definition (k, m_T, burn-in, and now the origin rule). Breakout
+  detection, Cryptic breakouts and Cryptic by scenario carry the detection rules.
+  Every one of them saves and loads the same named sets of all these rules
+  (`figures_gui/web/presets.js`; `server.py` `PRESET_KEYS` gained k, m_T, origin rule).
+* Figure tabs keep only how a figure looks. Their data controls (seed, clade
+  definition, origin rule, burn-in, Figure 5's F/H/source) are replaced by a Data
+  card that links to where each rule is set.
+* The old Export tab (compute jobs) is now Compute. The new Export tab writes a
+  figure as PNG, JPEG or PDF at 89, 120 or 183 mm and 300, 600 or 1200 dpi. The
+  figure is redrawn at that density (`EXPORT_DPR` in `draw.js`) and composed with
+  html2canvas; PNGs carry the dpi.
+
+Figures
+-------
+
+* "Burden" is "frequency AUC" everywhere it is read: Figure 4, S1, the Method
+  tab, the axis tooltips and GLOSSARY.md (which now lists "burden" under words
+  not to use). The code and the cache keep the name `burden`. The bars split into only long / mostly long / mostly standard /
+  standard only (`panels.panel1_hosts`), red on the left, the founding clade
+  hatched inside the green. Labels have one decimal, narrow segments are labelled
+  above the bar and drawn at least 5 px. A colour-scheme option offers normal,
+  colour-blind colours (validated: worst colour-blind ΔE 8.4, worst normal-vision
+  ΔE 19.0) and colour-blind texture.
+* Figure 5: the cryptic-percentage form is gone. The tab reads only the
+  exploration tabs' rules, fits the screen and has no table.
+* Breakout detection and Cryptic breakouts: a burn-in gate on the breakout start,
+  still-rising clades counted, `dip=low` trough rule, the brkQuiet toggle in place
+  of launch f, saved settings, and the Cryptic by scenario tab with
+  Kruskal–Wallis and Holm-adjusted Mann–Whitney tests (`/api/count_tests`).
+* `server.py` sends `Cache-Control: no-cache` for page files, so a plain reload
+  shows an edit.
+* `check_app.js` puts every build parameter back to the operating point after its
+  grid checks, so the renders after them do not need a build at another grid point.
+
+Pipeline layout (carried on this branch)
+----------------------------------------
+
+`scripts/experiments` split into `scripts/experiments_pipeline` (the pipeline),
+`scripts/experiments_settings` (one JSON per configuration, read with
+`--settings`), `scripts/experiment_settings_gui` (writes them),
+`scripts/launchers` (`run_pipeline_and_grid.sh`, `start_simplicity_session.sh`)
+and `scripts/checks`. `simplicity/population.py`: the reservoir of fresh
+susceptibles is `RESERVOIR_PER_CAPITA` (100) per member of the population
+instead of a fixed 100000, which ran dry at N=5000; every slot draws from rng3,
+so a seed at another reservoir size is another simulation.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.19 — 2026-11-20 — pietro gerletti
 
 The studio holds the paper's figures

@@ -16,7 +16,7 @@ import tempfile
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                os.pardir, 'scripts', 'experiments'))
+                                os.pardir, 'scripts', 'experiments_pipeline'))
 
 import simplicity.dir_manager as dm
 
@@ -26,7 +26,7 @@ import impact_long_shedders_exp as exp
 # A scratch Data/ for the whole module. Not os.chdir: dm captured an ABSOLUTE
 # _data_dir at import (dir_manager.py:31) and does not follow the cwd, so the
 # orchestrator sections below wrote experiment_state.json into the live Data/
-# for exp-nums 99 (both modes) and 998. The reference parameters come along, so
+# for stamps 99 (both modes) and 998. The reference parameters come along, so
 # the stages still read this machine's standard_values.json.
 _SCRATCH = tempfile.mkdtemp(prefix='consensus_pipelines_')
 shutil.copytree(os.path.join(dm.get_data_dir(), '00_Reference_parameters'),
@@ -92,7 +92,7 @@ def test_calibration_states_its_consensus():
     and gitignored -- and read_standard_parameters_values merges that file
     OVER the code defaults, so the mode a calibration ran under was a
     property of the host, not of the pipeline. Two machines could calibrate
-    the same --exp-num differently and nothing would say so.
+    the same --stamp differently and nothing would say so.
     """
     ranges = {'min': 1e-4, 'max': 1e-2, 'steps': 3}
     for label, build in (('cal_1', cfg.build_cal1_settings),
@@ -118,7 +118,7 @@ def test_orchestrator_refuses_two_modes():
     must refuse rather than silently calibrate under one and run under both."""
     import run_impact_long_shedders_pipeline as r
     argv = sys.argv
-    sys.argv = ['run', '--exp-num', '999',
+    sys.argv = ['run', '--stamp', '999',
                 '--consensus', 'distribution', 'argmax']
     try:
         r.main()
@@ -150,7 +150,7 @@ def test_dispatch():
     for mode in cfg.CONSENSUS_MODES:
         seen = []
 
-        def record(runner, exp_num, settings_func, name, append=True, _s=seen):
+        def record(runner, stamp, settings_func, name, append=True, _s=seen):
             varying, fixed, n_seeds = settings_func()
             groups = [g['name'] for g in varying['_scenario_groups']]
             _s.append((name, groups, [g.get('consensus') for g in
@@ -159,7 +159,7 @@ def test_dispatch():
             return groups
 
         exp.run_experiment_phase_script = record
-        sys.argv = ['exp', '--exp-num', '99', '--runner', 'serial',
+        sys.argv = ['exp', '--stamp', '99', '--runner', 'serial',
                     '--seeds', '30', '--consensus', mode]
         exp.main()
 
@@ -222,7 +222,7 @@ def test_sanity_plots():
         # the command carries --output/--error now, so take the script's
         # own arguments from the script path rather than by position
         i = next(n for n, a in enumerate(cmd) if a.endswith('submit_sanity_plot.sh'))
-        check(f"{mode}: exp_num and targets passed",
+        check(f"{mode}: stamp and targets passed",
               cmd[i + 1:i + 4], ['7', '0.0013', '0.00205'])
         check(f"{mode}: slurm output is not the repo root",
               any(a.startswith('--output=') and 'slurm_logs' in a for a in cmd),
@@ -272,7 +272,7 @@ def test_archive_follows_the_mode_run():
 def test_shell_passes_exp_name():
     """The sbatch wrapper must forward a 4th argument and default it."""
     sh = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir,
-                           'scripts', 'experiments',
+                           'scripts', 'experiments_pipeline',
                            'submit_sanity_plot.sh')).read()
     check("shell reads a 4th argument with a default",
           'EXP_NAME="${4:-impact_long_shedders}"' in sh, True)
@@ -309,7 +309,7 @@ def test_main_reaches_the_summary():
     runner.compress_results = lambda *a, **k: calls.__setitem__('compress', a)
 
     argv = sys.argv
-    sys.argv = ['run', '--exp-num', '998', '--runner', 'serial']
+    sys.argv = ['run', '--stamp', '998', '--runner', 'serial']
     log = os.path.join('Data', 'pipeline_logs',
                        f'{cfg.EXP_NAME}_pipeline_#998.log')
     outcome, text = 'reached', ''

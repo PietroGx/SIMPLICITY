@@ -74,6 +74,13 @@ TRAJECTORY_COLUMNS = _OUTPUT_COLUMNS[TRAJECTORY]
 # Off by default; flip this to record it again.
 track_fitness_traj = False
 
+# Individuals allocated per member of the initial population: the pool that
+# replaces each removed individual with a fresh susceptible. It was a fixed
+# 100000 whatever the size, so at N=5000 it ran dry before the run ended.
+# Every slot draws from rng3 at creation, so its size is part of a seed's
+# stream: the same seed at another reservoir size is another simulation.
+RESERVOIR_PER_CAPITA = 100
+
 class Population:
     '''
     The class defines a population for the SIMPLICITY simulations. It contains
@@ -97,7 +104,7 @@ class Population:
                  sequence_long_shedders=False,
                  susceptibility_long=1.0,
                  write_fasta=False,
-                 reservoir=100000,
+                 reservoir=None,
                  output_directory=None):
 
         # random number generator
@@ -132,6 +139,8 @@ class Population:
         self.detectables_long     = 0
         self.detectables          = 0 # number of detectable individuals
         
+        if reservoir is None:
+            reservoir = RESERVOIR_PER_CAPITA * size
         self.reservoir = reservoir   # size of total population (not everyone is 
                                      # susceptible at the beginning, when 
                                      # individuals get removed from the system
@@ -195,7 +204,7 @@ class Population:
         # 47 MB respectively in the worst N=5000 task of profile_grid_#910.
         # Rows land in "<name>.partial" and are renamed on save, so a file
         # under its real name still means the run finished -- which is what
-        # scripts/check_completed_simulations.py reads it as.
+        # scripts/checks/check_completed_simulations.py reads it as.
         # phylogenetic_data deliberately stays in memory: its rows are read
         # on the hot path (get_lineage_genome) and MUTATED after the fact
         # (population_model.py increments Total_infections), so a streamed

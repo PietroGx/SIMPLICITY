@@ -42,8 +42,8 @@ import numpy as np
 import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in ("", "tests", os.path.join("tests", "studio"),
-           os.path.join("scripts", "nature_plots")):
+for _p in ("", "tests", "figures_gui",
+           os.path.join("figures_gui", "prep")):
     sys.path.insert(0, os.path.join(ROOT, _p))
 
 import simplicity.clustering as cl
@@ -108,7 +108,7 @@ def one_run(ssod, k, mt, prom, lo, hi, ref_win):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--exp-num", type=int, default=1)
+    ap.add_argument("--stamp", default="latest")
     ap.add_argument("--scenarios", nargs="+", default=SCEN)
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("-k", type=int, default=7)
@@ -120,12 +120,14 @@ if __name__ == "__main__":
     ap.add_argument("--csv", default=os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "_rise_window_effect.csv"))
     a = ap.parse_args()
+    from _scenarios import resolve_stamp
+    a.stamp = resolve_stamp(a.stamp, 'impact_long_shedders')
     sys.setrecursionlimit(300000)
 
     allrows, failed = [], []
     for sc in a.scenarios:
         ssods = compute.dm.get_seeded_simulation_output_dirs(
-            compute.one_sod(compute.EXP_NAME, sc, a.exp_num))[:a.seeds]
+            compute.one_sod(compute.EXP_NAME, sc, a.stamp))[:a.seeds]
         for ss in ssods:
             rows, err = one_run(ss, a.k, a.mt, a.prom, a.lo, a.hi, a.ref_win)
             if err:

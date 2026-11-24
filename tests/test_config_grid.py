@@ -41,8 +41,8 @@ Usage on the HPC, from the repo root:
     --i0-fractions A B C    default 0.01 0.03 0.05  (production is 50/1000)
     --r-values A B          default 1.06 1.07
     --seeds N               per scenario per cell   (default 10)
-    --table-exp-num N       frozen table to reuse   (default 3)
-    --exp-num N             write under             (default 906)
+    --table-stamp N       frozen table to reuse   (default 3)
+    --stamp N             write under             (default 906)
     --max-array-tasks N     largest single array      (default 900, 0 = all)
     --analyse-only          skip the run, re-print the report
 
@@ -67,7 +67,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
-sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments'))
+sys.path.insert(0, os.path.join(REPO, 'scripts', 'experiments_pipeline'))
 
 import pandas as pd
 
@@ -94,8 +94,8 @@ def cell_label(cell):
 
 # ---------------------------------------------------------------- building
 
-def rows_from_table(table_exp_num):
-    path = frozen_table_path(table_exp_num)
+def rows_from_table(table_stamp):
+    path = frozen_table_path(table_stamp)
     if not os.path.isfile(path):
         raise SystemExit(f'No frozen table at {path}.')
     df = pd.read_csv(path)
@@ -182,7 +182,7 @@ def part_name(index, total):
     return GRID_EXP_NAME if total == 1 else f'{GRID_EXP_NAME}_part{index + 1}'
 
 
-def run_grid(rows, cells, exp_num, runner, n_seeds, max_array_tasks):
+def run_grid(rows, cells, stamp, runner, n_seeds, max_array_tasks):
     groups, base_fixed = build_groups(rows, cells, n_seeds)
     chunks = chunk_groups(groups, n_seeds, max_array_tasks)
     print(f'[grid] submitting {len(chunks)} array(s), '
@@ -195,7 +195,7 @@ def run_grid(rows, cells, exp_num, runner, n_seeds, max_array_tasks):
 
         print(f'[grid] --- {name}: {len(chunk)} groups, '
               f'{len(chunk) * n_seeds} tasks ---')
-        run_experiment_script(runner, exp_num, make_settings, name)
+        run_experiment_script(runner, stamp, make_settings, name)
 
 
 # ---------------------------------------------------------------- measuring
@@ -251,7 +251,7 @@ def measure(paths, pop_size):
     return m
 
 
-def seeds_on_disk(exp_num, fallback):
+def seeds_on_disk(stamp, fallback):
     """The seed count the grid was actually RUN with, read from the experiment
     rather than from --seeds.
 
@@ -263,18 +263,18 @@ def seeds_on_disk(exp_num, fallback):
     for name in ([GRID_EXP_NAME]
                  + [f'{GRID_EXP_NAME}_part{i}' for i in range(1, 100)]):
         try:
-            return int(sm.read_n_seeds_file(f'{name}_#{exp_num}')['n_seeds'])
+            return int(sm.read_n_seeds_file(f'{name}_#{stamp}')['n_seeds'])
         except (OSError, KeyError, ValueError):
             continue
     return fallback
 
 
-def grid_params_files(exp_num):
+def grid_params_files(stamp):
     '''Every parameter file across the grid's parts. The grid may have been
     submitted as several arrays, each its own experiment.'''
-    return glob.glob(f'Data/{GRID_EXP_NAME}_#{exp_num}/'
+    return glob.glob(f'Data/{GRID_EXP_NAME}_#{stamp}/'
                      f'{dm.SIMULATIONS_DIRNAME}/*.json') + \
-           glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{exp_num}/'
+           glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{stamp}/'
                      f'{dm.SIMULATIONS_DIRNAME}/*.json')
 
 
@@ -295,7 +295,7 @@ def scenario_lookup(rows):
             for r in rows}
 
 
-def collect(rows, cells, exp_num, table_exp_num):
+def collect(rows, cells, stamp, table_stamp):
     '''{cell: {scenario: metrics}} for the single grid experiment, plus the
     run #3 reference row. Each parameter combination is identified from its
     own written parameters file, not from the directory name.'''
@@ -304,7 +304,7 @@ def collect(rows, cells, exp_num, table_exp_num):
     base = {}
     for s in SCENARIO_ORDER:
         paths = sorted(glob.glob(
-            f'Data/{base_prefix}_{s}_#{table_exp_num}/04_Output/*/seed_*/'
+            f'Data/{base_prefix}_{s}_#{table_stamp}/04_Output/*/seed_*/'
             f'simulation_trajectory.csv'))
         if paths:
             base[s] = measure(paths, BASELINE[1])
@@ -312,7 +312,7 @@ def collect(rows, cells, exp_num, table_exp_num):
         out[BASELINE] = base
 
     lookup = scenario_lookup(rows)
-    for params_file in sorted(grid_params_files(exp_num)):
+    for params_file in sorted(grid_params_files(stamp)):
         try:
             with open(params_file) as fh:
                 params = json.load(fh)
@@ -360,10 +360,10 @@ def repeat_state_counts(experiment):
         return {}
 
 
-def failed_count(exp_num):
+def failed_count(stamp):
     total = 0
-    for path in (glob.glob(f'Data/{GRID_EXP_NAME}_#{exp_num}') +
-                 glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{exp_num}')):
+    for path in (glob.glob(f'Data/{GRID_EXP_NAME}_#{stamp}') +
+                 glob.glob(f'Data/{GRID_EXP_NAME}_part*_#{stamp}')):
         total += repeat_state_counts(os.path.basename(path)).get(jobs.FAILED, 0)
     return total
 
@@ -412,7 +412,7 @@ def se_pct(k, n):
 
 # ---------------------------------------------------------------- report
 
-def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
+def report(data, cells, stamp, table_stamp, n_seeds, timing=None):
     L = []
     w = L.append
     expected_per_cell = len(SCENARIO_ORDER) * n_seeds
@@ -422,7 +422,7 @@ def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
     w('=' * 96)
     w('CONFIGURATION GRID — population x starting infections x R')
     w('=' * 96)
-    w(f'frozen table : {frozen_table_path(table_exp_num)}'
+    w(f'frozen table : {frozen_table_path(table_stamp)}'
       f'   (fitted at R=1.03, N=1000)')
     w(f'consensus    : {CONSENSUS} only      R_long set equal to R throughout')
     w(f'seeds        : {n_seeds} per scenario per cell, 5 scenarios '
@@ -457,7 +457,7 @@ def report(data, cells, exp_num, table_exp_num, n_seeds, timing=None):
     if got > want:
         w('  *** MORE output than expected. The seed count used for this')
         w('  *** report does not match the run. Numbers below are unsafe.')
-    nfailed = failed_count(exp_num)
+    nfailed = failed_count(stamp)
     if nfailed:
         w(f'tasks marked .failed: {nfailed}')
     for line in missing_lines:
@@ -574,8 +574,8 @@ def main():
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--table-exp-num', type=int, default=3)
-    p.add_argument('--exp-num', type=int, default=906)
+    p.add_argument('--table-stamp', type=int, default=3)
+    p.add_argument('--stamp', type=int, default=906)
     p.add_argument('--populations', type=int, nargs='+',
                    default=[1000, 2500, 5000])
     p.add_argument('--i0-fractions', type=float, nargs='+',
@@ -596,7 +596,7 @@ def main():
     add_slurm_resource_args(p)
     args = p.parse_args()
 
-    table_path, rows = rows_from_table(args.table_exp_num)
+    table_path, rows = rows_from_table(args.table_stamp)
     cells = build_grid(args.r_values, args.populations, args.i0_fractions)
     wall = None
 
@@ -635,17 +635,17 @@ def main():
             else:
                 print(f'[grid] MaxArraySize: {limit}, each array fits')
         t0 = time.monotonic()
-        run_grid(rows, cells, args.exp_num, args.runner, args.seeds,
+        run_grid(rows, cells, args.stamp, args.runner, args.seeds,
                  args.max_array_tasks)
         wall = time.monotonic() - t0
         print(f'[grid] wall clock : {hms(wall)}')
 
-    data = collect(rows, cells, args.exp_num, args.table_exp_num)
+    data = collect(rows, cells, args.stamp, args.table_stamp)
     if not data:
         raise SystemExit('No output found to measure. Did the run complete?')
 
     # what the grid was run with, not what this invocation was asked for
-    seeds = seeds_on_disk(args.exp_num, args.seeds)
+    seeds = seeds_on_disk(args.stamp, args.seeds)
     if seeds != args.seeds:
         print(f'[grid] seeds on disk: {seeds} (not --seeds {args.seeds}); '
               f'measuring against {seeds}')
@@ -653,13 +653,13 @@ def main():
     timing = {'wall': wall,
               'tasks': len(cells) * len(rows) * args.seeds,
               'cap': args.project_cap, 'seeds': args.project_seeds,
-              'by_cell': task_seconds_by_cell(rows, args.exp_num)}
+              'by_cell': task_seconds_by_cell(rows, args.stamp)}
 
-    text = report(data, cells, args.exp_num, args.table_exp_num, seeds,
+    text = report(data, cells, args.stamp, args.table_stamp, seeds,
                   timing)
     print('\n' + text)
 
-    out = os.path.join('Data', f'config_grid_report_#{args.exp_num}.txt')
+    out = os.path.join('Data', f'config_grid_report_#{args.stamp}.txt')
     try:
         os.makedirs('Data', exist_ok=True)
         with open(out, 'w') as fh:
