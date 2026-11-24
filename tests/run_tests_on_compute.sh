@@ -52,7 +52,7 @@ if [ "$INTERFACE" = "0" ] && [ "$WITH_LOCAL" = "0" ] \
 fi
 
 resolve_python
-mkdir -p Data/test_logs
+mkdir -p Data/logs/tests
 
 # --------------------------------------------------------------- submit path
 if [ -z "${SLURM_JOB_ID:-}" ] && [ "${SIMPLICITY_TESTS_LOCAL:-0}" != "1" ]; then
@@ -62,7 +62,7 @@ if [ -z "${SLURM_JOB_ID:-}" ] && [ "${SIMPLICITY_TESTS_LOCAL:-0}" != "1" ]; then
         exit 1
     fi
     STAMP="$(date +%Y%m%d_%H%M%S)"
-    OUT="$REPO/Data/test_logs/tests_${STAMP}_%j.log"
+    OUT="$REPO/Data/logs/tests/tests_${STAMP}_%j.log"
     FORWARD=""
     [ "$INTERFACE" = "0" ] && FORWARD="$FORWARD --no-interface"
     [ "$WITH_LOCAL" = "1" ] && FORWARD="$FORWARD --with-local"

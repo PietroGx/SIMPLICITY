@@ -9,7 +9,7 @@ import base64, csv, json, os, sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "Data", "figures_studio", "tx")
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "Data", "figures", "impact_long_shedders_1", "exploration", "tx")
 PREV = os.path.join(ROOT, "tests", "_prevalence_window.csv")
 CELLS = ["ll", "ls", "sl", "ss"]
 

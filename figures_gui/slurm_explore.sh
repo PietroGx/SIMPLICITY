@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=main
 #SBATCH --qos=standard
-#SBATCH --output=slurm_logs/fig2_precompute/explore_%A_%a.log
-#SBATCH --error=slurm_logs/fig2_precompute/explore_%A_%a.err
+#SBATCH --output=Data/logs/precompute/explore_%A_%a.log
+#SBATCH --error=Data/logs/precompute/explore_%A_%a.err
 
 # ============================================================================
 # slurm_explore.sh -- figures_gui/warm_explore.py as an array: each task fills
@@ -29,7 +29,7 @@ cd "$ROOT"
 
 STAMP="${STAMP:-latest}"
 EXP_NAME="${EXP_NAME:-impact_long_shedders}"
-STORE="${STORE:-$ROOT/Data/figures_studio}"
+STORE="${STORE:-$ROOT/Data/figures}"
 K="${K:-7}"
 MT="${MT:-0.01}"
 SEEDS="${SEEDS:-50}"
@@ -41,7 +41,7 @@ conda activate simplicity
 
 PATHS=$(python -I figures_gui/sweep.py --print-paths --store "$STORE" \
         --stamp "$STAMP" --exp-name "$EXP_NAME")
-read -r EXP_NAME STAMP _REL EXP_STORE _CACHE <<<"$PATHS"
+read -r EXP_NAME STAMP _REL EXP_STORE _CACHE EXP_ROOT <<<"$PATHS"
 
 echo "explore warm: shard $IDX/$N on $(hostname -s), $EXP_NAME #$STAMP, k=$K m_T=$MT"
 date

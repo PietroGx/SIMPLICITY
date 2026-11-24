@@ -42,7 +42,7 @@
 # slurm/ logs and still packs Data_Export. --drop-slurm-logs and --no-compress
 # are opt-in and are named on the plan line.
 #
-# One log, Data/pipeline_logs/<name>_pipeline_and_grid_#<stamp>_<time>.log, with
+# One log, Data/logs/pipeline/<name>_pipeline_and_grid_#<stamp>_<time>.log, with
 # every stage boundary timestamped. --check-only writes no log.
 #
 # No 'set -u': conda's activate.d hooks are not nounset-safe.
@@ -68,7 +68,7 @@ SLURM_MEM_CAL2=""
 SLURM_TIME=""
 CAL_WORKERS=""
 GRID_SEEDS=""
-STORE="${STORE:-$ROOT/Data/figures_studio}"
+STORE="${STORE:-$ROOT/Data/figures}"
 LIMIT=""
 LOG=""
 YES=0
@@ -91,9 +91,9 @@ Flags (each resolved value is printed in the checks table):
   --cal-workers N       SIMPLICITY_CALIBRATION_WORKERS for the
                         login-node per-seed fit, ~1.6 GB each  [auto, cap 4]
   --grid-seeds N        seeds run_precompute.sh's gate demands [--exp-seeds]
-  --store PATH          studio store for the grid              [<repo>/Data/figures_studio]
+  --store PATH          studio store for the grid              [<repo>/Data/figures]
   --limit N             throttle the grid array                [none]
-  --log PATH            the one log                            [Data/pipeline_logs/...]
+  --log PATH            the one log                            [Data/logs/pipeline/...]
   --no-compress         skip the pipeline's Data_Export packing
   --drop-slurm-logs     let the packager DELETE each experiment's slurm/ logs
   --yes, -y             skip the confirmation prompt
@@ -160,7 +160,7 @@ LOG_TIME="$(date +%Y%m%d_%H%M%S)"
 log_line() { printf '[%s] %s\n' "$(date -Is)" "$*"; }
 
 if [ "$CHECK_ONLY" -eq 0 ]; then
-    LOG="${LOG:-Data/pipeline_logs/impact_long_shedders_pipeline_and_grid_#${STAMP}_${LOG_TIME}.log}"
+    LOG="${LOG:-Data/logs/pipeline/impact_long_shedders_pipeline_and_grid_#${STAMP}_${LOG_TIME}.log}"
     mkdir -p "$(dirname "$LOG")"
     # everything below -- checks, prompt, both stages -- goes to the one log
     exec > >(tee -a "$LOG") 2>&1

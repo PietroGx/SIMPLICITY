@@ -9,10 +9,10 @@ SLURM_EXTRAS="$2"
 
 if [[ "$FLAG" == "--slurm" ]]; then
     echo "Submitting reconstruction job to SLURM..."
-    mkdir -p slurm_logs/packaging
+    mkdir -p Data/logs/packaging
     sbatch ${SLURM_EXTRAS} --job-name="simp_rec" --cpus-per-task=16 --mem=64G --time=02:00:00 \
-           --output="slurm_logs/packaging/reconstruct_%j.out" \
-           --error="slurm_logs/packaging/reconstruct_%j.err" \
+           --output="Data/logs/packaging/reconstruct_%j.out" \
+           --error="Data/logs/packaging/reconstruct_%j.err" \
            --mail-type=END --wrap="./scripts/reconstruct_simplicity_data.sh --internal"
     exit 0
 fi

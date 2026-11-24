@@ -324,14 +324,14 @@ def report_phi(cell, cutoff):
 # -------------------------------------------------------------------- main
 
 def submit(args):
-    os.makedirs(os.path.join('slurm_logs', 'trajectories'), exist_ok=True)
+    os.makedirs(os.path.join('Data', 'logs', 'trajectories'), exist_ok=True)
     inner = [sys.executable, os.path.abspath(__file__),
              '--stamps', *[str(n) for n in args.stamps],
              '--consensus', args.consensus]
     cmd = ['sbatch', '--job-name=traj_plot', '--cpus-per-task=1',
            '--mem=8G', '--time=01:00:00',
-           '--output=slurm_logs/trajectories/traj_%j.out',
-           '--error=slurm_logs/trajectories/traj_%j.err',
+           '--output=Data/logs/trajectories/traj_%j.out',
+           '--error=Data/logs/trajectories/traj_%j.err',
            '--wrap=' + ' '.join(inner)]
     print(' '.join(cmd))
     subprocess.run(cmd, check=True)

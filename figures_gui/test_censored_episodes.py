@@ -46,7 +46,7 @@ def real(n_files):
     key check, so no re-clustering. The trajectories do not depend on the
     episode rule, so a memo from older code is still the right input."""
     import glob
-    store = os.path.join(ROOT, "Data", "figures_studio", "exp_impact_long_shedders_2")
+    store = os.path.join(ROOT, "Data", "figures", "impact_long_shedders_2", "exploration")
     files = sorted(glob.glob(os.path.join(store, "cache", "_panels", "daily_*.json")))
     files = files[::max(1, len(files) // n_files)][:n_files]
     out = []

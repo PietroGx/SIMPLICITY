@@ -178,7 +178,7 @@ def submit_sanity_plots(stamp, target_osr_std, target_osr_long, log_fh,
         name = exp_name(mode)
         # without --output Slurm writes slurm-<id>.out into the CWD, which
         # is the repo root: one stray file per run, 36 from a grid. The job's
-        # real output already goes to slurm_logs/sanity/, so these only ever
+        # real output already goes to Data/logs/sanity/, so these only ever
         # held the wrapper's echo lines.
         # get_slurm_logs_dir refuses an experiment that is not on disk
         os.makedirs(run_dir(stamp, mode), exist_ok=True)
@@ -433,7 +433,7 @@ def main():
                                     args.stamp, consensus)
 
     log_file = args.log_file or os.path.join(
-        "Data", "pipeline_logs",
+        "Data", "logs", "pipeline",
         f"{EXP_NAME}_pipeline_#{args.stamp}.log")
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
 

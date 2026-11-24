@@ -30,6 +30,7 @@ import compute
 import dist
 import explore
 import fig1
+import layout
 import panels
 import sweep
 
@@ -37,9 +38,15 @@ import sweep
 # export scripts, which otherwise default to experiment 1 and would write a
 # different experiment's data into this store under identical directory names
 # -- compute.params_key carries no experiment identity.
-# The store is Data/figures_studio, untracked like the rest of Data/. It was
-# ~/fig2_studio, then <repo>/fig2_studio, then Data/fig2_studio until v2.5.19.
-BASE_STORE = os.path.join(ROOT, "Data", "figures_studio")
+# The store is Data/figures, untracked like the rest of Data/. It was
+# ~/fig2_studio, <repo>/fig2_studio, Data/fig2_studio, then Data/figures_studio
+# until v2.5.21.
+BASE_STORE = os.path.join(ROOT, "Data", "figures")
+if os.path.isdir(os.path.join(ROOT, "Data", "figures_studio")):
+    sys.exit("Data/figures_studio is the pre-v2.5.21 store: move its contents into Data/figures\n"
+             "  mv Data/figures_studio/* Data/figures/ && rmdir Data/figures_studio")
+if layout.legacy_stores(BASE_STORE):
+    sys.exit("Data/figures holds the pre-v2.5.21 layout: python -I figures_gui/layout.py migrate --apply")
 # compute.py, panels.py and export_transmissions.py keep the name --exp-num/EXP_NUM
 # (their AST is their cache key) but take a minute stamp as well as a number.
 # STAMP / EXP_NAME from the environment, as run_precompute.sh takes them;
@@ -291,7 +298,7 @@ class H(SimpleHTTPRequestHandler):
             if u.path == "/api/explore_panel":
                 return self._send(explore.explore_panel(STORE, q))
             if u.path == "/api/fig1":
-                return self._send(fig1.load(STORE))
+                return self._send(fig1.load(layout.root_of(STORE)))
             if u.path == "/api/presets":
                 return self._send(presets_read())
         except FileNotFoundError as exc:

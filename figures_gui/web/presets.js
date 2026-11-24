@@ -1,6 +1,6 @@
 /* Saved data settings: one named set of every rule the exploration tabs decide
    (clade definition, burn-in, breakout detection), stored by server.py in
-   Data/figures_studio/detection_presets.json so it outlives the browser. Every
+   Data/figures/detection_presets.json so it outlives the browser. Every
    exploration tab loads and saves the same sets; the figure tabs only read them. */
 
 const DATA_PRESET_KEYS = ["k", "mt", "originRule", "burnin",

@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=main
 #SBATCH --qos=standard
-#SBATCH --output=slurm_logs/fig2_precompute/tx_%j.log
-#SBATCH --error=slurm_logs/fig2_precompute/tx_%j.err
+#SBATCH --output=Data/logs/precompute/tx_%j.log
+#SBATCH --error=Data/logs/precompute/tx_%j.err
 
 # ============================================================================
 # slurm_tx.sh -- the transmission table panel 2 reads, written into the
@@ -24,14 +24,14 @@ cd "$ROOT"
 STAMP="${STAMP:-1}"
 EXP_NAME="${EXP_NAME:-}"
 SEEDS="${SEEDS:-50}"
-STORE="${STORE:-$ROOT/Data/figures_studio}"
+STORE="${STORE:-$ROOT/Data/figures}"
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate simplicity
 
 PATHS=$(python -I figures_gui/sweep.py --print-paths --store "$STORE" \
         --stamp "$STAMP" ${EXP_NAME:+--exp-name "$EXP_NAME"})
-read -r EXP_NAME STAMP _REL EXP_STORE _CACHE <<<"$PATHS"
+read -r EXP_NAME STAMP _REL EXP_STORE _CACHE EXP_ROOT <<<"$PATHS"
 
 echo "fig2 tx: $EXP_NAME #$STAMP -> $EXP_STORE/tx"
 python -I figures_gui/export_transmissions.py --exp-num "$STAMP" \

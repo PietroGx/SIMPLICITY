@@ -132,7 +132,7 @@ def test_orchestrator_refuses_two_modes():
     finally:
         sys.argv = argv
     check("no stray pipeline log was written",
-          os.path.isfile(os.path.join('Data', 'pipeline_logs',
+          os.path.isfile(os.path.join('Data', 'logs', 'pipeline',
                                       'impact_long_shedders_pipeline_#999.log')),
           False)
 
@@ -310,7 +310,7 @@ def test_main_reaches_the_summary():
 
     argv = sys.argv
     sys.argv = ['run', '--stamp', '998', '--runner', 'serial']
-    log = os.path.join('Data', 'pipeline_logs',
+    log = os.path.join('Data', 'logs', 'pipeline',
                        f'{cfg.EXP_NAME}_pipeline_#998.log')
     outcome, text = 'reached', ''
     try:

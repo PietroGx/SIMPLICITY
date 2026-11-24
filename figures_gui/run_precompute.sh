@@ -13,8 +13,8 @@
 #   3. the warm array, WARM_SHARDS tasks (default 32, --warm-shards N) that
 #      memoise every panel answer, afterany on 1 and 2
 #      (figures_gui/slurm_warm.sh)
-#   4. a pack job, afterany on 3 and 2b, which tars the grid, tx/ and fig1/ into one
-#      downloadable file (figures_gui/pack_cache.sh). Its own warm pass then
+#   4. a pack job, afterany on 3 and 2b, which archives the experiment into
+#      Data_Export/figures/<exp>/ (figures_gui/pack_cache.sh, layout.py pack). Its own warm pass then
 #      reads from disk and computes only what a failed shard left.
 #      --warm-shards 0 skips 3 and leaves the warming to the pack job alone.
 #
@@ -46,8 +46,8 @@
 # read, and reach compute.py through sweep.py. They used to be printed and
 # gated on but never forwarded, so STAMP=3 checked experiment 3 and built
 # experiment 1. Since compute.params_key holds no experiment identity, each
-# experiment gets its OWN STORE -- experiment 1 of impact_long_shedders keeps
-# $STORE/cache, anything else builds into $STORE/exp_<name>_<num>/cache -- and
+# experiment gets its OWN STORE -- $STORE/<name>_<stamp>/exploration/cache,
+# see figures_gui/layout.py -- and
 # sweep.py refuses an --out belonging to another experiment. The resolution is
 # `sweep.py --print-paths`, in one place, and the gate/build agreement is
 # printed rather than assumed.
@@ -88,11 +88,11 @@ CALIBRATE=0
 CAL_IDX=0
 RESUBMIT=0
 CHUNK="${RESUBMIT_CHUNK:-100}"
-TIMES="slurm_logs/fig2_precompute/timings"
+TIMES="Data/logs/precompute/timings"
 STAMP="${STAMP:-1}"
 EXP_NAME="${EXP_NAME:-}"
 SEEDS="${SEEDS:-50}"
-STORE="${STORE:-$ROOT/Data/figures_studio}"
+STORE="${STORE:-$ROOT/Data/figures}"
 WARM_SHARDS="${WARM_SHARDS:-32}"
 FIG1=1
 DRY_RUN=0
@@ -146,9 +146,13 @@ bad()  { printf "  %-54s %s\n" "$1" "$2"; fail=1; }
 # and pack_cache.sh. EXP_NAME unset means sweep.py's default.
 PATHS=$(python -I figures_gui/sweep.py --print-paths --store "$STORE" \
         --stamp "$STAMP" ${EXP_NAME:+--exp-name "$EXP_NAME"})
-read -r EXP_NAME STAMP EXP_REL EXP_STORE CACHE <<<"$PATHS"
+read -r EXP_NAME STAMP EXP_REL EXP_STORE CACHE EXP_ROOT <<<"$PATHS"
 note "experiment to build" "$EXP_NAME #$STAMP"
 note "cache directory" "$CACHE"
+[ -d "$ROOT/Data/figures_studio" ] && bad "old store Data/figures_studio" \
+    "still there -- mv Data/figures_studio/* Data/figures/ && rmdir Data/figures_studio"
+ls -d "$STORE"/exp_* "$STORE/cache" >/dev/null 2>&1 && bad "pre-v2.5.21 layout in $STORE" \
+    "python -I figures_gui/layout.py migrate --apply"
 
 # --- the grid, and the hash the builds will carry ------------------------
 WANT=$(python -I figures_gui/sweep.py --list | wc -l)
@@ -295,7 +299,7 @@ elif [ ! -f figures_gui/fig1.py ]; then
 elif ! git ls-files --error-unmatch figures_gui/fig1.py >/dev/null 2>&1; then
     note "Figure 1 (slurm_fig1.sh)" "fig1.py UNTRACKED -- a pull will not bring it"
 else
-    note "Figure 1 (slurm_fig1.sh)" "-> $EXP_STORE/fig1"
+    note "Figure 1 (slurm_fig1.sh)" "-> $EXP_ROOT/fig1"
     # patient_global_clock.csv is gitignored, so a pull never brings it: without it
     # fig1.py only warns and D and E lose their patient series (v2.5.19's archive)
     for f in literature_long_shedders_data.csv patient_global_clock.csv patient_intrahost_clock.csv; do
@@ -303,7 +307,7 @@ else
             "Data/RealWorldData/$f MISSING -- copy it over, or --no-fig1"
     done
 fi
-note "archive afterwards" "~350 MB as one tar.gz (measured 8.3x on JSON)"
+note "archive afterwards" "Data_Export/figures/$EXP_REL/, one tar.gz per section, parts of <= 1 GB"
 
 echo
 if [ "$fail" -ne 0 ] && [ "$DRY_RUN" -eq 1 ]; then
@@ -324,7 +328,7 @@ if [ "$CALIBRATE" -eq 1 ] && [ "$DRY_RUN" -eq 1 ]; then
     exit 0
 fi
 if [ "$CALIBRATE" -eq 1 ]; then
-    mkdir -p slurm_logs/fig2_precompute
+    mkdir -p Data/logs/precompute
     echo
     echo "  timing ONE build (grid entry $CAL_IDX). sbatch --wait blocks until"
     echo "  it finishes, including any queue time -- expect minutes."
@@ -334,7 +338,7 @@ if [ "$CALIBRATE" -eq 1 ]; then
         figures_gui/slurm_precompute.sh "$CACHE" || true
     if [ ! -f "$TIMES/${CAL_IDX}.txt" ]; then
         echo "  no timing was written. Either the task failed -- check"
-        echo "  slurm_logs/fig2_precompute/ -- or that build already existed,"
+        echo "  Data/logs/precompute/ -- or that build already existed,"
         echo "  in which case pass --calibrate-index N for one not yet built."
         exit 1
     fi
@@ -413,7 +417,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
     echo
     echo "  [dry-run] env STORE=$STORE SEEDS=$SEEDS STAMP=$STAMP EXP_NAME=$EXP_NAME"
 else
-    mkdir -p slurm_logs/fig2_precompute
+    mkdir -p Data/logs/precompute
 fi
 
 JOBS=()
@@ -468,8 +472,8 @@ fi
 WATCH="$PACK"
 [ "${#JOBS[@]}" -gt 0 ] && WATCH="$(IFS=,; echo "${JOBS[*]}"),$PACK"
 echo "  watch:     squeue -j $WATCH"
-echo "  logs:      slurm_logs/fig2_precompute/"
-echo "  failures:  slurm_logs/fig2_precompute/failed/<IDX>.txt"
-echo "  result:    $EXP_STORE/fig2_cache_${HASH}_<date>.tar.gz + .manifest.txt"
+echo "  logs:      Data/logs/precompute/"
+echo "  failures:  Data/logs/precompute/failed/<IDX>.txt"
+echo "  result:    Data_Export/figures/$EXP_REL/*_${HASH}_<date>*.tar.gz + .manifest.txt"
 echo "  if the grid is short the pack job exits 3 and names the indices;"
 echo "  then: bash figures_gui/run_precompute.sh --resubmit"

@@ -30,6 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import compute
+import layout
 
 K = [5, 7, 10]
 WIN = [1.0, 7.0, 15.0, 21.0]
@@ -38,32 +39,26 @@ PROM = [0.10, 0.20]
 # its own partition. The values come from compute, which the panels also read.
 MT = compute.MT_VALUES
 LO, HI, WINDOW = 0.10, 0.90, "post"
-DEFAULT_STORE = os.path.join(ROOT, "Data", "figures_studio")
+DEFAULT_STORE = os.path.join(ROOT, "Data", "figures")
 
 
 def exp_tag(stamp, exp_name):
-    return f"exp_{exp_name}_{stamp}"
-
-
-def is_default_exp(stamp, exp_name):
-    return str(stamp) == "1" and exp_name == compute.EXP_NAME
+    return layout.exp_tag(stamp, exp_name)
 
 
 def store_dir(store, stamp=1, exp_name=compute.EXP_NAME):
-    """The store holding ONE experiment's grid.
+    """The store holding ONE experiment's grid: <base>/<name>_<stamp>/exploration.
 
     `compute.params_key` carries no experiment identity, so two experiments
     building into one cache directory take the same directory names and
     `done()` reports the other one's finished build as this one's. Separation
-    is therefore by directory: experiment 1 of the default experiment keeps the
-    historical `<store>/cache`, anything else gets its own store at
-    `<store>/exp_<name>_<num>` -- a store, not a renamed cache, so
-    `server.py --store` and `panels.py` read it unchanged.
+    is therefore by directory (layout.py).
     """
-    store = os.path.expanduser(store)
-    if is_default_exp(stamp, exp_name):
-        return store
-    return os.path.join(store, exp_tag(stamp, exp_name))
+    return layout.store_dir(store, stamp, exp_name)
+
+
+def root_dir(store, stamp=1, exp_name=compute.EXP_NAME):
+    return layout.root_dir(store, stamp, exp_name)
 
 
 def cache_dir(store, stamp=1, exp_name=compute.EXP_NAME):
@@ -73,25 +68,16 @@ def cache_dir(store, stamp=1, exp_name=compute.EXP_NAME):
 def out_conflict(out, stamp, exp_name):
     """Why `out` cannot hold this experiment's builds, or None.
 
-    The refusal is what makes the separation hold: `--out` is also passed by
-    hand, `slurm_precompute.sh` takes it positionally, and the historical
-    default is experiment 1's. Sharing one directory would serve one
-    experiment's builds as another's, and no index.json records which
-    experiment a build read.
+    `--out` is also passed by hand and `slurm_precompute.sh` takes it
+    positionally; sharing one directory would serve one experiment's builds as
+    another's, and no index.json records which experiment a build read.
     """
-    parts = os.path.abspath(os.path.expanduser(out)).split(os.sep)
     mine = exp_tag(stamp, exp_name)
-    others = sorted({p for p in parts if p.startswith("exp_")} - {mine})
-    if is_default_exp(stamp, exp_name):
-        if others:
-            return (f"--out {out} is under {others[0]}, another experiment's "
-                    f"store, but this builds {exp_name} #{stamp}")
-        return None
-    if mine not in parts:
+    if mine not in os.path.abspath(os.path.expanduser(out)).split(os.sep):
         return (f"--out {out} has no {mine} component, so {exp_name} "
                 f"#{stamp} would build into another experiment's cache; "
                 f"pass --store STORE instead (builds go to "
-                f"STORE/{mine}/cache) or an --out under {mine}/")
+                f"STORE/{mine}/{layout.EXPLORATION}/cache) or an --out under {mine}/")
     return None
 
 
@@ -167,10 +153,10 @@ def main():
     ap.add_argument("--exp-name", default=compute.EXP_NAME,
                     help="experiment name, forwarded to compute.py.")
     ap.add_argument("--print-paths", action="store_true",
-                    help="print `exp_name stamp rel store cache` for the "
-                         "shell scripts and exit, so the cache location has "
-                         "one implementation. `rel` is the store subdirectory "
-                         "('.' for the default experiment).")
+                    help="print `exp_name stamp rel store cache root` for "
+                         "the shell scripts and exit, so the cache location "
+                         "has one implementation. `rel` is the experiment's "
+                         "directory under the base, `root` its full path.")
     ap.add_argument("--procs", type=int, default=2)
     ap.add_argument("--seeds", type=int, default=50)
     ap.add_argument("--dry-run", action="store_true")
@@ -194,8 +180,8 @@ def main():
     sd = store_dir(a.store, a.stamp, a.exp_name)
     if a.print_paths:
         print(a.exp_name, a.stamp,
-              os.path.relpath(sd, os.path.expanduser(a.store)),
-              sd, os.path.join(sd, "cache"))
+              exp_tag(a.stamp, a.exp_name), sd, os.path.join(sd, "cache"),
+              root_dir(a.store, a.stamp, a.exp_name))
         return 0
     if a.out is None:
         a.out = os.path.join(sd, "cache")

@@ -1062,7 +1062,7 @@ fi
 
 # One cohort per invocation, whichever way it runs: the cohorts are independent
 # and each one's phase 2 depends only on its own phase 1.
-mkdir -p Data/test_logs
+mkdir -p Data/logs/tests
 LOG_TIME="$(date +%Y%m%d_%H%M%S)"
 
 if [ "$RUNNER" != "slurm" ]; then
@@ -1070,7 +1070,7 @@ if [ "$RUNNER" != "slurm" ]; then
     echo "  runner=$RUNNER: running here, in the foreground, cohort by cohort."
     rc=0
     for i in "${!COHORTS[@]}"; do
-        LOGFILE="$ROOT/Data/test_logs/long_nsr_local_fit_${LOG_TIME}_${STAMP_ARR[$i]}.log"
+        LOGFILE="$ROOT/Data/logs/tests/long_nsr_local_fit_${LOG_TIME}_${STAMP_ARR[$i]}.log"
         echo
         echo "=================== ${COHORTS[$i]} ==================="
         echo "  log $LOGFILE"
@@ -1098,7 +1098,7 @@ if [ "$RUNNER" != "slurm" ]; then
         cohort experiment "stored-root" "[1]" "[2]" "cal vs tgt" \
         "old pred" "old meas"
     for i in "${!COHORTS[@]}"; do
-        LOGFILE="$ROOT/Data/test_logs/long_nsr_local_fit_${LOG_TIME}_${STAMP_ARR[$i]}.log"
+        LOGFILE="$ROOT/Data/logs/tests/long_nsr_local_fit_${LOG_TIME}_${STAMP_ARR[$i]}.log"
         line=$(grep '^VERDICT|' "$LOGFILE" 2>/dev/null | tail -1)
         if [ -z "$line" ]; then
             printf "  %-22s %-12s %s\n" "${COHORTS[$i]}" \
@@ -1163,7 +1163,7 @@ echo
 for i in "${!COHORTS[@]}"; do
     COH="${COHORTS[$i]}"
     N="${STAMP_ARR[$i]}"
-    OUT="$ROOT/Data/test_logs/long_nsr_local_fit_${LOG_TIME}_${N}_%j.log"
+    OUT="$ROOT/Data/logs/tests/long_nsr_local_fit_${LOG_TIME}_${N}_%j.log"
     JOB=$(sbatch --parsable \
         --job-name="long_nsr_local_fit_$N" \
         --time="$JOB_TIME" --mem="$JOB_MEM" --cpus-per-task=1 \
@@ -1189,7 +1189,7 @@ for i in "${!COHORTS[@]}"; do
     JOBS="${JOBS:+$JOBS,}$JOB"
 done
 echo
-echo "  watch      tail -f $ROOT/Data/test_logs/long_nsr_local_fit_${LOG_TIME}_*"
+echo "  watch      tail -f $ROOT/Data/logs/tests/long_nsr_local_fit_${LOG_TIME}_*"
 echo "  cancel     scancel $JOBS"
 echo "  result     per cohort, the [1] and [2] lines and the VERDICT line at"
 echo "             the end of its log. [2] is directional: the displacement"

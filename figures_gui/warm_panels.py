@@ -59,6 +59,7 @@ sys.path.insert(0, HERE)
 
 import compute
 import dist
+import layout
 import panels
 import sweep
 
@@ -177,7 +178,7 @@ def main():
     ap.add_argument("--exp-name", type=str, default=compute.EXP_NAME)
     ap.add_argument("--store", default=None,
                     help="override; by default the experiment's own store")
-    ap.add_argument("--base-store", default=os.path.join(ROOT, "Data", "figures_studio"))
+    ap.add_argument("--base-store", default=os.path.join(ROOT, "Data", "figures"))
     ap.add_argument("--procs", type=int, default=4)
     ap.add_argument("--what", default=",".join(KINDS),
                     help="comma-separated: " + ", ".join(KINDS))
@@ -249,13 +250,12 @@ def main():
                 eta = el * (len(jobs) - i) / max(i, 1)
                 print(f"[warm] {i}/{len(jobs)} {kind}  {el/60:5.1f} min in, "
                       f"~{eta/60:.0f} min left, {nbad} failed", flush=True)
-    pdir = os.path.join(store, "cache", "_panels")
-    size = sum(os.path.getsize(os.path.join(pdir, f))
-               for f in os.listdir(pdir)) if os.path.isdir(pdir) else 0
+    size = sum(os.path.getsize(os.path.join(d, f)) for d in layout.memo_dirs(store)
+               if os.path.isdir(d) for f in os.listdir(d))
     print(f"[warm] core-seconds by kind: "
           + ", ".join(f"{k}={v:.0f}" for k, v in sorted(seen.items())))
     print(f"[warm] done in {(time.time()-t0)/60:.1f} min, "
-          f"_panels is {size/1e6:.1f} MB, {nbad} failed")
+          f"panel caches {size/1e6:.1f} MB, {nbad} failed")
     return 1 if nbad else 0
 
 

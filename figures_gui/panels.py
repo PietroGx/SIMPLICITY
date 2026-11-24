@@ -17,6 +17,7 @@ import numpy as np
 
 import codehash as ch
 import compute
+import layout
 import simplicity.clustering as cl
 
 SCEN_ORDER = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"]
@@ -137,10 +138,9 @@ def _panel_cache_path(store, tag, parts):
     reads every build. It is not any more: panel 4 caches one ROW per build
     instead, so adding a build no longer discards every other panel's answer.
     """
-    cache = os.path.join(store, "cache")
     raw = json.dumps([tag, parts, scoped_hash(tag)], sort_keys=True)
     h = hashlib.sha256(raw.encode()).hexdigest()[:16]
-    d = os.path.join(cache, "_panels")
+    d = layout.memo_dir(store, tag)
     os.makedirs(d, exist_ok=True)
     return os.path.join(d, f"{tag}_{h}.json")
 

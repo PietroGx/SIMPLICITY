@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=main
 #SBATCH --qos=standard
-#SBATCH --output=slurm_logs/fig2_precompute/warm_%A_%a.log
-#SBATCH --error=slurm_logs/fig2_precompute/warm_%A_%a.err
+#SBATCH --output=Data/logs/precompute/warm_%A_%a.log
+#SBATCH --error=Data/logs/precompute/warm_%A_%a.err
 
 # ============================================================================
 # slurm_warm.sh -- the panel warm-up (figures_gui/warm_panels.py) as an array:
@@ -27,7 +27,7 @@ cd "$ROOT"
 
 STAMP="${STAMP:-1}"
 EXP_NAME="${EXP_NAME:-}"
-STORE="${STORE:-$ROOT/Data/figures_studio}"
+STORE="${STORE:-$ROOT/Data/figures}"
 IDX="${SLURM_ARRAY_TASK_ID:-0}"
 N="${SLURM_ARRAY_TASK_COUNT:-1}"
 
@@ -36,7 +36,7 @@ conda activate simplicity
 
 PATHS=$(python -I figures_gui/sweep.py --print-paths --store "$STORE" \
         --stamp "$STAMP" ${EXP_NAME:+--exp-name "$EXP_NAME"})
-read -r EXP_NAME STAMP _REL EXP_STORE _CACHE <<<"$PATHS"
+read -r EXP_NAME STAMP _REL EXP_STORE _CACHE EXP_ROOT <<<"$PATHS"
 
 echo "fig2 warm: shard $IDX/$N on $(hostname -s), $EXP_NAME #$STAMP"
 date

@@ -81,7 +81,7 @@ if ! "$PY" -c 'import numpy' >/dev/null 2>&1; then
     exit 1
 fi
 
-mkdir -p Data/pipeline_logs
+mkdir -p Data/logs/pipeline
 
 # --------------------------------------------------------------- submit path
 # Not already inside Slurm, and not explicitly told to run here: hand the whole
@@ -93,7 +93,7 @@ if [ -z "${SLURM_JOB_ID:-}" ] && [ "${SIMPLICITY_GRID_LOCAL:-0}" != "1" ]; then
         exit 1
     fi
     STAMP="$(date +%Y%m%d_%H%M%S)"
-    OUT="$REPO/Data/pipeline_logs/calibrated_grid_${STAMP}_%j.log"
+    OUT="$REPO/Data/logs/pipeline/calibrated_grid_${STAMP}_%j.log"
     # The orchestrator waits and fits between stages rather than computing hard,
     # so one core is right; the walltime has to cover the WHOLE grid, since
     # every cell runs inside this one job.
@@ -116,7 +116,7 @@ if [ -z "${SLURM_JOB_ID:-}" ] && [ "${SIMPLICITY_GRID_LOCAL:-0}" != "1" ]; then
     echo "watch  : tail -f $LOGFILE"
     echo "cancel : scancel $JOB"
     echo
-    echo "Per-cell pipeline logs still go to Data/pipeline_logs/."
+    echo "Per-cell pipeline logs still go to Data/logs/pipeline/."
     if [ "$WATCH" = "1" ]; then
         echo
         echo "waiting for the job to start (Ctrl-C stops watching, not the job)..."

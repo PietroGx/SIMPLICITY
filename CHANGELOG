@@ -5,6 +5,57 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.21 — 2026-11-24 — pietro gerletti
+
+Studio data under Data/figures, one folder per section; logs under Data/logs
+---------------------------------------------------------------------------
+
+The studio store is `Data/figures` (was `Data/figures_studio`), one folder per
+experiment, `<name>_<stamp>/` (was `exp_<name>_<num>/`, and experiment 1 at the
+top level). Inside it, `exploration/` holds what the exploration tabs and the
+figures read (`cache/<build>`, `cache/_explore`, `cache/_panels`, `tx/`,
+`runs/`), and each figure's panel cache sits in its own folder: `fig3/`,
+`fig4/`, `fig5/`, `supplementary/S1/` (`fig1/` as before). The new
+`figures_gui/layout.py` owns every path; `sweep.store_dir` returns
+`.../exploration` and `--print-paths` gains the experiment folder as a sixth
+field.
+
+The builds stay at `exploration/cache/<build>` on purpose: `panels._build_dir`
+is in every panel cache key (`MEMO_DEPS`), so renaming that path would discard
+every warmed panel. Only `panels._panel_cache_path`, which is outside every key
+(`MEMO_INFRA`), changed, so the HPC's warmed panels and explore caches survive
+the move. The build hash is unchanged (`83607fd0aa7e`).
+
+`layout.py migrate [--apply] [--prune]` moves a pre-v2.5.21 store into this
+layout. `--prune` deletes builds at another code hash and caches older than the
+oldest current build: a stale cache is never served (its key holds the code
+hash), so this frees disk, nothing else. Locally it freed 12.1 GB (505 builds
+at three old hashes, ~129,500 caches). The server and the precompute check
+refuse to run while an old layout is still under `Data/figures`.
+
+`pack_cache.sh` now calls `layout.py pack`: `Data_Export/figures/<name>_<stamp>/`,
+one `.tar.gz` per section, split into `_partNN` files of at most 1 GB that each
+unpack on their own, plus a manifest with checksums and the extract line. Only
+builds at the current hash are packed; the old single tarball packed every
+build in `cache/`, stale hashes included. Checked with a 5 MB limit:
+exploration came out as 9 parts and the unpacked tree was identical.
+
+Logs: `Data/logs/pipeline` (was `Data/pipeline_logs`), `Data/logs/tests` (was
+`Data/test_logs`), and the Slurm logs that used to land in `slurm_logs/` at the
+repo root: `Data/logs/precompute`, `.../packaging`, `.../sanity`,
+`.../trajectories`. Per-run Slurm logs stay in the experiment's own
+`slurm/slurm_logs/`, which is archived with it. Touched outside `figures_gui/`
+and `tests/`: `scripts/launchers/run_pipeline_and_grid.sh`,
+`scripts/experiments_pipeline/run_impact_long_shedders_pipeline.py`,
+`scripts/experiments_pipeline/submit_sanity_plot.sh`,
+`scripts/package_simplicity_data.sh`, `scripts/reconstruct_simplicity_data.sh`,
+`scripts/archive_paper_runs.sh`.
+
+Also: `figures_gui/test_dist_mirrors_panels.py` and `test_dist_cold_cost.py`
+looked for `Data/` one directory above the repo since the v2.5.20 move.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.20 — 2026-11-24 — pietro gerletti
 
 The studio is the only source of the figures

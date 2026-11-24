@@ -76,7 +76,7 @@ cd "$(dirname "$0")/.." || exit 1      # the repo root; running from tests/
 REPO="$PWD"                            # would scatter a stray Data/
 . tests/_suite.sh
 resolve_python
-mkdir -p Data/test_logs
+mkdir -p Data/logs/tests
 
 # --------------------------------------------------------------- submit path
 if [ -z "${SLURM_JOB_ID:-}" ] && [ "$RUNNER" = "slurm" ] && [ "$DRY" = "0" ]; then
@@ -86,7 +86,7 @@ if [ -z "${SLURM_JOB_ID:-}" ] && [ "$RUNNER" = "slurm" ] && [ "$DRY" = "0" ]; th
         exit 1
     fi
     STAMP="$(date +%Y%m%d_%H%M%S)"
-    OUT="$REPO/Data/test_logs/nsr_range_${STAMP}_%j.log"
+    OUT="$REPO/Data/logs/tests/nsr_range_${STAMP}_%j.log"
     FORWARD="--base $BASE --steps $STEPS --seeds $SEEDS"
     [ -n "$ONLY" ] && FORWARD="$FORWARD --only $ONLY"
     [ "${#EXTRA[@]}" -gt 0 ] && FORWARD="$FORWARD -- ${EXTRA[*]}"

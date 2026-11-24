@@ -170,7 +170,7 @@ def cell_command(cell, stamp, args):
 
 def run_cells(cells, numbers, args):
     cap_per_cell = max(1, args.cap // max(1, min(args.concurrency, len(cells))))
-    log_dir = os.path.join('Data', 'pipeline_logs')
+    log_dir = os.path.join('Data', 'logs', 'pipeline')
     os.makedirs(log_dir, exist_ok=True)
     gate = threading.Semaphore(args.concurrency)
     outcomes = {}
@@ -275,7 +275,7 @@ def section_completeness(cells, data, outcomes, args):
         print(f'  pipelines exiting non-zero : {len(failed)}')
         for cell in failed:
             print(f'      {cell_label(cell)}  #{data[cell]["stamp"]}  '
-                  f'see Data/pipeline_logs/')
+                  f'see Data/logs/pipeline/')
     print()
     print(f'  seeds: {args.cal_seeds} per calibration grid point, '
           f'{args.exp_seeds} per production scenario')

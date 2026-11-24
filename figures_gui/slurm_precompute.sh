@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=main
 #SBATCH --qos=standard
-#SBATCH --output=slurm_logs/fig2_precompute/%A_%a.log
-#SBATCH --error=slurm_logs/fig2_precompute/%A_%a.err
+#SBATCH --output=Data/logs/precompute/%A_%a.log
+#SBATCH --error=Data/logs/precompute/%A_%a.err
 
 # ============================================================================
 # slurm_precompute.sh -- the figure-2 clade-build grid, one build per array
@@ -33,7 +33,7 @@
 #
 # Usage, from the REPO ROOT:
 #
-#     mkdir -p slurm_logs/fig2_precompute
+#     mkdir -p Data/logs/precompute
 #     sbatch figures_gui/slurm_precompute.sh                      # all 168
 #     sbatch --array=0-55 figures_gui/slurm_precompute.sh         # one k block
 #     sbatch figures_gui/slurm_precompute.sh /scratch/$USER/cache # another out dir
@@ -42,7 +42,7 @@
 # A task whose build already carries the current code hash and the full run
 # count exits immediately, so a resubmission after a partial failure is free.
 # `run_precompute.sh --resubmit` submits an array of just the unfinished
-# indices. A task that dies writes slurm_logs/fig2_precompute/failed/<IDX>.txt
+# indices. A task that dies writes Data/logs/precompute/failed/<IDX>.txt
 # naming itself, its parameters and its log, so the cause is findable without
 # reading 168 logs.
 #
@@ -73,11 +73,11 @@ OUT="${1:-}"
 SEEDS="${SEEDS:-50}"
 STAMP="${STAMP:-1}"
 EXP_NAME="${EXP_NAME:-}"
-STORE="${STORE:-$ROOT/Data/figures_studio}"
+STORE="${STORE:-$ROOT/Data/figures}"
 PROCS="${SLURM_CPUS_PER_TASK:-2}"
 IDX="${SLURM_ARRAY_TASK_ID:-0}"
 
-LOGS="slurm_logs/fig2_precompute"
+LOGS="Data/logs/precompute"
 TIMES="$LOGS/timings"
 FAILED="$LOGS/failed"
 STEM="${SLURM_ARRAY_JOB_ID:-local}_${IDX}"
@@ -111,7 +111,7 @@ conda activate simplicity
 # resolve it -- `sweep.py --print-paths`, needing the env above. $1 wins.
 PATHS=$(python -I figures_gui/sweep.py --print-paths --store "$STORE" \
         --stamp "$STAMP" ${EXP_NAME:+--exp-name "$EXP_NAME"})
-read -r EXP_NAME STAMP _REL _STORE CACHE <<<"$PATHS"
+read -r EXP_NAME STAMP _REL _STORE CACHE _ROOT <<<"$PATHS"
 OUT="${OUT:-$CACHE}"
 
 mkdir -p "$OUT"

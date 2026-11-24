@@ -44,7 +44,7 @@ EXP_NAME="${4:-impact_long_shedders}"
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate simplicity
 
-LOG_DIR="slurm_logs/sanity"
+LOG_DIR="Data/logs/sanity"
 mkdir -p "$LOG_DIR"
 
 # the run's scenarios, from the settings file the pipeline exported

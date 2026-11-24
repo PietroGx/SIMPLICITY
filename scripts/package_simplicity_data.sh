@@ -66,10 +66,10 @@ if [[ "$USE_SLURM" == "1" ]]; then
         WRAPPED+=" $(printf '%q' "$arg")"
     done
     # --output keeps slurm-<id>.out out of the repo root
-    mkdir -p slurm_logs/packaging
+    mkdir -p Data/logs/packaging
     sbatch --job-name="simp_pkg" --cpus-per-task=16 --mem=32G --time=04:00:00 \
-           --output="slurm_logs/packaging/pack_%j.out" \
-           --error="slurm_logs/packaging/pack_%j.err" \
+           --output="Data/logs/packaging/pack_%j.out" \
+           --error="Data/logs/packaging/pack_%j.err" \
            --mail-type=END --export=ALL,SIMPLICITY_KEEP_SLURM_LOGS="${SIMPLICITY_KEEP_SLURM_LOGS:-0}" \
            --wrap="$WRAPPED"
     exit 0

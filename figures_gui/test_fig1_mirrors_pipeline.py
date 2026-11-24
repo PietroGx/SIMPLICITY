@@ -7,7 +7,7 @@ figures_gui/fig1.py's painter hooks -- and compares them with
 band, the printed point and seed counts, the violin quartiles, the box
 statistics, and the A and E curves. Reads only.
 
-    python figures_gui/test_fig1_mirrors_pipeline.py --stamp 2 --store <experiment store>
+    python figures_gui/test_fig1_mirrors_pipeline.py --stamp 2 --store Data/figures/impact_long_shedders_2
 """
 import argparse, contextlib, io, os, re, sys
 

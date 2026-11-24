@@ -52,7 +52,7 @@ if [ -z "${SLURM_JOB_ID:-}" ] && command -v sbatch >/dev/null 2>&1 \
 fi
 
 resolve_python
-mkdir -p Data/test_logs
+mkdir -p Data/logs/tests
 
 echo "interpreter : $PY"
 echo "host        : $(hostname)"

@@ -5,12 +5,14 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --partition=main
 #SBATCH --qos=standard
-#SBATCH --output=slurm_logs/fig2_precompute/pack_%j.log
-#SBATCH --error=slurm_logs/fig2_precompute/pack_%j.err
+#SBATCH --output=Data/logs/precompute/pack_%j.log
+#SBATCH --error=Data/logs/precompute/pack_%j.err
 
 # ============================================================================
-# pack_cache.sh -- the clade-build grid as ONE downloadable file, with tx/
-# (slurm_tx.sh) and fig1/ (slurm_fig1.sh) beside it when they exist.
+# pack_cache.sh -- one experiment's studio data, archived into
+# Data_Export/figures/<name>_<stamp>/: one tar.gz per section (exploration,
+# fig1, fig3..fig5, supplementary), split into parts of at most 1 GB that each
+# unpack on their own (figures_gui/layout.py pack).
 #
 # `run_precompute.sh` submits this with --dependency=afterany on the array
 # (through the warm array) and on the tx and fig1 jobs, so
@@ -18,9 +20,8 @@
 # be afterok, which cancelled this job on any failure: the only sign of a
 # broken grid was an archive that never appeared. It can also be run by hand.
 #
-# It REFUSES to pack a partial grid. The whole point of one file is that what
-# arrives is the whole grid; a tarball holding 150 of 168 builds looks the same
-# from the outside and would be found out later, on the wrong machine.
+# It REFUSES to pack a partial grid: an archive holding 150 of 168 builds looks
+# the same from the outside and would be found out later, on the wrong machine.
 #
 # Completeness comes from `sweep.py --missing`, which is the same `done()` test
 # that makes a resubmitted array skip finished work. It is NOT a directory
@@ -62,7 +63,7 @@ ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$ROOT"
 [ -f figures_gui/compute.py ] || { echo "[pack] not a SIMPLICITY checkout: $ROOT" >&2; exit 1; }
 
-STORE="${STORE:-$ROOT/Data/figures_studio}"
+STORE="${STORE:-$ROOT/Data/figures}"
 SEEDS="${SEEDS:-50}"
 STAMP="${STAMP:-1}"
 EXP_NAME="${EXP_NAME:-}"
@@ -81,13 +82,13 @@ done
 # Not already inside a job, and sbatch is reachable: submit rather than pack
 # here. Done before conda, which costs seconds and is only needed for the work.
 if [ -z "$SLURM_JOB_ID" ] && [ "$HERE" -eq 0 ] && command -v sbatch >/dev/null 2>&1; then
-    mkdir -p slurm_logs/fig2_precompute
+    mkdir -p Data/logs/precompute
     JOB=$(STORE="$STORE" SEEDS="$SEEDS" STAMP="$STAMP" EXP_NAME="$EXP_NAME" \
           sbatch --parsable figures_gui/pack_cache.sh "$@")
     echo "[pack] submitted job $JOB"
     echo "[pack]   watch   squeue -j $JOB"
-    echo "[pack]   log     slurm_logs/fig2_precompute/pack_$JOB.log"
-    echo "[pack]   errors  slurm_logs/fig2_precompute/pack_$JOB.err"
+    echo "[pack]   log     Data/logs/precompute/pack_$JOB.log"
+    echo "[pack]   errors  Data/logs/precompute/pack_$JOB.err"
     echo "[pack]   --here would have packed in this shell instead"
     exit 0
 fi
@@ -104,7 +105,7 @@ PY
 )
 PATHS=$(python -I figures_gui/sweep.py --print-paths --store "$STORE" \
         --stamp "$STAMP" ${EXP_NAME:+--exp-name "$EXP_NAME"})
-read -r EXP_NAME STAMP EXP_REL EXP_STORE CACHE <<<"$PATHS"
+read -r EXP_NAME STAMP EXP_REL EXP_STORE CACHE EXP_ROOT <<<"$PATHS"
 
 WANT=$(python -I figures_gui/sweep.py --list | wc -l)
 MISS=$(python -I figures_gui/sweep.py --missing \
@@ -130,7 +131,7 @@ if [ "$NMISS" -ne 0 ]; then
             2>&1 | sed 's/^/[pack] /' || true
         echo "[pack] $NMISS missing: $IDS"
         echo "[pack] why each task died, one file per task:"
-        echo "[pack]     slurm_logs/fig2_precompute/failed/<IDX>.txt"
+        echo "[pack]     Data/logs/precompute/failed/<IDX>.txt"
         echo "[pack] resubmit ONLY those builds, then this packs itself:"
         echo "[pack]     bash figures_gui/run_precompute.sh --resubmit"
         if [ "$NMISS" -le 64 ]; then
@@ -143,11 +144,6 @@ if [ "$NMISS" -ne 0 ]; then
     fi
     echo "[pack] --partial: packing anyway, $NMISS missing: $IDS"
 fi
-
-# EXP_REL is "." for the default experiment, which extracts into the store
-# itself; any other experiment extracts into its own store under it.
-EXTRACT="<repo>/Data/figures_studio"
-[ "$EXP_REL" != "." ] && EXTRACT="<repo>/Data/figures_studio/$EXP_REL"
 
 # Warm the panels BEFORE packing, so the archive carries them. The grid is the
 # expensive precomputation but not the whole of it: panel 4 walks every build
@@ -173,57 +169,13 @@ if [ "$WARM" -eq 1 ]; then
     fi
 fi
 
-PACK_DATE=$(date +%Y%m%d)
-OUT="$EXP_STORE/fig2_cache_${HASH}_${PACK_DATE}.tar.gz"
-MAN="${OUT%.tar.gz}.manifest.txt"
-
-echo "[pack] writing $OUT"
-# cache/_panels IS packed. It used to be excluded as "rebuilt in milliseconds",
-# which is true of panels 1 to 3 and wrong about panel 4: that one reads every
-# build in the grid, and a cold value measured 197 s on the 168-build run #2.
-# It is ~13 MB against a 416 MB archive.
-# tx/ is panel 2's transmission table (slurm_tx.sh); without it panel 2 has
-# nothing to read. pigz compresses on every core where gzip uses one.
-PARTS=(cache)
-[ -f "$EXP_STORE/tx/index.json" ] && PARTS+=(tx) \
-    || echo "[pack] WARNING: no $EXP_STORE/tx -- panel 2 will be empty" >&2
-FIG1="ABSENT -- the Figure 1 tab will be empty"
-if [ -f "$EXP_STORE/fig1/fig1.json" ] && [ -f "$EXP_STORE/fig1/index.json" ]; then
-    PARTS+=(fig1)
-    FIG1="$(du -sh "$EXP_STORE/fig1" | cut -f1), fig1.json of $(date -r "$EXP_STORE/fig1/fig1.json" -Is)"
-else
-    echo "[pack] WARNING: no $EXP_STORE/fig1/fig1.json + index.json -- Figure 1 will be empty" >&2
-fi
-if command -v pigz >/dev/null 2>&1; then
-    tar -cf - -C "$EXP_STORE" "${PARTS[@]}" | pigz -p "${SLURM_CPUS_PER_TASK:-4}" > "$OUT"
-else
-    tar -czf "$OUT" -C "$EXP_STORE" "${PARTS[@]}"
-fi
-
-SIZE=$(du -h "$OUT" | cut -f1)
-SUM=$(sha256sum "$OUT" | cut -d' ' -f1)
-NFILES=$(find "$CACHE" -maxdepth 2 -type f -path "*__${HASH}/*" 2>/dev/null | wc -l || true)
-
-{
-    echo "fig2 clade-build grid"
-    echo "built        $(date -Is)"
-    echo "build hash   $HASH"
-    echo "experiment   $EXP_NAME #$STAMP  (the run output these builds read)"
-    echo "builds       $HAVE of $WANT finished (sweep.py done(), not dir count)"
-    echo "directories  $DIRS at this hash"
-    echo "panels       $WARMED  (cache/_panels is packed with the grid)"
-    echo "contents     ${PARTS[*]}"
-    echo "fig1         $FIG1"
-    echo "files        $NFILES"
-    echo "archive      $(basename "$OUT")  $SIZE"
-    echo "sha256       $SUM"
-    echo "commit       $(git rev-parse HEAD 2>/dev/null || echo unknown)"
-    echo "dirty        $(git status --porcelain -- figures_gui/compute.py simplicity/clustering.py figures_gui/prep/clade_preprocess.py | wc -l) of the 3 hashed files"
-    echo
-    echo "extract on the studio box with:"
-    echo "    tar -xzf $(basename "$OUT") -C $EXTRACT"
-} > "$MAN"
-
-echo "[pack] $SIZE  sha256 ${SUM:0:16}..."
-echo "[pack] manifest $MAN"
-cat "$MAN"
+# Only builds at the current hash are packed; stale builds and caches stay
+# behind (layout.py migrate --prune deletes them).
+[ -f "$EXP_STORE/tx/index.json" ] \
+    || echo "[pack] WARNING: no $EXP_STORE/tx -- Figures 3 and 4 will lack transmissions" >&2
+[ -f "$EXP_ROOT/fig1/fig1.json" ] && [ -f "$EXP_ROOT/fig1/index.json" ] \
+    || echo "[pack] WARNING: no $EXP_ROOT/fig1/fig1.json + index.json -- Figure 1 will be empty" >&2
+python -I figures_gui/layout.py pack --base "$STORE" --stamp "$STAMP" --exp-name "$EXP_NAME" \
+    --note "builds=$HAVE of $WANT finished (sweep.py done(), not a directory count)" \
+    --note "panels=$WARMED" \
+    --note "dirty=$(git status --porcelain -- figures_gui/compute.py simplicity/clustering.py figures_gui/prep/clade_preprocess.py | wc -l) of the 3 hashed files"

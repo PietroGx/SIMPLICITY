@@ -61,14 +61,24 @@ never leaves the browser.
 ## Data
 
 ```
-Data/figures_studio/<store>/           one store per experiment (sweep.py --print-paths)
-  runs/     55 MB   phylogeny + sparse lineage frequency, 250 runs (120 time points)
-  tx/               per-day 2x2 transmission counts by host type, and per-day
-                    jump tables per transmitter type (export_transmissions.py)
-  fig1/             fig1.json + index.json, Figure 1's data (fig1.py build)
-  cache/            clade builds + the panel cache, keyed by parameters and
-                    a hash of the code that produced them
+Data/figures/<name>_<stamp>/    one experiment (layout.py, sweep.py --print-paths)
+  exploration/                  the store: what panels.py, explore.py, dist.py read
+    cache/<build>/              clade builds, keyed by parameters and a hash of
+                                the code that produced them
+    cache/_explore/ _panels/    the exploration tabs' caches
+    runs/     55 MB             phylogeny + sparse lineage frequency, 250 runs (120 time points)
+    tx/                         per-day 2x2 transmission counts by host type, and per-day
+                                jump tables per transmitter type (export_transmissions.py)
+  fig1/                         fig1.json + index.json, Figure 1's data (fig1.py build)
+  fig3/ fig4/ fig5/ cache/      each figure's panel cache (layout.MEMO_HOME)
+  supplementary/S1/cache/       Figure S1's panel cache
 ```
+
+The builds stay at `exploration/cache/<build>`: `panels._build_dir` is in every
+panel cache key, so moving them would discard every warmed panel.
+`python -I figures_gui/layout.py migrate [--apply] [--prune]` moves a
+pre-v2.5.21 store into this layout; `--prune` deletes builds at another code
+hash and caches older than the oldest current build.
 
 **`runs/` is not deletable.** It is the only source for the phylogeny, the
 Muller plot and the episode grid. The artifact-era `clades/` store and
@@ -81,7 +91,7 @@ because a clade build is the output of both: an uncommitted one-line change to
 the clade walk once altered what a clade is while `compute.py` was untouched,
 and 24 builds carried the new maths under a key claiming the old.
 
-The panel cache sits under `cache/_panels/`, keyed by the request and by a hash
+The panel cache sits in each figure's `cache/` (exploration tabs: `exploration/cache/_panels/`), keyed by the request and by a hash
 of **both** `compute.py` and `panels.py`. The set of clade builds used to be in
 that key, because panel 4 reads every build; panel 4 now caches one ROW per
 build instead, so adding a build no longer discards every other panel's answer.
@@ -131,14 +141,14 @@ Both are jobs: one at a time, loopback only, refused rather than queued.
 ```bash
 # the transmission table. Reads each run's phylogeny for the jump tables,
 # ~1.5 s a run; 250 runs took 1 min 40 s at --procs 4
-python -I figures_gui/export_transmissions.py --out <store>/tx --procs 2
+python -I figures_gui/export_transmissions.py --out <store>/tx --procs 2   # <store> = .../exploration
 
 # one clade build -- clades, composition, burden, episodes at one k. ~12 min
-python -I figures_gui/compute.py --out Data/figures_studio/cache --procs 2 \
+python -I figures_gui/compute.py --out Data/figures/impact_long_shedders_1/exploration/cache --procs 2 \
     --k 7 --win 15 --prom 0.10 --window post
 ```
 
-`fig1.py build --stamp N --store <store>` writes `<store>/fig1/`: one
+`fig1.py build --stamp N --store <experiment>` writes `<experiment>/fig1/`: one
 process, ~5 min, ~1 GB.
 
 Use `--procs 2`. The box has 4 cores and about 4 GB free with swap already in
@@ -170,9 +180,11 @@ STAMP=2 bash figures_gui/run_precompute.sh             # checks, ask, submit
 python -I figures_gui/warm_panels.py --stamp 2 --shard 0/32 --list   # jobs per shard
 ```
 
-The pack job tars `cache/` (with `_panels/`), `tx/` and `fig1/` into
-`<store>/fig2_cache_<hash>_<date>.tar.gz`; a missing `tx/` or `fig1/` is a
-warning in the log and the manifest, a partial grid is a refusal (exit 3).
+The pack job (`layout.py pack`) writes `Data_Export/figures/<name>_<stamp>/`:
+one `.tar.gz` per section (exploration, fig1, fig3..fig5, supplementary), only
+builds at the current hash, split into `_partNN` files of at most 1 GB that each
+unpack on their own, plus a manifest with checksums and the extract line. A
+missing `tx/` or `fig1/` is a warning, a partial grid is a refusal (exit 3).
 The warm pass skips a memo only if its file exists, and the file name carries
 the hash of the code that computes it, so a changed panel re-warms itself.
 
