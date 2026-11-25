@@ -198,7 +198,7 @@ def subtree_transmission_counts(phylogenetic_data_df, individuals_df):
                            phylogenetic_data_df["Lineage_parent"])}
     order = list(phylogenetic_data_df
                  .sort_values("Time_emergence", kind="mergesort")["Lineage_name"])
-    tx = individuals_df["inherited_lineage"].value_counts().to_dict()
+    tx = transmitted_lineages(individuals_df).value_counts().to_dict()
     stx = {l: int(tx.get(l, 0)) for l in order}
     for l in reversed(order):                      # children before parents
         p = par.get(l)
@@ -207,9 +207,17 @@ def subtree_transmission_counts(phylogenetic_data_df, individuals_df):
     return stx
 
 
+def transmitted_lineages(individuals_df):
+    """inherited_lineage of every host infected by another host: one entry per
+    transmission event. The seeded infections (parent == "root") inherit "wt"
+    but had no transmitter, so they are not events."""
+    return individuals_df["inherited_lineage"][
+        individuals_df["parent"].astype(str) != "root"]
+
+
 def transmission_total(individuals_df):
-    """The run's own transmission events: inherited_lineage, one row per host."""
-    return int(individuals_df["inherited_lineage"].value_counts().sum())
+    """The run's own transmission events, seeded infections excluded."""
+    return int(transmitted_lineages(individuals_df).value_counts().sum())
 
 
 def transmission_floor(individuals_df, min_tx_frac):
@@ -326,7 +334,7 @@ def lineage_tree(phylogenetic_data_df, individuals_df=None,
         raise ValueError(
             f'order_by must be "emergence" or "topology", got {order_by!r}')
     tx = ({} if individuals_df is None
-          else individuals_df["inherited_lineage"].value_counts().to_dict())
+          else transmitted_lineages(individuals_df).value_counts().to_dict())
     sub = {l: 1 for l in order}
     stx = {l: int(tx.get(l, 0)) for l in order}
     for l in reversed(order):                      # children before parents

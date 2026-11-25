@@ -151,7 +151,7 @@ def run_context(ssod, k, window, mt=0.0):
     # (export_clade_explorer.py:63), so that order is how a daily
     # series is matched to the browser's own clade rows
     lin_pos = {n: i for i, n in enumerate(ph["Lineage_name"])}
-    tx_all = ind["inherited_lineage"].value_counts().to_dict()
+    tx_all = cl.transmitted_lineages(ind).value_counts().to_dict()
     n_tx_run = int(sum(tx_all.values()))
 
     clades = list(c2l)
@@ -327,7 +327,7 @@ def _one(job):
     vote_of = ctx['vote_of']
     # infections on or after the burn-in day, windowed as burden is
     tinf = ind["t_infection"].astype(float).to_numpy()
-    tx_post = ind["inherited_lineage"][tinf >= cutoff].value_counts().to_dict()
+    tx_post = cl.transmitted_lineages(ind[tinf >= cutoff]).value_counts().to_dict()
 
     crec, erec = [], []
     for ci, c in enumerate(cols):

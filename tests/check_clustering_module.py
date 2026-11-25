@@ -102,10 +102,11 @@ def section_a():
     class _Ind(dict):
         pass
     import pandas as pd
-    ind = pd.DataFrame({"inherited_lineage": ["a", "a", "b", "c"] * 25})
+    ind = pd.DataFrame({"inherited_lineage": ["a", "a", "b", "c"] * 25 + ["wt"] * 5,
+                        "parent": ["7"] * 100 + ["root"] * 5})
     ck(cl.transmission_total(ind) == 100,
-       f"transmission_total counts transmission events (got "
-       f"{cl.transmission_total(ind)}, want 100)")
+       f"transmission_total counts transmission events, not the 5 seeded "
+       f"infections (got {cl.transmission_total(ind)}, want 100)")
     ck(abs(cl.transmission_floor(ind, 0.01) - 1.0) < 1e-9,
        "transmission_floor turns the fraction 0.01 into 1.0 of 100 transmissions")
     ck(abs(cl.transmission_floor(ind, 1.0) - 100.0) < 1e-9,

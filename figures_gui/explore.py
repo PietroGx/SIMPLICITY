@@ -44,6 +44,7 @@ import codehash as ch
 import compute
 import panels
 import clade_preprocess as cp
+import simplicity.clustering as cl
 import simplicity.dir_manager as dm
 from _scenarios import one_sod
 
@@ -251,8 +252,9 @@ def _run_meta_build(scen, seed, k, mt):
     if err:
         raise RuntimeError(err)
     ind = ctx["ind"]
-    first = (ind["t_infection"].astype(float)
-             .groupby(ind["inherited_lineage"].astype(str)).min().to_dict())
+    lin = cl.transmitted_lineages(ind)
+    first = (ind.loc[lin.index, "t_infection"].astype(float)
+             .groupby(lin.astype(str)).min().to_dict())
     out = {}
     for c in ctx["cols"]:
         tx = [first[m] for m in ctx["c2l"].get(c, []) if m in first]

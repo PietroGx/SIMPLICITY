@@ -5,6 +5,36 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Unreleased (branch mt_seeded_fix, versioned at the merge) — 2026-11-25 — pietro gerletti
+
+m_T no longer counts the seeded infections as transmission events
+------------------------------------------------------------------
+
+The `I_0` hosts infected at day 0 (`infected_individuals_at_start`, 90 in both
+production settings) carry `inherited_lineage = "wt"` and `parent = "root"`
+(`simplicity/population.py:402`). Every count that read `inherited_lineage`
+alone took them as transmissions, against GLOSSARY ("seeded infections ... are
+not transmission events"): the m_T denominator (`transmission_total`), the
+founding lineage's subtree support, the per-clade `ntx`, and the founding
+clade's first transmission in `explore._run_meta_build`.
+
+New `clustering.transmitted_lineages(individuals_df)` drops rows with
+`parent == "root"`; `subtree_transmission_counts`, `transmission_total`,
+`lineage_tree`, `compute.run_context` (`tx_all`), `compute._one` (`tx_post`)
+and `explore._run_meta_build` read it.
+
+Measured on 10 runs per scenario of the local experiment #2, k = 7,
+m_T = 1%: the floor falls by 0.9 transmissions; clade sets are identical in
+control, SOT, HIV low and edge case, and HIV high goes 220 -> 221 clades
+(3 differ). A small effect, but the denominator now is what its name says.
+
+The build hash moves (83607fd0aa7e -> c760f865a74a): every clade build is
+orphaned until `figures_gui/run_precompute.sh` is rerun. No simulation output
+is affected; no recalibration. `tests/check_clustering_module.py`'s fixture now
+carries seeded rows and checks they are excluded (32 passed on stamp 2).
+
+------------------------------------------------------------------------
+
 ## Version 2.5.21 — 2026-11-24 — pietro gerletti
 
 Studio data under Data/figures, one folder per section; logs under Data/logs
