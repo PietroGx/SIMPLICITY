@@ -77,8 +77,10 @@ import simplicity.jobs as jobs
 import simplicity.settings_manager as sm
 from impact_long_shedders_config import (
     table_path as frozen_table_path, build_exp_scenario_settings,
-    add_slurm_resource_args, set_slurm_resource_env, exp_name,
+    add_slurm_resource_args, set_slurm_resource_env, exp_name, run_exp_name,
+    exp_group,
 )
+import experiment_settings as es
 
 CONSENSUS = 'distribution'
 HORIZON = 1095.0
@@ -200,15 +202,20 @@ def run_grid(rows, cells, stamp, runner, n_seeds, max_array_tasks):
 
 # ---------------------------------------------------------------- measuring
 
-def measure(paths, pop_size):
+def measure(paths, pop_size, reservoir=None):
     '''Completion, stop reason, how far the early ones got, and when phi
     saturates. Mirrors extrande.check_stop_conditions, in its order.
 
     pop_size must be the population the run actually used: phi is
     (diagnosed + recovered)/size, so a wrong size silently moves every
-    burn-in number without any sign that it has.'''
+    burn-in number without any sign that it has. reservoir is the run's
+    individual pool, es.reservoir(pop_size) by default; every diagnosis and
+    recovery draws one from it (population_model.py:123, population.py:495),
+    so what is left at the stop is reservoir - pop_size - (diagnosed +
+    recovered). A grid run before v2.5.20 had a fixed pool of 100000.'''
+    reservoir = es.reservoir(pop_size) if reservoir is None else reservoir
     m = {'n': 0, 'full': 0, 'died': 0, 'noinfectious': 0, 'saturated': 0,
-         'other': 0, 'stop_days': [], 'peak': [], 'phi_days': [],
+         'reservoir': 0, 'other': 0, 'stop_days': [], 'peak': [], 'phi_days': [],
          'phi_never': 0, 'window': []}
     for p in paths:
         with open(p) as fh:
@@ -246,6 +253,9 @@ def measure(paths, pop_size):
             m['saturated'] += 1
         elif infectious == 0 and t > 60.0:
             m['noinfectious'] += 1
+        elif (reservoir - pop_size - float(last['diagnosed'])
+              - float(last['recovered'])) < 1000:
+            m['reservoir'] += 1
         else:
             m['other'] += 1
     return m
@@ -295,22 +305,14 @@ def scenario_lookup(rows):
             for r in rows}
 
 
-def collect(rows, cells, stamp, table_stamp):
-    '''{cell: {scenario: metrics}} for the single grid experiment, plus the
-    run #3 reference row. Each parameter combination is identified from its
-    own written parameters file, not from the directory name.'''
-    out = {}
-    base_prefix = exp_name(CONSENSUS)
-    base = {}
-    for s in SCENARIO_ORDER:
-        paths = sorted(glob.glob(
-            f'Data/{base_prefix}_{s}_#{table_stamp}/04_Output/*/seed_*/'
-            f'simulation_trajectory.csv'))
-        if paths:
-            base[s] = measure(paths, BASELINE[1])
-    if base:
-        out[BASELINE] = base
+def _trajectories(root, stem):
+    """A simulation's seed trajectories, with or without a group directory."""
+    return sorted(glob.glob(f'{root}/04_Output/{stem}/seed_*/simulation_trajectory.csv')
+                  + glob.glob(f'{root}/04_Output/*/{stem}/seed_*/simulation_trajectory.csv'))
 
+
+def _grid_cells(rows, stamp):
+    """(params file, cell, scenario) for every grid simulation of a known scenario."""
     lookup = scenario_lookup(rows)
     for params_file in sorted(grid_params_files(stamp)):
         try:
@@ -318,18 +320,47 @@ def collect(rows, cells, stamp, table_stamp):
                 params = json.load(fh)
         except (OSError, ValueError):
             continue
-        key = (round(float(params.get('long_shedders_ratio', 0.0)), 6),
-               round(float(params.get('tau_3_long', 0.0)), 2))
-        scenario = lookup.get(key)
-        if scenario is None:
-            continue
-        cell = (float(params['R']), int(params['population_size']),
-                int(params['infected_individuals_at_start']))
-        experiment = os.path.basename(
-            os.path.dirname(os.path.dirname(params_file)))
+        scenario = lookup.get((round(float(params.get('long_shedders_ratio', 0.0)), 6),
+                               round(float(params.get('tau_3_long', 0.0)), 2)))
+        if scenario is not None:
+            yield params_file, (float(params['R']), int(params['population_size']),
+                                int(params['infected_individuals_at_start'])), scenario
+
+
+def collect(rows, cells, stamp, table_stamp):
+    '''{cell: {scenario: metrics}} for the single grid experiment, plus the
+    run #3 reference row. Each parameter combination is identified from its
+    own written parameters file, not from the directory name.'''
+    out = {}
+    base = {}
+    base_root = f'Data/{run_exp_name(table_stamp, CONSENSUS)}/04_Output'
+    for s in SCENARIO_ORDER:
+        paths = sorted(glob.glob(
+            f'{base_root}/{exp_group(s)}/*/seed_*/simulation_trajectory.csv'))
+        if paths:
+            base[s] = measure(paths, BASELINE[1])
+    if base:
+        out[BASELINE] = base
+
+    for params_file, cell, scenario in _grid_cells(rows, stamp):
+        root = os.path.dirname(os.path.dirname(params_file))
+        paths = _trajectories(root, os.path.splitext(os.path.basename(params_file))[0])
+        if paths:
+            per = out.setdefault(cell, {}).get(scenario)
+            got = measure(paths, cell[1])
+            out[cell][scenario] = merge(per, got) if per else got
+    return out
+
+
+def task_seconds_by_cell(rows, stamp):
+    """Per-repeat wall seconds, grouped by cell (repeat_wall_seconds)."""
+    by_cell, walls = {}, {}
+    for params_file, cell, _ in _grid_cells(rows, stamp):
+        experiment = os.path.basename(os.path.dirname(os.path.dirname(params_file)))
+        if experiment not in walls:
+            walls[experiment] = repeat_wall_seconds(experiment)
         stem = os.path.splitext(os.path.basename(params_file))[0]
-        for seconds in repeat_wall_seconds(experiment).get(stem, []):
-            by_cell.setdefault(cell, []).append(seconds)
+        by_cell.setdefault(cell, []).extend(walls[experiment].get(stem, []))
     return by_cell
 
 
@@ -520,13 +551,13 @@ def report(data, cells, stamp, table_stamp, n_seeds, timing=None):
     w('3. WHY THE REST STOPPED')
     w('-' * 96)
     w(f'{"configuration":<26}{"early":>7}{"died out":>10}{"no infectious":>15}'
-      f'{"saturated":>11}{"other":>7}{"med stop day":>14}{"med peak":>10}')
+      f'{"saturated":>11}{"reservoir":>11}{"other":>7}{"med stop day":>14}{"med peak":>10}')
     for cell in ordered:
         per = data[cell]
         early = pooled(per, 'n') - pooled(per, 'full')
         w(f'{cell_label(cell):<26}{early:>7}{pooled(per, "died"):>10}'
           f'{pooled(per, "noinfectious"):>15}{pooled(per, "saturated"):>11}'
-          f'{pooled(per, "other"):>7}'
+          f'{pooled(per, "reservoir"):>11}{pooled(per, "other"):>7}'
           f'{fmt(med(pooled_list(per, "stop_days"))):>14}'
           f'{fmt(med(pooled_list(per, "peak"))):>10}')
     w('')

@@ -246,6 +246,15 @@ def test_the_run_records_what_it_ran_with():
             outcome = 'refused' if 'seeds' in str(exc) else str(exc)
         check('different settings into the same run are refused, naming the field',
               outcome, 'refused')
+        cv = runner.record_code_version('991', 'distribution')
+        runner.record_code_version('991', 'distribution')
+        with open(cv) as fh:
+            recs = json.load(fh)
+        head = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+        check('the code version sits beside the settings', os.path.dirname(cv), os.path.dirname(path))
+        check('one record per launch', len(recs), 2)
+        check('the commit is the checkout\'s', recs[-1]['commit'], head)
+        check('with a dirty flag', isinstance(recs[-1]['dirty'], bool), True)
     finally:
         if saved is None:
             os.environ.pop(es.SETTINGS_ENV, None)

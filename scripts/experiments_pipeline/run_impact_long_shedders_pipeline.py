@@ -270,6 +270,37 @@ def record_settings(s, stamp, consensus):
     return path
 
 
+CODE_VERSION_FILENAME = "code_version.json"
+
+
+def record_code_version(stamp, consensus):
+    """Append this launch's commit, branch and dirty flag to the run's
+    setup_data/, one record per invocation: a --skip-cal1 relaunch on other
+    code shows up as a second record. None where git cannot say."""
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    def git(*a):
+        try:
+            return subprocess.run(["git", "-C", repo, *a], capture_output=True, text=True,
+                                  timeout=30, check=True).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return None
+    status = git("status", "--porcelain", "--untracked-files=no")
+    rec = {"launched": datetime.now().isoformat(timespec="seconds"),
+           "commit": git("rev-parse", "HEAD"), "branch": git("rev-parse", "--abbrev-ref", "HEAD"),
+           "dirty": None if status is None else bool(status)}
+    path = os.path.join(setup_dir(stamp, consensus), CODE_VERSION_FILENAME)
+    prior = []
+    if os.path.exists(path):
+        with open(path) as fh:
+            prior = json.load(fh)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".partial", "w") as fh:
+        json.dump(prior + [rec], fh, indent=2)
+    os.replace(path + ".partial", path)
+    return path
+
+
 def write_artifacts_archive(archive_path, stamp, log_file, consensus_modes):
     """The grids collected are the ones this run produced.
 
@@ -285,6 +316,7 @@ def write_artifacts_archive(archive_path, stamp, log_file, consensus_modes):
     for mode in consensus_modes:
         candidates.append(os.path.join(setup_dir(stamp, mode),
                                        es.RUN_SETTINGS_FILENAME))
+        candidates.append(os.path.join(setup_dir(stamp, mode), CODE_VERSION_FILENAME))
         plots = os.path.join(run_dir(stamp, mode), "05_Plots")
         stem = run_exp_name(stamp, mode)
         candidates += [
@@ -431,6 +463,7 @@ def main():
     dm.mark_experiment_started(numbered)
     settings_file = record_settings(effective_settings(args, consensus),
                                     args.stamp, consensus)
+    record_code_version(args.stamp, consensus)
 
     log_file = args.log_file or os.path.join(
         "Data", "logs", "pipeline",

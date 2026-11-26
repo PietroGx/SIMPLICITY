@@ -5,6 +5,52 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.23 — 2026-11-26 — pietro gerletti
+
+A run records the code that produced it
+---------------------------------------
+
+`run_impact_long_shedders_pipeline.record_code_version` appends one record per
+launch to the run's `setup_data/code_version.json`: the commit
+(`git rev-parse HEAD`), the branch, whether tracked files differed from it
+(`dirty`), and the launch time. A `--skip-cal1` relaunch on other code shows up
+as a second record instead of overwriting the first. Where git cannot answer
+(no checkout on the node), the fields are `null`. The file is collected into
+the run's artifacts archive beside `experiment_settings.json`.
+`tests/test_experiment_settings.py` checks that the file sits beside the
+settings, that a second launch adds a second record, that the commit is the
+checkout's, and that `dirty` is a boolean.
+
+The config grid names the reservoir stop, and its analysis runs again
+---------------------------------------------------------------------
+
+`tests/test_config_grid.measure` classifies the fifth stop condition,
+`extrande.check_stop_conditions`' "Reservoir depleted": every diagnosis and
+recovery draws one individual from the reservoir
+(`simplicity/population_model.py:123`, `simplicity/population.py:495`), so
+what is left at the stop is `reservoir - N - (diagnosed + recovered)`, and the
+stop is the reservoir's when that is under 1000. `reservoir` defaults to
+`es.reservoir(N)`, `RESERVOIR_PER_CAPITA` x N since v2.5.20; a grid run before
+that had a fixed pool of 100000 and must be measured with `reservoir=100000`.
+"WHY THE REST STOPPED" gains a reservoir column; "other" is now max runtime
+only.
+
+The analysis could not have run since v2.4.71: an edit there replaced the end
+of `collect()` with the end of `task_seconds_by_cell()`, so `collect()` raised
+`NameError` on `by_cell`, and `main()` called `task_seconds_by_cell`, which no
+longer existed. Both are restored, reading the layout of v2.4.94 on: a grid
+simulation's seeds under `04_Output/<group>/<simulation>/`, and the reference
+row from the production experiment's `exp__<scenario>` groups (it globbed the
+pre-Stage-8 per-scenario experiments and so silently came back empty).
+
+Checked on a scratch grid whose simulations link to experiment #2's 250
+trajectories, plus two synthetic stops: the grid row equals the reference row
+read from #2 directly in every scenario (control 47/50 full, 2 no infectious,
+1 saturated), the stop at 999 left is counted under reservoir and the one with
+the reservoir full under other.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.22 — 2026-11-26 — pietro gerletti
 
 Outbreak detection and Cryptic outbreaks
