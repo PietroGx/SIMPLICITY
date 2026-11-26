@@ -83,7 +83,7 @@ def _run_pipeline(stamp, exp_name):
 
     def tm(*a, **k):
         out = saved["_time_match"](*a, **k)
-        matched.append(len(out[0]))
+        matched.append(out[1])
         return out
 
     for n in painters + ("_time_match",):
@@ -111,6 +111,22 @@ def _scenario_of(exp_name):
     return {preproc.get_clinical_label(s): s for s in preproc.duration_groups(exp_name)}
 
 
+def _durations(stamp, exp_name):
+    """Each cohort's designed infection length, tau_1 + tau_2 + tau_3 (tau_3_long
+    for long shedders) + tau_4, read from one simulation output dir per scenario
+    as panel A's curves are: for a long shedder this is inf_duration_long."""
+    import fig1_preprocess_data as preproc
+    out = {}
+    for sc in preproc.duration_groups(exp_name):
+        sod = preproc.one_sod(exp_name, sc, stamp)
+        if sod is None:
+            continue
+        get = lambda n: float(preproc.sm.get_parameter_value_from_simulation_output_dir(sod, n))
+        out[preproc.get_clinical_label(sc)] = round(
+            get("tau_1") + get("tau_2") + get("tau_3" if sc == "control" else "tau_3_long") + get("tau_4"), 2)
+    return out
+
+
 def _lims(ax):
     return dict(xlim=list(map(float, ax.get_xlim())), ylim=list(map(float, ax.get_ylim())),
                 xlabel=ax.get_xlabel(), ylabel=ax.get_ylabel())
@@ -133,6 +149,7 @@ def _panel_b(calls, plots):
     (ax, df), _ = calls["plot_fig1_violins"][0]
     if df.empty:
         return dict(violins=[], **_lims(ax))
+    shown = plots.violin_sample(df)   # the painter's own draw: same seed, same rows
     order = [t.get_text() for t in ax.get_xticklabels()]
     polys = [c.get_paths()[0].vertices for c in ax.collections]
     qs = sorted(((float(np.mean(l.get_xdata())), float(l.get_ydata()[0])) for l in ax.lines))
@@ -140,8 +157,9 @@ def _panel_b(calls, plots):
     for i, c in enumerate(order):
         v = next(p for p in polys if abs(p[:, 0].mean() - i) < 0.45)
         q = [y for x, y in qs if abs(x - i) < 0.45]
-        d = df.loc[df["cohort"] == c, "duration"]
-        out.append(dict(cohort=c, n=int(len(d)), mean=float(d.mean()), q=sorted(q),
+        d = shown.loc[shown["cohort"] == c, "duration"]
+        out.append(dict(cohort=c, n=int(len(d)), n_all=int((df["cohort"] == c).sum()),
+                        mean=float(d.mean()), q=sorted(q),
                         dx=_r(v[:, 0] - i, 4), y=_r(v[:, 1], 5)))
     return dict(violins=out, **_lims(ax))
 
@@ -249,12 +267,22 @@ def _panel_e(calls, matched, plots):
         series.setdefault(name, {})[kind] = dict(x=_r(l.get_xdata(), 5), y=_r(l.get_ydata(), 5))
     rx = k.get("real_x", "days_since_ref")
     ry = k.get("real_y", "hamming_per_overlap")
+    import numpy as np
+    rng = np.random.default_rng(42)
+
+    def pts(v, n=1500):
+        """the series' own values, a random 1,500 where there are more, for the studio's dots"""
+        v = np.asarray(v, float)
+        v = v[np.isfinite(v)]
+        return _r(np.sort(rng.choice(v, n, replace=False) if len(v) > n else v), 5)
     if "data" in series:
-        series["data"].update(n=int(len(df_real.dropna(subset=[rx, ry]))),
+        r = df_real.dropna(subset=[rx, ry])
+        series["data"].update(n=int(len(r)), pts=pts(r[ry].astype(float)),
                               label=k.get("data_label", "Patient data"))
     if "model" in series:
         series["model"].update(n=int((df_model["cohort"] == "Control").sum()),
-                               matched=matched[0] if matched else None, label="Model, Control")
+                               matched=len(matched[0]) if matched else None,
+                               pts=pts(matched[0]) if matched else [], label="Model, Control")
     return dict(series=series, x_max=k.get("x_max"), title=k.get("title"),
                 n_time_bins=10, **_lims(ax))
 
@@ -266,6 +294,7 @@ def build(stamp, exp_name, store):
     out = dict(
         experiment=dict(name=exp_name, num=stamp),
         cohort_scenario=_scenario_of(exp_name),
+        cohort_duration=_durations(stamp, exp_name),
         sources=dict(
             A="fig1_preprocess_data.get_panel_a_data: Host(tau_1, tau_2, tau_3 or tau_3_long, tau_4)"
               ".data_plot_ih_solution, taus read from each scenario's simulation output dir",

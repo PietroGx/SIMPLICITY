@@ -166,9 +166,9 @@ def cache_cap(limit_gb):
 # detection and Cryptic breakouts tabs. One file for every experiment: a rule
 # set is not tied to a run.
 PRESETS = os.path.join(BASE_STORE, "detection_presets.json")
-PRESET_KEYS = {"k", "mt", "originRule", "sdKernel", "sdSpace", "sdWin", "sdProm", "sdWidth", "sdCens", "sdStart",
+PRESET_KEYS = {"k", "mt", "originRule", "sdKernel", "sdSpace", "sdWin", "sdProm", "sdPromRef", "sdWidth", "sdCens", "sdStart",
                "sdTrough", "sdFrac", "sdAnchor", "sdPick", "sdGate", "burnin",
-               "brkF", "brkH", "brkLo", "brkQuiet"}
+               "brkF", "brkH", "brkLo", "brkQuiet", "brkRule"}
 
 
 def presets_read():

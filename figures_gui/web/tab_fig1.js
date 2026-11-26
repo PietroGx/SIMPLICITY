@@ -1,4 +1,4 @@
-/* Figure 1 · Model: the six panels of scripts/nature_plots/fig1_save.py, drawn
+/* Figure 1 · Model: the six panels of figures_gui/prep/fig1_save.py, drawn
    from what that script drew. figures_gui/fig1.py runs build_figure_1 and
    records each painter's frames, limits, outlines and fits, and stops if its
    clock fits differ from the lines the figure drew; nothing here computes a
@@ -7,7 +7,12 @@
 API_LABELS["/api/fig1"] = "reading Figure 1";
 
 const F1_H = 240;
-let f1Cloud = false, f1Last = null;
+let f1Last = null;
+/* the Display switches live in settings (settings.js), so a reload keeps them */
+const f1On = k => !!settings[k];
+/* bottom padding each canvas needs, and the floor its row imposes, so the plot
+   areas of one row share their x axis line (f1Align) */
+const f1PadNeed = {}, f1PadMin = {};
 
 const f1Data = () => css("--fig1-data");
 const f1Col = (d, cohort) => scenarioRaw((d.cohort_scenario || {})[cohort] || "control");
@@ -34,9 +39,14 @@ function f1Frame(cv, {x0, x1, y0, y1, xlab, ylab, fmtX, fmtY, cats, sub}) {
   g.font = catFont;
   const catW = cats ? Math.max(...cats.map(c => g.measureText(String(c)).width || 0)) : 0;
   const tilt = cats && catW > 0.95 * (w - 58) / Math.max(1, x1 - x0);
-  const pad = {l: 46, r: 12, t: 10,
-               b: !cats ? 34 : tilt ? Math.ceil(16 + (sub ? 12 : 0) + catW * 0.66) : (sub ? 40 : 30)};
-  axes(g, w, h, pad, xlab, ylab, y0, y1, fmtY);
+  const need = !cats ? 34 : tilt ? Math.ceil(16 + (sub ? 12 : 0) + catW * 0.66) : (sub ? 40 : 30);
+  f1PadNeed[cv.id] = need;
+  const pad = {l: 46, r: 12, t: 10, b: Math.max(need, f1PadMin[cv.id] || 0)};
+  /* a row's deeper padding would leave the label far below a plain axis: draw it under the ticks */
+  const lift = pad.b - need;
+  axes(g, w, h, pad, lift ? null : xlab, ylab, y0, y1, fmtY);
+  if (lift && xlab) { g.font = "600 11px " + css("--f-ui"); g.fillStyle = css("--ink-2"); g.textAlign = "center";
+    g.fillText(xlab, (pad.l + w - pad.r) / 2, h - 3 - lift); g.textAlign = "left"; }
   const X = v => pad.l + (w - pad.l - pad.r) * (v - x0) / ((x1 - x0) || 1);
   const Y = v => h - pad.b - (h - pad.b - pad.t) * (v - y0) / ((y1 - y0) || 1);
   g.strokeStyle = css("--line"); g.textAlign = "center";
@@ -44,6 +54,7 @@ function f1Frame(cv, {x0, x1, y0, y1, xlab, ylab, fmtX, fmtY, cats, sub}) {
   ticks.forEach(([v, t], i) => {
     const x = X(v);
     g.beginPath(); g.moveTo(x, h - pad.b); g.lineTo(x, h - pad.b + 3); g.stroke();
+    if (!cats && v === 0 && y0 === 0) return;   /* the y axis already prints the origin's 0 */
     g.fillStyle = css(cats ? "--ink-2" : "--ink-3");
     g.font = cats ? catFont : "10px " + css("--f-num");
     if (tilt) {
@@ -54,7 +65,10 @@ function f1Frame(cv, {x0, x1, y0, y1, xlab, ylab, fmtX, fmtY, cats, sub}) {
       g.fillText(t, 0, 0); g.restore();
       return;
     }
-    g.fillText(t, x, h - pad.b + 13);
+    /* a label wider than the space right of its tick ends at the canvas edge instead of being cut */
+    const tw = g.measureText(t).width;
+    if (x + tw / 2 > w - 1) { g.textAlign = "right"; g.fillText(t, w - 1, h - pad.b + 13); g.textAlign = "center"; }
+    else g.fillText(t, x, h - pad.b + 13);
     if (sub) { g.fillStyle = css("--ink-3"); g.font = "9px " + css("--f-num");
                g.fillText(sub[i], x, h - pad.b + 25); }
   });
@@ -100,7 +114,7 @@ function f1PaintB(cv, d) {
   const B = d.B, V = B.violins;
   const {g, X, Y} = f1Frame(cv, {x0: B.xlim[0], x1: B.xlim[1], y0: B.ylim[0], y1: B.ylim[1],
     ylab: "realized duration (days)", fmtY: v => v.toFixed(0),
-    cats: V.map(v => f1Name(d, v.cohort)), sub: V.map(v => `n=${v.n.toLocaleString()}`)});
+    cats: V.map(v => f1Name(d, v.cohort)), sub: f1On("f1ShowN") ? V.map(v => `n=${v.n.toLocaleString()}`) : null});
   const hits = [];
   V.forEach((v, i) => {
     f1Path(g, v.dx.map(dx => i + dx), v.y, X, Y); g.closePath();
@@ -114,7 +128,7 @@ function f1PaintB(cv, d) {
     g.setLineDash([]);
     hits.push({x: X(i), y: Y(v.q[1]), text: {
       text: `${f1Name(d, v.cohort)}: realized duration of ${v.cohort === "Control" ? "standard individuals" : "long shedders"}, t_not_infected − t_infection.`,
-      math: `individuals  ${v.n.toLocaleString()}\nquartiles    ${v.q.map(q => fmt(q, 1)).join(" · ")} d\nmean         ${fmt(v.mean, 1)} d`}});
+      math: `individuals  ${v.n.toLocaleString()}${v.n_all > v.n ? ` drawn at random of ${v.n_all.toLocaleString()}` : ""}\nquartiles    ${v.q.map(q => fmt(q, 1)).join(" · ")} d\nmean         ${fmt(v.mean, 1)} d`}});
   });
   g.restore();
   cv._ptHit = hits; axisTip(cv);
@@ -125,7 +139,7 @@ function f1PaintC(cv, d) {
   const C = d.C, K = C.categories;
   const {g, X, Y} = f1Frame(cv, {x0: C.xlim[0], x1: C.xlim[1], y0: C.ylim[0], y1: C.ylim[1],
     ylab: "literature duration (days)", fmtY: v => v.toFixed(0),
-    cats: K.map(k => k.cat), sub: K.map(k => `n=${k.n}`)});
+    cats: K.map(k => k.cat), sub: f1On("f1ShowN") ? K.map(k => `n=${k.n}`) : null});
   const hits = [];
   let j = 0;
   K.forEach((k, i) => {
@@ -158,7 +172,7 @@ function f1PaintClock(cv, d, P, xlab) {
   const {g, X, Y} = f1Frame(cv, {x0: P.xlim[0], x1: P.xlim[1], y0: P.ylim[0], y1: P.ylim[1],
     xlab, ylab: "divergence (10⁻³ subs/site)", fmtY: v => (v * 1e3).toFixed(2)});
   const xm = P.x_max;
-  if (f1Cloud) P.model.forEach(m => {
+  if (f1On("f1Cloud")) P.model.forEach(m => {
     g.fillStyle = f1Col(d, m.cohort); g.globalAlpha = 0.25;
     m.thin.x.forEach((x, i) => { g.beginPath(); g.arc(X(x), Y(m.thin.y[i]), 1.5, 0, 6.2832); g.fill(); });
   });
@@ -202,12 +216,13 @@ function f1ClockTable(d, P) {
 function f1PaintE(cv, d) {
   const E = d.E, S = E.series || {};
   const {g, X, Y} = f1Frame(cv, {x0: E.xlim[0], x1: E.xlim[1], y0: E.ylim[0], y1: E.ylim[1],
-    xlab: "divergence (10⁻³ subs/site)", ylab: "density (10³ per subs/site)",
-    fmtX: v => fmt(v * 1e3, 1), fmtY: v => v.toFixed(2)});
+    /* fig1_plots stores the density divided by 1,000; shown here in plain units */
+    xlab: "divergence (subs/site)", ylab: "density (per subs/site)",
+    fmtX: v => v.toFixed(3), fmtY: v => (v * 1e3).toFixed(0)});
   const col = k => k === "data" ? f1Data() : f1Col(d, "Control");
   ["model", "data"].forEach(k => {
     const h = (S[k] || {}).hist;
-    if (!h || !h.x.length) return;
+    if (!f1On("f1Hist") || !h || !h.x.length) return;
     g.strokeStyle = col(k); g.globalAlpha = 0.35; g.lineWidth = 0.8;
     g.beginPath(); g.moveTo(X(h.x[0]), Y(h.y[0]));
     for (let i = 1; i < h.x.length; i++) {
@@ -225,9 +240,21 @@ function f1PaintE(cv, d) {
     g.strokeStyle = col("model"); g.lineWidth = 1.6; f1Path(g, km.x, km.y, X, Y); g.stroke();
   }
   if (kd) {
-    g.strokeStyle = col("data"); g.lineWidth = 1.6; g.setLineDash([6, 3]);
-    f1Path(g, kd.x, kd.y, X, Y); g.stroke(); g.setLineDash([]);
+    g.strokeStyle = col("data"); g.lineWidth = 1.8; g.lineCap = "round"; g.setLineDash([0.1, 3.5]);
+    f1Path(g, kd.x, kd.y, X, Y); g.stroke(); g.setLineDash([]); g.lineCap = "butt";
   }
+  /* each series' own values as a rug of short ticks along the floor, model
+     lowest and patients above: a value has an x but no y of its own, the y axis
+     being the whole sample's density (fig1.py stores up to 1,500 of each) */
+  const y0 = E.ylim[0], span = E.ylim[1] - E.ylim[0];
+  [["model", f1On("f1DotsModel"), 0.0], ["data", f1On("f1DotsData"), 0.05]].forEach(([k, on, lo]) => {
+    const v = (S[k] || {}).pts;
+    if (!on || !v) return;
+    g.strokeStyle = col(k); g.globalAlpha = 0.25; g.lineWidth = 0.7;
+    const ya = Y(y0 + span * lo), yb = Y(y0 + span * (lo + 0.04));
+    g.beginPath(); v.forEach(x => { g.moveTo(X(x), ya); g.lineTo(X(x), yb); }); g.stroke();
+  });
+  g.globalAlpha = 1;
   g.restore();
 }
 
@@ -240,23 +267,98 @@ function f1PaintClocks() {
 }
 
 function f1Rail(rail) {
-  const el = document.createElement("div");
-  el.className = "ctl";
-  el.innerHTML = `<label class="chk"><input type="checkbox"${f1Cloud ? " checked" : ""}>
-      <span>Model points in D and F</span></label>
-    <div class="hint">Figure 1 draws only the model's fitted lines: its thousands of
-      points buried the patients'. Ticked, each scenario's points are added behind,
-      thinned to 600 with <code>fig1_plots._thin</code> as
-      <code>plot_clock_overlay(model_scatter=True)</code> would draw them.</div>`;
-  el.querySelector("input").addEventListener("change", ev => {
-    f1Cloud = !!ev.target.checked; f1PaintClocks(); });
-  rail.append(card("Display", [el]));
+  const tog = (key, label, hint) => {
+    const c = document.createElement("div");
+    c.className = "ctl";
+    c.innerHTML = `<label class="chk"><input type="checkbox"${f1On(key) ? " checked" : ""}><span>${label}</span></label>`
+      + (hint ? `<div class="hint">${hint}</div>` : "");
+    c.querySelector("input").addEventListener("change", ev => {
+      setSetting(key, ev.target.checked ? 1 : 0); renderTab(tabById("fig1")); });
+    return c;
+  };
+  rail.append(card("Display", [
+    tog("f1Titles", "Panel titles", "Off: only the panel letters."),
+    tog("f1ShowN", "n = under B and C",
+        "The count under each violin and box: simulated individuals in B, patients in C."),
+    tog("f1Hist", "Histogram in D", "The faint step outline of each series' histogram behind its density."),
+    tog("f1DotsData", "Patient sequences in D",
+        "Each patient sequence's divergence as a tick along the floor: the values the dotted density is drawn from."),
+    tog("f1DotsModel", "Model sequences in D",
+        "The time-matched model sample the solid density is drawn from, 1,500 of its sequences at random, as ticks below the patients'."),
+    tog("f1Cloud", "Model points in E and F",
+        "Figure 1 draws only the model's fitted lines: its thousands of points buried the patients'. "
+        + "Ticked, each scenario's points are added behind, thinned to 600 with <code>fig1_plots._thin</code> "
+        + "as <code>plot_clock_overlay(model_scatter=True)</code> would draw them."),
+  ]));
+}
+
+/* ------------------------------------------------------------ legend
+   One key for the whole figure, right of the grid: colours once, then what each
+   panel's marks mean. Swatches are CSS, not SVG, so the Export tab's
+   html2canvas draws them as the page does. */
+const F1_CATS = {HIV: "HIV/AIDS", SOT: "solid organ transplant", "B-CN": "B-cell neoplasm",
+  AuIm: "rheumatological / autoimmune", PID: "primary immunodeficiency",
+  aHSCT: "haematopoietic stem-cell transplant", OHem: "other haematological disease",
+  ImmC: "immunocompromised, unspecified", Other: "other"};
+const f1Sw = {
+  line: (c, dash) => `<i class="sw" style="border-top:2px ${dash === "dot" ? "dotted" : dash ? "dashed" : "solid"} ${c};height:0;margin-top:1px"></i>`,
+  band: c => `<i class="sw"><i style="position:absolute;inset:0;background:${c};opacity:.18"></i><i style="position:absolute;left:0;right:0;top:4px;border-top:2px solid ${c}"></i></i>`,
+  area: c => `<i class="sw"><i style="position:absolute;inset:0;background:${c};opacity:.12"></i><i style="position:absolute;left:0;right:0;top:0;border-top:2px solid ${c}"></i></i>`,
+  dot: (c, a = 0.8) => `<i class="sw"><i style="position:absolute;left:7px;top:2px;width:6px;height:6px;border-radius:50%;background:${c};opacity:${a}"></i></i>`,
+  tick: c => `<i class="sw">${[4, 8, 9, 13, 16].map(x => `<i style="position:absolute;left:${x}px;top:1px;height:8px;border-left:1px solid ${c};opacity:.6"></i>`).join("")}</i>`,
+  fill: c => `<i class="sw"><i style="position:absolute;inset:0;background:${c}"></i></i>`,
+};
+const f1Row = (sw, text) => `<div class="r">${sw}<span>${text}</span></div>`;
+/* a dashed segment as spans, so its dash lengths match the canvas's and html2canvas draws it */
+const f1Dash = (on, off, wpx, c = "var(--ink)") => {
+  let out = "", x = 0;
+  while (x < 20) { const l = Math.min(on, 20 - x);
+    out += `<i style="position:absolute;left:${x}px;top:4px;width:${l}px;border-top:${wpx}px solid ${c}"></i>`; x += on + off; }
+  return `<i class="sw">${out}</i>`;
+};
+function f1Legend(d) {
+  const cs = d.cohort_scenario || {}, dur = d.cohort_duration || {}, C = d.C, pd = f1Data(), mc = f1Col(d, "Control");
+  const who = c => c === "Control" ? "standard individuals"
+    : `long shedders${isNum(dur[c]) ? ` – ${fmt(dur[c], 0)} days` : ""}`;
+  const txt = t => `<div class="r"><span>${t}</span></div>`;
+  const clock = (P, dot, data, model) => [
+    f1Row(f1Sw.dot(pd, 0.35), dot),
+    f1Row(f1Sw.line(pd, true), data),
+  ].concat(P.model.map(m => f1Row(f1Sw.band(f1Col(d, m.cohort)), model(m))),
+    f1On("f1Cloud") ? [f1Row(f1Sw.dot("var(--ink-2)", 0.3), "model sequences, thinned to 600")] : []).join("");
+  const cats = C.categories.map(k => txt(`<b>${k.cat}</b> ${F1_CATS[k.cat] || ""}`)).join("");
+  return `<aside class="f1leg">
+    <h5>A · intra-host model</h5>
+    ${["Control", "SOT", "HIV", "Edge Case"].filter(c => cs[c])
+      .map(c => f1Row(f1Sw.fill(f1Col(d, c)), `<b>${f1Name(d, c)}</b> (${who(c)})`)).join("")}
+    <h5>B · realized duration</h5>
+    ${f1Row(f1Dash(5, 2, 1.5), "median")}
+    ${f1Row(f1Dash(2, 2, 1), "quartiles")}
+    <h5>C · clinical category</h5>
+    ${cats}
+    ${f1Row(f1Sw.dot(f1Col(d, "Edge Case")), `any patient beyond ${C.cutoff ?? 300} d`)}
+    <h5>D · divergence</h5>
+    ${f1Row(f1Sw.line(pd, "dot"), "patients data Gaussian KDE")}
+    ${f1Row(f1Sw.area(mc), "model Gaussian KDE")}
+    ${f1On("f1DotsData") ? f1Row(f1Sw.tick(pd), "one patient sequence") : ""}
+    ${f1On("f1DotsModel") ? f1Row(f1Sw.tick(mc), "one model sequence, time-matched") : ""}
+    <h5>E · global clock</h5>
+    ${clock(d.D, "standard patient sequences", "standard patients – root-to-tip regression",
+            () => "model – root-to-tip regression on standard individuals")}
+    <h5>F · intra-host clock</h5>
+    ${clock(d.F, "long shedder sequences", "intra-host long shedder longitudinal data – root-to-tip regression",
+            m => `model ${f1Name(d, m.cohort)} – root-to-tip regression`)}
+    <div class="r f1foot"><span>model line: mean of single sim. fits ±1 SD</span></div>
+  </aside>`;
 }
 
 /* the original's 2×3 grid (fig1_save.py: GridSpec(2, 6), two columns each):
    a panel is letter, title, canvas and key; captions and tables go below */
+/* printed letter per panel: the divergence distribution (data key E) sits
+   left of the global clock (data key D), so in reading order they swap letters */
+const F1_LETTER = {A: "A", B: "B", C: "C", D: "E", E: "D", F: "F"};
 const f1Box = (id, title, sub, key) => `<div class="f1p">
-  <div class="ph"><h3><b>${id}</b> ${title}</h3><span class="sub">${sub}</span></div>
+  <div class="ph"><h3><b>${F1_LETTER[id]}</b>${f1On("f1Titles") ? " " + title : ""}</h3></div>
   <canvas id="f1_${id}"></canvas>${key}</div>`;
 const f1Note = (id, cap, extra = "") => `<div class="f1n"><h4>${id}</h4><div class="cap">${cap}</div>${extra}</div>`;
 
@@ -264,7 +366,6 @@ async function renderFig1(main) {
   const d = await apiGetSlot("/api/fig1");
   f1Last = d;
   const ix = d.index || {}, ex = d.experiment || {}, src = d.sources || {};
-  const cohortKey = cs => keyRow(cs.map(c => [f1Col(d, c), f1Name(d, c)]));
   const A = d.A, B = d.B, C = d.C, D = d.D, E = d.E, F = d.F, S = E.series || {};
   const hiv = (d.cohort_scenario || {}).HIV;
 
@@ -272,7 +373,7 @@ async function renderFig1(main) {
     (hash ${ix.code_hash}, now ${ix.current_hash}): these panels may no longer be the
     figure. Rebuild with ${f1Code(`python figures_gui/fig1.py build --stamp ${ex.num} --store &lt;store&gt;`)}.</div>` : "";
   const note = `<div class="note">Experiment ${f1Code(`${ex.name} #${ex.num}`)}, read back off
-    ${f1Code("scripts/nature_plots/fig1_save.py")}'s own axes by ${f1Code("figures_gui/fig1.py")}
+    ${f1Code("figures_gui/prep/fig1_save.py")}'s own axes by ${f1Code("figures_gui/fig1.py")}
     on ${ix.built || "—"} (code ${ix.code_hash || "—"}). Every number here is one the figure
     draws or prints; the build stops if its clock fits differ from the figure's lines.
     The HIV series is ${f1Code(hiv || "—")} alone: ${f1Code("duration_groups")} keeps one
@@ -286,7 +387,9 @@ async function renderFig1(main) {
 
   const vq = B.violins.map(v => `${f1Name(d, v.cohort)} ${fmt(v.q[1], 0)} d (${fmt(v.q[0], 0)}–${fmt(v.q[2], 0)}, n=${v.n.toLocaleString()})`).join("; ");
   const capB = `Realized infection durations: standard individuals in control,
-    long shedders in every other scenario. Source: ${src.B || ""}. Width-normalised
+    long shedders in every other scenario. Source: ${src.B || ""}. Each violin rests on
+    at most 150 individuals drawn at random (seed 42, ${f1Code("fig1_plots.violin_sample")}), so a
+    scenario with ~280,000 hosts and one with under 200 are drawn from the same number. Width-normalised
     kernel densities cut at the data's range, outlines exactly as seaborn drew them;
     the dashed lines are the quartiles. Median (quartiles, individuals): ${vq}.`;
 
@@ -297,9 +400,6 @@ async function renderFig1(main) {
     not marked, but every patient is a point. A category is coloured as the scenario
     that stands in for it, grey if none does; any patient beyond ${C.cutoff ?? 300} d
     is coloured as the edge case whatever the category. Jitter is cosmetic.`;
-  const keyC = keyRow([["SOT", "SOT"], ["HIV", "HIV"]].filter(([c]) => (d.cohort_scenario || {})[c])
-    .map(([c, t]) => [f1Col(d, c), t]).concat([[f1Col(d, "Edge Case"), `beyond ${C.cutoff ?? 300} d`],
-    [css("--fig1-unmod"), "no modelled scenario"]]));
 
   const clockLine = P => [P.data ? `${P.data_label} ${fmt(P.data.rate, 5)} s/s/y (R² ${fmt(P.data.r2, 2)})` : null]
     .concat(P.model.map(m => `model ${f1Name(d, m.cohort)} ${fmt(m.rate, 5)} ± ${fmt(m.sd_rate, 5)} s/s/y (R² ${fmt(m.r2, 2)})`))
@@ -320,33 +420,50 @@ async function renderFig1(main) {
      genome and time since its own infection.`);
 
   const sd_ = S.data || {}, sm = S.model || {};
-  const capE = `Panel D's two series with time collapsed: the distribution of divergence.
+  const capE = `Panel E's two series with time collapsed: the distribution of divergence.
     Patients: ${(sd_.n || 0).toLocaleString()} sequences from ${f1Code(src.D_data || "")}. Model:
     control's ${(sm.n || 0).toLocaleString()} standard sequences, resampled with replacement to
     ${(sm.matched || 0).toLocaleString()} so their sampling days follow the patients' in
     ${E.n_time_bins} quantile bins (${f1Code("fig1_plots._time_match")}) — otherwise this would
-    compare two sampling designs as much as two clocks. Curves are Gaussian KDEs with the
-    bandwidth floored at 1.2× the model's 1/genome step (${f1Code("_smoothed")}); the faint
+    compare two sampling designs as much as two clocks. Curves are Gaussian KDEs, each bandwidth floored at
+    1.2× its own series' step: 1/genome length for the model, 1/median overlap length
+    for the patients (${f1Code("_smoothed")}); the faint
     steps are histograms, each binned at twice its own resolution. Read the shape, not the
-    rate: D shows the rates; here the patients are bimodal, the model is not.`;
+    rate: E shows the rates; here the patients are bimodal, the model is not.`;
 
-  const keyClock = P => keyRow([[f1Data(), `${P.data_label} (dashed)`]]
-    .concat(P.model.map(m => [f1Col(d, m.cohort), `model, ${f1Name(d, m.cohort)}`])));
 
-  main.innerHTML = stale + note + `<div class="plot"><div class="f1grid">`
-    + f1Box("A", "Infectiousness by day", "within-host model", cohortKey(A.curves.map(c => c.cohort)))
-    + f1Box("B", "Realized infection duration", "simulated, 10 seeds", cohortKey(B.violins.map(v => v.cohort)))
-    + f1Box("C", "Published shedding durations", `${C.n} patients`, keyC)
-    + f1Box("D", D.title || "Global clock", "patients vs control", keyClock(D))
-    + f1Box("E", E.title || "Divergence distribution", "D's points, time collapsed",
-      keyRow([[f1Data(), `${sd_.label || "Patient data"} (dashed)`], [f1Col(d, "Control"), "model, control"]]))
-    + f1Box("F", F.title || "Intra-host clock", "patients vs long shedders", keyClock(F))
-    + `</div></div><div class="plot"><div class="ph"><h3>Panel notes</h3>
+  main.innerHTML = stale + note + `<div class="plot"><div class="f1wrap"><div class="f1grid">`
+    + f1Box("A", "Infectiousness by day", "within-host model", "")
+    + f1Box("B", "Realized infection duration", "simulated, 10 seeds", "")
+    + f1Box("C", "Published shedding durations", `${C.n} patients`, "")
+    + f1Box("E", E.title || "Divergence distribution", "", "")
+    + f1Box("D", D.title || "Global clock", "patients vs control", "")
+    + f1Box("F", F.title || "Intra-host clock", "patients vs long shedders", "")
+    + `</div>${f1Legend(d)}</div></div><div class="plot"><div class="ph"><h3>Panel notes</h3>
       <span class="sub">what each panel reads and the numbers it draws</span></div>`
     + f1Note("A", capA) + f1Note("B", capB) + f1Note("C", capC)
-    + f1Note("D", capD, f1ClockTable(d, D)) + f1Note("E", capE) + f1Note("F", capF, f1ClockTable(d, F))
+    + f1Note("D", capE) + f1Note("E", capD, f1ClockTable(d, D)) + f1Note("F", capF, f1ClockTable(d, F))
     + `</div>`;
 
+  f1PaintA(document.getElementById("f1_A"), d);
+  f1PaintB(document.getElementById("f1_B"), d);
+  f1PaintC(document.getElementById("f1_C"), d);
+  f1PaintE(document.getElementById("f1_E"), d);
+  f1PaintClocks();
+  f1Align(d);
+}
+
+/* Panels side by side share their x axis line: each row takes the largest
+   bottom padding any of its canvases needs, then all six repaint with it */
+function f1Align(d) {
+  const ids = ["A", "B", "C", "D", "E", "F"], rows = {};
+  ids.forEach(id => { const cv = document.getElementById("f1_" + id); if (!cv) return;
+    const top = Math.round(cv.getBoundingClientRect().top);
+    (rows[top] = rows[top] || []).push(cv.id); });
+  let moved = false;
+  Object.values(rows).forEach(r => { const b = Math.max(...r.map(i => f1PadNeed[i] || 0));
+    r.forEach(i => { if (f1PadMin[i] !== b) { f1PadMin[i] = b; moved = true; } }); });
+  if (!moved) return;
   f1PaintA(document.getElementById("f1_A"), d);
   f1PaintB(document.getElementById("f1_B"), d);
   f1PaintC(document.getElementById("f1_C"), d);
@@ -356,7 +473,7 @@ async function renderFig1(main) {
 
 registerTab({
   id: "fig1", group: "figures", num: "1", title: "Model", viewId: "viewFig1",
-  lede: "The paper's Figure 1, panel for panel: how long hosts stay infectious in the model and in the literature, and the model's global and intra-host clocks against patient data. Drawn from what <code>scripts/nature_plots/fig1_save.py</code> itself drew.",
+  lede: "The paper's Figure 1, panel for panel: how long hosts stay infectious in the model and in the literature, and the model's global and intra-host clocks against patient data. Drawn from what <code>figures_gui/prep/fig1_save.py</code> itself drew.",
   rail: f1Rail,
   rerenderOn: [],
   render: renderFig1,

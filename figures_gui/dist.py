@@ -275,11 +275,8 @@ def operating_point():
     """The operating point across EVERY build parameter: compute.DEFAULTS plus
     window="post", the values a rebuild uses when nothing is overridden.
 
-    NOT panels._p4_operating_key (panels.py:458-465), which matches on P4_AXES
-    = ["k","win","prom"] only. m_T is absent from that list, so it answers with
-    the first row in directory order, k7_m0.001_... -- m_T = 0.1% instead of the
-    operating point's 1% -- and that key feeds _p4_summary's at_operating_point
-    (panels.py:432-437).
+    panels._p4_operating_key (panels.py:740-747) matches on P4_AXES only
+    (k, m_T, win, prom); this one also fixes lo, hi and window.
     """
     return dict(compute.DEFAULTS, window="post")
 
@@ -294,15 +291,12 @@ def _same(a, b):
 def sens(store, q):
     """Panel 4's sensitivity line, one axis at a time, with bands.
 
-    panel4's own by_axis cannot serve it. P4_AXES is ["k","win","prom"]
-    (panels.py:442), so _p4_by_axis (:503-523) leaves m_T unpinned and
-    by_axis["k"] comes back with 21 levels for three values of k -- seven m_T
-    rows per k, sorted lexicographically by directory name so m0 lands after
-    m0.1. Here every build axis but the one asked for is pinned, m_T included,
-    and levels sort numerically.
+    panel4's own by_axis cannot serve it: it pins P4_AXES (panels.py:725)
+    but not lo, hi or window. Here every build axis but the one asked for is
+    pinned, and levels sort numerically.
 
     Each metric carries a full bootstrap CI over runs. Panel 4's rows take
-    .get("mean") and drop lo/hi (panels.py:388-393), and a sensitivity line
+    .get("mean") and drop lo/hi (panels.py:646-672), and a sensitivity line
     without a band invites a 2-day wiggle to be read as a real shift.
     """
     axis = q.get("axis")

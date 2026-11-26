@@ -155,7 +155,7 @@ def main():
                       ("kernel", "none"), ("space", "log"), ("win", "60"),
                       ("prom_abs", "0.01"), ("sep", "90"), ("width", "30"),
                       ("cens", "0"), ("start", "frac"), ("start", "base"),
-                      ("trough", "0.05"), ("anchor", "transmission"), ("gate", "start"), ("dip", "low")):
+                      ("trough", "0.05"), ("anchor", "transmission"), ("gate", "start"), ("dip", "low"), ("promref", "peak")):
         moved = [scen for scen, (q0, ref) in refs.items()
                  if signature(explore.explore(store, dict(q0, **{name: val}))) != ref]
         check(f"{name}={val} changes the measurement in {len(moved)} of {len(refs)} runs",

@@ -51,22 +51,29 @@ KERNELS = ("box", "gauss", "savgol", "median", "none")
 SPACES = ("lin", "log")
 STARTS = ("trough", "frac", "base")
 ANCHORS = ("emergence", "transmission")
-# which clades the burn-in day lets through. trunc (Figure 5): measure from the
-# burn-in day and drop a clade already circulating then. start: measure on the
-# whole record and keep a clade whose breakout STARTS after the burn-in day --
-# the browser applies that test, since it picks the breakout
+# which clades the burn-in day lets through. trunc (the build's): measure from
+# the burn-in day and drop a clade already circulating then. start (Figure 5 and
+# the detection tabs, web/episodes.js exploreQuery): measure on the whole record
+# and keep a clade whose breakout STARTS after the burn-in day -- the browser
+# applies that test, since it picks the breakout
 GATES = ("trunc", "start")
 # which dips may start an episode under start=trough. any (the build's): every
 # dip clearing the trough bar, so a wobble at the top of a plateau can start an
-# episode a day before its peak. low: only a dip at least the prominence bar
-# below the peak -- one the episode can be said to rise from
+# episode a day before its peak. low (Figure 5 and the detection tabs): only a
+# dip at least the prominence bar below the peak -- one the episode can be said
+# to rise from
 DIPS = ("any", "low")
+# what the prominence bar is a fraction of: the clade's highest frequency (the
+# build's, until branch prom_peak_fix) or each peak's own height
+PROMREFS = ("clade", "peak")
 LOG_FLOOR = 1e-6          # added before log10, so an absent clade is -6, not -inf
 
-# the rules Figure 5 measured with; win, prom and lo come from the build axes
+# the build's rules, the default for a query that omits one; win, prom and lo
+# come from the build axes. Figure 5 sends gate=start and dip=low instead
+# (web/episodes.js exploreQuery), so FIG5 names the origin, not the figure
 FIG5 = dict(kernel="box", space="lin", prom_abs=0.0, sep=0.0, width=0.0,
             cens=True, start="trough", trough=cp.TROUGH_PROM, anchor="emergence",
-            gate="trunc", dip="any")
+            gate="trunc", dip="any", promref="clade")
 
 
 def read_params(q):
@@ -105,6 +112,9 @@ def read_params(q):
         anchor=choice("anchor", ANCHORS, FIG5["anchor"]),
         gate=choice("gate", GATES, FIG5["gate"]),
         dip=choice("dip", DIPS, FIG5["dip"]),
+        promref=choice("promref", PROMREFS, FIG5["promref"]),
+        # cryptic rule 2's ceiling f: hidden time ends when the curve first exceeds it
+        under=num("under", 0.01, 0.0, 1.0),
         mf=panels.read_mf(q),
         burnin=str(q.get("burnin", "1")) not in ("0", "", "false", "False"))
 
@@ -135,6 +145,19 @@ def smooth(y, t, kernel, win, space):
     return np.clip(out, 0.0, None) if kernel != "box" or space == "log" else out
 
 
+def _peaks(ys, h, r, **kw):
+    """find_peaks under the prominence bar: (peaks, props, bar per peak).
+    promref=peak tests each peak against p times its own height."""
+    if r["promref"] == "clade":
+        bar = max(r["prom"] * h, r["prom_abs"])
+        pk, props = find_peaks(ys, prominence=bar, **kw)
+        return pk, props, np.full(len(pk), bar)
+    pk, props = find_peaks(ys, prominence=0.0, **kw)
+    bars = np.maximum(r["prom"] * ys[pk], r["prom_abs"])
+    keep = props["prominences"] >= bars
+    return pk[keep], {k: v[keep] for k, v in props.items()}, bars[keep]
+
+
 def episodes(ys, t, r):
     """(height, [(start, peak, censored)]) under rules `r`: clade_preprocess.
     episodes_of, except that a clade still rising on the last day counts as a
@@ -147,12 +170,13 @@ def episodes(ys, t, r):
         return 0.0, []
     bar = max(r["prom"] * h, r["prom_abs"])
     step = (t[-1] - t[0]) / (n - 1)
-    kw = dict(prominence=bar)
+    kw = {}
     if r["sep"] > 0:
         kw["distance"] = max(1, int(round(r["sep"] / step)))
     if r["width"] > 0:
         kw["width"] = r["width"] / step
-    pk, props = find_peaks(ys, **kw)
+    pk, props, bars = _peaks(ys, h, r, **kw)
+    bar_of = {int(i): float(b) for i, b in zip(pk, bars)}
     peaks = [(int(i), False, int(lb)) for i, lb in zip(pk, props["left_bases"])]
     if r["cens"]:
         m = int(np.argmax(ys >= h * (1 - cp.CENSOR_TOL)))
@@ -163,19 +187,23 @@ def episodes(ys, t, r):
     if r["start"] == "trough":
         mins, _ = find_peaks(-ys, prominence=r["trough"] * h)
         mins = np.concatenate([[0], mins])
-    out = []
+    out, prev = [], None
     for i, c, base in peaks:
         if r["start"] == "trough":
             before = mins[mins < i]
             if r["dip"] == "low":
-                before = before[ys[before] <= ys[i] - bar]
+                before = before[ys[before] <= ys[i] - bar_of.get(i, bar)]
             a = int(before[-1]) if len(before) else 0
         elif r["start"] == "frac":
-            below = np.nonzero(ys[:i] <= r["frac"] * ys[i])[0]
-            a = int(below[-1]) if len(below) else 0
+            # never back past the previous peak: from it on, the last day under
+            # frac of this peak, else the lowest point since it
+            lo = 0 if prev is None else prev
+            below = np.nonzero(ys[lo:i] <= r["frac"] * ys[i])[0]
+            a = lo + int(below[-1]) if len(below) else 0 if prev is None else lo + int(np.argmin(ys[lo:i]))
         else:
             a = base
         out.append((a, i, c))
+        prev = i
     return h, out
 
 
@@ -190,12 +218,11 @@ def widths(ys, t, r):
     h = float(np.max(ys)) if n else 0.0
     if n < 3 or not (h > 0):
         return []
-    bar = max(r["prom"] * h, r["prom_abs"])
     step = (t[-1] - t[0]) / (n - 1)
-    kw = dict(prominence=bar)
+    kw = {}
     if r["sep"] > 0:
         kw["distance"] = max(1, int(round(r["sep"] / step)))
-    pk, props = find_peaks(ys, **kw)
+    pk, props, _ = _peaks(ys, h, r, **kw)
     if not len(pk):
         return []
     w, wh, li, ri = peak_widths(ys, pk, rel_height=0.5, prominence_data=(
@@ -331,6 +358,16 @@ def detect(y, t, r):
     return ys, h, rs
 
 
+def _cross(ys, t, tem, f):
+    """The first day, from the anchor on, that the smoothed curve is above f:
+    where cryptic rule 2's hidden time ends. None when it never is."""
+    if tem is None:
+        return None
+    ja = int(np.searchsorted(t, float(tem)))
+    k = np.nonzero(np.asarray(ys[ja:]) > f)[0]
+    return round(float(t[ja + k[0]]), 2) if len(k) else None
+
+
 def _pre(ys, t, tem, a):
     """The smoothed curve's highest value from the anchor up to (not
     including) an episode's start: what the clade reached during the hidden
@@ -406,6 +443,7 @@ def explore(store, q):
             # the smoothed series the peaks were found on, so the tab draws
             # what was measured rather than re-smoothing with a box
             rec["ys"] = [round(float(v), 7) for v in ys]
+            rec["t_cross"] = _cross(ys, t, tem, r["under"])
             rec["wid"] = widths(ys, t, r)
         out.append(rec)
 
@@ -438,15 +476,17 @@ def _panel_build(store, r, seeds):
                 tem = c["t_em"] if r["anchor"] == "emergence" else c["t_tx"]
                 if tem is None or _trunc(r, phi, tem, y):
                     continue
-                eps = []
+                eps, cross = [], None
                 if len(t) >= 3 and not empty:
                     ys, _, rs = detect(y, t, r)
+                    cross = _cross(ys, t, tem, r["under"])
                     eps = sorted([round(float(t[e["a"]]), 2), round(float(e["top"]), 5),
                                   round(float(e["amp"]), 5), round(float(e["days"]), 2),
-                                  _pre(ys, t, tem, int(e["a"]))]
+                                  _pre(ys, t, tem, int(e["a"])), round(float(t[e["b"]]), 2)]
                                  for e in rs)
+                rnd = lambda v: None if v is None else round(float(v), 2)
                 clades.append([int(c["nlong"]), int(c["ndef"]), round(float(tem), 2),
-                               eps, c["name"]])
+                               eps, c["name"], rnd(c["t_em"]), rnd(c["t_tx"]), cross])
             runs.append(dict(seed=seed, phi=phi, end=P["end"], clades=clades))
         out[sc] = dict(runs=runs)
     return out
@@ -455,7 +495,7 @@ def _panel_build(store, r, seeds):
 def explore_panel(store, q):
     """Figure 5 under the rules in `q`: /api/panel?n=3b's shape -- per
     scenario, per run, each candidate clade as [nlong, ndef, anchor, [[a_day,
-    top, amp, days], ...], name] -- so the Figure 5 tab plots it unchanged and
+    top, amp, days, pre, b_day], ...], name, t_emerge, t_tx1, t_cross] -- so the Figure 5 tab plots it unchanged and
     applies F, H, f and m_F itself. Cached on disk per rule set; the first
     answer for new rules re-measures every run (seconds once the runs' daily
     records and anchors are on disk, see warm_explore.py)."""
@@ -463,7 +503,7 @@ def explore_panel(store, q):
     seeds = int(q.get("seeds", 50))
     rules = {k: v for k, v in r.items() if k != "mf"}
     scen = _xmemo(store, "panel", [rules, seeds],
-                  ("_panel_build", "detect", "smooth", "episodes", "_slice", "_trunc", "_pre",
-                   "pool", "_run_meta_build"),
+                  ("_panel_build", "detect", "smooth", "episodes", "_peaks", "_slice", "_trunc", "_pre",
+                   "_cross", "pool", "_run_meta_build"),
                   lambda: _panel_build(store, r, seeds))
     return dict(kind="explore_panel", rules=r, seeds=seeds, scenarios=scen)

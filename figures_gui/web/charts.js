@@ -110,7 +110,10 @@ function dots(cv, {cats, series, ylab, fmtY, height, points, zero, pct}) {
 
 /* x against y, one marked point per group, arms = each axis's own interval.
    `points` draws that group's runs as a cloud behind it; `diagonal` rules y=x,
-   which is what makes "above the line" a readable claim.
+   which is what makes "above the line" a readable claim. `lines` rules any
+   segment, [{x0, y0, x1, y1, colour, label}], or polyline ({pts: [[x, y], ...]}),
+   dashed, clipped to the plot, label at its top end. `xticks`: x values labelled
+   between the two end labels.
 
    groups: [{colour, label, x: CI, y: CI, xruns: [], yruns: []}] -- xruns and
    yruns are index-aligned by run, so a point is one run on both axes.
@@ -118,7 +121,7 @@ function dots(cv, {cats, series, ylab, fmtY, height, points, zero, pct}) {
    (draw.js SCENARIO_SHAPE values), `fill`, `stroke` (outline), `arm` (whisker
    colour), `alpha` (faded groups are drawn first), `tip` ({text, math} on hover). */
 function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
-                        diagonal, zero, pctX, pctY, xlim, ylim, vlines, hlines}) {
+                        diagonal, zero, pctX, pctY, xlim, ylim, vlines, hlines, lines, xticks}) {
   const {g, w, h} = fit(cv, height || CHART_H);
   const pad = {l: 46, r: 12, t: 12, b: 34};
   const win = (pick, runs) => {
@@ -182,6 +185,18 @@ function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
     if (v.label) { g.font = "600 9px " + css("--f-ui"); g.textAlign = "right";
       g.fillText(v.label, w - pad.r - 2, Y(v.y) - 3); g.textAlign = "left"; }
   });
+  (lines || []).forEach(v => {
+    g.strokeStyle = g.fillStyle = v.colour || css("--ink-3");
+    g.lineWidth = 1.2; g.setLineDash(v.dash || [5, 3]);
+    g.save(); g.beginPath(); g.rect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b); g.clip();
+    const pts = v.pts || [[v.x0, v.y0], [v.x1, v.y1]];
+    g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y)));
+    g.stroke(); g.restore();
+    g.setLineDash([]);
+    if (v.label) { const top = pts.reduce((a, p) => p[1] > a[1] ? p : a);
+      g.font = "600 9px " + css("--f-ui");
+      g.fillText(v.label, X(top[0]) + 4, Math.max(pad.t + 9, Y(top[1]) + 9)); }
+  });
   const hits = [];
   const al = gr => isNum(gr.alpha) ? gr.alpha : 1;
   [...groups.filter(gr => al(gr) < 1), ...groups.filter(gr => al(gr) >= 1)].forEach(gr => {
@@ -219,6 +234,7 @@ function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
   g.fillText(f(x0), pad.l, h - 16);
   const lt = f(x1);
   g.fillText(lt, w - pad.r - g.measureText(lt).width, h - 16);
+  g.textAlign = "center"; (xticks || []).forEach(v => g.fillText(f(v), X(v), h - 16)); g.textAlign = "left";
   return {g, w, h};
 }
 

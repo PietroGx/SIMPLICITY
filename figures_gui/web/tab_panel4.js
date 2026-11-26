@@ -5,9 +5,8 @@
    fetch goes through apiGetSlot so a repeat costs nothing.
 
    The sensitivity lines read /api/sens, never this payload's `by_axis`:
-   P4_AXES is ["k","win","prom"] (panels.py:442), so _p4_by_axis (:503-523)
-   leaves m_T unpinned and by_axis["k"] comes back with 21 levels for three
-   values of k. See p4SensNote().
+   _panel4_row (panels.py:646-672) keeps each metric's mean and drops its
+   interval, and a line needs the band. See p4SensNote().
 */
 
 /* Which build axis the sensitivity lines walk. */
@@ -36,7 +35,7 @@ const p4Level = (ax, v) =>
    percentage, so the server's "(fraction)" label is restated for display */
 const P4_SHARE = "frac_burden_majority_long";
 const p4Val = (m, v) => m === P4_SHARE ? asPctNum(v) : v;
-const p4Label = (M, m) => String(M[m] || m).replace("(fraction)", "(%)");
+const p4Label = (M, m) => String(M[m] || m).replace("(fraction)", "(%)").replace(/^burden\b/, "frequency AUC");
 /* m_T off a build's directory name, which is the build's own identity --
    by_axis reports a level per row without saying which m_T that row is. */
 const p4KeyMt = key => (String(key).match(/_m([0-9.]+)_/) || [])[1];
@@ -55,23 +54,17 @@ rail.append(dataCard(`The burn-in is set on <a href="#clustering">Clustering</a>
 }
 
 /* Why the lines are missing, with the numbers. Shown in place of the chart so
-   nothing silently draws by_axis against a duplicated axis. */
+   nothing silently draws by_axis without its band. */
 function p4SensNote(ax) {
   return `The three sensitivity lines need <code>/api/sens</code>, which is
     not answering yet — <code>sensFor("${ax}")</code> in
     <code>web/dist.js</code> returned null. This panel's own
-    <code>by_axis</code> cannot stand in: <code>P4_AXES = ["k","win","prom"]</code>
-    (<code>panels.py:442</code>) omits m_T, so <code>_p4_by_axis</code>
-    (<code>panels.py:503-523</code>) leaves it unpinned and
-    <code>by_axis["k"]</code> carries 21 levels for three values of k — seven
-    m_T rows per k, ordered lexicographically by directory name, so m_T=0 lands
-    after m_T=0.1. At k=5, HIV high, mean emergence rise, those seven rows read
-    20.9, 22.6, 23.8, 24.3, 25.9, 28.2, 10.7 days: rise climbing with m_T and
-    then the 10.7 of m_T=0, not instability in k. The tables below are that
-    grouping, each column named with the m_T it is actually at.
-    <code>/api/sens</code> pins every build axis but the one asked for, sorts
-    the levels numerically, and carries the interval per level, which
-    <code>_panel4_row</code> (<code>panels.py:388-393</code>) drops.`;
+    <code>by_axis</code> cannot stand in: it pins every build axis
+    (<code>P4_AXES</code>, <code>panels.py:725</code>) but
+    <code>_panel4_row</code> (<code>panels.py:646-672</code>) keeps each
+    metric's mean and drops its interval, and a line without its band invites a
+    two-day wiggle to be read as a real shift. The tables below are that
+    grouping.`;
 }
 
 async function render_panel4(main, rail, {idp = "p4", compact = false} = {}){
@@ -190,15 +183,9 @@ async function render_panel4(main, rail, {idp = "p4", compact = false} = {}){
       <table class="t"><thead><tr><th>metric</th>${a.levels.map((lv, i) =>
         `<th>${col(i)}</th>`).join("")}</tr></thead>
       <tbody>${rows}</tbody></table>
-      <div class="cap">m_T is not one of the axes this grouping pins
-        (<code>panels.py:442</code>), so ${ax2}=${a.levels[0]} repeats once per
-        m_T value on disk and the columns are ordered by directory name, not
-        numerically. Read the second line of each header before comparing
-        columns. The chart above takes its levels from
-        <code>/api/sens</code> instead.</div></div>`;
+      <div class="cap">Means only; the chart above takes its levels from
+        <code>/api/sens</code>, which carries each level's interval.</div></div>`;
   };
-
-  const opMt = p4KeyMt(d.operating_point);
 
   if (compact) { main.innerHTML = sensBlock().replace(/<div class="cap">[\s\S]*?<\/div>/g, ""); drawSens(); return; }
   main.innerHTML = `
@@ -216,23 +203,18 @@ async function render_panel4(main, rail, {idp = "p4", compact = false} = {}){
     <div class="cap">The big number is the operating point; beneath it the
       range over every build on disk, and how many builds that is. A range
       wider than the difference between scenarios means the grid, not the
-      biology, is doing the talking.${opMt === undefined ? "" :
-      ` <strong>The big number is at m_T=${mtPct(opMt)}%</strong>, not
-      necessarily the 1% of the operating point:
-      <code>_p4_operating_key</code> (<code>panels.py:458-465</code>) matches on
-      k, win and prom only, so it returns whichever m_T sorts first —
-      <code>${d.operating_point}</code>.`}</div></div>
+      biology, is doing the talking.</div></div>
   ${["k", "win", "prom"].map(axisBlock).join("")}
   <div class="plot"><div class="ph"><h3>Figure 4 — frequency AUC in the majority-long classes</h3>
     <span class="sub">% of the simulation's frequency AUC</span></div>
     <table class="t"><thead>${head}</thead><tbody>${body(P4_SHARE)}</tbody></table>
     <div class="cap">Majority-long means more than half of a clade's defining
       mutations arose in a long shedder, so the classes summed depend on k.</div></div>
-  <div class="plot"><div class="ph"><h3>Figure 5 — emergence rise time</h3>
-    <span class="sub">days</span></div>
+  <div class="plot"><div class="ph"><h3>Emergence rise time</h3>
+    <span class="sub">days · the clade build's emergence episodes, not Figure 5's outbreaks</span></div>
     <table class="t"><thead>${head}</thead><tbody>${body("rise_days")}</tbody></table></div>
-  <div class="plot"><div class="ph"><h3>Figure 5 — latent interval</h3>
-    <span class="sub">days</span></div>
+  <div class="plot"><div class="ph"><h3>Latent interval</h3>
+    <span class="sub">days · the clade build's emergence episodes, not Figure 5's outbreaks</span></div>
     <table class="t"><thead>${head}</thead><tbody>${body("latent_days")}</tbody></table></div>
   <div class="plot"><div class="ph"><h3>Simulations contributing</h3></div>
     <table class="t"><thead>${head}</thead><tbody>${body("runs")}</tbody></table>
@@ -245,7 +227,7 @@ async function render_panel4(main, rail, {idp = "p4", compact = false} = {}){
 
 registerTab({
   id: "panel4", group: "supp", num: "S1", title: "Clustering sensitivity", viewId: "viewP4",
-  lede: "Does anything on Figures 4 and 5 survive changing the clade definition or the episode rules? One row per cached clade build. This is not an independent choice — it is those figures, recomputed per build.",
+  lede: "Does Figure 4's frequency AUC, or the clade build's emergence timing, survive changing the clade definition or the episode rules? One row per cached clade build. This is not an independent choice — it is the same measurements, recomputed per build.",
   rail: rail_panel4,
   render: render_panel4,
 });

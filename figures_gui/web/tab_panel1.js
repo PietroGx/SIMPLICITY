@@ -3,6 +3,11 @@
    are gone). The table and the note sit under it. */
 
 function rail_panel1(rail) {
+  rail.append(card("Display", [
+    checkControl({setting: "f4Titles", label: "Titles", hint: "Off: only the panel letters."}),
+    checkControl({setting: "f4Dots", label: "Colour behind letters, panels"}),
+    checkControl({setting: "f4TextCol", label: "Scenario names in colour"}),
+  ]));
   rail.append(dataCard(DATA_CLADE));
   rail.append(card("Colours", [segmentControl({setting: "p1Pal", label: "Colour scheme", options: P1_SCHEMES,
     hint: "<em>Colour-blind colours</em>: lightness steps down from red to yellow and the "
@@ -60,14 +65,15 @@ function p1Texture(g, kind, x, y, w, h, ink) {
 async function panel1Form(d, {idp = "p1", compact = false} = {}) {
   const of = sc => d.scenarios[sc] || {};
   const SUBS = SUB_SCENARIOS;
-  const sub = `k=${settings.k} · m_T=${mtPct(settings.mt)}% · ${settings.burnin?"post burn-in":"whole simulation"}`;
-  const scNote = sc => `${fmt(asPctNum(of(sc).prevalence), 1)}% · ${of(sc).duration ?? "—"}d`;
-  const box = (tag, title, key, cap, note = scNote) => `<div class="plot">
-    <div class="ph"><h3>${title}</h3><span class="sub">${sub}</span></div>
-    <div class="scgrid">${SUBS.map(sc => `<div>
-      ${scenarioHead(sc, note(sc))}
+  /* as Figures 1-3: lettered heads, the legend on the right, the caption in its own box below */
+  const box = (tag, title, key, cap) => `<div class="plot"><div class="c4wrap">
+    <div class="scgrid">${SUBS.map((sc, i) => `<div>
+      <h4>${figLetter(sc, FIG_LETTERS[i], settings.f4Dots)}${settings.f4Titles ? figName(sc, cap1(SCENARIO_LABEL[sc]), settings.f4TextCol) : ""}</h4>
       <canvas id="${idp}${tag}_${sc}"></canvas></div>`).join("")}</div>
-    ${key || ""}${compact ? "" : `<div class="cap">${cap}</div>`}</div>`;
+    ${key || ""}</div></div>
+    ${compact ? "" : `<div class="plot"><div class="ph"><h3>Panel notes</h3></div><div class="cap">${cap}</div></div>`}`;
+  const legRow = (sw, t) => `<div class="r">${sw}<span>${t}</span></div>`;
+  const legSq = k => `<i class="c4sw" style="background:${S.swatch(k)}"></i>`;
   const each = (tag, f) => () => SUBS.forEach(sc => f(document.getElementById(`${idp}${tag}_${sc}`), sc));
 
   const ph = await apiGetSlot("/api/panel?n=1h&" + buildQuery()).catch(e => ({error: e.message}));
@@ -85,8 +91,13 @@ async function panel1Form(d, {idp = "p1", compact = false} = {}) {
 
   return {
     html: box("hb", "Long shedders: share of hosts against share of infections and frequency AUC",
-      keyRow([[S.swatch("only_long"), "long shedders (hosts bar)"], [S.swatch("standard"), "standard hosts (hosts bar)"]]
-        .concat(HB.map(([k, t]) => [S.swatch(k), k === "founding" ? "of which founding clade (hatched)" : t]))),
+      `<aside class="c4leg">
+        ${HB.map(([k, t]) => legRow(legSq(k), `${t.replace(/ \(.*\)$/, "")} <span class="nw">(${{
+          only_long: "<i>j</i> = <i>n</i>", mostly_long: "<i>n</i>/2 &lt; <i>j</i> &lt; <i>n</i>",
+          mostly_std: "0 &lt; <i>j</i> ≤ <i>n</i>/2", standard: "<i>j</i> = 0", founding: "<i>n</i> = 0"}[k]})</span>`)).join("")}
+        <div class="r" style="margin-top:6px"><span><i>n</i> = clade-defining substitutions</span></div>
+        <div class="r"><span><i>j</i> = substitutions that arose in a long shedder</span></div>
+      </aside>`,
       `Three bars per scenario, each out of 100%. <strong>Hosts:</strong> the share
        of infected individuals who are long shedders, in each simulation as
        realized. <strong>Infections:</strong> every infection in the simulation,
@@ -95,7 +106,7 @@ async function panel1Form(d, {idp = "p1", compact = false} = {}) {
          ? "These clade builds count infections over the whole simulation only, so this bar ignores the burn-in setting until the next rebuild."
          : "Counted on or after the burn-in day, as frequency AUC is."} <strong>Frequency AUC:</strong> each
        simulation's frequency AUC (the area under the clade's frequency curve: its share
-       of infected hosts, summed over the days in the window) split by where
+       of infected hosts, integrated over the window) split by where
        the clade's defining mutations arose — <strong>only long</strong>: every definer
        arose in a long shedder; <strong>mostly long</strong>: more than half, not all;
        <strong>mostly standard</strong>: at least one, at most half; <strong>standard
@@ -110,15 +121,15 @@ async function panel1Form(d, {idp = "p1", compact = false} = {}) {
        A long shedder stays infected far longer than a standard host, so part
        of the over-representation is longer infection itself, not fitter
        mutations.${(ph || {}).error ? ` <strong>Not available:</strong> ${ph.error}` : ""}`,
-      sc => scNote(sc)),
+      ),
     draw: each("hb", (cv, sc) => {
       const v = phOf(sc), b = v.burden || {}, inf = v.infections || {}, hm = asPctNum((v.hosts || {}).mean);
-      const {g, w, h} = fit(cv, compact ? 144 : 158);
-      const L = 62, R = 6, bh = 20, y1 = 30, y2 = 66, y3 = 102;
+      const {g, w, h} = fit(cv, compact ? 152 : 170);
+      const L = 62, R = 6, bh = 20, y1 = 34, y2 = 74, y3 = 114;
       const W = w - L - R, any = asPctNum((inf.any_long || {}).mean);
       g.font = "600 11px " + css("--f-ui"); g.fillStyle = css("--ink"); g.textAlign = "left";
       g.fillText(isNum(hm) && isNum(any)
-        ? `${pctTxt(hm)} of hosts → ${pctTxt(any)} of infections${hm > 0 ? ` · ${fmt(any / hm, 0)}×` : ""}`
+        ? `${pctTxt(hm)} of hosts → ${pctTxt(any)} of infections`
         : "not available", 0, 13);
       const hits = [];
       const bar = (y, label, segs) => {
@@ -154,13 +165,18 @@ async function panel1Form(d, {idp = "p1", compact = false} = {}) {
             if (!r.plain) { g.fillStyle = r.col; g.fillRect(r.x + lw / 2 - tw / 2, y + 4, tw, bh - 8); }   // a clear patch under the label
             g.fillStyle = r.ink; g.fillText(txt, r.x + lw / 2, y + bh / 2 + 4); return; }
           g.font = "600 9px " + css("--f-num");
-          above.push({txt, cx: r.x + sw / 2, hw: g.measureText(txt).width / 2 + 2}); });
+          above.push({txt, cx: r.x + sw / 2, at: r.x + sw / 2, hw: g.measureText(txt).width / 2 + 2}); });
         /* no overlaps, inside the bar's span: push right, then back left from the end */
         above.forEach((a, i) => { a.cx = Math.max(a.cx, L + a.hw, i ? above[i - 1].cx + above[i - 1].hw + a.hw : -Infinity); });
         for (let i = above.length - 1; i >= 0; i--)
           above[i].cx = Math.min(above[i].cx, i < above.length - 1 ? above[i + 1].cx - above[i + 1].hw - above[i].hw : L + W - above[i].hw);
         g.font = "600 9px " + css("--f-num"); g.fillStyle = css("--ink-2"); g.textAlign = "center";
-        above.forEach(a => g.fillText(a.txt, a.cx, y - 3));
+        /* each label raised a little, with a leader down to the middle of its segment */
+        above.forEach(a => {
+          g.fillText(a.txt, a.cx, y - 8);
+          g.strokeStyle = css("--ink-3"); g.lineWidth = 0.75;
+          g.beginPath(); g.moveTo(a.cx, y - 6); g.lineTo(a.at, y); g.stroke();
+        });
         g.strokeStyle = css("--line"); g.strokeRect(L + 0.5, y + 0.5, W - 1, bh - 1);
       };
       const ciOf = o => o && isNum(o.lo) ? `${pctTxt(asPctNum(o.lo))} – ${pctTxt(asPctNum(o.hi))}` : null;
@@ -191,11 +207,9 @@ async function render_panel1(main){
       + cls.map(c => `<td class="n">${fmt(asPctNum((cc[c]||{}).frac_burden?.mean),1)}</td>`).join("")
       + `</tr>`;
   }).join("");
-  main.innerHTML = `
-  <div class="note">${simWords(d.note)}.
+  main.innerHTML = `${form.html.replace('<div class="cap">', `<div class="cap">${cap1(simWords(d.note))}.
     Percentages are formed inside each simulation and then averaged over
-    simulations; whiskers are a bootstrap over simulations, never over clades.</div>
-  ${form.html}
+    simulations; whiskers are a bootstrap over simulations, never over clades. `)}
   <div class="plot"><div class="ph"><h3>Percentage of frequency AUC, by class</h3></div>
     <table class="t"><thead><tr><th>scenario</th>
       ${cls.map(c => `<th>${lab(c)}</th>`).join("")}</tr></thead>

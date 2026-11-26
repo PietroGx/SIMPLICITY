@@ -86,6 +86,24 @@ const SUB_SCENARIOS = SCENARIOS.filter(sc => sc !== "control");
 const scenarioRaw = sc => css("--sc" + Math.max(0, SCENARIOS.indexOf(sc)));
 const scenarioHead = (sc, note = "") => `<h4>${shapeSvg(SCENARIO_SHAPE[sc], scenarioRaw(sc))}${SCENARIO_LABEL[sc]}`
   + `${note ? ` <small style="color:var(--ink-3);font-weight:400">${note}</small>` : ""}</h4>`;
+/* figure panel heads: a letter, on a disc in the scenario's colour when `disc`,
+   and the scenario's name, capitalised, in its colour when `col` */
+const FIG_LETTERS = ["A", "B", "C", "D", "E", "F"];
+const cap1 = t => t.charAt(0).toUpperCase() + t.slice(1);
+/* white on a dark disc (control's near-black), the ink colour on the rest */
+const discInk = c => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c).trim()); if (!m) return "";
+  const n = parseInt(m[1], 16), lum = (0.2126 * (n >> 16) + 0.7152 * (n >> 8 & 255) + 0.0722 * (n & 255)) / 255;
+  return lum < 0.35 ? ";color:#fff" : ""; };
+const figLetter = (sc, letter, disc) => `<b class="c4let${disc ? " on" : ""}"${disc
+  ? ` style="background:${scenarioRaw(sc)}${discInk(scenarioRaw(sc))}"` : ""}>${letter}</b>`;
+const figName = (sc, t, col) => col ? `<span style="color:${scenarioRaw(sc)}">${t}</span>` : t;
+/* a dashed segment as spans, its dash lengths the canvas's, so html2canvas draws it */
+const dashSwatch = (on, off, wpx, c = "var(--ink)") => {
+  let out = "", x = 0;
+  while (x < 20) { const l = Math.min(on, 20 - x);
+    out += `<i style="position:absolute;left:${x}px;top:4px;width:${l}px;border-top:${wpx}px solid ${c}"></i>`; x += on + off; }
+  return `<i class="c4dash">${out}</i>`;
+};
 function scenarioColour(scenario) {
   const c = css("--sc" + Math.max(0, SCENARIOS.indexOf(scenario)));
   const f = focusSet();
@@ -229,8 +247,8 @@ function jShadeBar(k) {
 const AXIS_HELP = {
   "long-shedder prevalence (% of individuals)": "The scenario's long_shedders_ratio from config, as a percentage: the share of hosts who are long shedders. A design value, not a measurement, so it has no interval.",
   "long-shedder prevalence (%)": "The scenario's long_shedders_ratio from config, as a percentage: the share of hosts who are long shedders. A design value, not a measurement, so it has no interval.",
-  "% of simulation frequency AUC, classes j ≥ 1": "Per simulation: the frequency AUC of every clade with at least one defining mutation that arose in a long shedder (classes j ≥ 1), divided by the simulation's total frequency AUC. Frequency AUC is the area under a clade's frequency curve, its frequency summed over days (stored as <code>burden</code>). Averaged over simulations; the burn-in toggle sets which days count.",
-  "% of the simulation's frequency AUC": "Per simulation: the frequency AUC of this class's clades divided by the simulation's total frequency AUC (the founding clade included, as wild type, so the classes sum to 100%). Frequency AUC is the area under a clade's frequency curve, its frequency summed over days (stored as <code>burden</code>). Averaged over simulations.",
+  "% of simulation frequency AUC, classes j ≥ 1": "Per simulation: the frequency AUC of every clade with at least one defining mutation that arose in a long shedder (classes j ≥ 1), divided by the simulation's total frequency AUC. Frequency AUC is the area under a clade's frequency curve, the trapezoid-rule integral of its frequency over the sampling times (stored as <code>burden</code>). Averaged over simulations; the burn-in toggle sets which days count.",
+  "% of the simulation's frequency AUC": "Per simulation: the frequency AUC of this class's clades divided by the simulation's total frequency AUC (the founding clade included, as wild type, so the classes sum to 100%). Frequency AUC is the area under a clade's frequency curve, the trapezoid-rule integral of its frequency over the sampling times (stored as <code>burden</code>). Averaged over simulations.",
   "% of the simulation's clades": "Per simulation: the number of clades in this class divided by the number of clades in the simulation, founding clade included. Averaged over simulations.",
   "% of events with a long-shedder transmitter": "Per simulation: transmission events whose transmitter is a long shedder (long→long + long→standard) divided by all transmission events. Seeded infections are not events. With the burn-in toggle on, only events on or after the simulation's burn-in day count. Averaged over simulations.",
   "% of events in each cell": "Per simulation: the events in one transmitter→recipient cell (long→long, long→standard, standard→long, standard→standard) divided by all transmission events in the window. Averaged over simulations; the four cells sum to 100%.",
@@ -251,16 +269,19 @@ const AXIS_HELP = {
   "k": "The shared-mutation threshold: how far a lineage must have diverged from its clade root to found a clade. Each value is its own clade build.",
   "m_T": "The minimum share of the simulation's transmissions a lineage's subtree must carry to found a clade. Each value is its own clade build.",
   "smoothing window": "The width of the centred moving average the daily frequency is read through before episodes are found.",
+  "average cryptic outbreaks per simulation": "Per scenario: the mean, over its simulations, of how many cryptic outbreaks each one has. Each segment is one origin group's own mean, so the segments add up to the column.",
+  "intra-host hidden time (days)": "Per outbreak: days from the clade's first appearance (its root lineage's emergence inside a host) to its first transmission, the earliest infection that inherited any of its lineages. How long the clade stayed inside the host where it arose.",
+  "between-host hidden time (days)": "Per outbreak: days from the clade's first transmission to the first day its smoothed frequency rises above f. How long it spread from host to host before it became visible. Under cryptic rule 2 the two hidden times add up to the hidden time; negative when the clade rose above f before its first transmission.",
   "prominence": "How far a peak must stand above its neighbouring dip, as a fraction of the clade's own peak height, to count as an episode.",
 };
 /* The same axes as formulas. s is one simulation (S of them), c a clade, f_c(t)
-   its frequency on day t, B_c = Σ_t f_c(t) its frequency AUC, E_xy the events from
+   its frequency at sampling time t, B_c its frequency AUC (trapezoid rule), E_xy the events from
    host type x to y (l long, s standard), φ the burn-in day. */
 const AXIS_MATH = {
   "long-shedder prevalence (% of individuals)": [String.raw`\text{prevalence} = \frac{N_{\text{long}}}{N}\times 100`, String.raw`\text{(config: long\_shedders\_ratio}\times 100\text{)}`],
   "long-shedder prevalence (%)": [String.raw`\text{prevalence} = \frac{N_{\text{long}}}{N}\times 100`, String.raw`\text{(config: long\_shedders\_ratio}\times 100\text{)}`],
-  "% of simulation frequency AUC, classes j ≥ 1": [String.raw`y = \frac{1}{S}\sum_{s}\frac{\sum_{c:\,j_c\ge 1} B_c}{\sum_{c} B_c}\times 100`, String.raw`B_c = \sum_t f_c(t)`],
-  "% of the simulation's frequency AUC": [String.raw`\text{share}_j = \frac{1}{S}\sum_{s}\frac{\sum_{c\in j} B_c}{\sum_{c} B_c}\times 100`, String.raw`B_c = \sum_t f_c(t)`],
+  "% of simulation frequency AUC, classes j ≥ 1": [String.raw`y = \frac{1}{S}\sum_{s}\frac{\sum_{c:\,j_c\ge 1} B_c}{\sum_{c} B_c}\times 100`, String.raw`B_c = \sum_i \tfrac{1}{2}\big(f_c(t_i)+f_c(t_{i+1})\big)(t_{i+1}-t_i)`],
+  "% of the simulation's frequency AUC": [String.raw`\text{share}_j = \frac{1}{S}\sum_{s}\frac{\sum_{c\in j} B_c}{\sum_{c} B_c}\times 100`, String.raw`B_c = \sum_i \tfrac{1}{2}\big(f_c(t_i)+f_c(t_{i+1})\big)(t_{i+1}-t_i)`],
   "% of the simulation's clades": [String.raw`\text{share}_j = \frac{1}{S}\sum_{s}\frac{n_j}{n}\times 100`, String.raw`n_j:\ \text{clades in class } j,\quad n:\ \text{all clades}`],
   "% of events with a long-shedder transmitter": [String.raw`y = \frac{1}{S}\sum_{s}\frac{E_{ll}+E_{ls}}{E_{ll}+E_{ls}+E_{sl}+E_{ss}}\times 100`, String.raw`E_{xy} = \sum_{t\ge\varphi} e_{xy}(t)`],
   "% of events in each cell": [String.raw`y_{xy} = \frac{1}{S}\sum_{s}\frac{E_{xy}}{E_{ll}+E_{ls}+E_{sl}+E_{ss}}\times 100`, String.raw`E_{xy} = \sum_{t\ge\varphi} e_{xy}(t)`],
@@ -273,13 +294,15 @@ const AXIS_MATH = {
   "latent interval (days)": [String.raw`L_c = t_{\text{start}}(\text{emergence episode}) - t_{\text{first}}(c)`, String.raw`y_j = \frac{1}{S}\sum_{s}\operatorname{mean}_{c\in j} L_c`],
   "days · rise time and latent interval": [String.raw`T_c = t\big[\tilde y \ge \tilde y_{\text{start}}+0.9A\big] - t\big[\tilde y \ge \tilde y_{\text{start}}+0.1A\big]`, String.raw`L_c = t_{\text{start}}(\text{emergence episode}) - t_{\text{first}}(c)`, String.raw`\text{each: } \frac{1}{S}\sum_{s}\operatorname{mean}_c`],
   "clades (count)": [String.raw`n = \sum_{s} n_s`],
-  "% of simulation frequency AUC, majority-long classes": [String.raw`y = \frac{1}{S}\sum_{s}\frac{\sum_{c:\,j_c > k/2} B_c}{\sum_{c} B_c}\times 100`, String.raw`B_c = \sum_t f_c(t)`],
+  "% of simulation frequency AUC, majority-long classes": [String.raw`y = \frac{1}{S}\sum_{s}\frac{\sum_{c:\,j_c > k/2} B_c}{\sum_{c} B_c}\times 100`, String.raw`B_c = \sum_i \tfrac{1}{2}\big(f_c(t_i)+f_c(t_{i+1})\big)(t_{i+1}-t_i)`],
   "mean rise time (days)": [String.raw`y = \frac{1}{S}\sum_{s}\operatorname{mean}_c T_c`],
   "mean latent interval (days)": [String.raw`y = \frac{1}{S}\sum_{s}\operatorname{mean}_c L_c`],
   "% of the simulation": [String.raw`\text{band} = \frac{\text{part}}{\sum \text{parts}}\times 100`],
   "k": [String.raw`\ell \text{ founds a clade if } d(\ell,\ \text{clade root}) \ge k`, String.raw`\text{and } \frac{T(\text{subtree } \ell)}{T(\text{simulation})} \ge m_T`],
   "m_T": [String.raw`\ell \text{ founds a clade if } \frac{T(\text{subtree } \ell)}{T(\text{simulation})} \ge m_T`, String.raw`\text{and } d(\ell,\ \text{clade root}) \ge k`],
   "smoothing window": [String.raw`\tilde y(t) = \operatorname{mean}\{\, f(\tau) : |\tau - t| \le w/2 \,\}`, String.raw`\text{(w in samples, forced odd; edges shrink)}`],
+  "intra-host hidden time (days)": [String.raw`x_c = t_{\text{tx}}(c) - t_{\text{first}}(c)`],
+  "between-host hidden time (days)": [String.raw`y_c = \min\{t \ge t_{\text{first}}(c) : \tilde y_c(t) > f\} - t_{\text{tx}}(c)`, String.raw`\text{rule 2: } x_c + y_c = \text{hidden time}`],
   "prominence": [String.raw`\text{peak } p \text{ counts if } \operatorname{prom}(p) \ge \text{prom}\times \max_t \tilde y(t)`],
 };
 
@@ -473,7 +496,7 @@ function drawBurnin(g, x, w, h, day, mini) {
   g.setLineDash(mini ? [2, 2] : [5, 3]);
   g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke();
   g.setLineDash([]);
-  if (mini) { g.restore(); return; }
+  if (mini || day == null) { g.restore(); return; }   /* day null: the line alone, its key elsewhere */
   const t = `burn-in \u00b7 day ${Math.round(day)}`;
   g.font = "500 10px " + css("--f-num");
   const tw = g.measureText(t).width;

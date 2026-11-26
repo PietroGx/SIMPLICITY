@@ -168,14 +168,14 @@ function prepareEpisodes(view, daily) {
   const times = ft.slice(j0);
   /* Figure 5 reads the build, which measures on its own window: from the burn-in
      day, or nothing for a simulation that never reaches it (compute.py cutoff =
-     inf); the whole record for window=all. Breakouts are drawn only when this
+     inf); the whole record for window=all. Outbreaks are drawn only when this
      slice is that window: "burnin" says the toggle differs, "nophi" that the
      build's window is empty. */
   const fig5Off = !dailyOf ? null
     : settings.window === "all" ? (j0 > 0 ? "burnin" : null)
     : !daily.burnin ? "burnin" : !isNum(daily.phi) ? "nophi" : null;
   const asFig5 = !!dailyOf && !fig5Off;
-  /* /api/explore draws breakouts under any rules and either window, except
+  /* /api/explore draws outbreaks under any rules and either window, except
      where the window it was asked for is empty */
   const explored = !!daily && daily.kind === "explore";
   const brkOn = explored ? !(settings.burnin && !isNum(daily.phi)) : asFig5;
@@ -220,13 +220,13 @@ function prepareEpisodes(view, daily) {
     const ampShare = rs.length ? main.amp / rs.reduce((t, e) => t + e.amp, 0) : 0;
     let peakAll = 0;
     for (const v of yAll) if (v > peakAll) peakAll = v;
-    /* the breakout needs first appearance, which only the build carries; a
+    /* the outbreak needs first appearance, which only the build carries; a
        clade already circulating at the burn-in day (trunc) has none to time from */
     const tem = rec && isNum(rec.tem) ? rec.tem : null, trunc = !!(rec && rec.trunc);
     const gate = explored ? sdGateDay(settings.burnin, daily.phi) : null;
     const de = dailyEps(rs, times);
-    const brk = brkOn && !trunc ? breakoutOf(de, tem, pick, gate) : null;
-    /* a breakout that began on or before the burn-in day: the clade is left out */
+    const brk = brkOn && !trunc ? breakoutOf(de, tem, pick, gate, rec ? rec.t_cross : null) : null;
+    /* an outbreak that began on or before the burn-in day: the clade is left out */
     const pe = brkOn && !brk && gate !== null ? breakoutPick(de, pick) : null;
     const preStart = pe && isNum(tem) ? Math.max(pe.aDay, tem) : null;
     const preBurn = isNum(preStart) && !(preStart > gate) ? preStart : null;
@@ -245,19 +245,19 @@ function prepareEpisodes(view, daily) {
                  phiIdx: phi !== null ? dayToIndex(ft, phi) : null, phi}};
 }
 
-/* ------------------------------------------------------------ breakout */
+/* ------------------------------------------------------------ outbreak */
 
-/* Figure 5's metric, set on the detection tabs. A clade's breakout is its FIRST
+/* Figure 5's metric, set on the detection tabs. A clade's outbreak is its FIRST
    episode peaking at or above F. Hidden time runs from first appearance to that
    episode's start, clamped at first appearance: the start is the last trough
    before the peak, which for a clade absent until it appears is the start of its
    run of zeros. Launch is the frequency at the start (peak minus the episode's
    amplitude). Cryptic: hidden at least H days and launched below f.
    `eps` are {aDay, bDay, top, amp, days} in time order. */
-const BRK_F = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5];
+const BRK_F = Array.from({length: 19}, (_, i) => +(i * 0.05).toFixed(2));   // 0-90%, 5% steps
 const BRK_H = [0, 7, 15, 30, 45, 60, 90, 120, 180, 270, 365];
 
-const brkPct = v => v < 1e-3 ? fmt(100 * v, 3) + "%" : v < 0.01 ? fmt(100 * v, 2) + "%" : fmt(100 * v, 0) + "%";
+const brkPct = v => v === 0 ? "0%" : v < 1e-3 ? fmt(100 * v, 3) + "%" : v < 0.01 ? fmt(100 * v, 2) + "%" : fmt(100 * v, 0) + "%";
 
 /* "first": Figure 5's, the first episode to reach F. "largest": the tallest
    episode reaching F, so smaller rises before it count as hidden. */
@@ -267,25 +267,47 @@ function breakoutPick(eps, pick = "first") {
                              : over[0]) || null;
 }
 
-/* The burn-in day a breakout must start after, under the "start" burn-in rule
+/* The burn-in day an outbreak must start after, under the "start" burn-in rule
    (explore.py GATES): measured on the whole record, a clade counts only if its
-   breakout begins after the burn-in day. null under Figure 5's rule. */
+   outbreak begins after the burn-in day. null under Figure 5's rule. */
 const sdGateDay = (burnin, phi) =>
   burnin && settings.sdGate === "start" && isNum(phi) ? phi : null;
 
-function breakoutOf(eps, tem, pick = "first", gate = null) {
-  const H = +settings.brkH;
+/* Two cryptic rules. Rule 1 ("launch"): hidden time runs to the outbreak's
+   start, and with brkQuiet the curve must stay under the launch level inside
+   it. Rule 2 ("under"): hidden time runs to tCross, the first day the curve is
+   above f (brkLo); staying under f is what hidden means. */
+function breakoutOf(eps, tem, pick = "first", gate = null, tCross = null) {
+  const H = +settings.brkH, under = settings.brkRule === "under";
   const e = breakoutPick(eps, pick);
-  /* the gate tests the breakout's start as hidden time uses it, clamped to the anchor */
+  /* the gate tests the outbreak's start as hidden time uses it, clamped to the anchor */
   if (!e || !isNum(tem) || (isNum(gate) && !(Math.max(e.aDay, tem) > gate))) return null;
   const start = Math.max(e.aDay, tem), launch = Math.max(0, e.top - e.amp), hidden = start - tem;
   /* brkQuiet: hidden time only counts if the curve never rose above the launch
      level (the red dot) inside it -- e.pre is its highest value there */
   const rose = isNum(e.pre) && e.pre > launch + 1e-9;
-  return {tem, start, clamped: e.aDay < tem, hidden, launch, peak: e.top, pre: e.pre, rose,
-          peakDay: isNum(e.bDay) ? e.bDay : null, rise: e.days,
+  const peakDay = isNum(e.bDay) ? e.bDay : null;
+  if (under) {
+    const hEnd = Math.max(tem, isNum(tCross) ? tCross : start), h2 = hEnd - tem;
+    return {tem, start, clamped: e.aDay < tem, hidden: h2, hEnd, launch, peak: e.top, pre: e.pre, rose,
+            peakDay, rise: e.days, ceil: +settings.brkLo, cry: h2 >= H};
+  }
+  return {tem, start, clamped: e.aDay < tem, hidden, hEnd: start, launch, peak: e.top, pre: e.pre, rose,
+          peakDay, rise: e.days, ceil: settings.brkQuiet ? launch : null,
           cry: hidden >= H && !(settings.brkQuiet && rose)};
 }
+
+/* the cryptic rule in force, in prose: what "hidden" means, and the dotted
+   ceiling's key; null when rule 1 runs without the launch rule */
+const cryUnder = () => settings.brkRule === "under";
+const cryHiddenText = () => cryUnder()
+  ? `never above f = ${brkPct(+settings.brkLo)} while hidden`
+  : settings.brkQuiet ? "never above its launch frequency while hidden" : "";
+const cryCeilText = () => cryUnder() ? `f = ${brkPct(+settings.brkLo)}: hidden ends when the curve rises above it`
+  : settings.brkQuiet ? "launch level: the curve must stay under it while hidden" : null;
+
+/* what the prominence bar is a fraction of, in prose */
+const promRefText = () => settings.sdPromRef === "clade" ? "the clade's highest frequency" : "the peak's own height";
 
 /* The detection tabs' rules (sd* settings) as an /api/explore or
    /api/explore_panel query. Figure 5 sends the same, so the two tabs measure
@@ -293,14 +315,16 @@ function breakoutOf(eps, tem, pick = "first", gate = null) {
 function exploreQuery(extra) {
   return new URLSearchParams(Object.assign({
     k: settings.k, mt: settings.mt, burnin: settings.burnin ? 1 : 0, mf: settings.mf,
-    kernel: settings.sdKernel, space: settings.sdSpace, win: settings.sdWin,
+    kernel: settings.sdKernel, space: "lin", win: settings.sdWin,
     /* absolute prominence and separation are held at 0 and the rise band is
-       the build's: measured on 50 runs they moved no breakout at the useful
+       the build's: measured on 50 runs they moved no outbreak at the useful
        stops (#2, k = 7, m_T = 1%, 2026-11-22), so they left the rail */
-    prom: settings.sdProm, prom_abs: 0, sep: 0,
+    prom: settings.sdProm, promref: settings.sdPromRef, prom_abs: 0, sep: 0,
+    /* f: rule 2's ceiling, and under either rule where Figure 5's between-host hidden time ends */
+    under: settings.brkLo,
     width: settings.sdWidth, cens: settings.sdCens ? 1 : 0, start: settings.sdStart,
     trough: settings.sdTrough, frac: settings.sdFrac, lo: settings.lo,
-    anchor: settings.sdAnchor, gate: settings.sdGate,
+    anchor: "emergence", gate: settings.sdGate,
     /* a dip must lie a prominence below the peak to start an episode: the
        build's "any" let a wobble at the top start one a day before its peak */
     dip: "low"}, extra || {})).toString();

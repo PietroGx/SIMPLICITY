@@ -80,8 +80,9 @@ function segmentControl({setting, label, hint, options, axis}) {
   el.className = "ctl";
   el.innerHTML = `
     ${label ? `<div class="lab"><span>${label}</span></div>` : ""}
-    <div class="seg">${options.map(([v, t]) =>
-      `<button type="button" data-v="${v}" aria-pressed="${settings[setting] === v}">${t}</button>`
+    <div class="seg">${options.map(([v, t, h]) =>
+      `<button type="button" data-v="${v}" aria-pressed="${settings[setting] === v}"${
+        h ? ` data-hint="${String(h).replace(/"/g, "&quot;")}"` : ""}>${t}</button>`
       ).join("")}</div>
     ${hint ? `<div class="hint">${hint}</div>` : ""}`;
   el.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {

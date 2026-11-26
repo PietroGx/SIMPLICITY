@@ -1,11 +1,11 @@
 /* Saved data settings: one named set of every rule the exploration tabs decide
-   (clade definition, burn-in, breakout detection), stored by server.py in
+   (clade definition, burn-in, outbreak detection), stored by server.py in
    Data/figures/detection_presets.json so it outlives the browser. Every
    exploration tab loads and saves the same sets; the figure tabs only read them. */
 
 const DATA_PRESET_KEYS = ["k", "mt", "originRule", "burnin",
-  "sdKernel", "sdSpace", "sdWin", "sdProm", "sdWidth", "sdCens", "sdStart",
-  "sdTrough", "sdFrac", "sdAnchor", "sdPick", "sdGate", "brkF", "brkH", "brkQuiet"];
+  "sdKernel", "sdWin", "sdProm", "sdPromRef", "sdWidth", "sdCens", "sdStart",
+  "sdTrough", "sdFrac", "sdPick", "sdGate", "brkF", "brkH", "brkQuiet", "brkRule", "brkLo"];
 const DATA_TABS = ["clustering", "across", "sweep", "cryptic", "crystats"];
 const presetEsc = v => String(v).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
 
@@ -29,6 +29,18 @@ const presetMatch = () => Object.keys(dataPresets || {}).find(n => {
   const p = dataPresets[n], ks = DATA_PRESET_KEYS.filter(k => k in p);
   return ks.length && ks.every(k => String(p[k]) === String(settings[k]));
 });
+/* The saved set the settings in force started from: the one they match, else
+   the last one matched, loaded or saved, while it still exists. Kept in
+   settings without notifying, so recording it never triggers a render. */
+function presetRemember(n) {
+  if (n && settings.presetRef !== n) { settings.presetRef = n; mirrorSettings(); }
+}
+function presetRef() {
+  const m = presetMatch();
+  if (m) { presetRemember(m); return m; }
+  const n = settings.presetRef;
+  return n && dataPresets && dataPresets[n] ? n : null;
+}
 /* every exploration tab's rail shows these values, so all of them rebuild */
 function presetApply(patch) {
   setSettings(patch);
@@ -48,12 +60,12 @@ function presetWire(P, rerender) {
   const fail = e => alert(`Could not save: ${e.message}`);
   if (el("pload")) el("pload").onchange = ev => {
     const n = ev.target.value;
-    if (n && dataPresets[n]) presetApply(dataPresets[n]);
+    if (n && dataPresets[n]) { presetRemember(n); presetApply(dataPresets[n]); }
   };
   if (el("psave")) el("psave").onclick = () => {
     const n = (prompt("Save these data settings as:", presetMatch() || "") || "").trim();
     if (!n || (dataPresets[n] && !confirm(`Replace the saved "${n}"?`))) return;
-    presetsPost(n, presetNow()).then(rerender, fail);
+    presetsPost(n, presetNow()).then(() => { presetRemember(n); rerender(); }, fail);
   };
   if (el("pdel")) el("pdel").onclick = () => {
     const n = presetMatch();
@@ -68,7 +80,7 @@ function presetCard(P) {
     const m = presetMatch();
     el.innerHTML = `<h2>Saved settings</h2>${presetBarHtml(P)}
       <div class="hint" style="display:block">${m ? `Matches <b>${presetEsc(m)}</b>. ` : ""}A saved set holds
-        the clade definition, the burn-in and the breakout rules: every exploration tab
+        the clade definition, the burn-in and the outbreak rules: every exploration tab
         loads and saves the same sets, and the figures read whatever is in force.</div>`;
     presetWire(P, () => { paint(); });
   };

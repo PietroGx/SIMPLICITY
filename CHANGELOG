@@ -5,6 +5,207 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.22 — 2026-11-26 — pietro gerletti
+
+Outbreak detection and Cryptic outbreaks
+----------------------------------------
+
+"Breakout" is "outbreak" in every tab title, label, hint and caption (Outbreak
+detection, Cryptic outbreaks). Code names keep it (`breakoutOf`, `brkF`).
+
+* Prominence relative to (`sdPromRef`): the prominence bar is a fraction of each
+  peak's own height (`peak`, the tabs' default) or of the clade's highest
+  frequency (`clade`, the clade build's until branch `prom_peak_fix` is merged).
+  `explore.py` takes it as `promref` through the new `_peaks`. A query that
+  omits it gets `clade`, so `/api/explore` without the switch still matches the
+  build. `check_explore.py` checks that `promref=peak` moves the measurement.
+* Cryptic rule 2 (`brkRule` = `under`): hidden means never above f. Hidden time
+  ends on the first day the smoothed curve rises above f. `explore.py` returns
+  that day as `t_cross` (`_cross`, from the anchor on), and `breakoutOf` takes it.
+  Rule 1 (`launch`) is the old rule. The hidden-time band now runs to `hEnd`.
+  The dotted ceiling is the launch level under rule 1 with the launch rule on,
+  and f under rule 2 (`paint.js` `drawBreakout`, `breakoutKey`). The f slider
+  runs 0.1–20%, and its default `brkLo` is 1% (was 0.1%).
+* The F slider runs 0–90% in 5% steps (was eight stops from 0.5% to 50%).
+* The "Smooth in log₁₀" switch is gone: `exploreQuery` sends `space=lin`.
+* `explore.py`, `start=frac`: an episode's start never reaches back past the
+  previous peak. It is the last day under frac of this peak after that peak, or
+  else the lowest point since it.
+* `explore_panel`'s clade rows carry more fields. Each episode gains its peak
+  day (`b_day`), and each clade gains `t_emerge`, `t_tx1` and `t_cross`.
+* Rail hints are cut to one line each. Segment buttons carry their own hover
+  hint (`controls.js`).
+* In an Outbreak detection cell, every other episode reaching F shows its start
+  and peak as smaller dots. For a clade left without an outbreak, the episode
+  the Which rule would have picked is drawn full size.
+* Whole scenario (`sdOverview`, `crOverview`): every outbreak in every
+  simulation of the scenario, one cell each, loading one simulation at a time.
+  Show and Why filter the cells: no outbreak because below F, before burn-in,
+  at burn-in or no peak; not cryptic because hidden < H or rose while hidden.
+  Each reason has its own outline colour (Okabe–Ito, `studio.css` `.why-*`).
+  Clicking a cell opens its simulation with the clade selected. Cryptic cells
+  are now outlined in black instead of tinted.
+* Saved data-settings sets (`presets.js`) gain `sdPromRef`, `brkRule` and
+  `brkLo`, and drop `sdSpace`. `server.py` `PRESET_KEYS` gains `sdPromRef` and
+  `brkRule`.
+
+Cryptic by scenario marks what moved from a saved set
+-----------------------------------------------------
+
+The tab remembers the saved set the settings in force started from: the one
+they match, else the last one matched, loaded or saved (`presetRef`). Once the
+settings move off it, the tab measures under both. Each test pair is marked
+when it moved from the saved set: ⇅ flip (direction reversed), new (became
+significant) or lost (no longer significant), with the saved p under the cell.
+Means, cryptic percentage, simulation counts and Kruskal–Wallis show their
+change from the saved set. "Fade unchanged" dims the cells that did not move.
+The saved measurement never takes the request slot, so it cannot abort the live
+one.
+
+Figure 5
+--------
+
+One figure replaces the two forms (`plot3` `breakout_counts` and
+`breakout_scatter`). A shows the average cryptic outbreaks per simulation in all
+five scenarios, control included. The bars are stacked by Figure 4's origin
+groups, in Figure 4's colour-blind colours. Stars mark a scenario that differs
+from control: Cryptic by scenario's Mann–Whitney tests, Holm-adjusted over the
+comparisons with control. A Display card holds titles, scenario names in
+colour, n under the bars in A, the stars, hiding empty B–F panels, and the
+B–F axes: linear, semi-log or log-log (default log-log).
+
+Panels B–F plot one point per cryptic outbreak. x is the intra-host hidden time:
+from first appearance to first transmission. y is the between-host hidden time:
+from first transmission to the first day the smoothed frequency rises above f
+(`brkLo`; `t_cross` from `explore.py`). Time to peak stays in the point tooltip.
+
+f is now sent on every `/api/explore` and `/api/explore_panel` request
+(`episodes.js` `exploreQuery`). Before, it was sent only under rule 2, so under
+rule 1 the server measured the crossing at its default 1% whatever the rail
+said. The Cryptic outbreaks tab shows the f slider under both rules.
+
+Fixed, with no switch: Figure 4's colour-blind colours by origin group; every
+cryptic outbreak drawn in B–F; no bootstrap whisker and no totals over A's
+columns (the interval stays in A's hover); segment numbers as shares of the
+column; no colour behind the panel letters. The legend holds only the
+origin-group swatches and the definitions of n and j. A's y axis reads "average
+cryptic outbreaks per simulation".
+
+Hidden time always starts at emergence in host. The `sdAnchor` setting and the
+"From" switch on Cryptic outbreaks are gone, `exploreQuery` sends
+`anchor=emergence`, and `sdAnchor` is dropped from saved data-settings sets
+(`presets.js`).
+
+The hover popup draws a linear frequency axis over first appearance to peak. It
+marks first transmission (dotted), the first day above f (dash-dot) and f
+itself. The axis help (`draw.js`) and the Method tab describe the new axes.
+
+`check_app.js` renders Figure 5 at linear and log-log, and its reconciliation
+with Cryptic by scenario now covers all five scenarios. It recomputes the f
+crossing from `/api/explore`'s daily series at f = 2% under both rules: 0 of 18
+off under rule 1 and 0 of 19 under rule 2; with the old request, 18 of 18 fail.
+Under rule 2, intra-host plus between-host hidden time equals the hidden time
+(0 of 19 off).
+
+Figures 1–4 and S1: one layout
+------------------------------
+
+Figures 1–4 share one layout. Each has a Display card whose switches are kept in
+settings (`f1*` to `f4*`), so a reload keeps them. Each has lettered panel heads,
+optionally on a disc in the scenario's colour (`draw.js` `figLetter`,
+`figName`), one legend to the right of the grid, and the caption in its own
+"Panel notes" box below.
+
+* Figure 1 (`tab_fig1.js`, `fig1.py`, `prep/fig1_plots.py`):
+  * Panel B's violins rest on at most 150 individuals per cohort, drawn with a
+    fixed seed (`violin_sample`, seed 42). Control has ~280,000 and the edge
+    case under 200, and a density from either is a different object. The
+    painter itself samples, so the matplotlib figure changes too. The hover
+    gives n out of `n_all`.
+  * The divergence distribution and the global clock swap printed letters (now
+    D and E) to follow reading order. The data keys are unchanged.
+  * The divergence distribution shows density in plain units (per subs/site,
+    x in subs/site). Optional ticks show up to 1,500 patient and time-matched
+    model values (`fig1.py` `pts`).
+  * The legend gives each long-shedder cohort's designed infection length,
+    tau_1 + tau_2 + tau_3_long + tau_4 (`cohort_duration`).
+  * Panels in one row share their x-axis line (`f1Align`).
+* Figure 2 (`tab_clades4.js`):
+  * A Seed slider plus a Shortlist slider that steps only through seeds the
+    user added (`f2Seeds`).
+  * Year ticks under the frequency plot. The burn-in line is drawn, unlabelled,
+    on both the tree and the frequency plot (`paintMuller` `burninLabel`,
+    `drawBurnin` with no day).
+  * The legend carries the simulation, the k and m_T, and each scenario's
+    lineage and clade counts.
+  * The rows fill the window.
+  * The clade palettes are colour-blind safe only: Okabe–Ito (the new default)
+    and Viridis. The hue wheel, Tableau 10 and Spectral are gone (`paint.js`).
+* Figure 3 (`tab_panel2.js`):
+  * Each violin is drawn from 800 of its transmission events without
+    replacement, with a fixed seed (`P2_SUB`). The bandwidth shrinks as
+    n^-1/5, so 1.2 million events and 877 were smoothed ~4× apart. A switch
+    turns this off. Quartiles are the sample's, and the median is bold.
+  * Panels A–C share a 0–6 y axis. The edge case keeps its own.
+  * The y label is "new substitutions on transmission".
+  * Arrow labels show 3 significant digits and ± half the 95% interval, set
+    outside each arrow. The full interval is on hover.
+  * The caption now says each arrow's number is a per-simulation share
+    averaged over simulations.
+* Figure 4 (`tab_panel1.js`):
+  * The legend lists the origin groups with their j-of-n rules.
+  * Labels for narrow segments sit raised, with a leader line.
+  * The "N×" ratio is dropped from the head line.
+  * The frequency AUC is "integrated over the window", and `AXIS_MATH` gives
+    `B_c` as the trapezoid sum the build computes (was Σ_t f_c(t)).
+* S1 (`tab_panel4.js`, `dist.py`):
+  * Notes and docstrings that said `P4_AXES` omits m_T are removed (fixed in
+    v2.5.16, `panels.py:725`). The note now says `by_axis` cannot draw the lines
+    because `_panel4_row` drops each level's interval.
+  * The rise and latency tables are titled as the clade build's emergence
+    episodes, not Figure 5's outbreaks. The "burden" label reads "frequency AUC".
+
+Method tab
+----------
+
+`tab_method.js` is rewritten. Each plotted quantity is one entry: a line on what
+is drawn, its formula typeset by KaTeX, its symbols, and the file:line the
+formula mirrors. The entries are grouped as shared definitions, then Figures 1–5
+and S1. "Where the numbers come from" lists the four stores by their
+`GLOSSARY.md` names and replaces the four-pass diagram. Contents links scroll
+within the tab.
+
+Caches
+------
+
+The build hash is unchanged: `compute.py`, `prep/clade_preprocess.py` and
+`simplicity/clustering.py` are untouched. The panel caches keep their keys:
+`panels.py` is untouched, and `dist.py` changed only in docstrings, which
+`codehash` strips.
+
+Two things are re-keyed:
+* `explore_panel`'s entries in `exploration/cache/_explore/`. The key's
+  dependency list gains `_peaks` and `_cross`, the detector functions changed,
+  and the rules carry `promref` and `under`. Figure 5 and Cryptic by scenario
+  re-measure every simulation on first request. The per-simulation anchors
+  (`_run_meta_build`) keep their key.
+* Figure 1's build. `fig1.code_hash` covers `fig1.py` and
+  `prep/fig1_plots.py`, both changed, so the tab marks it stale until
+  `fig1.py build --stamp <stamp> --store <experiment>` is rerun. The old build
+  has no `cohort_duration`, `n_all` or `pts`, and its violins are not
+  subsampled.
+
+Also
+----
+
+* `figures_gui/Data/reference.txt`, a reference genome committed by mistake in
+  v2.5.20, is deleted.
+* `prep/burnin.py`'s docstring named the version that retired
+  `scripts/nature_plots` as v2.6; it is v2.5.20.
+* `dist.js` `DIST_CAPABLE` lists Figure 5's single form, `breakouts`.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.21 — 2026-11-24 — pietro gerletti
 
 Studio data under Data/figures, one folder per section; logs under Data/logs

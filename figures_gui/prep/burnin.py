@@ -1,6 +1,6 @@
 """The burn-in day and the run-length gates, shared by the clade build, the
 transmission table and the diagnostics in tests/. Moved here from
-scripts/nature_plots/fig2_preprocess_data.py when that folder was retired (v2.6)."""
+scripts/nature_plots/fig2_preprocess_data.py when that folder was retired (v2.5.20)."""
 import numpy as np
 
 import simplicity.output_manager as om

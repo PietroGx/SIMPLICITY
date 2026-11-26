@@ -91,11 +91,23 @@ def plot_fig1_intra_host(ax, df, x_max=800):
     ax.set_ylabel("Probability of being infectious", fontsize=7)
     format_clean_axis(ax, remove_ticks=False)
 
+VIOLIN_N = 150
+
+
+def violin_sample(df, n=VIOLIN_N, seed=42):
+    """At most n individuals per cohort, drawn at random with a fixed seed, so
+    every violin rests on the same number of hosts: control has ~280,000 and
+    the edge case under 200, and a density from either is a different object."""
+    return pd.concat([g.sample(n=n, random_state=seed) if len(g) > n else g
+                      for _, g in df.groupby('cohort', sort=False)], ignore_index=True)
+
+
 def plot_fig1_violins(ax, df):
     if df.empty:
         format_clean_axis(ax, remove_ticks=True)
         ax.text(0.5, 0.5, "Panel B\n(Data Missing)", ha='center', va='center', transform=ax.transAxes)
         return
+    df = violin_sample(df)
     palette = SCEN_COLORS
     order = ["Control", "SOT", "HIV", "Edge Case"]
     existing_order = [c for c in order if c in df['cohort'].unique()]

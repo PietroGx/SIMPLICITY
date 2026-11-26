@@ -308,10 +308,10 @@ async function main() {
         ["panel1", "p1Pal", "cvd", null],
         ["panel1", "p1Pal", "texture", null],
         ["panel1", "p1Pal", "normal", null],
-        ["panel3", "plot3", "breakout_counts", null],
-        ["panel3", "plot3", "breakout_scatter", null],
-        ["panel3", "brkColour", "scale", null],
-        ["panel3", "brkColour", "origin", null]]) {
+        ["panel3", "f5Brackets", 0, null],
+        ["panel3", "f5Brackets", 1, null],
+        ["panel3", "f5Scale", "linear", null],
+        ["panel3", "f5Scale", "loglog", null]]) {
     peek(`setSetting(${JSON.stringify(setting)}, ${JSON.stringify(form)})`);
     peek(`showTab(${JSON.stringify(tabId)})`);
     await wait(400);
@@ -333,7 +333,7 @@ async function main() {
   }
 
   /* Figure 5 under the detection tabs' source counts what Cryptic by scenario
-     counts: same request, and per scenario the same breakout and cryptic totals
+     counts: same request, and per scenario the same outbreak and cryptic totals
      as swScenCounts, with the brkQuiet rule both off and on. */
   peek(`setSetting("p3Source", "sweep")`);
   const p3d = await peek(`apiGet(p3Url())`);
@@ -343,13 +343,42 @@ async function main() {
     peek(`setSetting("brkQuiet", ${q})`);
     ctx.__p3d = p3d;
     const cmp = peek(`(() => { const B = p3Breakouts(__p3d), C = swScenCounts(__p3d);
-      return SUB_SCENARIOS.map(sc => { const s = a => a.reduce((t, x) => t + x, 0);
+      return SCENARIOS.map(sc => { const s = a => a.reduce((t, x) => t + x, 0);
         return [sc, B[sc].nRuns, B[sc].cl.filter(c => c.ev).length, B[sc].cl.filter(c => c.cry).length,
                 C[sc].brk.length, s(C[sc].brk), s(C[sc].cry)]; }); })()`);
     ck(cmp.every(([, a, b, c, d, e, f]) => a === d && b === e && c === f),
-       `brkQuiet=${q}: Figure 5's simulations/breakouts/cryptic equal Cryptic by scenario's: `
+       `brkQuiet=${q}: Figure 5's simulations/outbreaks/cryptic equal Cryptic by scenario's: `
        + cmp.map(r => `${r[0]} ${r[1]}/${r[2]}/${r[3]} vs ${r[4]}/${r[5]}/${r[6]}`).join("; "));
   }
+
+  /* B-F's between-host hidden time runs from first transmission to the first day the
+     smoothed curve is above f. Under rule 1 f used to stay off the request, so
+     the server measured at its own default (0.01) whatever the rail said: set f
+     away from that default, and recompute the crossing from the daily series
+     /api/explore sends, for every cryptic outbreak of one simulation per scenario */
+  for (const rule of ["launch", "under"]) {
+    peek(`setSettings({brkRule: ${JSON.stringify(rule)}, brkLo: 0.02, brkQuiet: 0})`);
+    ctx.__p3d2 = await peek(`apiGet(p3Url())`);
+    const sel = peek(`(() => { const B = p3Breakouts(__p3d2), out = [];
+      SCENARIOS.forEach(sc => { const c = B[sc].cl.filter(c => c.cry && isNum(c.bh));
+        const run = c.length ? c[0].run : null;
+        c.filter(x => x.run === run).forEach(x => out.push([sc, x.run, x.name, x.tem, x.tTx, x.bh, x.t, x.ih])); });
+      return out; })()`);
+    let n = 0, bad = [], sum = 0;
+    for (const [sc, run, name, tem, tTx, bh, t, ih] of sel) {
+      const d = await peek(`apiGet("/api/explore?" + exploreQuery({scenario: ${JSON.stringify(sc)}, seed: ${run}, mf: 0}))`);
+      const c = d.clades.find(x => x.name === name), T = d.t.slice(d.j0 || 0);
+      const k = T.findIndex((v, i) => v >= tem - 1e-9 && c.ys[i] > 0.02);
+      const want = k < 0 ? null : T[k] - tTx;
+      n++;
+      if (want === null || Math.abs(bh - want) > 0.02) bad.push(`${sc} ${name}: ${bh} vs ${want}`);
+      if (rule === "under" && Math.abs(ih + bh - t) > 0.02) sum++;
+    }
+    ck(n > 0 && !bad.length, `brkRule=${rule}, f=2%: between-host hidden time = first transmission to first day above f, `
+       + `recomputed from /api/explore: ${bad.length} of ${n} off ${bad.slice(0, 3).join("; ")}`);
+    if (rule === "under") ck(!sum, `rule 2: intra-host + between-host hidden time = hidden time: ${sum} of ${n} off`);
+  }
+  peek(`setSettings({brkRule: "launch", brkLo: SETTING_DEFAULTS.brkLo, brkQuiet: SETTING_DEFAULTS.brkQuiet})`);
 
   /* Every share the server sends is a fraction now. A tab that forgot to
      convert shows 0.36 where 36% belongs, which no other check would catch:

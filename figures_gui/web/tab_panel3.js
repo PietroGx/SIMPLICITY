@@ -1,21 +1,18 @@
-/* Figure 5: breakouts. A clade's breakout is its first sweep peaking at or
+/* Figure 5: outbreaks. A clade's outbreak is its first sweep peaking at or
    above F; cryptic if hidden at least H days (and, under brkQuiet, never above
-   its launch level in that time) -- breakoutOf in episodes.js. Clades are
-   grouped by the long-born share of their defining mutations (settings.brkColour).
-   Under the "sweep" source the records are the Cryptic by scenario tab's
-   (swScenCounts): same request, burn-in rule, pick and skipped simulations. */
+   its launch level in that time) -- breakoutOf in episodes.js. One figure:
+   A, cryptic outbreaks per simulation in every scenario, control included,
+   stacked by Figure 4's origin groups, starred where it differs from control;
+   B-F, each cryptic outbreak's intra-host hidden time (first appearance to first
+   transmission) against its between-host hidden time (first transmission to the
+   first day above f, t_cross from explore.py). The records
+   are Cryptic by scenario's (swScenCounts): same request, burn-in rule, pick
+   and skipped simulations. */
 
-const P3_PLOTS = [
-  ["breakout_counts", "Cryptic breakouts per simulation",
-   "Per scenario and origin group, how many cryptic breakouts a simulation has."],
-  ["breakout_scatter", "Hidden time against launch frequency",
-   "One point per breakout: how long the clade was around before its sweep "
-   + "against its frequency when the sweep began; cryptic ones ringed."],
-];
+const P3_PLOTS = [["breakouts", "Cryptic outbreaks and hidden time", ""]];
 
-/* a stored or linked plot3 from before v2.5.20 names a form that is gone */
-const p3Snap = () => { if (!P3_PLOTS.some(([v]) => v === settings.plot3)) settings.plot3 = P3_PLOTS[0][0];
-  settings.p3Source = "sweep"; };     // the clade-build source is no longer offered
+/* a stored or linked plot3 names a form that is gone; one form since the merge */
+const p3Snap = () => { settings.plot3 = P3_PLOTS[0][0]; settings.p3Source = "sweep"; };
 
 function rail_panel3(rail) {
   p3Snap();
@@ -26,19 +23,26 @@ function rail_panel3(rail) {
      every control to check_app.js. */
   if (Array.isArray(rail.children)) rail.children.length = 0;
   /* only what the figure looks like: every data rule is set on the exploration tabs */
-  rail.append(card("Plot", [
-    pickControl({setting: "plot3", label: "Form", options: P3_PLOTS}),
-    segmentControl({setting: "brkColour", label: "Colour by", options: P3_COLOUR,
-      hint: "The long-born share of a clade's defining mutations. <em>Classes</em>: one "
-          + "colour per j of k. <em>Scale</em>: white to red on the exact share. "
-          + "<em>Any long-born</em>: two groups, one long-born definer is enough."}),
+  rail.append(card("Display", [
+    checkControl({setting: "f5Titles", label: "Titles", hint: "Off: only the panel letters."}),
+    checkControl({setting: "f5TextCol", label: "Scenario names in colour"}),
+    checkControl({setting: "f5ShowN", label: "n = under each bar in A"}),
+    checkControl({setting: "f5Brackets", label: "Stars vs control in A",
+      hint: "Over a bar: its scenario differs from control in cryptic outbreaks per simulation. "
+          + "Two-sided Mann–Whitney (Cryptic by scenario's tests), Holm-adjusted over the "
+          + "comparisons with control; * p &lt; 0.05, ** p &lt; 0.01, *** p &lt; 0.001."}),
+    checkControl({setting: "f5HideEmpty", label: "Hide empty B–F panels",
+      hint: "Leave out the panel of a scenario with no cryptic outbreak to draw; the rest are lettered in order."}),
+    segmentControl({setting: "f5Scale", label: "Axes, B–F", options: P3_SCALE,
+      hint: "<em>Linear</em>: days on both. <em>Semi-log</em>: intra-host hidden time on a log axis, "
+          + "between-host hidden time linear. <em>Log-log</em>: both log."}),
   ]));
   const m = document.createElement("div");
   m.className = "card";
   m.innerHTML = `<h2>Data</h2><div class="hint" style="display:block">Every rule is set on the
-    exploration tabs: <a href="#sweep">Breakout detection</a> (smoothing, episodes, start, F),
-    <a href="#cryptic">Cryptic breakouts</a> (hidden time, H, the launch rule) and the burn-in
-    rule. The counts are <a href="#crystats">Cryptic by scenario</a>'s.</div>`;
+    exploration tabs: <a href="#sweep">Outbreak detection</a> (smoothing, episodes, start, F),
+    <a href="#cryptic">Cryptic outbreaks</a> (hidden time, H, the launch rule, f) and the burn-in
+    rule. The counts and tests are <a href="#crystats">Cryptic by scenario</a>'s.</div>`;
   rail.append(m);
 }
 
@@ -47,27 +51,22 @@ function rail_panel3(rail) {
 const p3Window = () => settings.window === "all" ? "whole record" : "from the burn-in day";
 const p3Burnin = () => settings.window === "all" ? 0 : 1;
 
-/* ------------------------------------------------------------ breakouts */
+/* ------------------------------------------------------------ outbreaks */
 
-const P3_ORIG = [["std", "standard-born", () => jShade(0)], ["long", "long-born", () => jShade(1)]];
-const P3_COLOUR = [["class", "Classes"], ["scale", "Scale"], ["origin", "Any long-born"]];
-const P3_CLASSES = ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#b10026"];
-const P3_SCALE = ["#ffffff", "#fee0d2", "#fcbba1", "#fc9272", "#fb6a4a", "#ef3b2c", "#cb181d", "#a50f15", "#67000d"];
-const p3Ramp = (stops, t) => { const x = Math.max(0, Math.min(1, t)) * (stops.length - 1);
-  const i = Math.min(stops.length - 2, Math.floor(x)); return mixHex(stops[i], stops[i + 1], x - i); };
-
-/* The groups bars and table rows are split by, and each clade's colour. Class j
-   holds clades with j of k definers long-born; a clade with ndef≠k goes to the
-   nearest step, never to 0 or k unless none or all of its definers are long-born. */
-function p3Groups() {
-  const K = +settings.k, mode = settings.brkColour;
-  if (mode === "origin") return {key: c => c.o, list: P3_ORIG, head: "origin",
-    colourOf: c => c.o === "long" ? jShade(1) : jShade(0)};
-  const pal = mode === "scale" ? P3_SCALE : P3_CLASSES;
-  return {key: c => String(c.j), head: "long-born definers",
-    list: Array.from({length: K + 1}, (_, j) => [String(j), `${j}/${K}`, () => p3Ramp(pal, j / K)]),
-    colourOf: c => p3Ramp(pal, mode === "scale" ? c.share : c.j / K)};
-}
+/* Figure 4's origin groups (tab_panel1.js) in its colour-blind colours, stacked
+   bottom to top; the founding clade is not among Figure 5's candidate clades,
+   so it is listed only if one shows up */
+const P3_CLS = [["founding", "founding clade", "<i>n</i> = 0"],
+  ["standard", "standard only", "<i>j</i> = 0"],
+  ["mostly_std", "mostly standard", "0 &lt; <i>j</i> ≤ <i>n</i>/2"],
+  ["mostly_long", "mostly long", "<i>n</i>/2 &lt; <i>j</i> &lt; <i>n</i>"],
+  ["only_long", "only long", "<i>j</i> = <i>n</i>"]];
+const p3Class = (nl, nd) => nd <= 0 ? "founding" : nl <= 0 ? "standard" : nl >= nd ? "only_long"
+  : 2 * nl > nd ? "mostly_long" : "mostly_std";
+const p3Col = k => k === "founding" ? "#9a9a9a" : P1_CVD[k];
+const P3_G = {key: c => c.cls, colourOf: c => p3Col(c.cls),
+  list: P3_CLS.map(([k, t]) => [k, t, () => p3Col(k)])};
+const P3_SCALE = [["linear", "Linear"], ["semilog", "Semi-log"], ["loglog", "Log-log"]];
 
 /* The request each source measures with. "sweep" asks exactly what Cryptic by
    scenario asks (m_F is not applied on the exploration tabs). */
@@ -81,28 +80,30 @@ const p3Url = () => settings.p3Source === "sweep"
    burn-in is on, sdGateDay's gate, settings.sdPick -- kept per clade so it can
    be split by origin; check_app.js pins the totals to swScenCounts. */
 function p3Breakouts(d) {
-  const K = +settings.k, sweep = settings.p3Source === "sweep";
+  const sweep = settings.p3Source === "sweep";
   const MF = sweep ? 0 : +settings.mf || 0, pick = sweep ? settings.sdPick : "first";
   const out = {};
-  SUB_SCENARIOS.forEach(sc => {
+  SCENARIOS.forEach(sc => {
     const runs = ((d.scenarios || {})[sc] || {}).runs || [], cl = [];
     let nRuns = 0, skipped = 0;
     runs.forEach((r, run) => {
       if (sweep && settings.burnin && r.phi == null) { skipped++; return; }
       const slot = nRuns++, gate = sweep ? sdGateDay(settings.burnin, r.phi) : null;
-      r.clades.forEach(([nl, nd, tem, eps, name]) => {
+      r.clades.forEach(([nl, nd, tem, eps, name, tEm, tTx, tCross]) => {
         const share = nd > 0 ? nl / nd : 0;
-        const j = nl <= 0 ? 0 : nl >= nd ? K : Math.min(K - 1, Math.max(1, Math.round(K * share)));
+        const cls = p3Class(nl, nd);
         /* m_F ("build" only) drops an episode before the pick, as /api/run_daily does */
         const ex = eps.filter(e => e[1] >= MF)
-          .map(([aDay, top, amp, days, pre]) => ({aDay, top, amp, days, pre}));
-        /* a clade whose breakout began on or before the gate day is left out */
+          .map(([aDay, top, amp, days, pre, bDay]) => ({aDay, top, amp, days, pre, bDay}));
+        /* a clade whose outbreak began on or before the gate day is left out */
         const pe = gate !== null ? breakoutPick(ex, pick) : null;
         if (pe && isNum(tem) && !(Math.max(pe.aDay, tem) > gate)) return;
-        const b = breakoutOf(ex, tem, pick, gate);
-        const rec = {o: nl > 0 ? "long" : "std", run, slot, seed: r.seed, nl, nd, share, j, tem, name};
-        if (b) Object.assign(rec, {ev: 1, t: b.hidden, clamped: b.clamped, a: b.start,
-            launch: b.launch, rise: b.rise, top: b.peak, cry: b.cry});
+        const b = breakoutOf(ex, tem, pick, gate, sweep ? tCross : null);
+        const rec = {run, slot, seed: r.seed, nl, nd, share, cls, tem, name, tTx};
+        if (b) Object.assign(rec, {ev: 1, t: b.hidden, clamped: b.clamped, a: b.start, hEnd: b.hEnd,
+            ceil: b.ceil, launch: b.launch, rise: b.rise, top: b.peak, cry: b.cry, tCross,
+            ih: isNum(tEm) && isNum(tTx) ? tTx - tEm : null, bh: isNum(tTx) && isNum(tCross) ? tCross - tTx : null,
+            pk: b.peakDay, tp: isNum(tTx) && isNum(b.peakDay) ? b.peakDay - tTx : null});
         else Object.assign(rec, {ev: 0, t: Math.max(0, r.end - tem)});
         cl.push(rec);
       });
@@ -131,147 +132,230 @@ function p3Boot(vals) {
   return p3BootBy(v.length, ix => ix.reduce((t, i) => t + v[i], 0) / ix.length);
 }
 async function p3RenderBreakout(main, idp, compact) {
-  const sweep = settings.p3Source === "sweep";
   let d; try { d = await apiGetSlot(p3Url()); }
   catch (e) { main.innerHTML = ""; main.append(errorBox(e.message)); return; }
-  const plot = settings.plot3, B = p3Breakouts(d), G = p3Groups();
-  const F = +settings.brkF, H = +settings.brkH, quiet = !!settings.brkQuiet;
+  const B = p3Breakouts(d), G = P3_G, SC = SCENARIOS.filter(sc => B[sc]);
+  const F = +settings.brkF, H = +settings.brkH;
   const fPct = v => v < 0.01 ? fmt(100 * v, 2) + "%" : fmt(100 * v, 0) + "%";
-  let H_ = compact ? 200 : 240;
   const inG = (sc, gk) => B[sc].cl.filter(c => G.key(c) === gk);
-  const sumOf = (sc, gk, f) => inG(sc, gk).filter(c => c[f]).length;
-  const perRun = (sc, gk, f) => { const v = new Array(B[sc].nRuns).fill(0);
-    inG(sc, gk).forEach(c => { if (c[f]) v[c.slot]++; }); return v; };
-  const shown = G.list.filter(([gk]) => SUB_SCENARIOS.some(sc => inG(sc, gk).length));
+  /* per simulation: how many of its clades have flag f, optionally in group gk */
+  const perRun = (sc, f, gk) => { const v = new Array(B[sc].nRuns).fill(0);
+    B[sc].cl.forEach(c => { if (c[f] && (gk === undefined || G.key(c) === gk)) v[c.slot]++; }); return v; };
   const tot = (sc, f) => B[sc].cl.filter(c => c[f]).length;
   const pctOf = (a, b) => b ? fmt(100 * a / b, 0) + "%" : "—";
-  const tmax = Math.ceil(Math.max(100, ...SUB_SCENARIOS.flatMap(sc => B[sc].cl.filter(c => c.ev).map(c => c.t))) / 100) * 100;
-  const sw = c => `<span><i style="background:${c};box-shadow:inset 0 0 0 1px var(--line)"></i>`;
-  const ring = plot === "breakout_scatter"
-    ? `<span><i style="background:transparent;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--ink)"></i>ringed: cryptic breakout</span>` : "";
-  const key = settings.brkColour === "scale"
-    ? `<div class="key"><span>long-born share of defining mutations: 0%
-        <i style="width:160px;background:linear-gradient(90deg,${P3_SCALE.join(",")});box-shadow:inset 0 0 0 1px var(--line)"></i>100%</span>${ring}</div>`
-    : settings.brkColour === "origin"
-    ? `<div class="key">${P3_ORIG.map(([, t, c]) => `${sw(c())}${t} clades</span>`).join("")}${ring}</div>`
-    : `<div class="key">${shown.map(([, t, c]) => `${sw(c())}${t} long-born</span>`).join("")}${ring}</div>`;
-  const colourCap = settings.brkColour === "origin"
-    ? ` Colour: clade origin; <strong>long-born</strong> has at least one defining
-       mutation that arose in a long shedder.`
-    : ` Colour: clade origin, the share of its defining mutations that arose in a long
-       shedder${settings.brkColour === "scale" ? "" : `, as j of k = ${settings.k}
-       (a clade with more or fewer definers than k goes to the nearest step)`}.`;
-  const anchorWord = sweep && settings.sdAnchor === "transmission" ? "first transmission" : "first appearance";
-  const off = sweep && typeof sweepOffRules === "function" ? sweepOffRules() : [];
-  const cryDef = `hidden ≥ ${H} d from ${anchorWord}${quiet ? ", never above its launch frequency in that time" : ""}`;
-  const rule = `${sweep && settings.sdPick === "largest" ? "largest" : "first"} sweep peaking ≥ ${fPct(F)} · `
-    + `cryptic = ${cryDef}`;
+  const shown = G.list.filter(([gk]) => SC.some(sc => inG(sc, gk).some(c => c.ev)));
+  const anchorWord = "first appearance";
+  /* log days, 0.1 to 1000 in every panel; shorter times, and the outbreaks that
+     began before their first transmission, sit on the floor */
+  const DMIN = 0.1, LG = v => Math.log10(Math.max(DMIN, v));
+  /* B-F: cryptic outbreaks only, intra-host against between-host hidden time */
+  const yOf = c => c.bh;
+  const bfOf = sc => B[sc].cl.filter(c => c.cry && isNum(c.ih) && isNum(yOf(c)));
+  const evs = SC.flatMap(bfOf);
+  /* f5HideEmpty: B-F only for scenarios with a cryptic outbreak to draw, lettered in order */
+  const SCB = settings.f5HideEmpty ? SC.filter(sc => bfOf(sc).length) : SC;
+  const bfHidden = SC.filter(sc => !SCB.includes(sc));
+  const bfRange = SCB.length > 1 ? `B–${FIG_LETTERS[SCB.length]}` : "B";
+  const nNoPk = SC.reduce((t, sc) => t + tot(sc, "cry"), 0) - evs.length;
+  /* y: whole orders of magnitude around every panel's time to peak, the same in all five */
+  /* f5Scale: linear, semi-log (log x) or log-log; the same axes in every panel */
+  const logX = settings.f5Scale !== "linear", logY = settings.f5Scale === "loglog";
+  /* what sits on an axis: under DMIN on a log axis, below 0 on a linear y */
+  const nFloorX = logX ? evs.filter(c => c.ih < DMIN).length : 0;
+  const nFloorY = evs.filter(c => logY ? yOf(c) < DMIN : yOf(c) < 0).length;
+  const floorNote = [nFloorX ? `intra-host hidden times under ${DMIN} d (${nFloorX})` : "",
+    nFloorY ? `between-host hidden times ${logY ? `under ${DMIN} d` : "below 0"} (${nFloorY})` : ""].filter(Boolean).join(" and ");
+  const nice = m => { const e = Math.pow(10, Math.floor(Math.log10(Math.max(m, 1e-9) / 4)));
+    return [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 10].map(k => k * e).find(st => 4 * st >= m); };
+  const linAx = vals => { const st = nice(Math.max(1, ...vals)); return {lim: [0, 4 * st], ticks: [st, 2 * st, 3 * st]}; };
+  const fx = v => logX ? LG(v) : Math.max(0, v), fy = v => logY ? LG(v) : Math.max(0, v);
+  const yv = evs.map(yOf), tps = yv.map(LG);
+  /* x per panel, from that scenario's own intra-host hidden times; y shared */
+  const xAxOf = sc => { const v = bfOf(sc).map(c => c.ih);
+    if (!logX) { const m = Math.max(1, ...v), e = Math.pow(10, Math.floor(Math.log10(m / 5)));
+      const st = [1, 2, 5, 10].map(k => k * e).find(q => m / q <= 5), n = Math.max(1, Math.ceil(m / st - 1e-9));
+      return {lim: [0, n * st], ticks: Array.from({length: n - 1}, (_, k) => (k + 1) * st), lin: 1}; }
+    const lg = v.map(LG), lo = lg.length ? Math.floor(Math.min(...lg)) : -1;
+    const hi = Math.max(lo + 1, lg.length ? Math.ceil(Math.max(...lg)) : 3);
+    /* a centred tick at every order of magnitude; the chart's own corner labels are blanked (see fmtX) */
+    return {lim: [lo, hi], ticks: [lo + 1e-9, ...Array.from({length: hi - lo - 1}, (_, k) => lo + 1 + k), hi - 1e-9]}; };
+  const yAx = logY ? {lim: tps.length ? [Math.floor(Math.min(...tps)), Math.max(3, Math.ceil(Math.max(...tps)))] : [-1, 3]}
+    : linAx(yv);
+  const fmtLog = v => Math.abs(v - Math.round(v)) > 1e-6 ? "" : fmt(Math.pow(10, v), v < 0 ? 1 : 0);
+  const cryDef = `hidden ≥ ${H} d from ${anchorWord}${cryHiddenText() ? ", " + cryHiddenText() : ""}`;
+  const rule = `outbreak: the ${settings.sdPick === "largest" ? "largest" : "first"} sweep peaking ≥ ${fPct(F)}; `
+    + `cryptic: ${cryDef}`;
 
-  const note = sc => `${tot(sc, "cry")}/${tot(sc, "ev")} breakouts cryptic · ${B[sc].nRuns} simulations`;
-  const titles = {
-    breakout_counts: "Cryptic breakouts per simulation, by clade origin",
-    breakout_scatter: "Hidden time against launch frequency, one point per breakout",
-  };
-  const caps = {
-    breakout_counts: `Bars: mean number of <strong>cryptic breakouts</strong> per simulation
-      (${cryDef}, then a sweep peaking ≥ ${fPct(F)}); whiskers: 95% bootstrap interval over
-      simulations. Groups differ in size; the hover gives each group's cryptic share of its breakouts.${colourCap}`,
-    breakout_scatter: `One point per breakout. x: days from the clade's ${anchorWord} to the
-      start of its breakout sweep. y: its frequency when the sweep began, log scale (floor
-      0.001%). Ringed: cryptic.${quiet ? " Unringed points right of H rose above their launch frequency while hidden." : ""}
-      Hover a point for its daily frequency; click to keep it open.${colourCap}`,
-  };
-  const scHead = sc => scenarioHead(sc, note(sc));
-  const skipped = SUB_SCENARIOS.reduce((t, sc) => t + B[sc].skipped, 0);
-  const scope = sweep
-    ? ` Burn-in: ${!settings.burnin ? "ignored, the whole record of every simulation"
-        : settings.sdGate === "start" ? "a clade counts only if its breakout starts after the burn-in day"
-        : "measured from the burn-in day; clades already circulating then are left out"}${
-        skipped ? `; ${skipped} simulation${skipped > 1 ? "s" : ""} that never reach it left out` : ""},
-      as on <a href="#crystats">Cryptic by scenario</a>.`
-    : ` Measured ${p3Window()}, the clade build's window, whatever the burn-in toggle says${
-        settings.window === "all" ? "" : `: clades already circulating at the burn-in day are left
-        out, and so are simulations that never reach it`}.${+settings.mf > 0
-        ? ` Episodes peaking under m<sub>F</sub> = ${mtPct(settings.mf)}% do not count.` : ""}`;
-  main.classList.toggle("fit", !compact);
-  main.innerHTML = `<div class="sw-rule">${rule}.${scope}</div>
-    <div class="plot"><div class="ph"><h3>${titles[plot]}</h3><span class="sub">k=${settings.k} · m_T=${mtPct(settings.mt)}%</span></div>
-    <div class="scgrid">${SUB_SCENARIOS.map(sc => `<div>${scHead(sc)}<canvas id="${idp}_bo_${sc}"></canvas></div>`).join("")}</div>
-    ${key}
-    ${compact ? "" : `<div class="cap">${caps[plot]}</div>`}</div>`;
+  /* A's stars: Cryptic by scenario's own Mann–Whitney tests, on the same
+     per-simulation totals, the pairs with control Holm-adjusted among themselves */
+  let T = null, terr = null;
+  if (settings.f5Brackets && !compact) {
+    try { const m = await swCryMeasure(null); T = m.T ? m.T.cryptic : null; terr = m.terr; }
+    catch (e) { terr = e.message; }
+  }
+  const vsC = (T ? T.pairs || [] : []).filter(x => (x.a === "control") !== (x.b === "control")
+    && SC.includes(x.a) && SC.includes(x.b) && isNum(x.p)).sort((u, v) => u.p - v.p);
+  const pC = {};
+  vsC.reduce((run, x, i) => { const p = Math.max(run, Math.min(1, (vsC.length - i) * x.p));
+    pC[x.a === "control" ? x.b : x.a] = p; return p; }, 0);
+  const stars = p => !isNum(p) ? "" : p < 0.001 ? "***" : p < 0.01 ? "**" : p < 0.05 ? "*" : "";
+  const nStar = Object.values(pC).filter(p => p < 0.05).length;
 
-  /* the four panels share what is left of the screen: no page scroll */
+  /* -------------------------------------------------------------- markup */
+  const head = (sc, i) => `<h4>${figLetter(sc, FIG_LETTERS[i + 1], false)}${settings.f5Titles
+    ? figName(sc, cap1(SCENARIO_LABEL[sc]), settings.f5TextCol) : ""}</h4>`;
+  const sw = c => `<i class="c4sw" style="background:${c};box-shadow:inset 0 0 0 1px var(--line)"></i>`;
+  const row = (s, t) => `<div class="r">${s}<span>${t}</span></div>`;
+  const originRows = shown.slice().reverse().map(([k, t, c]) => row(sw(c()),
+      `${t} <span class="nw">(${(P3_CLS.find(x => x[0] === k) || [])[2]})</span>`)).join("")
+    + `<div class="r" style="margin-top:6px"><span><i>n</i> = clade-defining substitutions</span></div>
+       <div class="r"><span><i>j</i> = substitutions that arose in a long shedder</span></div>`;
+  const legend = `<aside class="c4leg">${originRows}</aside>`;
+
+  const skipped = SC.reduce((t, sc) => t + B[sc].skipped, 0);
+  const scope = ` Burn-in: ${!settings.burnin ? "ignored, the whole record of every simulation"
+      : settings.sdGate === "start" ? "a clade counts only if its outbreak starts after the burn-in day"
+      : "measured from the burn-in day; clades already circulating then are left out"}${
+      skipped ? `; ${skipped} simulation${skipped > 1 ? "s" : ""} that never reach it left out` : ""},
+    as on <a href="#crystats">Cryptic by scenario</a>.`;
+  const colourCap = ` Colour: Figure 4's origin groups, from a clade's n defining mutations, j of which
+      arose in a long shedder: only long, j = n; mostly long, n/2 &lt; j &lt; n; mostly standard,
+      0 &lt; j ≤ n/2; standard only, j = 0.`;
+  const kw = T && T.kruskal ? ` Kruskal–Wallis across the ${T.kruskal.groups} scenarios: H = ${fmt(T.kruskal.H, 2)}, p ${
+    T.kruskal.p < 0.001 ? "&lt; 0.001" : "= " + T.kruskal.p.toFixed(3)}.` : "";
+  const testCap = !settings.f5Brackets ? ""
+    : T ? ` Stars: the scenario differs from control in cryptic outbreaks per simulation (two-sided
+        Mann–Whitney, Holm-adjusted over the ${vsC.length} comparisons with control; * p &lt; 0.05,
+        ** p &lt; 0.01, *** p &lt; 0.001; ${nStar} of ${vsC.length} differ).${kw}`
+    : ` <strong>Tests not available:</strong> ${terr || "no answer from /api/count_tests"}.`;
+  const notes = `<strong>A:</strong> mean number of cryptic outbreaks per simulation in each scenario,
+      stacked by origin group: each segment is that group's own mean, so the segments add up to the bar.
+      Beside it: each segment's share of the column.${testCap}
+      ${bfHidden.length ? `No panel for ${bfHidden.map(sc => SCENARIO_LABEL[sc]).join(", ")}: no cryptic outbreak to draw. ` : ""}
+      <strong>${bfRange}:</strong> cryptic outbreaks only, one point each, pooled over the scenario's
+      simulations, so a scenario with more simulations has more points; A is the per-simulation rate.
+      x, intra-host hidden time: days from the clade's first appearance to its first transmission, inside the
+      host where it arose. y, between-host hidden time: days from that first transmission to the first day the
+      clade's smoothed frequency rises above f = ${fPct(+settings.brkLo)}; negative where it rose above f
+      before the first transmission. ${{linear: "Linear scales", semilog: "Log x, linear y", loglog: "Log scales"}[settings.f5Scale] || "Log scales"},
+      y the same in every panel, x fitted to each panel's own intra-host hidden times${floorNote ? `; ${floorNote} sit on the axis` : ""}.${nNoPk ? ` ${nNoPk} cryptic outbreaks with no first transmission on record, or never above f, are not drawn.` : ""}
+      Hover a point for its daily frequency; click to keep it open.${colourCap}
+      Rules: ${rule}.${scope} Per scenario: ${SC.map(sc =>
+        `${SCENARIO_LABEL[sc]} ${tot(sc, "cry")} of ${tot(sc, "ev")} outbreaks cryptic over ${B[sc].nRuns} simulations`).join("; ")}.`;
+
+  main.classList.remove("fit");     // fit mode hides captions; the notes box must show
+  main.innerHTML = `<div class="plot"><div class="c4wrap"><div class="f5col">
+      <div><h4>${figLetter(null, "A", false)}</h4>
+        <canvas id="${idp}_bars"></canvas></div>
+      <div class="f5grid">${SCB.map((sc, i) => `<div>${head(sc, i)}<canvas id="${idp}_bo_${sc}"></canvas></div>`).join("")}</div>
+    </div>${legend}</div></div>
+    ${compact ? "" : `<div class="plot f5notes"><div class="ph"><h3>Panel notes</h3></div><div class="cap">${notes}</div></div>`}`;
+
+  /* columns for B-F from the figure's own width, not the window's: the rail and
+     the legend take a share the window width does not know about */
+  const col = main.querySelector(".f5col"), grid = main.querySelector(".f5grid");
+  const cw = (col && col.clientWidth) || 900, cols = Math.max(1, Math.min(SCB.length, cw >= 900 ? 5 : cw >= 480 ? 3 : 1));
+  if (grid && grid.style) grid.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`;
+
+  /* A and the scatter rows share what is left of the screen: no page scroll */
+  let barH = compact ? 190 : 230, scH = compact ? 190 : 240;
   if (!compact) {
-    const cvs = SUB_SCENARIOS.map(sc => document.getElementById(`${idp}_bo_${sc}`));
-    const rows = (window.innerWidth || 1200) >= 720 ? 2 : 4;
-    H_ = clampH((fitFree(main, cvs) - 6) / rows, 130, 340);
+    const cvs = [document.getElementById(`${idp}_bars`), ...SCB.map(sc => document.getElementById(`${idp}_bo_${sc}`))];
+    const rows = Math.max(1, Math.ceil(SCB.length / cols));
+    /* the figure fills the window; the notes box sits below it, one scroll away */
+    const nb = main.querySelector(".f5notes"), lg = main.querySelector(".c4leg");
+    if (lg) lg.style.display = "none";
+    const free = fitFree(main, cvs) - 8 + (nb && nb.getBoundingClientRect ? nb.getBoundingClientRect().height + 14 : 0);
+    if (lg) lg.style.display = "";
+    barH = clampH(free * (rows === 1 ? 0.46 : 0.32), 150, 360);
+    scH = clampH((free - barH) / rows, 140, 360);
   }
 
-  /* one bar per origin group present in any scenario, with its interval */
-  const bars = (cv, sc, {ylab, stat, fmtY, top, label}) => {
-    const {g, w, h} = fit(cv, H_);
-    const pad = {l: 46, r: 10, t: 16, b: 30};
-    const bs = shown.map(([gk]) => inG(sc, gk).length ? stat(gk) : {mean: null});
-    const ymax = top || Math.max(1, ...bs.map(b => b.hi ?? b.mean ?? 0)) * 1.15;
-    axes(g, w, h, pad, "", ylab, 0, ymax, fmtY);
-    const slot = (w - pad.l - pad.r) / shown.length, few = shown.length <= 2;
-    const Y = v => h - pad.b - (h - pad.b - pad.t) * v / ymax, hits = [];
-    shown.forEach(([gk, t, c], i) => {
-      const b = bs[i], x = pad.l + slot * (i + 0.5), bw = Math.min(56, slot * (few ? 0.5 : 0.7));
-      g.fillStyle = css("--ink-2"); g.font = "600 10px " + css("--f-ui"); g.textAlign = "center";
-      g.fillText(t, x, h - pad.b + 13);
-      const n = inG(sc, gk).length, br = sumOf(sc, gk, "ev"), cr = sumOf(sc, gk, "cry");
-      if (isNum(b.mean)) {
-        g.fillStyle = c(); g.fillRect(x - bw / 2, Y(b.mean), bw, Y(0) - Y(b.mean));
-        g.strokeStyle = css("--ink-3"); g.lineWidth = 0.6;
-        g.strokeRect(x - bw / 2 + 0.3, Y(b.mean) + 0.3, bw - 0.6, Y(0) - Y(b.mean) - 0.6);
-        if (isNum(b.lo)) { g.strokeStyle = css("--ink"); g.lineWidth = 1.2;
-          g.beginPath(); g.moveTo(x, Y(b.lo)); g.lineTo(x, Y(b.hi)); g.stroke(); }
-        g.fillStyle = css("--ink"); g.font = (few ? "600 10px " : "9px ") + css("--f-num");
-        const lab = label(b, cr, br, few);
-        if (lab) g.fillText(lab, x, Math.max(pad.t + 2, Y(b.hi ?? b.mean) - 5));
+  /* ---------------------------------------------------------------- A */
+  const drawBars = cv => {
+    if (!cv) return;
+    const {g, w, h} = fit(cv, barH);
+    const totals = Object.fromEntries(SC.map(sc => [sc, p3Boot(perRun(sc, "cry"))]));
+    const pad = {l: 46, r: 10, t: nStar ? 22 : 14, b: settings.f5ShowN ? 34 : 22};
+    const top = t => t.mean ?? 0;
+    const yraw = Math.max(0.5, ...SC.map(sc => top(totals[sc]))) * 1.18;
+    const ystep = [0.125, 0.25, 0.5, 1, 1.5, 2, 2.5, 5, 10, 20, 25, 50].find(s => 4 * s >= yraw), ymax = ystep ? 4 * ystep : yraw;
+    axes(g, w, h, pad, "", "average cryptic outbreaks per simulation", 0, ymax, v => v.toFixed(ystep < 0.25 ? 3 : ystep < 0.5 ? 2 : 1));
+    const slot = (w - pad.l - pad.r) / SC.length, bw = Math.min(64, slot * 0.5);
+    const X = i => pad.l + slot * (i + 0.5), Y = v => h - pad.b - (h - pad.b - pad.t) * v / ymax, hits = [];
+    SC.forEach((sc, i) => {
+      const x = X(i), t = totals[sc];
+      let y0 = Y(0);
+      const parts = G.list.map(([gk, lab, c]) => ({lab, c, m: B[sc].nRuns ? swMean(perRun(sc, "cry", gk)) : 0}));
+      parts.forEach(({c, m}) => { if (!(m > 0)) return;
+        const y1 = y0 - (Y(0) - Y(m));
+        g.fillStyle = c(); g.fillRect(x - bw / 2, y1, bw, y0 - y1);
+        g.strokeStyle = css("--ink-3"); g.lineWidth = 0.6; g.strokeRect(x - bw / 2 + 0.3, y1 + 0.3, bw - 0.6, y0 - y1 - 0.6);
+        y0 = y1; });
+      /* each segment's number, popped out to the right of the column on a leader line */
+      const segs = [], sum = parts.reduce((a, p) => a + (p.m > 0 ? p.m : 0), 0);
+      let yb = Y(0);
+      parts.forEach(p => { if (!(p.m > 0)) return; const y1 = yb - (Y(0) - Y(p.m));
+        segs.push({my: (yb + y1) / 2, txt: fmt(100 * p.m / sum, 0) + "%"}); yb = y1; });
+      if (segs.length > 1) {
+        const gap = 11, lx = x + bw / 2 + 14;
+        segs.forEach((q, k) => q.ly = k ? Math.min(q.my, segs[k - 1].ly - gap) : Math.min(q.my, Y(0) - 4));
+        const over = pad.t + 6 - segs[segs.length - 1].ly;
+        if (over > 0) segs.forEach(q => q.ly += over);
+        g.strokeStyle = css("--ink-3"); g.lineWidth = 0.8; g.fillStyle = css("--ink-2");
+        g.font = "10px " + css("--f-num"); g.textAlign = "left";
+        segs.forEach(q => { g.beginPath(); g.moveTo(x + bw / 2 - 6, q.my); g.lineTo(x + bw / 2 + 5, q.my);
+          g.lineTo(lx - 3, q.ly); g.stroke(); g.fillText(q.txt, lx, q.ly + 3.5); });
       }
-      if (n) hits.push({x0: x - slot / 2, x1: x + slot / 2, y0: pad.t, y1: h - pad.b,
-        text: {text: `${SCENARIO_LABEL[sc]} · ${G.head} ${t}`,
-          math: `cryptic per simulation   ${ci(p3Boot(perRun(sc, gk, "cry")), 2)}\n`
-              + `breakouts per simulation ${ci(p3Boot(perRun(sc, gk, "ev")), 2)}\n`
-              + `cryptic of breakouts     ${cr}/${br}${br ? ` (${pctOf(cr, br)})` : ""}\n`
-              + `clades                   ${n}`}});
+      g.textAlign = "center"; g.font = "600 11px " + css("--f-ui");
+      g.fillStyle = settings.f5TextCol ? scenarioRaw(sc) : css("--ink-2");
+      g.fillText(cap1(SCENARIO_LABEL[sc]), x, h - pad.b + 14);
+      if (settings.f5ShowN) { g.fillStyle = css("--ink-3"); g.font = "10px " + css("--f-num");
+        g.fillText(`n = ${B[sc].nRuns}`, x, h - pad.b + 27); }
+      const br = tot(sc, "ev"), cr = tot(sc, "cry");
+      hits.push({x0: x - slot / 2, x1: x + slot / 2, y0: pad.t, y1: h - pad.b,
+        text: {text: `${SCENARIO_LABEL[sc]} · cryptic outbreaks`,
+          math: `cryptic per simulation   ${ci(t, 2)}\n`
+              + `outbreaks per simulation ${ci(p3Boot(perRun(sc, "ev")), 2)}\n`
+              + `cryptic of outbreaks     ${cr}/${br}${br ? ` (${pctOf(cr, br)})` : ""}\n`
+              + `simulations              ${B[sc].nRuns}${B[sc].skipped ? ` (${B[sc].skipped} left out)` : ""}\n`
+              + (isNum(pC[sc]) ? `vs control, Holm p       ${pC[sc] < 0.001 ? pC[sc].toExponential(1) : fmt(pC[sc], 3)} ${stars(pC[sc])}\n` : "")
+              + parts.filter(p => p.m > 0).map(p => `  ${p.lab}`.padEnd(25) + fmt(p.m, 2)).join("\n")}});
     });
-    cv._axHit = hits; axisTip(cv);
+    /* stars over the column of each scenario that differs from control */
+    g.fillStyle = css("--ink"); g.textAlign = "center"; g.font = "700 13px " + css("--f-ui");
+    SC.forEach((sc, i) => { const s = stars(pC[sc]), t = totals[sc];
+      if (s) g.fillText(s, X(i), Math.max(12, Y(top(t)) - 6)); });
     g.textAlign = "left";
+    cv._axHit = hits; axisTip(cv);
   };
 
-  SUB_SCENARIOS.forEach(sc => {
-    const cv = document.getElementById(`${idp}_bo_${sc}`);
-    if (plot === "breakout_counts") bars(cv, sc, {ylab: "cryptic breakouts per simulation",
-      stat: gk => p3Boot(perRun(sc, gk, "cry")), fmtY: v => v.toFixed(1),
-      label: (b, cr, br, few) => few ? `${fmt(b.mean, 2)} · ${pctOf(cr, br)} of breakouts`
-                                     : b.mean > 0 ? fmt(b.mean, 2) : ""});
-    else {
-      const floor = 1e-5;
-      const {g} = scatterCI(cv, {height: H_, zero: true, xlim: [0, tmax], ylim: [-5, 0],
-        xlab: "hidden days before the breakout sweep", ylab: "frequency at sweep start",
-        fmtX: v => fmt(v, 0) + " d", fmtY: v => fPct(Math.pow(10, v)),
-        vlines: [{x: H, colour: css("--ink-3"), label: `H ${H} d`}],
-        groups: B[sc].cl.filter(x => x.ev).sort((a, b) => a.cry - b.cry || a.share - b.share).map(x => ({
-          colour: G.colourOf(x), fill: G.colourOf(x), stroke: css("--ink-3"), r: 2.4, alpha: x.cry ? 0.95 : 0.6,
-          x: {mean: x.t}, y: {mean: Math.log10(Math.max(floor, x.launch))},
-          tip: {rec: x, text: `${SCENARIO_LABEL[sc]} · ${x.seed} · ${x.nl}/${x.nd} definers long-born`,
-            math: `hidden      ${fmt(x.t, 0)} d${x.clamped ? " (start clamped)" : ""}\n`
-              + `launched at ${fPct(x.launch)}\npeak        ${fPct(x.top)}\nrise        ${fmt(x.rise, 0)} d\n`
-              + (x.cry ? "cryptic breakout" : "not cryptic")}})),
-      });
-      g.strokeStyle = css("--ink"); g.lineWidth = 0.9; g.globalAlpha = 0.8;
-      (cv._ptHit || []).forEach(p => { if (!p.text.rec.cry) return;
-        g.beginPath(); g.arc(p.x, p.y, 4.2, 0, 6.2832); g.stroke(); });
-      g.globalAlpha = 1;
-      p3Peek(cv, sc);
-    }
-  });
+  /* -------------------------------------------------------------- B-F */
+  const drawScatter = (cv, sc, i) => {
+    if (!cv) return;
+    const xAx = xAxOf(sc);
+    scatterCI(cv, {height: scH, xlim: xAx.lim, ylim: yAx.lim,
+      xlab: "intra-host hidden time (days)", ylab: i % cols === 0 ? "between-host hidden time (days)" : "",
+      fmtX: logX ? v => v === xAx.lim[0] || v === xAx.lim[1] ? "" : fmtLog(v) : v => fmt(v, 0),
+      fmtY: logY ? fmtLog : v => Math.abs(v) < 1e-9 ? "" : fmt(v, 0),
+      vlines: xAx.ticks.map(x => ({x, colour: css("--line-2"), dash: [1, 0]})), xticks: xAx.ticks,
+      groups: bfOf(sc).sort((a, b) => a.share - b.share).map(x => ({
+        colour: G.colourOf(x), fill: G.colourOf(x), stroke: css("--ink-3"), r: 2.6, alpha: 0.9,
+        x: {mean: fx(x.ih)}, y: {mean: fy(yOf(x))},
+        tip: {rec: x, text: `${SCENARIO_LABEL[sc]} · ${x.seed} · ${(P3_CLS.find(k => k[0] === x.cls) || [, x.cls])[1]}, j = ${x.nl} of n = ${x.nd}`,
+          math: `intra-host hidden    ${fmt(x.ih, 1)} d\n`
+            + `between-host hidden  ${fmt(x.bh, 1)} d  (to above f = ${fPct(+settings.brkLo)})\n`
+            + `time to peak         ${fmt(x.tp, 1)} d\nhidden               ${fmt(x.t, 0)} d${x.clamped ? " (start clamped)" : ""}\n`
+            + `launched at          ${fPct(x.launch)}\npeak                 ${fPct(x.top)}\nrise                 ${fmt(x.rise, 0)} d`}})),
+    });
+    p3Peek(cv, sc);
+  };
+
+  drawBars(document.getElementById(`${idp}_bars`));
+  SCB.forEach((sc, i) => drawScatter(document.getElementById(`${idp}_bo_${sc}`), sc, i));
 }
 
-/* Hovering a breakout in the scatter: that clade's daily frequency from
+/* Hovering an outbreak in the scatter: that clade's daily frequency from
    /api/run_daily (the record the build measures on), with its first appearance,
    hidden time, sweep start, launch and peak marked. */
 const p3Daily = new Map();
@@ -284,7 +368,7 @@ function p3DailyFor(sc, run) {
   return p3Daily.get(url);
 }
 
-/* one popup for every scatter: hover previews a breakout, a click pins it until
+/* one popup for every scatter: hover previews an outbreak, a click pins it until
    the × , Escape, a click on empty plot, or the next render */
 const P3_PEEK = {cur: null, pinned: false};
 function p3PeekEl() {
@@ -315,9 +399,7 @@ function p3PeekShow(ev, hit, sc, pin) {
   if (P3_PEEK.cur === rec) return;
   P3_PEEK.cur = rec;
   const key = e.querySelector(".bkey");
-  if (key) key.outerHTML = breakoutKey(undefined,
-    settings.p3Source === "sweep" && settings.sdAnchor === "transmission"
-      ? "first transmission" : "first appearance (emergence in host)");
+  if (key) key.outerHTML = breakoutKey(undefined, "first appearance (emergence in host)", true);
   e.querySelector(".pk-h").textContent = hit.text.text;
   e.querySelector("pre").textContent = hit.text.math;
   const pcv = e.querySelector("canvas");
@@ -358,38 +440,62 @@ function p3DrawPeek(cv, d, rec) {
   const {g, w, h} = fit(cv, 190);
   const msg = m => { g.fillStyle = css("--ink-3"); g.font = "11px " + css("--f-ui"); g.fillText(m, 8, h / 2); };
   const c = (d.clades || []).find(x => x.name === rec.name);
-  if (!c) return msg("not among this run's clades in the daily record");
+  if (!c) return msg("not among this simulation's clades in the daily record");
   const j0 = d.j0 || 0, t = d.t.slice(j0);
   const ys = c.ys ? Float64Array.from(c.ys) : smooth(c.y.slice(j0), t, +settings.win);
   if (t.length < 2) return msg("too short a record");
-  const LG = -5, box = {l: 44, r: w - 10, t: 22, b: h - 20}, t0 = t[0], t1 = t[t.length - 1];
+  const bd = breakoutOf(dailyEps(c.eps, t), rec.tem,
+    settings.p3Source === "sweep" ? settings.sdPick : "first", null, rec.tCross);
+  const b = {tem: rec.tem, start: rec.a, hEnd: rec.hEnd, ceil: rec.ceil, launch: rec.launch, peak: rec.top,
+             peakDay: bd ? bd.peakDay : null};
+  /* only the outbreak's own stretch: first appearance to its peak, a margin either side */
+  const end = isNum(b.peakDay) ? b.peakDay : b.start, span = Math.max(1, end - b.tem);
+  const t0 = Math.max(t[0], b.tem - Math.max(5, 0.08 * span)), t1 = Math.min(t[t.length - 1], end + Math.max(5, 0.08 * span));
+  const inW = i => t[i] >= t0 && t[i] <= t1;
+  /* linear frequency, from 0 to just above the larger of the peak and F */
+  let top = Math.max(+settings.brkF, b.peak || 0);
+  for (let i = 0; i < t.length; i++) if (inW(i)) top = Math.max(top, ys[i]);
+  const step = [0.01, 0.02, 0.05, 0.1, 0.2, 0.25].find(s => top * 1.08 / s <= 5) || 0.25;
+  const ymax = Math.ceil(top * 1.08 / step) * step;
+  const box = {l: 44, r: w - 10, t: 22, b: h - 20};
   const X = v => box.l + (box.r - box.l) * (Math.max(t0, Math.min(t1, v)) - t0) / (t1 - t0 || 1);
-  const Y = v => box.b - (box.b - box.t) * (Math.log10(Math.max(1e-5, v)) - LG) / -LG;
+  const Y = v => box.b - (box.b - box.t) * Math.max(0, Math.min(ymax, v)) / ymax;
   g.font = "9px " + css("--f-num");
-  for (let p = LG; p <= 0; p++) {
+  for (let v = 0; v <= ymax + 1e-9; v += step) {
     g.strokeStyle = css("--line-2"); g.lineWidth = 1;
-    g.beginPath(); g.moveTo(box.l, Y(10 ** p)); g.lineTo(box.r, Y(10 ** p)); g.stroke();
-    g.fillStyle = css("--ink-3"); g.textAlign = "right"; g.fillText(brkPct(10 ** p), box.l - 4, Y(10 ** p) + 3);
+    g.beginPath(); g.moveTo(box.l, Y(v)); g.lineTo(box.r, Y(v)); g.stroke();
+    g.fillStyle = css("--ink-3"); g.textAlign = "right"; g.fillText(fmt(100 * v, 0) + "%", box.l - 4, Y(v) + 3);
   }
   g.textAlign = "left"; g.fillText(`day ${fmt(t0, 0)}`, box.l, h - 5);
   g.textAlign = "right"; g.fillText(`day ${fmt(t1, 0)}`, box.r, h - 5); g.textAlign = "left";
-  /* the point's own numbers (the build's), with the peak day from the daily record */
-  const bd = breakoutOf(dailyEps(c.eps, t), rec.tem,
-    settings.p3Source === "sweep" ? settings.sdPick : "first");
-  const b = {tem: rec.tem, start: rec.a, launch: rec.launch, peak: rec.top, peakDay: bd ? bd.peakDay : null};
+  g.save(); g.beginPath(); g.rect(box.l, box.t - 2, box.r - box.l, box.b - box.t + 4); g.clip();
   drawBreakout(g, X, Y, box, null, {labels: true});
+  /* Figure 5's two axes: first appearance to first transmission (dotted), then
+     to the first day above f (dash-dot), with f itself */
+  if (isNum(rec.tTx) && rec.tTx > b.tem) {
+    g.strokeStyle = css("--ink-2"); g.lineWidth = 1.2; g.setLineDash([1, 2]);
+    g.beginPath(); g.moveTo(X(rec.tTx), box.t); g.lineTo(X(rec.tTx), box.b); g.stroke(); g.setLineDash([]); }
+  if (isNum(rec.tCross)) {
+    g.strokeStyle = css("--ink-2"); g.lineWidth = 1; g.setLineDash([6, 2, 1, 2]);
+    g.beginPath(); g.moveTo(X(rec.tCross), box.t); g.lineTo(X(rec.tCross), box.b);
+    /* rule 2 draws f already, as its ceiling */
+    if (!cryUnder()) { g.moveTo(box.l, Y(+settings.brkLo)); g.lineTo(box.r, Y(+settings.brkLo)); }
+    g.stroke(); g.setLineDash([]); }
   g.strokeStyle = css("--ink"); g.lineWidth = 1.5; g.beginPath();
   const jE = emergedFrom(t, isNum(c.t_emerge) ? c.t_emerge : c.tem);
-  for (let i = jE; i < t.length; i++) i > jE ? g.lineTo(X(t[i]), Y(ys[i])) : g.moveTo(X(t[i]), Y(ys[i]));
+  let on = false;
+  for (let i = jE; i < t.length; i++) { if (!inW(i)) continue;
+    on ? g.lineTo(X(t[i]), Y(ys[i])) : g.moveTo(X(t[i]), Y(ys[i])); on = true; }
   g.stroke();
   drawBreakout(g, X, Y, box, b, {});
+  g.restore();
   g.font = "600 10px " + css("--f-ui"); g.fillStyle = css("--ink");
-  const xa = X(b.tem), xs = X(b.start);
-  const lab = `hidden ${fmt(rec.t, 0)} d${rec.tem < t0 ? " (appeared before the window)" : ""}`;
+  const xa = X(b.tem), xs = X(isNum(b.hEnd) ? b.hEnd : b.start);
+  const lab = `hidden ${fmt(rec.t, 0)} d${rec.tem < t[0] ? " (appeared before the window)" : ""}`;
   const lw = g.measureText(lab).width;
   g.fillText(lab, Math.max(box.l, Math.min(box.r - lw, (xa + xs) / 2 - lw / 2)), 12);
   if (isNum(b.peakDay)) { g.font = "600 10px " + css("--f-num");
-    const pt = `peak ${brkPct(b.peak)} · day ${fmt(b.peakDay, 0)}`, pw = g.measureText(pt).width, px = X(b.peakDay);
+    const pt = `peak ${brkPct(b.peak)}`, pw = g.measureText(pt).width, px = X(b.peakDay);
     g.fillText(pt, px + 6 + pw < box.r ? px + 6 : px - 6 - pw, Math.max(box.t + 10, Y(b.peak) + 4)); }
 }
 
@@ -400,7 +506,7 @@ async function render_panel3(main, rail, {idp = "p3", compact = false} = {}) {
 }
 
 registerTab({
-  id: "panel3", group: "figures", num: "5", title: "Breakouts", viewId: "viewP3",
+  id: "panel3", group: "figures", num: "5", title: "Outbreaks", viewId: "viewP3",
   lede: "Do clades circulate unseen, in long shedders or chains of transmission, and then suddenly break out?",
   rail: rail_panel3,
   render: render_panel3,

@@ -32,16 +32,14 @@ function colourFor(r, inf, ordIdx, n){
 /* settings.cladePal: [value, label, cycle or ramp]. A cycle repeats, lighter then
    darker on each pass; a ramp runs along the tree order, top to bottom. */
 const CLADE_PALETTES = [
-  ["wheel", "Hue wheel", null],
-  ["tableau", "Tableau 10", {cycle: ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f",
-    "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac"]}],
-  ["okabe", "Okabe–Ito (colour-blind safe)", {cycle: ["#e69f00", "#56b4e9", "#009e73",
+  /* colour-blind safe only: the hue wheel, Tableau 10 and Spectral are gone (v2.5.21+) */
+  ["okabe", "Okabe–Ito", {cycle: ["#e69f00", "#56b4e9", "#009e73",
     "#f0e442", "#0072b2", "#d55e00", "#cc79a7", "#999999"]}],
   ["viridis", "Viridis, by tree order", {ramp: ["#440154", "#482878", "#3e4989", "#31688e",
     "#26828e", "#1f9e89", "#35b779", "#6ece58", "#b5de2b", "#fde725"]}],
-  ["spectral", "Spectral, by tree order", {ramp: ["#9e0142", "#d53e4f", "#f46d43", "#fdae61",
-    "#fee08b", "#e6f598", "#abdda4", "#66c2a5", "#3288bd", "#5e4fa2"]}],
 ];
+/* a stored palette that is no longer offered falls back to Okabe–Ito */
+if (!CLADE_PALETTES.some(([v]) => v === settings.cladePal)) settings.cladePal = "okabe";
 
 function cladeColour(k, i, n){
   const pal = (CLADE_PALETTES.find(([v]) => v === settings.cladePal) || [])[2];
@@ -154,7 +152,7 @@ function paintOne(cv, r, hCss, big, V, showEps = true, focus = null){
     g.lineTo(sx(nt - 1), yb); g.closePath(); g.fill(); g.globalAlpha = 1;
   }
   const col = r.col || css("--ink-3");
-  /* the breakout's own episode, matched by its peak day */
+  /* the outbreak's own episode, matched by its peak day */
   const isBrk = e => !!(r.brk && isNum(r.brk.peakDay) && r.times
     && Math.abs(r.times[e.b] - r.brk.peakDay) < 1e-6);
   const epsOn = showEps || focus === "peak" || focus === "start";
@@ -208,7 +206,7 @@ function paintOne(cv, r, hCss, big, V, showEps = true, focus = null){
   return {sx, sy, w, h};
 }
 
-/* A breakout's marks over a clade curve already drawn on X (day) and Y
+/* An outbreak's marks over a clade curve already drawn on X (day) and Y
    (frequency) inside box {l, r, t, b}: hidden-time band, first appearance,
    sweep start, launch and peak dots, F and f rules. One painter for the Sweep
    time cells and Figure 5's popup, so the two cannot drift. */
@@ -226,19 +224,20 @@ function drawBreakout(g, X, Y, box, b, {labels = false, r = 3.5, hidden = true, 
   if (showF) rule(+settings.brkF, [4, 3], "F");
   g.globalAlpha = 1;
   if (!b) return;
-  const xa = X(b.tem), xs = X(b.start);
+  const xa = X(b.tem), xs = X(b.start), xh = X(isNum(b.hEnd) ? b.hEnd : b.start);
   if (hidden) { const hi = lay("band");
     g.fillStyle = css("--long"); g.globalAlpha = hi ? .3 : focus ? .05 : .14;
-    g.fillRect(xa, box.t, Math.max(1, xs - xa), box.b - box.t); g.globalAlpha = 1; }
+    g.fillRect(xa, box.t, Math.max(1, xh - xa), box.b - box.t); g.globalAlpha = 1; }
   const vline = (x, dash, k) => { const hi = lay(k);
     g.strokeStyle = css(hi ? "--ink" : "--ink-2"); g.lineWidth = hi ? 1.8 : 1; g.setLineDash(dash);
     g.beginPath(); g.moveTo(x, box.t); g.lineTo(x, box.b); g.stroke(); g.setLineDash([]); };
   if (hidden) vline(xa, [], "anchor");
-  /* brkQuiet: the launch level across the hidden time, the ceiling the curve
-     must stay under for the hidden time to count */
-  if (hidden && settings.brkQuiet && xs > xa) { const hi = lay("ceil"), y = Y(b.launch);
+  /* the ceiling across the hidden time: the launch level (rule 1, brkQuiet)
+     or f (rule 2), which the curve must stay under while hidden */
+  const ceil = b.ceil !== undefined ? b.ceil : settings.brkQuiet ? b.launch : null;
+  if (hidden && isNum(ceil) && xh > xa) { const hi = lay("ceil"), y = Y(ceil);
     g.strokeStyle = css("--long"); g.lineWidth = hi ? 2 : 1.3; g.setLineDash([2, 3]);
-    g.beginPath(); g.moveTo(xa, y); g.lineTo(xs, y); g.stroke(); g.setLineDash([]); }
+    g.beginPath(); g.moveTo(xa, y); g.lineTo(xh, y); g.stroke(); g.setLineDash([]); }
   if (startLine) vline(xs, [3, 2], "launch");
   const dot = (x, y, col, k) => { const hi = lay(k), rr = hi ? r * 1.5 : r;
     g.fillStyle = col; g.beginPath(); g.arc(x, y, rr, 0, 6.2832); g.fill();
@@ -249,7 +248,7 @@ function drawBreakout(g, X, Y, box, b, {labels = false, r = 3.5, hidden = true, 
 }
 
 /* drawBreakout's legend: one small SVG per mark, drawn as the canvas draws it */
-function breakoutKey(curve = "clade frequency (smoothed)", anchor = "first appearance") {
+function breakoutKey(curve = "clade frequency (smoothed)", anchor = "first appearance", tx = false) {
   const ink = css("--ink"), ink2 = css("--ink-2"), ink3 = css("--ink-3"), lng = css("--long");
   const sv = body => `<svg width="22" height="12" viewBox="0 0 22 12">${body}</svg>`;
   const hl = dash => sv(`<line x1="1" y1="6" x2="21" y2="6" stroke="${ink3}" stroke-width="1.2" stroke-dasharray="${dash}"/>`);
@@ -259,12 +258,18 @@ function breakoutKey(curve = "clade frequency (smoothed)", anchor = "first appea
     ...(curve ? [[sv(`<line x1="1" y1="6" x2="21" y2="6" stroke="${ink}" stroke-width="1.6"/>`), curve]] : []),
     [sv(`<rect x="1" y="0" width="20" height="12" fill="${lng}" opacity=".18"/>`), "hidden time"],
     [vl("none"), anchor],
-    [vl("3 2"), "breakout sweep starts"],
+    ...(tx ? [[sv(`<line x1="11" y1="0" x2="11" y2="12" stroke="${ink2}" stroke-width="1.2" stroke-dasharray="1 2"/>`),
+     "first transmission: intra-host hidden time before it, between-host hidden time after"],
+    [sv(`<line x1="11" y1="0" x2="11" y2="12" stroke="${ink2}" stroke-width="1" stroke-dasharray="6 2 1 2"/>`),
+     "first day above f: between-host hidden time ends"],
+    ...(cryUnder() ? [] : [[sv(`<line x1="1" y1="6" x2="21" y2="6" stroke="${ink2}" stroke-width="1" stroke-dasharray="6 2 1 2"/>`),
+     "f"]])] : []),
+    [vl("3 2"), "outbreak sweep starts"],
     [dot(lng), "launch frequency"],
-    [dot(ink), "breakout peak"],
+    [dot(ink), "outbreak peak"],
     [hl("4 3"), "F: big-sweep threshold"],
-    ...(settings.brkQuiet ? [[sv(`<line x1="1" y1="6" x2="21" y2="6" stroke="${lng}" stroke-width="1.4" stroke-dasharray="2 3"/>`),
-     "launch level: hidden time must stay under it"]] : []),
+    ...(cryCeilText() ? [[sv(`<line x1="1" y1="6" x2="21" y2="6" stroke="${lng}" stroke-width="1.4" stroke-dasharray="2 3"/>`),
+     cryCeilText()]] : []),
   ];
   return `<div class="bkey">${items.map(([i, t]) => `<span>${i}${t}</span>`).join("")}</div>`;
 }
@@ -288,7 +293,7 @@ function breakoutKey(curve = "clade frequency (smoothed)", anchor = "first appea
 /* `hideExcluded`: excluded clades and the overflow are left out of the stack
    entirely instead of drawn grey, so it holds only the clades that are kept. */
 function paintMuller(cv, {D, C, ordered, colMap, height, washBurnin, excluded,
-                          selected, hideExcluded, burninLine = true}) {
+                          selected, hideExcluded, burninLine = true, burninLabel = true}) {
   const {g, w, h} = fit(cv, height);
   const times = D.times, nt = times.length;
   const padL = 2, padR = 2, padT = 4, padB = 4;
@@ -372,7 +377,7 @@ function paintMuller(cv, {D, C, ordered, colMap, height, washBurnin, excluded,
         g.save(); g.globalAlpha = 0.62; g.fillStyle = css("--bg");
         g.fillRect(0, 0, sx(ji), h); g.restore();
       }
-      if (burninLine) drawBurnin(g, sx(ji), w, h, day, false);
+      if (burninLine) drawBurnin(g, sx(ji), w, h, burninLabel ? day : null, false);
     }
   }
   /* Which clade's band holds a point, in CSS pixels -- which is what fit()
