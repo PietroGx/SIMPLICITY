@@ -5,6 +5,39 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.6.0 — 2026-11-26 — pietro gerletti
+
+Release: main takes everything since v2.3.0
+-------------------------------------------
+
+`main` moves from v2.3.0 (2026-07-03) to this commit, which carries
+`settings_data_flow` and the branches merged into it (`calibration_pipeline`,
+`mt_seeded_fix` at v2.5.24, `prom_peak_fix` at v2.5.25). The entries from
+v2.3.1 to v2.5.27 below are what changed; the larger steps:
+
+* One pipeline, one experiment per run, its phases as groups (Stage 8,
+  v2.4.94), named by the launch stamp; calibration of `NSR` and `NSR_long`
+  in context.
+* Clades under rule B (divergence and transmission support), m_T a share of
+  each simulation's own transmissions (v2.5.15), seeded infections not counted
+  as transmissions (v2.5.24).
+* The studio in `figures_gui/` is the only source of the paper's figures
+  (v2.5.20): exploration tabs set the data rules, figure tabs only the looks,
+  the Export tab writes the files.
+* `figures_gui/prepare.py` prepares the figure data on the cluster or here,
+  hooked into the pipeline as `--prepare-figures` / `--pack-results`;
+  Figure 1, which reads non-public patient data, is built only locally
+  (v2.5.27).
+* A run records the code that produced it (v2.5.23); `BACKLOG.md` is tracked
+  (v2.5.26).
+
+`setup.py`'s version, left at 2.2.0, is 2.6.0.
+
+**Recalibration required** for figure numbers taken from any clade build
+before v2.5.25: rebuild with `prepare.py --slurm --pack` (`BACKLOG.md`).
+
+------------------------------------------------------------------------
+
 ## Version 2.5.27 — 2026-11-26 — pietro gerletti
 
 One command prepares the figure data, on the cluster or here
