@@ -61,10 +61,6 @@ def root_dir(store, stamp=1, exp_name=compute.EXP_NAME):
     return layout.root_dir(store, stamp, exp_name)
 
 
-def cache_dir(store, stamp=1, exp_name=compute.EXP_NAME):
-    return os.path.join(store_dir(store, stamp, exp_name), "cache")
-
-
 def out_conflict(out, stamp, exp_name):
     """Why `out` cannot hold this experiment's builds, or None.
 

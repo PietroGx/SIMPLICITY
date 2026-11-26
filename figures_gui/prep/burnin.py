@@ -39,12 +39,6 @@ MIN_FINAL_TIME = 365
 MIN_WINDOW_DAYS = 365
 
 
-def window_tag(window=None):
-    """Cache-key fragment naming the window, so two modes never share a file."""
-    window = BURNIN_WINDOW if window is None else window
-    return "phi" if window == "phi" else f"{float(window):g}"
-
-
 def phi_day(ssod):
     """The day this simulation completes burn-in: the first time at which
     (diagnosed + recovered)/N reaches 1, read from its own trajectory.
@@ -72,8 +66,3 @@ def phi_day(ssod):
     hit = np.flatnonzero(phi >= 1.0)
     return float(df["time"].iloc[hit[0]]) if hit.size else None
 
-
-def window_cutoff(ssod, window=None):
-    """One simulation's left edge under the configured window, or None."""
-    window = BURNIN_WINDOW if window is None else window
-    return phi_day(ssod) if window == "phi" else float(window)

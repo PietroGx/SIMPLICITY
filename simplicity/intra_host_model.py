@@ -54,11 +54,7 @@ class Host:
        
         self.get_A_t = self.factory_get_A_t()
 
-    def get_update_mode(self):
-        return self.update_mode
     
-    def get_jump_rate(self, state):
-        return -self.A[state][state]
 
     @staticmethod
     def _get_A_matrix(tau_1, tau_2, tau_3, tau_4):

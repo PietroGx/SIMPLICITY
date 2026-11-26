@@ -195,20 +195,6 @@ def resolve_repeat(data_dir, experiment, content):
         return None
 
 
-def relocate(path, data_dir):
-    """Re-root an absolute path recorded on the cluster onto this machine.
-
-    The slurm id map stores the path as the task saw it (/scratch/.../Data/...),
-    so a downloaded run would otherwise find none of its parameter files.
-    """
-    if os.path.isfile(path):
-        return path
-    marker = os.sep + 'Data' + os.sep
-    if marker in path:
-        return os.path.join(data_dir, path.split(marker, 1)[1])
-    return path
-
-
 def live(task):
     """Samples taken while a Population existed -- the others are startup."""
     return [s for s in task['samples'] if s.get('sim_time') is not None]

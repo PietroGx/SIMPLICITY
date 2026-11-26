@@ -379,52 +379,14 @@ def clade_max_divergence(member_lineages, root_lineage, lin2mut):
                default=0)
 
 
-def keep_clades_by_transmission(clades, n_tx_run, min_tx_frac,
-                                ntx=lambda c: c["ntx"],
-                                founding=lambda c: c["founding"],
-                                n_defining=lambda c: c["ndef"]):
-    """Rule B's support term applied to already-built clades.
-
-    The studio stores the divergence-only superset so m_T can be varied without
-    re-clustering, then filters here. That filter IS half the clade definition,
-    so it belongs beside the other half rather than restated in the panel code.
-
-    The founding clade is kept and labelled separately -- it has no defining
-    mutations and no parent, so neither term applies to it. A group with no
-    defining mutations and a parent is not a clade.
-    """
-    floor = float(min_tx_frac) * n_tx_run
-    out = []
-    for c in clades:
-        if founding(c):
-            out.append(c)
-            continue
-        if n_defining(c) <= 0:
-            continue
-        if ntx(c) <= 0 or ntx(c) < floor:
-            continue
-        out.append(c)
-    return out
-
-
 def keep_designated_clades(clades,
                            founding=lambda c: c["founding"],
                            n_defining=lambda c: c["ndef"]):
     """Structural filter for clades ALREADY designated under rule B.
 
-    The counterpart to `keep_clades_by_transmission`, and the two must not be
-    confused:
-
-      keep_clades_by_transmission   designation used divergence alone, so the
-                                    support term is applied here, by DROPPING
-                                    clades under m_T and discarding their
-                                    lineages
-      keep_designated_clades        designation used rule B, so the support
-                                    term is already satisfied and every lineage
-                                    is already FOLDED into a surviving clade
-
-    Re-applying the floor after rule B designation would be wrong, not merely
-    redundant. Designation tests the founding lineage's SUBTREE support, which
+    m_T is applied once, at designation (`founds_clade`): every lineage is
+    already folded into a surviving clade. Re-applying the floor here would be
+    wrong, not merely redundant. Designation tests the founding lineage's SUBTREE support, which
     includes descendants that later found clades of their own; a clade's own
     `ntx` counts only the lineages that stayed. So a legitimate rule B clade
     can carry fewer than m_T transmissions itself, and the floor would drop it.

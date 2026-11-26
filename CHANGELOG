@@ -5,6 +5,61 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.6.1 — 2026-11-26 — pietro gerletti
+
+m_T is applied in one place; functions nothing called are gone
+--------------------------------------------------------------
+
+`simplicity/clustering.py` `keep_clades_by_transmission` is deleted. It
+applied m_T after clustering by divergence alone, DROPPING clades under the
+floor; rule B applies it during designation (`founds_clade`) and FOLDS a
+refused lineage into its ancestor, and nothing in the pipeline or the studio
+called the old filter any more. Three diagnostics in `tests/` still did, so
+they measured a different clade definition from the build's:
+`tests/rise_window_effect.py` (now `compute.run_context(..., mt)` and
+`keep_designated_clades`; `--mt` is a fraction, default 0.01, not 1.0),
+`tests/panel_denominators.py` (reads the m_T the build was made at, drops its
+"under m_T" column, which re-applied the floor to clades rule B had already
+kept, and finds its store from `--stamp`), and
+`tests/check_clustering_module.py` (checks that every rule B clade root's
+subtree clears the floor: 32 passed, 0 failed, on experiment #2).
+
+**Build hash `6e55b23492c7` -> `eccccec8da18`** (`clustering.py` is in it).
+No build had been made at the old hash, so the pending HPC rebuild simply
+targets the new one.
+
+Functions with no caller anywhere in the repo, found by scanning every
+tracked `.py`/`.js`/`.sh`/`.html` with comments and docstrings ignored, and
+repeated until functions called only by deleted ones were gone too:
+
+* `simplicity/plots_manager.py`: 18 plotting functions (`plot_fitness`,
+  `plot_w_t`, `plot_intra_host`, `plot_R_effective`, `plot_histograms`,
+  `plot_combined_*`, `plot_IH_lineage_distribution*`, the diagnosis-rate
+  plots, ...), with the imports only they used.
+* `simplicity/output_manager.py`: the R-effective trajectory writers and
+  readers (8 functions); `simplicity/tuning/diagnosis_rate.py`:
+  `diagnosis_rate_table`, `get_effective_diagnosis_rate`,
+  `get_diagnosis_rates`; `simplicity/tuning/evolutionary_rate.py`:
+  `fit_weight`, `fit_weight_time`, `evaluate_model`;
+  `dir_manager.experiment_is_complete`;
+  `settings_manager.read_user_set_parameters_file`;
+  `Host.get_update_mode`, `Host.get_jump_rate`; `Simplicity.save_consensus`.
+* `figures_gui/`: `prep/burnin.py` `window_tag`, `window_cutoff`;
+  `sweep.cache_dir`; in `web/`, `apiCacheSize`, `chartKey`, `heatcells`,
+  `countBars`, `railDistribution`, `episodeControls`, `distFor`, `distRuns`,
+  `distRunsByScenario`, `distAllowed`, `asPctRuns`, `scenarioHead`,
+  `shapeSvg`, `shapeKey`, `classShare`, `jShade`, `classShade`, `classLabel`,
+  `jShadeBar` (and its `.jbar` CSS), `linesOverDays`, `nearIdx`,
+  `p3Window`, `sdPct`, `SCENARIO_SHAPE`, `FADE_ALPHA`.
+* `tests/`: `profile_report.relocate`, `test_settings_roundtrip.check_known`.
+
+The Method tab's file:line references into the shortened files are
+remapped; four references elsewhere that were already wrong
+(`test_sens_lines.js`, two `output_manager.py` lines cited in `tests/`) now
+name the function instead.
+
+------------------------------------------------------------------------
+
 ## Version 2.6.0 — 2026-11-26 — pietro gerletti
 
 Release: main takes everything since v2.3.0

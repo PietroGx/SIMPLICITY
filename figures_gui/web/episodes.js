@@ -102,12 +102,6 @@ function riseOf(ys, times, e, lo, hi){
   return {...e, ia, ib, days: times[ib] - times[ia], amp: yhi - ylo, top: yhi};
 }
 
-function nearIdx(v, list){
-  let b = 0;
-  for (let i = 1; i < list.length; i++) if (Math.abs(list[i] - v) < Math.abs(list[b] - v)) b = i;
-  return b;
-}
-
 /* The clade's chosen episode. The artifact made this a four-way control
    (largest / weighted / first / fastest); "first" was definition 2, dropped at
    tests/artifacts/STUDIO_PLAN.md:211 for a measured confound with lifetime of

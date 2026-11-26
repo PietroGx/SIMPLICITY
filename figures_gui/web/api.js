@@ -104,8 +104,6 @@ function apiInvalidate(prefix) {
     if (!prefix || url.startsWith(prefix)) apiCache.delete(url);
 }
 
-function apiCacheSize() { return apiCache.size; }
-
 async function apiPost(url, body) {
   const r = await fetch(url, {method: "POST",
     headers: {"Content-Type": "application/json"},

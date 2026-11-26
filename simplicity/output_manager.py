@@ -37,7 +37,6 @@ import simplicity.sequencing as sq
 import glob
 import ast
 import numpy as np
-from tqdm import tqdm
 import warnings
 from pathlib import Path
 
@@ -494,17 +493,7 @@ def read_final_time(seeded_simulation_output_dir):
             f"{final_time_file_path}: expected one number, found {raw[:40]!r} "
             f"({os.path.getsize(final_time_file_path)} bytes)") from None
 
-def save_R_effective_trajectory(simulation_output, seeded_simulation_output_dir):
-    R_effective_trajectory = simulation_output.R_effective_trajectory_to_df()
-    R_effective_trajectory_file_path = os.path.join(seeded_simulation_output_dir,
-                                               "R_effective_trajectory.csv")
-    R_effective_trajectory.to_csv(R_effective_trajectory_file_path)
 
-def read_R_effective_trajectory(seeded_simulation_output_dir):
-    trajectory_file_path = os.path.join(seeded_simulation_output_dir,
-                                        "R_effective_trajectory.csv")
-    df = pd.read_csv(trajectory_file_path,index_col=0)
-    return df
 
 # -----------------------------------------------------------------------------
 #                              Intra host lineages
@@ -1156,170 +1145,11 @@ def filter_lineage_frequency_df(lineage_frequency_df, threshold):
 
     return filtered_df, selected_lineages
 
-def get_r_effective_population_csv_filepath(experiment_name, 
-                                            seeded_simulation_output_dir,
-                                            window_size, threshold):
-    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
-    seed = os.path.basename(seeded_simulation_output_dir)
-    filename = f"{experiment_name}_{foldername}_{seed}_r_effective_population_win_{window_size}_ts_{threshold}.csv"
-    return os.path.join(experiment_output_dir, filename)
 
-def get_r_effective_lineages_csv_filepath(experiment_name, 
-                                          seeded_simulation_output_dir, 
-                                          window_size, threshold):
-    experiment_output_dir = dm.get_experiment_output_dir(experiment_name)
-    foldername = dm.get_simulation_output_foldername_from_SSOD(seeded_simulation_output_dir)
-    seed = os.path.basename(seeded_simulation_output_dir)
-    filename = f"{experiment_name}_{foldername}_{seed}_r_effective_lineages_win_{window_size}_ts_{threshold}.csv"
-    return os.path.join(experiment_output_dir, filename)
 
-def get_r_effective_population_traj(ssod, time_window):
-    """
-    Compute and return the population-level R_effective trajectory as a pandas Series.
-    """
-    df = read_individuals_data(ssod)
-    # df = df[df['t_infection'] > 0]
-    final_time = read_final_time(ssod)
 
-    timeline = np.arange(0, final_time, 1)
-    r_effective = []
 
-    for t in tqdm(timeline, desc="Computing R_effective (population)"):
-        window_start = t - time_window
-
-        births = df[
-            (df['t_infectious'] > window_start) & (df['t_infectious'] <= t)
-        ].shape[0]
-
-        deaths = df[
-            (df['t_not_infectious'] > window_start) & (df['t_not_infectious'] <= t)
-        ].shape[0]
-
-        r = births / deaths if deaths > 0 else float('nan')
-        r_effective.append((t, r))
-
-    return pd.Series([r for _, r in r_effective], index=[t for t, _ in r_effective], name='R_effective')
-
-def get_r_effective_lineages_traj(ssod, time_window, threshold):
-    """
-    Compute and return the lineage-level R_effective trajectories as a dictionary of Series.
-    """
     
-    def flatten_lineage_events(individuals_df):
-        """
-        Convert nested IH_lineages_trajectory dicts into a flat DataFrame.
-        Returns: DataFrame with columns: individual_id, lineage, ih_birth, ih_death
-        """
-        rows = []
-
-        for ind_id, row in individuals_df.iterrows():
-            traj = row.get('IH_lineages_trajectory', {})
-            for lineage, event in traj.items():
-                rows.append({
-                    'individual_id': ind_id,
-                    'lineage': lineage,
-                    'ih_birth': event.get('ih_birth'),
-                    'ih_death': event.get('ih_death')
-                })
-
-        return pd.DataFrame(rows)
-    
-    individuals_df = read_individuals_data(ssod)
-    # individuals_df = individuals_df[individuals_df['t_infection'] > 0]
-    final_time = read_final_time(ssod)
-    # Read and filter lineage frequency
-    lineage_freq_df = read_lineage_frequency(ssod)
-    _, filtered_lineages = filter_lineage_frequency_df(lineage_freq_df, threshold)
-    
-    flat_df = flatten_lineage_events(individuals_df)
-    timeline = np.arange(0, final_time, 1)
-    lineage_r_dict = {}
-
-    for lineage in tqdm(filtered_lineages, desc="Computing R_effective (lineages)"):
-        r_series = []
-        sub = flat_df[flat_df['lineage'] == lineage]
-
-        for t in timeline:
-            window_start = t - time_window
-
-            births = sub[
-                (sub['ih_birth'] > window_start) & (sub['ih_birth'] <= t)
-            ].shape[0]
-
-            deaths = sub[
-                (sub['ih_death'] > window_start) & (sub['ih_death'] <= t)
-            ].shape[0]
-
-            r = births / deaths if deaths > 0 else float('nan')
-            r_series.append((t, r))
-
-        lineage_r_dict[lineage] = pd.Series(
-            [r for _, r in r_series],
-            index=[t for t, _ in r_series],
-            name=f'R_eff_{lineage}'
-        )
-
-    return lineage_r_dict
-
-def write_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir, 
-                                time_window, threshold):
-    """
-    Compute and write R_effective (population + lineage) trajectories to CSV.
-    """
-    dm.assert_experiment_writable(experiment_name)
-    # Compute R_effective
-    r_effective_population_traj = get_r_effective_population_traj(seeded_simulation_output_dir, time_window)
-    r_effective_lineages_traj = get_r_effective_lineages_traj(seeded_simulation_output_dir, time_window, threshold)
-
-    # Get filepaths
-    pop_fp = get_r_effective_population_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
-    line_fp = get_r_effective_lineages_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
-
-    # Save
-    r_effective_population_traj.to_csv(pop_fp, header=True)
-    pd.DataFrame(r_effective_lineages_traj).to_csv(line_fp)
-
-    print(f"R_effective CSVs saved to:\n- {pop_fp}\n- {line_fp}")
-    
-def read_r_effective_trajs_csv(experiment_name, seeded_simulation_output_dir, 
-                               time_window, threshold):
-    """
-    Read R_effective (population + lineage) trajectories from CSV.
-    If files are missing, issues a warning and computes them in memory.
-
-    Returns:
-        - r_effective_population_traj: pd.Series
-        - r_effective_lineages_traj: dict of {lineage_name: pd.Series}
-    """
-    pop_fp = get_r_effective_population_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
-    line_fp = get_r_effective_lineages_csv_filepath(experiment_name, seeded_simulation_output_dir, time_window, threshold)
-
-    # Check if files exist
-    if not os.path.exists(pop_fp) or not os.path.exists(line_fp):
-        # asking for a value must not fill the cache: compute in memory and
-        # leave the experiment untouched. Shaped as the CSV round trip leaves
-        # it -- each lineage Series keyed and named by the column name a
-        # read_csv would have produced.
-        warnings.warn("R_effective CSVs missing. Computing them in memory; "
-                      "nothing is written.")
-        r_eff_pop = get_r_effective_population_traj(seeded_simulation_output_dir, time_window)
-        lineages = get_r_effective_lineages_traj(seeded_simulation_output_dir, time_window, threshold)
-        df_line = pd.DataFrame(lineages)
-        df_line.columns = df_line.columns.astype(str)
-        return r_eff_pop, {lineage: df_line[lineage].rename(lineage)
-                           for lineage in df_line.columns}
-
-    # Read population R_eff
-    r_eff_pop = pd.read_csv(pop_fp, index_col=0)
-    if isinstance(r_eff_pop, pd.DataFrame):
-        r_eff_pop = r_eff_pop.iloc[:, 0]
-
-    # Read lineage R_eff
-    df_line = pd.read_csv(line_fp, index_col=0)
-    r_eff_lin_dict = {lineage: df_line[lineage] for lineage in df_line.columns}
-
-    return r_eff_pop, r_eff_lin_dict
 
 # -----------------------------------------------------------------------------
 

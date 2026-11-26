@@ -244,26 +244,8 @@ def fit_observed_substitution_rate_regressor(df, model_type, weights=None,
         # If using lmfit, we might want to return None and check in the caller
         raise e
 
-def fit_weight(df):
-    x_data = df['nucleotide_substitution_rate']
-    weights = 1/x_data 
-    return weights
 
-def fit_weight_time(df):
-    x_data = df['nucleotide_substitution_rate']
-    weights = 1/x_data * (df['simulation_final_time']/df['settings_final_time'])
-    return weights
 
-def evaluate_model(model_type, params, x):
-    model = factory_model_func(model_type)
-    if isinstance(model, lmfit.models.SplineModel):
-        # Create initial parameters for lmfit
-        param_obj = model.make_params()
-        for key in param_obj.keys():
-            if key in params:
-                param_obj[key].set(value=params[key])
-        return model.eval(params=param_obj, x=x)
-    return model(x, **params)
 
 # ==============================================================================
 # INVERSE FUNCTIONS & BRIDGE

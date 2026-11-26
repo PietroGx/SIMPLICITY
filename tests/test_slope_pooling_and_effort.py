@@ -9,7 +9,7 @@ Two questions, one per clock:
            so pooling treats correlated points as independent and the line
            looks far more certain than it is. The two-stage estimator -- one
            slope per seed, then the 30 slopes as the sample -- is what
-           output_manager.py:691 already does for the calibration.
+           output_manager.compute_OSR_vs_parameter already does for the calibration.
 
   EFFORT   saving keeps the complete diagnosed record; the ratio is a post-hoc
            host-level draw. Whether fitting at 10% costs anything depends on

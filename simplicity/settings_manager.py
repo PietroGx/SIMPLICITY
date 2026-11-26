@@ -137,15 +137,6 @@ def write_user_set_parameters_file(user_set_parameters, filename):
         json.dump(user_set_parameters, file, indent=4)
     print(f"user_set_parameters saved to {file_path}")
 
-def read_user_set_parameters_file(filename):
-    file_path = os.path.join(dm.get_reference_parameters_dir(),filename)
-    try:
-        with open(file_path, "r") as file:
-            return json.load(file)
-    except FileNotFoundError:
-        print(f"Error: {filename} not found. Writing default standard values.")
-        write_standard_parameters_values()
-        return read_standard_parameters_values()
     
 # A _scenario_groups entry may name itself with this key; unnamed groups get a
 # positional name. A plain experiment is one group, DEFAULT_GROUP.

@@ -10,8 +10,8 @@
                   lives in studio.css alone and dark mode needs no JS
      fmt()/ci()   one rendering of a number and of a bootstrap interval
 
-   `bars` and `linesOverDays` are the generic charts. A phylogeny, a Muller plot
-   and an episode grid are not expressible through them, so those live in
+   `bars` is the generic chart. A phylogeny, a Muller plot
+   and an episode grid are not expressible through it, so those live in
    paint.js as their own painters -- but they still take their canvas from
    fit() and their colours from css().
 */
@@ -45,8 +45,7 @@ const mtPct = v => +(Number(v) * 100).toFixed(3);
    studio does, here and only here.
 
    `asPct` scales one {n, mean, lo, hi} and keeps its nulls, which matter: lo
-   and hi are null under three runs and a chart must not draw a whisker there.
-   `asPctRuns` does the same for a per-run array from /api/dist. */
+   and hi are null under three runs and a chart must not draw a whisker there. */
 const asPct = b => !b ? b : {
   n: b.n,
   mean: b.mean === null || b.mean === undefined ? b.mean : b.mean * 100,
@@ -56,8 +55,6 @@ const asPct = b => !b ? b : {
 
 const asPctNum = v => v === null || v === undefined ? v : v * 100;
 
-const asPctRuns = rs => !rs ? rs
-  : rs.map(r => !r ? r : r.map(asPctNum));
 /* m_F: the peak frequency an episode must reach to be counted. A READ
    parameter -- episodes are stored, so it filters a build it does not name. */
 const MF_VALUES = [0, 0.01, 0.02, 0.05, 0.10, 0.20, 0.30, 0.50];
@@ -84,8 +81,6 @@ function focusSet() {
    subpanel holds one scenario and has nothing to fade against */
 const SUB_SCENARIOS = SCENARIOS.filter(sc => sc !== "control");
 const scenarioRaw = sc => css("--sc" + Math.max(0, SCENARIOS.indexOf(sc)));
-const scenarioHead = (sc, note = "") => `<h4>${shapeSvg(SCENARIO_SHAPE[sc], scenarioRaw(sc))}${SCENARIO_LABEL[sc]}`
-  + `${note ? ` <small style="color:var(--ink-3);font-weight:400">${note}</small>` : ""}</h4>`;
 /* figure panel heads: a letter, on a disc in the scenario's colour when `disc`,
    and the scenario's name, capitalised, in its colour when `col` */
 const FIG_LETTERS = ["A", "B", "C", "D", "E", "F"];
@@ -168,12 +163,6 @@ function keyRow(items) {
     `<span><i style="background:${colour}"></i>${text}</span>`).join("") + `</div>`;
 }
 
-/* Panel 1's scatter: scenario -> marker shape, composition class -> shade of
-   j/k. One geometry for canvas and SVG key, so the two cannot drift. */
-const SCENARIO_SHAPE = {control: "circle", SOT: "square", HIV_low: "triangle",
-                        HIV_high: "diamond", edge_case: "cross"};
-const FADE_ALPHA = 0.22;
-
 function shapePoly(shape, x, y, r) {
   const R = r * 1.2, s = r * 0.85, d = r * 1.15, a = r * 1.1, b = r * 0.4;
   if (shape === "square") return [[x - s, y - s], [x + s, y - s], [x + s, y + s], [x - s, y + s]];
@@ -191,55 +180,12 @@ function traceShape(g, shape, x, y, r) {
   p.forEach(([px, py], i) => i ? g.lineTo(px, py) : g.moveTo(px, py));
   g.closePath();
 }
-function shapeSvg(shape, fill) {
-  const p = shapePoly(shape, 0, 0, 4.5);
-  const body = p ? `<polygon points="${p.map(q => q.map(v => v.toFixed(2)).join(",")).join(" ")}"/>`
-                 : `<circle r="4.27"/>`;
-  return `<svg width="12" height="12" viewBox="-6 -6 12 12" style="fill:${fill};flex:none">${body}</svg>`;
-}
-/* scenario key by shape, in ink; fades with the focus like the colour key */
-function shapeKey() {
-  const f = focusSet();
-  return `<div class="key">` + SCENARIOS.map(sc =>
-    `<span${f.size && !f.has(sc) ? ` style="opacity:${FADE_ALPHA}"` : ""}>`
-    + `${shapeSvg(SCENARIO_SHAPE[sc], "var(--ink-2)")}${SCENARIO_LABEL[sc]}</span>`).join("") + `</div>`;
-}
-
-/* The long-born share j/k of a class, 0..1; null for wt (0/0, undefined) and
-   for other (n_defining is not k, so j/k does not apply). */
-function classShare(c, k) {
-  return /^\d+$/.test(c) && Number(k) > 0 ? Math.min(1, Number(c) / Number(k)) : null;
-}
-/* Green to red, as the Clustering tab's "Ratio" origin colouring
-   (paint.js originColour): --std mixed into --long by the long-born share,
-   in sRGB like its color-mix. The founding clade is --founder there too. */
+/* a mixed into b by t, per sRGB channel, like color-mix (paint.js originColour) */
 function mixHex(a, b, t) {
   const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   const A = p(a), B = p(b);
   return "#" + A.map((x, i) => Math.round(x + (B[i] - x) * t)
     .toString(16).padStart(2, "0")).join("");
-}
-const jShade = t => mixHex(css("--std"), css("--long"), Math.max(0, Math.min(1, t)));
-function classShade(c, k) {
-  const t = classShare(c, k);
-  return t !== null ? jShade(t) : css(c === "wt" ? "--founder" : "--ndef");
-}
-function classLabel(c, k) {
-  return c === "wt" ? "wild type" : c === "other" ? "ndef≠k" : `${c} long of ${k}`;
-}
-/* the shade's legend: the ramp with a notch at each class j/k, then wild type and ndef≠k */
-function jShadeBar(k) {
-  const kk = Number(k) || 0;
-  const stops = [0, .25, .5, .75, 1].map(t => `${jShade(t)} ${t * 100}%`).join(",");
-  const notches = kk > 0 ? Array.from({length: kk + 1}, (_, j) =>
-    `<u style="left:${(100 * j / kk).toFixed(2)}%"></u>`).join("") : "";
-  return `<div class="jbar"><div class="ramp">
-      <b>long-born share of defining mutations (j/k)</b>
-      <div class="bar" style="background:linear-gradient(90deg,${stops})">${notches}</div>
-      <div class="ticks">${[0, 25, 50, 75, 100].map(v => `<span style="left:${v}%">${v}%</span>`).join("")}</div>
-    </div>
-    <span class="grey"><i style="background:${css("--founder")}"></i>wild type</span>
-    <span class="grey"><i style="background:${css("--ndef")}"></i>ndef≠k</span></div>`;
 }
 
 /* How each axis is computed, shown on hovering its label. Keyed by the label
@@ -446,40 +392,6 @@ function bars(cv, {cats, series, ylab, fmtY, height, pct}) {
     const t = String(c);
     g.fillText(t, x0 + (iw - 6) / 2 - g.measureText(t).width / 2, h - pad.b + 12);
   });
-  return {g, w, h};
-}
-
-/* One line per series over a day axis. */
-function linesOverDays(cv, {series, ylab, fmtY, height, xmax, marks}) {
-  const {g, w, h} = fit(cv, height || 240);
-  const pad = {l: 44, r: 8, t: 10, b: 26};
-  let hi = 0, n = 0;
-  series.forEach(s => { n = Math.max(n, s.y.length);
-                        s.y.forEach(v => { if (isFinite(v)) hi = Math.max(hi, v); }); });
-  hi = hi > 0 ? hi * 1.1 : 1;
-  const XM = xmax || n;
-  axes(g, w, h, pad, "day", ylab, 0, hi, fmtY);
-  const X = d => pad.l + (w - pad.l - pad.r) * (d / Math.max(XM - 1, 1));
-  const Y = v => h - pad.b - (h - pad.b - pad.t) * (v / hi);
-  (marks || []).forEach(m => {
-    g.strokeStyle = css("--warn"); g.setLineDash([3, 3]);
-    g.beginPath(); g.moveTo(X(m), pad.t); g.lineTo(X(m), h - pad.b); g.stroke();
-    g.setLineDash([]);
-  });
-  series.forEach(s => {
-    g.strokeStyle = s.colour; g.lineWidth = 1.4; g.beginPath();
-    let on = false;
-    s.y.forEach((v, i) => {
-      if (!isFinite(v)) { on = false; return; }
-      const x = X(i), y = Y(v);
-      if (!on) { g.moveTo(x, y); on = true; } else g.lineTo(x, y);
-    });
-    g.stroke();
-  });
-  g.fillStyle = css("--ink-3"); g.font = "10px " + css("--f-num");
-  g.fillText("0", pad.l, h - 8);
-  const lt = String(XM - 1);
-  g.fillText(lt, w - pad.r - g.measureText(lt).width, h - 8);
   return {g, w, h};
 }
 

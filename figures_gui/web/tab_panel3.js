@@ -48,7 +48,6 @@ function rail_panel3(rail) {
 
 /* "Clade build" source only: the build's window, which /api/panel?n=3b measures
    on whatever the burn-in toggle says; the popup asks /api/run_daily for the same */
-const p3Window = () => settings.window === "all" ? "whole record" : "from the burn-in day";
 const p3Burnin = () => settings.window === "all" ? 0 : 1;
 
 /* ------------------------------------------------------------ outbreaks */

@@ -96,16 +96,6 @@ def check(label, got, want):
     return ok
 
 
-def check_known(label, got, want, why):
-    '''A check expected to fail until a named stage fixes it.'''
-    if got == want:
-        print(f"  [FIXED] {label}: {got!r}")
-        fixed.append(label)
-    else:
-        print(f"  [known] {label}: {got!r}, want {want!r}  <- {why}")
-        known_bad.append(label)
-
-
 # ---------------------------------------------------------------- environment
 
 def redirect_data_dir(path):

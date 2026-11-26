@@ -151,16 +151,14 @@ def section_b(scenarios, nseeds, k, stamp=1, exp_name=EXP_NAME):
                f"{name}: one partition, {len(builder)} groups from the builder "
                f"vs {len(walk)} from the walk")
 
-            # the support term: every kept clade clears the run's own floor
+            # the support term: every rule B clade root's subtree clears the floor
             n_tx = cl.transmission_total(ind)
-            recs = [dict(c=r, ntx=int(stx.get(r, 0)), founding=(par.get(r) is None),
-                         ndef=len(lin2mut.get(r, frozenset())))
-                    for r in walk]
-            kept = cl.keep_clades_by_transmission(recs, n_tx, 0.01)
-            floor = 0.01 * n_tx
-            bad = [c for c in kept if not c["founding"] and c["ntx"] < floor]
+            floor = cl.transmission_floor(ind, 0.01)
+            croot_b = cl.designate_clades(lin2mut, par, order, k, stx, floor)
+            roots_b = {r for r in croot_b.values() if par.get(r) is not None}
+            bad = [r for r in roots_b if stx.get(r, 0) < floor]
             ck(not bad,
-               f"{name}: all {len(kept)} kept clades clear m_T=1% of "
+               f"{name}: all {len(roots_b)} rule B clade roots clear m_T=1% of "
                f"{n_tx:,} transmissions (floor {floor:.1f})")
 
             # order_by: topology must put every parent before its children

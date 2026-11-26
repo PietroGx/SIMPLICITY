@@ -68,7 +68,7 @@ def emergence(ys, t, prom, lo, hi):
 
 
 def one_run(ssod, k, mt, prom, lo, hi, ref_win):
-    ctx, err = compute.run_context(ssod, k, "post")
+    ctx, err = compute.run_context(ssod, k, "post", mt)
     if err:
         return None, err
     F, t, post = ctx["F"], ctx["t_post"], ctx["post"]
@@ -79,7 +79,7 @@ def one_run(ssod, k, mt, prom, lo, hi, ref_win):
                  ntx=int(sum(int(tx.get(m, 0)) for m in c2l.get(c, []))),
                  founding=not isinstance(ctx["par_of"].get(c), str))
             for i, c in enumerate(ctx["cols"])]
-    kept = [r for r in cl.keep_clades_by_transmission(recs, ctx["n_tx_run"], mt)
+    kept = [r for r in cl.keep_designated_clades(recs)
             if not r["founding"] and r["ndef"] > 0]
 
     rows = []
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     ap.add_argument("--scenarios", nargs="+", default=SCEN)
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("-k", type=int, default=7)
-    ap.add_argument("--mt", type=float, default=1.0)
+    ap.add_argument("--mt", type=float, default=0.01)
     ap.add_argument("--prom", type=float, default=0.10)
     ap.add_argument("--lo", type=float, default=0.10)
     ap.add_argument("--hi", type=float, default=0.90)
@@ -147,7 +147,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     nclades = df.groupby(["scenario", "seed", "clade"]).ngroups
-    print(f"\n=== k={a.k}, m_T={a.mt}%, prom={a.prom}, band "
+    print(f"\n=== k={a.k}, m_T={a.mt * 100:g}%, prom={a.prom}, band "
           f"{a.lo}-{a.hi}, frozen at win={a.ref_win:g} d ===")
     print(f"{nclades} clades over "
           f"{df.groupby(['scenario', 'seed']).ngroups} runs\n")

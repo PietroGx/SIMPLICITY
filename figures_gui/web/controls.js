@@ -141,22 +141,6 @@ function pickControl({setting, label, options, hint}) {
   return el;
 }
 
-/* The distribution overlay box, the same in every panel that offers it. `plot`
-   is the panel's selected form; dist.js decides which forms can carry points. */
-function railDistribution(setting, plot) {
-  const ok = distAllowed(plot);
-  return checkControl({
-    setting, disabled: !ok,
-    label: "Show the individual simulations",
-    why: "This plot form cannot carry them: a stack of means has no per-simulation "
-       + "form that stays a stack, and a count of simulations is not an estimate.",
-    hint: ok ? "The whiskers are a bootstrap CI of the <strong>mean</strong> "
-             + "(2000 resamples over simulations), so they are narrower than the simulations "
-             + "themselves by construction. This draws the simulations behind them."
-             : "",
-  });
-}
-
 function selectControl({setting, label, hint, options}) {
   const el = document.createElement("div");
   el.className = "ctl";
@@ -364,49 +348,6 @@ function originControl(label) {
           + "vote over those mutations, which cannot tie on an odd <i>k</i>. "
           + "<strong>Root</strong> is the host type of the clade's root lineage "
           + "alone, ignoring the rest."});
-}
-
-/* Episode detection: the rules that decide what counts as a rise. */
-/* The episode rules as separate controls, so the detection tabs can file them under
-   what each one decides. */
-function episodeControls() {
-  return {
-    win: sliderControl({setting: "win", label: "Smoothing window",
-      values: AXES.win, format: v => v + " d",
-      hint: "Centred moving average. Wider merges neighbouring episodes — and "
-          + "at 1 d there is no smoothing, so a rise collapses to the sampling "
-          + "interval.<br>"
-          + "<strong>This names a clade build</strong>: the stops are the "
-          + "grid's own window axis."}),
-    prom: sliderControl({setting: "prom", label: "Peak prominence",
-      values: AXES.prom, format: v => Number(v).toFixed(2),
-      hint: "As a fraction of the clade's own peak height.<br>"
-          + "<strong>This names a clade build</strong>, and the grid holds two "
-          + "values. Off them the daily record has no build, the tab falls "
-          + "back to the 9.2-day export and m<sub>F</sub> stops applying."}),
-    mf: sliderControl({setting: "mf", label: "Minimum peak <i>m<sub>F</sub></i>",
-      values: MF_VALUES, format: v => mtPct(v) + "%",
-      hint: "An episode is counted only if its peak reaches this share of the "
-          + "whole viral population. Prominence is relative to the clade's own "
-          + "height, so a clade that never leaves 1% still gets peaks; this is "
-          + "the absolute floor.<br>"
-          + "The clade is kept either way — only the episode stops counting. "
-          + "At 0 every episode counts, which is what the build recorded."}),
-    lo: sliderControl({setting: "lo", label: "Rise band",
-      values: AXES.lo,
-      format: v => `${Number(v).toFixed(2)}–${(1 - v).toFixed(2)}`,
-      hint: "Both ends are fractions of <strong>that episode's own "
-          + "amplitude</strong>, peak minus its start. Kept at 0.10–0.90 so the "
-          + "measure stays comparable to the final-approach definition. "
-          + "Only that band is built, so the slider has one stop: another band "
-          + "needs a clade build at it. It sets rise days only, never hidden time."}),
-    /* only when the grid holds more than one window: one button is no choice */
-    window: (AXES.window || []).length > 1 && segmentControl({setting: "window", label: "Window",
-      axis: AXES.window, options: [["post", "Post burn-in"], ["all", "Whole record"]],
-      hint: "Selection strength is proportional to the fraction of the "
-          + "population already infected, reaching full weight at the burn-in "
-          + "day, so a rise before it grew partly under drift."}),
-  };
 }
 
 /* A clade id names one lineage of ONE run under ONE partition, so a selection

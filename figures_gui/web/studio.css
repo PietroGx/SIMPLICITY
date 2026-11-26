@@ -103,19 +103,6 @@ canvas{display:block;width:100%;height:auto}
 .key{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:.7rem;color:var(--ink-2)}
 .key span{display:inline-flex;align-items:center;gap:5px}
 .key i{width:10px;height:10px;border-radius:2px;flex:none}
-/* panel 1 scatter's shade legend (draw.js jShadeBar) */
-.jbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 16px;margin-top:8px;font-size:.7rem;color:var(--ink-2)}
-.jbar .ramp{flex:1 1 200px;max-width:340px;min-width:0}
-.jbar .ramp b{display:block;font-weight:500;margin-bottom:4px}
-.jbar .bar{position:relative;height:10px;border-radius:2px;border:1px solid var(--line)}
-.jbar .bar u{position:absolute;top:-1px;bottom:-1px;width:1px;margin-left:-.5px;background:var(--panel);opacity:.8}
-.jbar .bar u:first-child,.jbar .bar u:last-child{display:none}
-.jbar .ticks{position:relative;height:13px;margin-top:2px;font-family:var(--f-num);font-size:.62rem;color:var(--ink-3)}
-.jbar .ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
-.jbar .ticks span:first-child{transform:none}
-.jbar .ticks span:last-child{transform:translateX(-100%)}
-.jbar .grey{display:inline-flex;align-items:center;gap:5px;margin-bottom:15px}
-.jbar .grey i{width:10px;height:10px;border-radius:2px;border:1px solid var(--line);flex:none}
 
 table.t{width:100%;border-collapse:collapse;font-size:.74rem;
   font-variant-numeric:tabular-nums;margin-top:4px}

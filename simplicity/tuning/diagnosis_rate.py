@@ -23,10 +23,6 @@ Created on Fri Jul 29 13:26:33 2022
 """
 import numpy as np
 import scipy 
-import simplicity.dir_manager as dm
-import simplicity.settings_manager as sm
-import os 
-import pandas as pd 
 
 def get_B(tau_1, tau_2, tau_3, tau_4, k_d):
     '''
@@ -104,58 +100,8 @@ def get_k_d_from_diagnosis_rate(target_diagnosis_rate_in_percent, tau_1, tau_2, 
 
     return round(k_d,4)
 
-def diagnosis_rate_table(diagnosis_rates, tau_1, tau_2, tau_3, tau_4): # Added taus here
-    import pandas as pd
-    
-    dic = {}
-    for diagnosis_rate in diagnosis_rates:
-        k_d = get_k_d_from_diagnosis_rate(diagnosis_rate, tau_1, tau_2, tau_3, tau_4)
-        dic[diagnosis_rate] = k_d
-    
-    df = pd.DataFrame(list(dic.values()),index=dic.keys(),columns=['k_d value'])
-    return df
 
-def get_effective_diagnosis_rate(simulation_output_dir, individual_type=None):
-    effective_diagnosis_rates = []
-    for seeded_simulation_output_dir in dm.get_seeded_simulation_output_dirs(simulation_output_dir):
-        ind_file = os.path.join(seeded_simulation_output_dir, 'individuals_data.csv')
-        
-        if not os.path.exists(ind_file):
-            continue
-            
-        df = pd.read_csv(ind_file, low_memory=False)
-        
-        # Filter by standard or long_shedder if requested
-        if individual_type:
-            df = df[df['type'] == individual_type]
-            
-        diagnosed = len(df[df['state'] == 'diagnosed'])
-        recovered = len(df[df['state'] == 'recovered'])
-        deceased = len(df[df['state'] == 'deceased']) if 'deceased' in df.columns else 0
-        
-        # Calculate the effective diagnosis rate 
-        total = recovered + diagnosed + deceased
-        if total > 0:
-            effective_rate = (diagnosed + deceased) / total
-            effective_diagnosis_rates.append(effective_rate)
-            
-    if not effective_diagnosis_rates:
-        return 0.0, 0.0
-        
-    return np.mean(effective_diagnosis_rates), np.std(effective_diagnosis_rates)
 
-def get_diagnosis_rates(simulation_output_dir, individual_type):
-    ''' get theoretical and effective diagnosis rates
-    '''
-    if individual_type == 'standard':
-        d_rate = 'diagnosis_rate_standard'
-    else:
-        d_rate = 'diagnosis_rate_long'
-        
-    effective_rate, std_effective_rate = get_effective_diagnosis_rate(simulation_output_dir, individual_type)
-    theoretical_rate = sm.get_parameter_value_from_simulation_output_dir(simulation_output_dir, d_rate)
-
-    return (theoretical_rate, effective_rate), std_effective_rate
 
 
 

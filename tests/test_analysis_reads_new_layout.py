@@ -251,8 +251,8 @@ def main():
                   sorted(set(raw['R'])), [1.05, 1.3])
 
         # Row COUNT is not a layout question and must not be asserted here.
-        # write_OSR_vs_parameter_csv wraps its per-repeat body in a bare
-        # `except Exception: continue` (output_manager.py:627), and
+        # write_OSR_vs_parameter_csv skips any repeat that raises
+        # (output_manager.compute_OSR_vs_parameter), and
         # er.tempest_regression raises on the single sequencing row a run this
         # small produces. An empty table therefore looks identical whether the
         # cause is thin data or a tree it cannot read -- so ask the layout

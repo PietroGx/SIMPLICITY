@@ -62,10 +62,6 @@ function xLabels(g, w, h, pad, cats, slotW) {
   });
 }
 
-function chartKey(series) {
-  return keyRow(series.filter(s => s.label).map(s => [s.colour, s.label]));
-}
-
 /* ------------------------------------------------------------------ dots */
 
 /* Dot and interval: the forest plot. x = category, one offset per series so
@@ -118,7 +114,7 @@ function dots(cv, {cats, series, ylab, fmtY, height, points, zero, pct}) {
    groups: [{colour, label, x: CI, y: CI, xruns: [], yruns: []}] -- xruns and
    yruns are index-aligned by run, so a point is one run on both axes.
    Optional per group, each defaulting to the scenario-coloured dot: `shape`
-   (draw.js SCENARIO_SHAPE values), `fill`, `stroke` (outline), `arm` (whisker
+   (a draw.js shapePoly name), `fill`, `stroke` (outline), `arm` (whisker
    colour), `alpha` (faded groups are drawn first), `tip` ({text, math} on hover). */
 function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
                         diagonal, zero, pctX, pctY, xlim, ylim, vlines, hlines, lines, xticks}) {
@@ -354,56 +350,4 @@ function stacked(cv, {cats, parts, height, pct, fmtV}) {
   });
   xLabels(g, w, h, pad, cats, slot);
   return {g, w, h};
-}
-
-/* --------------------------------------------------------------- heatmap */
-
-/* A small matrix, rows x cols, colour by value against `max`. Every cell
-   carries its number, because a reader cannot take a value off a ramp. */
-function heatcells(cv, {rows, cols, grid, height, fmtV, max, hue}) {
-  const {g, w, h} = fit(cv, height || 150);
-  const pad = {l: 56, r: 10, t: 18, b: 22};
-  const vals = grid.flat().filter(isNum);
-  const top = max || (vals.length ? Math.max(...vals) : 1) || 1;
-  const cw = (w - pad.l - pad.r) / Math.max(cols.length, 1);
-  const ch = (h - pad.t - pad.b) / Math.max(rows.length, 1);
-  const base = hue || css("--accent");
-  const f = fmtV || (v => fmt(v, 1));
-  g.font = "10px " + css("--f-num");
-  cols.forEach((c, j) => {
-    g.fillStyle = css("--ink-3");
-    const t = String(c);
-    g.fillText(t, pad.l + cw * (j + 0.5) - g.measureText(t).width / 2, pad.t - 5);
-  });
-  rows.forEach((r, i) => {
-    g.fillStyle = css("--ink-3");
-    g.fillText(String(r), 4, pad.t + ch * (i + 0.5) + 3);
-    cols.forEach((c, j) => {
-      const v = (grid[i] || [])[j];
-      const x = pad.l + cw * j, y = pad.t + ch * i;
-      g.globalAlpha = isNum(v) ? 0.12 + 0.82 * Math.min(1, v / top) : 0.05;
-      g.fillStyle = base;
-      g.fillRect(x + 1, y + 1, cw - 2, ch - 2);
-      g.globalAlpha = 1;
-      g.strokeStyle = css("--line-2"); g.lineWidth = 1;
-      g.strokeRect(x + 1, y + 1, cw - 2, ch - 2);
-      if (!isNum(v)) return;
-      const t = f(v);
-      g.fillStyle = v / top > 0.55 ? css("--panel") : css("--ink");
-      g.fillText(t, x + cw / 2 - g.measureText(t).width / 2, y + ch / 2 + 3);
-    });
-  });
-  return {g, w, h};
-}
-
-/* ------------------------------------------------------------ run counts */
-
-/* Counts, not estimates: denominator bars carry no interval because there is
-   nothing to bootstrap -- n_with_rise is a count of runs, not a mean over
-   them. One group per category, one bar per count. */
-function countBars(cv, {cats, series, ylab, height}) {
-  return bars(document.getElementById(cv.id) || cv, {
-    cats, ylab, height: height || CHART_H,
-    series: series.map(s => ({colour: s.colour,
-      vals: s.vals.map(v => isNum(v) ? {mean: v, lo: null, hi: null} : null)}))});
 }

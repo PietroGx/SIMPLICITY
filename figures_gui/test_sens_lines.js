@@ -148,10 +148,10 @@ async function main() {
        `axis=${axis}: the chart block rendered, not the missing-endpoint note`);
     /* The levels have to reach the x axis as the grid's own stops, and the
        operating point has to be one of them -- an unmatched `mark` is dropped
-       silently by linesOverLevels (charts.js:205-212). */
+       silently by charts.js linesOverLevels. */
     const want = levels.map(v => peek(`p4Level(${JSON.stringify(axis)}, ${v})`));
     const seen = texts[2];
-    /* xLabels thins the row when the stops crowd (charts.js:57-68), so not
+    /* xLabels thins the row when the stops crowd (charts.js xLabels), so not
        every stop is required -- but the first one is, and a thinned row is not
        an empty one. */
     const got = want.filter(t => seen.includes(t));

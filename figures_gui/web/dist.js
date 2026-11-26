@@ -95,43 +95,6 @@
    reload, which is when dist.py could have appeared. */
 const DIST_ABSENT = new Set();
 
-async function distFor(n) {
-  if (DIST_ABSENT.has("dist")) return null;
-  try {
-    const d = await apiGetSlot(`/api/dist?n=${n}&` + buildQuery());
-    return d && d.series ? d : null;
-  } catch (e) {
-    if (!isSuperseded(e)) DIST_ABSENT.add("dist");
-    return null;                 /* no endpoint, no build: draw the CIs alone */
-  }
-}
-
-/* The runs for one metric key, laid out per category to match a chart's
-   `vals`. `cats` are the category values the chart draws; `key` maps a
-   category to its metric key, or is a plain string for a single-category
-   chart. Returns undefined when there is nothing, which every chart in
-   charts.js reads as "no points". */
-function distRuns(dist, scenario, cats, key) {
-  if (!dist || !dist.series) return undefined;
-  const of = typeof key === "function" ? key : (() => key);
-  const out = cats.map(c => {
-    const s = dist.series[of(c)];
-    return (s && s[scenario]) || null;
-  });
-  return out.some(r => r && r.length) ? out : undefined;
-}
-
-/* The same, for a chart whose CATEGORIES are the scenarios -- a forest plot or
-   a scenario scatter -- where distRuns cannot help because it holds the
-   scenario fixed. `key` is the single metric key for all of them. */
-function distRunsByScenario(dist, cats, key) {
-  if (!dist || !dist.series) return undefined;
-  const s = dist.series[key];
-  if (!s) return undefined;
-  const out = cats.map(sc => s[sc] || null);
-  return out.some(r => r && r.length) ? out : undefined;
-}
-
 /* The sensitivity table for one axis of the build grid, or null. */
 async function sensFor(axis) {
   if (DIST_ABSENT.has("sens")) return null;
@@ -143,15 +106,4 @@ async function sensFor(axis) {
     if (!isSuperseded(e)) DIST_ABSENT.add("sens");
     return null;
   }
-}
-
-/* Whether the distribution box may be ticked for a given plot form. A stack of
-   means has no per-run form that stays a stack, and a count is not an estimate,
-   so those forms disable the box instead of ignoring it. */
-const DIST_CAPABLE = {
-  arrows: false, breakouts: false, breakout_counts: false, breakout_scatter: false, stacked: false, denominators: false, days: false, heatmap: false,
-};
-
-function distAllowed(plot) {
-  return DIST_CAPABLE[plot] !== false;
 }

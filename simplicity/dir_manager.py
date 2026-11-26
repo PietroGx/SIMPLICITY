@@ -193,12 +193,6 @@ def _enclosing_experiments(experiment_name):
     return [os.path.join(*parts[:n]) for n in range(len(parts), 0, -1)]
 
 
-def experiment_is_complete(experiment_name):
-    """True only for an experiment whose own state file says completed."""
-    state = read_experiment_state(experiment_name)
-    return bool(state and state.get('completed'))
-
-
 def assert_experiment_writable(experiment_name):
     """Raise if this experiment, or one it nests inside, is sealed."""
     for name in _enclosing_experiments(experiment_name):

@@ -95,14 +95,6 @@ class Simplicity:
         # plot simulation trajectory
         pm.plot_simulation(self.output_directory,threshold=0)
     
-    def save_consensus(self):
-        assert hasattr(self, "simulation_output"), "simulation has not run yet. Hint: see Simplicity.run"
-        # save consensus sequences calculated during simulation
-        # function in om need to be written if I implement this functionality
-        # takes population.consensus_sequences_t and writes it to csv
-        # also write function to read it into df!
-        om.save_consensus_sequences_t(self.simulation_output,
-                                      self.output_directory)
         
         
         

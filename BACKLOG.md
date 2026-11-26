@@ -24,11 +24,12 @@ it invalidates output produced before it.
 
 ## To do
 
-- **Rebuild the studio grid at `6e55b23492c7`.** v2.5.16 (censored episodes),
+- **Rebuild the studio grid at `eccccec8da18`.** v2.5.16 (censored episodes),
   v2.5.20 (the move to `figures_gui/`), v2.5.24 (`mt_seeded_fix`: seeded
-  infections are not transmissions) and v2.5.25 (`prom_peak_fix`: the
-  prominence bar is a fraction of each peak's own height) all change the build
-  hash, so no build on disk is readable. On the HPC:
+  infections are not transmissions), v2.5.25 (`prom_peak_fix`: the
+  prominence bar is a fraction of each peak's own height) and v2.6.1 (the
+  unused `keep_clades_by_transmission` deleted from `clustering.py`) all
+  change the build hash, so no build on disk is readable. On the HPC:
   `python -I figures_gui/prepare.py --stamp 2 --slurm --pack`, which also
   re-exports `runs/` (v2.5.27: its host counts no longer include the 90
   seeded infections, so the browser's clades match the build's). Then run

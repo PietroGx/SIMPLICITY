@@ -10,8 +10,8 @@ keep, from one clade build.
 
   rule B      how the build's groups become clades: the founding clade is kept
               and labelled, a group with no defining mutations and a parent is
-              not a clade, and the rest must carry >= m_T of the run's own
-              transmissions (simplicity/clustering.py keep_clades_by_transmission)
+              not a clade (simplicity/clustering.py keep_designated_clades); m_T
+              was applied when the build designated them, at the build's own m_T
   panel 1     composition classes 0..k, plus `other` for a clade whose defining
               count is not k, plus `wt` for the founding clade. These are meant
               to sum to 100% of a run, so `other` is reported in full: it is
@@ -27,7 +27,7 @@ keep, from one clade build.
 Reads a build directory, not the server. Read-only. Run from the repo root:
 
     python -I tests/panel_denominators.py                 # the k=7 operating point
-    python -I tests/panel_denominators.py --key k5_w1_p0.1_lo0.1_hi0.9_post
+    python -I tests/panel_denominators.py --key k5_m0.01_w15_p0.1_lo0.1_hi0.9_post
 """
 import os
 import sys
@@ -45,7 +45,9 @@ import simplicity.clustering as cl
 import compute
 import panels as P
 
-STORE = os.path.join(ROOT, "Data", "figures", "impact_long_shedders_1", "exploration")
+import sweep
+
+BASE = os.path.join(ROOT, "Data", "figures")
 
 
 def pick_build(cache, want_key):
@@ -75,14 +77,15 @@ def pick_build(cache, want_key):
     return hits[0] if hits else (None, None)
 
 
-def audit(cache, key, idx, mt):
+def audit(cache, key, idx):
     k = int(idx["params"]["k"])
+    mt = float(idx["params"].get("mt", 0.0))
     print(f"\nbuild {key}")
     print(f"  params {idx['params']}   code {idx['code']}   "
           f"m_T {mt} ({mt * 100:g}%)\n")
 
     hdr = (f"{'scenario':10} {'runs':>5} {'groups':>8} {'kept':>7} "
-           f"{'founding':>9} {'no def':>8} {'under m_T':>10} {'no phi':>7}")
+           f"{'founding':>9} {'no def':>8} {'no phi':>7}")
     print("  rule B: which groups become clades")
     print("  " + hdr)
     rows = {}
@@ -92,26 +95,22 @@ def audit(cache, key, idx, mt):
             continue
         runs = json.load(open(f))["runs"]
         rows[sc] = runs
-        g = kept = found = nodef = under = nophi = 0
+        g = kept = found = nodef = nophi = 0
         for r in runs:
             g += len(r["clades"])
-            ks = cl.keep_clades_by_transmission(r["clades"], r["n_tx_run"], mt)
-            kept += len(ks)
-            floor = mt * r["n_tx_run"]
+            kept += len(cl.keep_designated_clades(r["clades"]))
             for c in r["clades"]:
                 if c["founding"]:
                     found += 1
                 elif int(c["ndef"]) <= 0:
                     nodef += 1
-                elif c["ntx"] <= 0 or c["ntx"] < floor:
-                    under += 1
             if r.get("phi") is None:
                 nophi += 1
         print(f"  {sc:10} {len(runs):5} {g:8,} {kept:7,} {found:9,} "
-              f"{nodef:8,} {under:10,} {nophi:7}")
+              f"{nodef:8,} {nophi:7}")
         if g:
             print(f"  {'':10} {'':5} {'':8} {100*kept/g:6.1f}% "
-                  f"{100*found/g:8.1f}% {100*nodef/g:7.1f}% {100*under/g:9.1f}%")
+                  f"{100*found/g:8.1f}% {100*nodef/g:7.1f}%")
 
     print("\n  panel 1: composition classes, as % of KEPT clades and of burden")
     classes = P.classes_for(k)
@@ -121,7 +120,7 @@ def audit(cache, key, idx, mt):
         b = {c: 0.0 for c in classes}
         tot = totb = 0
         for r in runs:
-            for c in cl.keep_clades_by_transmission(r["clades"], r["n_tx_run"], mt):
+            for c in cl.keep_designated_clades(r["clades"]):
                 cls = P.class_of(c, k)
                 n[cls] += 1
                 b[cls] += float(c["burden"])
@@ -139,7 +138,7 @@ def audit(cache, key, idx, mt):
         kept = withep = trunc = lat = 0
         for r in runs:
             ks = {c["c"]: c for c in
-                  cl.keep_clades_by_transmission(r["clades"], r["n_tx_run"], mt)}
+                  cl.keep_designated_clades(r["clades"])}
             emg = {e["c"] for e in r["episodes"] if e["emg"] and e["c"] in ks}
             kept += len(ks)
             withep += len(emg)
@@ -206,15 +205,16 @@ def audit_panel2(store, burnin=True):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--store", default=STORE)
+    ap.add_argument("--stamp", default="2")
+    ap.add_argument("--store", default="", help="an exploration store; default from --stamp")
     ap.add_argument("--key", default="")
-    ap.add_argument("--mt", type=float, default=0.01)
     a = ap.parse_args()
+    a.store = a.store or sweep.store_dir(BASE, a.stamp)
     cache = os.path.join(a.store, "cache")
     key, idx = pick_build(cache, a.key)
     if key is None:
         print(f"no build in {cache} matches compute.code_hash() "
               f"= {compute.code_hash()}")
         sys.exit(2)
-    audit(cache, key, idx, a.mt)
+    audit(cache, key, idx)
     audit_panel2(a.store, burnin=True)

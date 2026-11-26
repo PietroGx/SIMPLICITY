@@ -48,7 +48,6 @@ const sweepFig5Patch = () => Object.assign({}, SD_FIG5,
 const sweepOffRules = () => Object.entries(sweepFig5Patch())
   .filter(([k, v]) => settings[k] !== v).map(([k]) => k);
 
-const sdPct = v => v === 0 ? "0" : brkPct(v);
 const sdEsc = v => String(v).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
 const sdMedian = a => {
   if (!a.length) return NaN;
