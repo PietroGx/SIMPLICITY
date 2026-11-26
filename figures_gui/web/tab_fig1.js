@@ -362,16 +362,58 @@ const f1Box = (id, title, sub, key) => `<div class="f1p">
   <canvas id="f1_${id}"></canvas>${key}</div>`;
 const f1Note = (id, cap, extra = "") => `<div class="f1n"><h4>${id}</h4><div class="cap">${cap}</div>${extra}</div>`;
 
+/* Figure 1 is built on this machine, never on the cluster: it reads patient
+   data that stays here (fig1.INPUTS). Missing or stale data starts the build
+   (POST /api/rebuild/fig1, one job at a time) and the tab redraws when it ends.
+   Another job holding the lock is waited out; any other refusal is an error. */
+let f1Job = null;
+const f1Sleep = ms => new Promise(r => setTimeout(r, ms));
+async function f1Idle() {
+  for (;;) { const j = await apiGet("/api/jobs", {fresh: true});
+    if (!j.running) return j; await f1Sleep(4000); }
+}
+function f1Rebuild() {
+  if (f1Job) return f1Job;
+  f1Job = (async () => {
+    for (;;) {
+      const r = await apiPost("/api/rebuild/fig1", {});
+      if (r.started || /^Figure 1/.test(r.msg || "")) break;
+      if (!/already running/.test(r.msg || "")) throw new Error(r.error || r.msg || "the build was refused");
+      await f1Idle();
+    }
+    const j = await f1Idle(), last = (j.history || []).filter(h => /^Figure 1/.test(h.name)).pop();
+    if (!last || last.rc !== 0) throw new Error(`the Figure 1 build failed (exit ${last ? last.rc : "?"}): `
+      + (j.tail || []).slice(-3).join(" "));
+    apiInvalidate("/api/fig1");
+  })().finally(() => { f1Job = null; });
+  return f1Job;
+}
+
 async function renderFig1(main) {
-  const d = await apiGetSlot("/api/fig1");
+  let d;
+  try { d = await apiGetSlot("/api/fig1"); }
+  catch (e) {
+    if (isSuperseded(e) || !/not computed yet/.test(e.message)) throw e;
+    main.innerHTML = `<div class="note">Figure 1 has not been built for this experiment. Building it
+      here now with ${f1Code("figures_gui/fig1.py build")}, about 5 minutes; it is built on this
+      machine only, because it reads patient data that is not on the cluster.</div>`;
+    await f1Rebuild();
+    return renderFig1(main);
+  }
   f1Last = d;
   const ix = d.index || {}, ex = d.experiment || {}, src = d.sources || {};
   const A = d.A, B = d.B, C = d.C, D = d.D, E = d.E, F = d.F, S = E.series || {};
   const hiv = (d.cohort_scenario || {}).HIV;
 
-  const stale = ix.stale ? `<div class="err">Built by code that has since changed
-    (hash ${ix.code_hash}, now ${ix.current_hash}): these panels may no longer be the
-    figure. Rebuild with ${f1Code(`python figures_gui/fig1.py build --stamp ${ex.num} --store &lt;store&gt;`)}.</div>` : "";
+  const why = (ix.stale_why || []).map(w => w === "code" ? `the code changed (${ix.code_hash} → ${ix.current_hash})`
+    : "the real-world input files changed").join(" and ");
+  const stale = (ix.stale ? `<div class="note" id="f1stale">Rebuilding Figure 1 here: ${why || "it is stale"}.
+      These panels are the old build until it finishes, about 5 minutes.</div>` : "")
+    + ((ix.inputs_missing || []).length ? `<div class="err">Not on this machine:
+      ${ix.inputs_missing.map(f => f1Code("Data/RealWorldData/" + f)).join(", ")}. Without them the
+      panels that compare with patients have no patient series.</div>` : "");
+  if (ix.stale) f1Rebuild().then(() => { if (activeTabId === "fig1") renderTab(tabById("fig1")); },
+    e => { const b = document.getElementById("f1stale"); if (b) { b.className = "err"; b.textContent = e.message; } });
   const note = `<div class="note">Experiment ${f1Code(`${ex.name} #${ex.num}`)}, read back off
     ${f1Code("figures_gui/prep/fig1_save.py")}'s own axes by ${f1Code("figures_gui/fig1.py")}
     on ${ix.built || "—"} (code ${ix.code_hash || "—"}). Every number here is one the figure

@@ -162,12 +162,11 @@ def cache_cap(limit_gb):
 
 
 # ------------------------------------------------------------------ presets
-# Named combinations of the detection tabs' rules, saved from the Breakout
-# detection and Cryptic breakouts tabs. One file for every experiment: a rule
-# set is not tied to a run.
+# Named sets of the data rules, saved from the exploration tabs (presets.js).
+# One file for every experiment: a rule set is not tied to a run.
 PRESETS = os.path.join(BASE_STORE, "detection_presets.json")
-PRESET_KEYS = {"k", "mt", "originRule", "sdKernel", "sdSpace", "sdWin", "sdProm", "sdPromRef", "sdWidth", "sdCens", "sdStart",
-               "sdTrough", "sdFrac", "sdAnchor", "sdPick", "sdGate", "burnin",
+PRESET_KEYS = {"k", "mt", "originRule", "sdKernel", "sdWin", "sdProm", "sdPromRef", "sdWidth", "sdCens", "sdStart",
+               "sdTrough", "sdFrac", "sdPick", "sdGate", "burnin",
                "brkF", "brkH", "brkLo", "brkQuiet", "brkRule"}
 
 
@@ -332,7 +331,8 @@ class H(SimpleHTTPRequestHandler):
                 return self._send({"error": f"{type(exc).__name__}: {exc}"}, 400)
 
         heavy = {"/api/rebuild/clades": "clades",
-                 "/api/rebuild/transmissions": "tx"}
+                 "/api/rebuild/transmissions": "tx",
+                 "/api/rebuild/fig1": "fig1"}
         if u.path not in heavy:
             return self._send({"error": "no such endpoint"}, 404)
         if not self._local():
@@ -364,6 +364,11 @@ class H(SimpleHTTPRequestHandler):
                     "--win", str(p["win"]),
                     "--prom", str(p["prom"]), "--lo", str(p["lo"]), "--hi", str(p["hi"])]
             name = f"clade build {compute.params_key(p)} [{EXP_NAME} #{STAMP}]"
+        elif which == "fig1":
+            # here, never on the cluster: it reads patient data (fig1.INPUTS)
+            argv = [PY, "-I", os.path.join(HERE, "fig1.py"), "build", "--stamp", str(STAMP),
+                    "--exp-name", EXP_NAME, "--store", layout.root_of(STORE)]
+            name = f"Figure 1 [{EXP_NAME} #{STAMP}]"
         else:
             argv = [PY, "-I", os.path.join(ROOT, "figures_gui", "export_transmissions.py"),
                     "--exp-num", str(STAMP), "--exp-name", EXP_NAME,

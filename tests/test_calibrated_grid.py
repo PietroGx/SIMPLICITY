@@ -159,8 +159,7 @@ def cell_command(cell, stamp, args):
                '--r-cal1', str(r),
                '--r-cal2', str(r),
                '--target-osr-std', str(args.target_osr_std),
-               '--target-osr-long', str(args.target_osr_long),
-               '--no-compress']
+               '--target-osr-long', str(args.target_osr_long)]   # packing is opt-in since v2.5.27
     if args.slurm_mem:
         command += ['--slurm-mem', args.slurm_mem]
     if args.slurm_time:

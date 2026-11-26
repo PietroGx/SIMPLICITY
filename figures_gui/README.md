@@ -37,7 +37,7 @@ one means adding a file.
 
 | group | tab | file | reads |
 |---|---|---|---|
-| figures | 1 · Model | (being written) | `fig1/` (`figures_gui/fig1.py`) |
+| figures | 1 · Model | `web/tab_fig1.js` | `/api/fig1` (`fig1/`, built here by `fig1.py`) |
 | figures | 2 · Clustering | `web/tab_clades4.js` | `/api/runs`, `/api/run` |
 | figures | 3 · Transmission | `web/tab_panel2.js` | `/api/panel?n=2` (`tx/`) |
 | figures | 4 · Frequency AUC | `web/tab_panel1.js` | `/api/panel?n=1`, `n=1h` |
@@ -66,10 +66,11 @@ Data/figures/<name>_<stamp>/    one experiment (layout.py, sweep.py --print-path
     cache/<build>/              clade builds, keyed by parameters and a hash of
                                 the code that produced them
     cache/_explore/ _panels/    the exploration tabs' caches
-    runs/     55 MB             phylogeny + sparse lineage frequency, 250 runs (120 time points)
+    runs/     55 MB             phylogeny + sparse lineage frequency, 250 runs (120 time points),
+                                export_clade_explorer.py
     tx/                         per-day 2x2 transmission counts by host type, and per-day
                                 jump tables per transmitter type (export_transmissions.py)
-  fig1/                         fig1.json + index.json, Figure 1's data (fig1.py build)
+  fig1/                         fig1.json + index.json, Figure 1's data (fig1.py build), local only
   fig3/ fig4/ fig5/ cache/      each figure's panel cache (layout.MEMO_HOME)
   supplementary/S1/cache/       Figure S1's panel cache
 ```
@@ -149,42 +150,57 @@ python -I figures_gui/compute.py --out Data/figures/impact_long_shedders_1/explo
 ```
 
 `fig1.py build --stamp N --store <experiment>` writes `<experiment>/fig1/`: one
-process, ~5 min, ~1 GB.
+process, ~6 min, ~1 GB. The Figure 1 tab starts it on its own (below).
 
 Use `--procs 2`. The box has 4 cores and about 4 GB free with swap already in
 use; the exporter costs roughly `0.15 + procs x 0.9` GB.
 
-## Precompute on the HPC
+## Preparing the figure data
 
-**Staged for the next rebuild:** `pending_compute_ntx_post.patch` adds each
-clade's infections on or after the burn-in day (`ntx_post`) to the clade pass.
-Not applied yet because it changes `compute.py`'s hash and so every build's
-name. Before launching: `git apply -p1 figures_gui/pending_compute_ntx_post.patch`,
-then delete the patch. `run_precompute.sh` refuses to submit while it is unapplied.
-Figure 4's infections bar uses `ntx_post` once the builds carry it.
-
-`run_precompute.sh` runs the login-node checks, asks, then submits:
-
-| job | script | depends on | resources |
-|---|---|---|---|
-| grid array, one build a task | `slurm_precompute.sh` | -- | 1 h, 16G, 4 cpu |
-| transmission table into `tx/` | `slurm_tx.sh` | -- | 30 min, 8G, 4 cpu |
-| Figure 1 data into `fig1/` | `slurm_fig1.sh` | -- | 45 min, 4G, 1 cpu |
-| warm array, `--shard I/N` | `slurm_warm.sh` | afterany grid, tx | 1 h, 8G, 4 cpu |
-| pack | `pack_cache.sh` | afterany warm, tx, fig1 | 3 h, 16G, 8 cpu |
+One command runs every step after the simulations, on the cluster or here:
 
 ```bash
-STAMP=2 bash figures_gui/run_precompute.sh --dry-run   # print the chain, submit nothing
-STAMP=2 bash figures_gui/run_precompute.sh             # checks, ask, submit
-#   --no-fig1  --warm-shards 0  --resubmit  --limit N  --calibrate  --check-only
-python -I figures_gui/warm_panels.py --stamp 2 --shard 0/32 --list   # jobs per shard
+python -I figures_gui/prepare.py --stamp 2 --slurm [--pack] [--dry-run]    # Slurm jobs
+python -I figures_gui/prepare.py --stamp 2 --local [--procs 2] [--pack]    # here, in order
+#   --local: --only tx,runs  --skip check  --all-builds (the whole grid, ~a day on 4 cores)
+#   --slurm: anything after `--` goes to run_precompute.sh (--limit N, --resubmit, ...)
 ```
 
+A pipeline run does the same once its experiments are sealed:
+`run_impact_long_shedders_pipeline.py --prepare-figures [--pack-results]`
+(Slurm jobs under `--runner slurm`, `--local` otherwise). `--pack-results`
+packs the run's data into `Data_Export/*.tar.xz`, and with `--prepare-figures`
+also the figure data into `Data_Export/figures/`. Both are off by default.
+`scripts/launchers/run_pipeline_and_grid.sh` runs `prepare.py --slurm` as its stage 2 and
+packs both the run data and the figure data unless `--no-compress`.
+
+| step | `--local` runs | `--slurm` job | depends on |
+|---|---|---|---|
+| check | `run_precompute.sh --check-only` | the same checks, on the login node | -- |
+| tx | `export_transmissions.py` | `slurm_tx.sh` (30 min, 8G, 4 cpu) | -- |
+| runs | `export_clade_explorer.py` | `slurm_runs.sh` (1 h, 16G, 4 cpu) | -- |
+| explore | `warm_explore.py` | `slurm_explore.sh`, then its Figure 5 panel task | -- |
+| grid | `compute.py` at the operating point; `--all-builds`: `sweep.py` | `slurm_precompute.sh`, one build a task (1 h, 16G, 4 cpu) | -- |
+| warm | `warm_panels.py` | `slurm_warm.sh`, 32 shards (1 h, 8G, 4 cpu) | grid, tx, explore |
+| pack | `pack_cache.sh --here` (`--partial` unless `--all-builds`) | `pack_cache.sh` (3 h, 16G, 8 cpu) | everything, afterany |
+
+`--slurm` is `run_precompute.sh` with `--no-pack` unless `--pack`; calling it
+directly still works (`--dry-run`, `--warm-shards 0`, `--resubmit`, `--limit N`,
+`--calibrate`, `--check-only`). `--local` skips a step whose prerequisite
+failed and exits nonzero if any step failed or was skipped.
+
+**Figure 1 is not a step.** It reads patient data in `Data/RealWorldData/` that
+is not on the cluster and cannot be on git. The studio builds it here: opening
+Figure 1 with `fig1/` missing, or stale (its code or its input files changed,
+`fig1.load`), starts `fig1.py build` as a job (`POST /api/rebuild/fig1`, ~6 min,
+~1 GB) and redraws when it ends. `fig1/` is never packed (`layout.SECTIONS`),
+because it holds values derived from the patient data.
+
 The pack job (`layout.py pack`) writes `Data_Export/figures/<name>_<stamp>/`:
-one `.tar.gz` per section (exploration, fig1, fig3..fig5, supplementary), only
+one `.tar.gz` per section (exploration, fig2..fig5, supplementary), only
 builds at the current hash, split into `_partNN` files of at most 1 GB that each
 unpack on their own, plus a manifest with checksums and the extract line. A
-missing `tx/` or `fig1/` is a warning, a partial grid is a refusal (exit 3).
+missing `tx/` or `runs/` is a warning, a partial grid is a refusal (exit 3).
 The warm pass skips a memo only if its file exists, and the file name carries
 the hash of the code that computes it, so a changed panel re-warms itself.
 

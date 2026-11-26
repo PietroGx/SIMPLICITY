@@ -22,10 +22,13 @@
 #          so this process is the run. Hence tmux: a login session that dies
 #          takes the orchestrator with it, and nohup is not the answer here --
 #          it leaves no session to reattach to and no terminal to confirm in.
-# stage 2  figures_gui/run_precompute.sh --yes, with STAMP/EXP_NAME/SEEDS
-#          exported so the grid is built from THIS run. ONLY if stage 1 exited
-#          0. It submits the 384-task array plus the afterany pack job and
-#          returns without blocking.
+# stage 2  figures_gui/prepare.py --slurm --yes for THIS run's stamp and
+#          experiment: run_precompute.sh's checks, then the grid array, tx,
+#          runs, explore, warm and (unless --no-compress) the afterany pack job.
+#          ONLY if stage 1 exited 0. Returns without blocking. Figure 1 is not
+#          built on the cluster: the studio builds it locally.
+#          (The pipeline's own --prepare-figures does the same for a run started
+#          without this launcher.)
 #
 # Every check runs before anything is submitted; one failure submits nothing.
 # The two checks that also guard the grid -- the three hashed files and
@@ -39,8 +42,9 @@
 # profiles at 301 MB and is the cheapest stage in the pipeline.
 #
 # Nothing is destructive by default: the pipeline keeps each experiment's
-# slurm/ logs and still packs Data_Export. --drop-slurm-logs and --no-compress
-# are opt-in and are named on the plan line.
+# slurm/ logs and this launcher still packs Data_Export (it passes the
+# pipeline's --pack-results, and --pack to stage 2). --drop-slurm-logs and
+# --no-compress are opt-in and are named on the plan line.
 #
 # One log, Data/logs/pipeline/<name>_pipeline_and_grid_#<stamp>_<time>.log, with
 # every stage boundary timestamped. --check-only writes no log.
@@ -53,7 +57,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 PIPELINE="scripts/experiments_pipeline/run_impact_long_shedders_pipeline.py"
-PRECOMPUTE="figures_gui/run_precompute.sh"
 HASHED=(figures_gui/compute.py simplicity/clustering.py
         figures_gui/prep/clade_preprocess.py)
 
@@ -94,7 +97,7 @@ Flags (each resolved value is printed in the checks table):
   --store PATH          studio store for the grid              [<repo>/Data/figures]
   --limit N             throttle the grid array                [none]
   --log PATH            the one log                            [Data/logs/pipeline/...]
-  --no-compress         skip the pipeline's Data_Export packing
+  --no-compress         skip the Data_Export packing (run data and figure data)
   --drop-slurm-logs     let the packager DELETE each experiment's slurm/ logs
   --yes, -y             skip the confirmation prompt
   --check-only          run every check, launch nothing
@@ -319,7 +322,7 @@ note "login-node fit workers" \
 note "grid experiment" "${GRID_EXP_NAME:-?} #$STAMP, gate at $GRID_SEEDS seeds"
 note "grid store" "$STORE${LIMIT:+  (array throttled to $LIMIT)}"
 note "packing" "$([ "$NO_COMPRESS" -eq 1 ] \
-     && echo 'SKIPPED (--no-compress)' || echo 'Data_Export tar.xz (kept)')"
+     && echo 'SKIPPED (--no-compress)' || echo 'Data_Export: run tar.xz + figure tar.gz')"
 note "slurm logs" "$([ "$DROP_SLURM_LOGS" -eq 1 ] \
      && echo 'DELETED by the packager (--drop-slurm-logs)' || echo 'kept')"
 note "log" "${LOG:---check-only: none}"
@@ -330,11 +333,13 @@ STAGE1=(python "$PIPELINE" --settings "$SETTINGS" --stamp "$STAMP"
         --consensus "$CONSENSUS" --slurm-mem "$SLURM_MEM")
 if [ -n "$SLURM_MEM_CAL2" ]; then STAGE1+=(--slurm-mem-cal2 "$SLURM_MEM_CAL2"); fi
 if [ -n "$SLURM_TIME" ]; then STAGE1+=(--slurm-time "$SLURM_TIME"); fi
-if [ "$NO_COMPRESS" -eq 1 ]; then STAGE1+=(--no-compress); fi
+if [ "$NO_COMPRESS" -eq 0 ]; then STAGE1+=(--pack-results); fi
 if [ "$DROP_SLURM_LOGS" -eq 1 ]; then STAGE1+=(--drop-slurm-logs); fi
 
-STAGE2=(bash "$PRECOMPUTE" --yes)
-if [ -n "$LIMIT" ]; then STAGE2+=(--limit "$LIMIT"); fi
+STAGE2=(python -I figures_gui/prepare.py --slurm --yes --stamp "$STAMP"
+        --exp-name "$GRID_EXP_NAME" --seeds "$GRID_SEEDS" --store "$STORE")
+if [ "$NO_COMPRESS" -eq 0 ]; then STAGE2+=(--pack); fi
+if [ -n "$LIMIT" ]; then STAGE2+=(-- --limit "$LIMIT"); fi
 
 echo
 echo "  plan"
@@ -344,8 +349,8 @@ echo "             calibration sweeps at $CAL_SEEDS seeds per grid point"
 echo "    stage 2  STAMP=$STAMP EXP_NAME=$GRID_EXP_NAME SEEDS=$GRID_SEEDS" \
      "STORE=$STORE ${STAGE2[*]}"
 echo "             only if stage 1 exits 0; $WANT builds, the transmission table,"
-echo "             Figure 1, the explore warm and the afterany pack job; it gates"
-echo "             again on its own before submitting"
+echo "             the per-seed export, the explore warm and the afterany pack job;"
+echo "             it gates again on its own before submitting"
 
 echo
 if [ "$fail" -ne 0 ]; then

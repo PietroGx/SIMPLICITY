@@ -11,11 +11,11 @@
 # ============================================================================
 # pack_cache.sh -- one experiment's studio data, archived into
 # Data_Export/figures/<name>_<stamp>/: one tar.gz per section (exploration,
-# fig1, fig3..fig5, supplementary), split into parts of at most 1 GB that each
+# fig3..fig5, supplementary; never fig1, which holds patient-derived values), split into parts of at most 1 GB that each
 # unpack on their own (figures_gui/layout.py pack).
 #
 # `run_precompute.sh` submits this with --dependency=afterany on the array
-# (through the warm array) and on the tx and fig1 jobs, so
+# (through the warm array) and on the tx and runs jobs, so
 # it runs even when tasks failed and SAYS which builds are missing. It used to
 # be afterok, which cancelled this job on any failure: the only sign of a
 # broken grid was an archive that never appeared. It can also be run by hand.
@@ -173,8 +173,8 @@ fi
 # behind (layout.py migrate --prune deletes them).
 [ -f "$EXP_STORE/tx/index.json" ] \
     || echo "[pack] WARNING: no $EXP_STORE/tx -- Figures 3 and 4 will lack transmissions" >&2
-[ -f "$EXP_ROOT/fig1/fig1.json" ] && [ -f "$EXP_ROOT/fig1/index.json" ] \
-    || echo "[pack] WARNING: no $EXP_ROOT/fig1/fig1.json + index.json -- Figure 1 will be empty" >&2
+[ -n "$(ls "$EXP_STORE/runs" 2>/dev/null)" ] \
+    || echo "[pack] WARNING: no $EXP_STORE/runs -- Figure 2 and the Clustering tab will be empty" >&2
 python -I figures_gui/layout.py pack --base "$STORE" --stamp "$STAMP" --exp-name "$EXP_NAME" \
     --note "builds=$HAVE of $WANT finished (sweep.py done(), not a directory count)" \
     --note "panels=$WARMED" \

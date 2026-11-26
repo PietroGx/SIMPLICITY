@@ -8,12 +8,13 @@
 #   1. the array, one task per build (figures_gui/slurm_precompute.sh)
 #   2. the transmission table panel 2 reads, alongside 1 -- it needs only the
 #      run output (figures_gui/slurm_tx.sh)
-#   2b. the Figure 1 data, alongside 1 -- raw run output and real-world data
-#      only (figures_gui/slurm_fig1.sh); --no-fig1 skips it
+#   2b. the per-seed export runs/, alongside 1 (figures_gui/slurm_runs.sh).
+#      Figure 1 is not built here: it reads patient data that is not on the
+#      cluster, and the studio builds it locally when its tab is opened
 #   3. the warm array, WARM_SHARDS tasks (default 32, --warm-shards N) that
 #      memoise every panel answer, afterany on 1 and 2
 #      (figures_gui/slurm_warm.sh)
-#   4. a pack job, afterany on 3 and 2b, which archives the experiment into
+#   4. a pack job, afterany on 3 and 2b (--no-pack: none), which archives the experiment into
 #      Data_Export/figures/<exp>/ (figures_gui/pack_cache.sh, layout.py pack). Its own warm pass then
 #      reads from disk and computes only what a failed shard left.
 #      --warm-shards 0 skips 3 and leaves the warming to the pack job alone.
@@ -38,7 +39,7 @@
 #     bash figures_gui/run_precompute.sh --calibrate      # time ONE build, then stop
 #     bash figures_gui/run_precompute.sh --resubmit        # only unfinished builds
 #     bash figures_gui/run_precompute.sh --warm-shards 32  # warm on 32 tasks
-#     bash figures_gui/run_precompute.sh --no-fig1        # no Figure 1 job
+#     bash figures_gui/run_precompute.sh --no-pack        # no pack job
 #     bash figures_gui/run_precompute.sh --dry-run        # print the sbatch chain
 #     STAMP=3 bash figures_gui/run_precompute.sh         # another experiment
 #
@@ -94,7 +95,7 @@ EXP_NAME="${EXP_NAME:-}"
 SEEDS="${SEEDS:-50}"
 STORE="${STORE:-$ROOT/Data/figures}"
 WARM_SHARDS="${WARM_SHARDS:-32}"
-FIG1=1
+PACK=1
 DRY_RUN=0
 
 while [ $# -gt 0 ]; do
@@ -110,7 +111,8 @@ while [ $# -gt 0 ]; do
         --exp-name)   EXP_NAME="$2"; shift ;;
         --seeds)      SEEDS="$2"; shift ;;
         --warm-shards) WARM_SHARDS="$2"; shift ;;
-        --no-fig1)    FIG1=0 ;;
+        --no-fig1)    ;;   # Figure 1 left this chain in v2.5.27
+        --no-pack)    PACK=0 ;;
         --dry-run)    DRY_RUN=1; YES=1 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
@@ -291,22 +293,6 @@ else
     COST=$(awk -v t="$TODO" -v r="$RATE_MIN" 'BEGIN {printf "%.0f", t*r/60}')
     note "rough cost" "${COST}h of task time, about $(( TODO * 8 / 1000 )).$(( TODO * 8 % 1000 / 100 )) GB"
 fi
-# --- Figure 1 -------------------------------------------------------------
-if [ "$FIG1" -eq 0 ]; then
-    note "Figure 1 (slurm_fig1.sh)" "skipped, --no-fig1"
-elif [ ! -f figures_gui/fig1.py ]; then
-    bad "Figure 1 (slurm_fig1.sh)" "figures_gui/fig1.py MISSING -- or --no-fig1"
-elif ! git ls-files --error-unmatch figures_gui/fig1.py >/dev/null 2>&1; then
-    note "Figure 1 (slurm_fig1.sh)" "fig1.py UNTRACKED -- a pull will not bring it"
-else
-    note "Figure 1 (slurm_fig1.sh)" "-> $EXP_ROOT/fig1"
-    # patient_global_clock.csv is gitignored, so a pull never brings it: without it
-    # fig1.py only warns and D and E lose their patient series (v2.5.19's archive)
-    for f in literature_long_shedders_data.csv patient_global_clock.csv patient_intrahost_clock.csv; do
-        [ -f "Data/RealWorldData/$f" ] || bad "Figure 1 patient data" \
-            "Data/RealWorldData/$f MISSING -- copy it over, or --no-fig1"
-    done
-fi
 note "archive afterwards" "Data_Export/figures/$EXP_REL/, one tar.gz per section, parts of <= 1 GB"
 
 echo
@@ -368,7 +354,7 @@ if [ "$RESUBMIT" -eq 1 ]; then
     [ -n "$cur" ] && SPECS+=("$cur")
     echo
     if [ "${#SPECS[@]}" -eq 0 ]; then
-        echo "  --resubmit: nothing is missing. Submitting tx, Figure 1, warm and pack only."
+        echo "  --resubmit: nothing is missing. Submitting tx, runs, explore, warm and pack only."
     else
         echo "  --resubmit: $TODO missing index(es) in ${#SPECS[@]} array(s)" \
              "of at most $CHUNK"
@@ -385,11 +371,11 @@ else
     SPECS=("0-$(( WANT - 1 ))")
 fi
 
-F1TXT=""
-[ "$FIG1" -eq 1 ] && F1TXT=", the Figure 1 data"
+PKTXT=" and the packing job"
+[ "$PACK" -eq 1 ] || PKTXT=", no packing (--no-pack)"
 if [ "$YES" -ne 1 ]; then
     echo
-    read -r -p "Submit ${#SPECS[@]} array job(s) covering $TODO builds, the transmission table$F1TXT, $WARM_SHARDS warm task(s) and the packing job? [y/N] " reply
+    read -r -p "Submit ${#SPECS[@]} array job(s) covering $TODO builds, the transmission table, the per-seed export, $WARM_SHARDS warm task(s)$PKTXT? [y/N] " reply
     case "$reply" in
         y|Y|yes|YES) ;;
         *) echo "  Nothing submitted."; exit 0 ;;
@@ -442,16 +428,8 @@ EXJ=$(sub explore figures_gui/slurm_explore.sh)
 EXPJ=$(sub explore_panel --dependency="afterany:$EXJ" --array=0-0 figures_gui/slurm_explore.sh)
 echo "  explore    $EXJ / $EXPJ   (detection inputs, then the Figure 5 panel)"
 JOBS+=("$EXPJ")
-FIG1J=""
-if [ "$FIG1" -eq 1 ]; then
-    # not fatal: a refused submission must not leave the grid without a pack job
-    if FIG1J=$(sub fig1 figures_gui/slurm_fig1.sh); then
-        echo "  fig1       $FIG1J   (Figure 1 data, alongside the grid)"
-    else
-        FIG1J=""
-        echo "  fig1       NOT SUBMITTED -- the archive will lack fig1/" >&2
-    fi
-fi
+RUNSJ=$(sub runs figures_gui/slurm_runs.sh)
+echo "  runs       $RUNSJ   (per-seed export for Figure 2 and the Clustering tab)"
 DEP="afterany:$(IFS=:; echo "${JOBS[*]}")"
 WARMJ=""
 if [ "$WARM_SHARDS" -gt 0 ]; then
@@ -461,16 +439,18 @@ if [ "$WARM_SHARDS" -gt 0 ]; then
     DEP="afterany:$WARMJ:$TXJ"
     JOBS+=("$WARMJ")
 fi
-[ -n "$FIG1J" ] && { DEP="$DEP:$FIG1J"; JOBS+=("$FIG1J"); }
-PACK=$(sub pack --dependency="$DEP" figures_gui/pack_cache.sh)
-echo "  pack       $PACK  (afterany: runs even if tasks fail, and says which)"
+DEP="$DEP:$RUNSJ"; JOBS+=("$RUNSJ")
+PACKJ=""
+if [ "$PACK" -eq 1 ]; then
+    PACKJ=$(sub pack --dependency="$DEP" figures_gui/pack_cache.sh)
+    echo "  pack       $PACKJ  (afterany: runs even if tasks fail, and says which)"
+fi
 echo
 if [ "$DRY_RUN" -eq 1 ]; then
     echo "  --dry-run: nothing submitted."
     exit 0
 fi
-WATCH="$PACK"
-[ "${#JOBS[@]}" -gt 0 ] && WATCH="$(IFS=,; echo "${JOBS[*]}"),$PACK"
+WATCH="$(IFS=,; echo "${JOBS[*]}")${PACKJ:+,$PACKJ}"
 echo "  watch:     squeue -j $WATCH"
 echo "  logs:      Data/logs/precompute/"
 echo "  failures:  Data/logs/precompute/failed/<IDX>.txt"

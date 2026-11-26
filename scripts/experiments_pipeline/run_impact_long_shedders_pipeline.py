@@ -332,6 +332,27 @@ def write_artifacts_archive(archive_path, stamp, log_file, consensus_modes):
                 print(f"  [skip] artifact not found: {path}")
 
 
+def prepare_figures(stamp, log_fh, consensus_modes, runner, seeds, pack):
+    """figures_gui/prepare.py for each consensus mode's experiment, now that
+    the experiments are sealed: Slurm jobs under --runner slurm (it returns once
+    they are submitted), the same steps here otherwise. pack adds the figure
+    archive to Data_Export/figures/. A failure is reported with the command to
+    rerun, not raised: the run's data is complete either way."""
+    script = os.path.join(SCRIPT_DIR, os.pardir, os.pardir, "figures_gui", "prepare.py")
+    for mode in consensus_modes:
+        cmd = [sys.executable, "-I", os.path.abspath(script), "--stamp", str(stamp),
+               "--exp-name", exp_name(mode), "--seeds", str(seeds)]
+        cmd += ["--slurm", "--yes"] if runner == "slurm" else ["--local"]
+        cmd += ["--pack"] if pack else []
+        _log(log_fh, f"\n$ {' '.join(cmd)}")
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        for line in result.stdout.splitlines():
+            _log(log_fh, line)
+        if result.returncode != 0:
+            _log(log_fh, f"[warn] figure preparation exited {result.returncode}; "
+                         f"the run itself is unaffected. Rerun with:\n  {' '.join(cmd)}")
+
+
 def compress_results(stamp, log_fh, consensus, keep_slurm_logs=True):
     """Pack everything this run produced into Data_Export/*.tar.xz.
 
@@ -411,10 +432,16 @@ def main():
     parser.add_argument('--ih-virus-emergence-rate', type=float,
                         default=USER_FIXED_PARAMS['IH_virus_emergence_rate'])
     parser.add_argument('--log-file', type=str, default=None)
-    parser.add_argument('--no-compress', action='store_true',
-                        help="Skip the final packaging step. By default the "
-                            "run's Data/*_#<stamp> directories are packed "
-                            "into Data_Export/*.tar.xz by a Slurm job.")
+    parser.add_argument('--prepare-figures', action='store_true',
+                        help="Once the experiments are sealed, run every figure "
+                            "preprocessing step (figures_gui/prepare.py): Slurm "
+                            "jobs under --runner slurm, here otherwise. Figure 1 "
+                            "is not among them; the studio builds it locally.")
+    parser.add_argument('--pack-results', action='store_true',
+                        help="Pack the run's Data/*_#<stamp> directories into "
+                            "Data_Export/*.tar.xz (a Slurm job); with "
+                            "--prepare-figures, also the figure files into "
+                            "Data_Export/figures/. Off by default since v2.5.27.")
     parser.add_argument('--drop-slurm-logs', action='store_true',
                         help="Let the packager delete each experiment's slurm/ "
                             "directory (its old behaviour). They are kept by "
@@ -568,9 +595,12 @@ def main():
             summary_lines += [f"  - {f}" for f in HEALTH_REPORT_FAILURES]
         summary_lines.append(f"Full log: {log_file}")
         summary_lines.append(f"Artifacts archive: {archive_path}")
-        if not args.no_compress:
+        if args.pack_results:
             summary_lines.append("Full results    : Data_Export/*.tar.xz "
                                  "(packing job submitted below)")
+        if args.prepare_figures:
+            summary_lines.append("Figure data     : Data/figures/ (prepared below)"
+                                 + (", packed into Data_Export/figures/" if args.pack_results else ""))
 
         for line in summary_lines:
             _log(log_fh, line)
@@ -578,7 +608,12 @@ def main():
         write_artifacts_archive(archive_path, args.stamp, log_file,
                                 args.consensus)
 
-        if not args.no_compress:
+        if args.prepare_figures:
+            _log(log_fh, "\n===== Preparing the figure data =====")
+            prepare_figures(args.stamp, log_fh, args.consensus, args.runner,
+                            args.exp_seeds, args.pack_results)
+
+        if args.pack_results:
             _log(log_fh, "\n===== Packing results for download =====")
             compress_results(args.stamp, log_fh, consensus,
                              keep_slurm_logs=not args.drop_slurm_logs)

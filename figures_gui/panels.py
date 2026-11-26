@@ -346,10 +346,11 @@ def panel1_hosts(store, p, burnin):
     origin, per run, then bootstrapped over runs. Origin is x = nlong/ndef:
     founding (no definers), standard (x = 0), mostly_std (0 < x <= 1/2),
     mostly_long (1/2 < x < 1), only_long (x = 1). Hosts are n_long / n_infected from the transmission table.
-    Infections split the same way by `ntx` -- every infection, seeded ones
-    included, carrying one of the clade's lineages -- or by `ntx_post`, those
-    on or after the burn-in day, when the build has it (pending patch) and the
-    burn-in is excluded."""
+    Infections split the same way by `ntx` -- every transmission event carrying
+    one of the clade's lineages, the seeded infections excluded since v2.5.24
+    (clustering.transmitted_lineages) -- or by `ntx_post`, those on or after
+    the burn-in day, when the build has it (pending patch) and the burn-in is
+    excluded."""
     idx, data = _load_builds(store, p)
     bkey = "burden" if burnin else "burden_all"
     tx = os.path.join(store, "tx")

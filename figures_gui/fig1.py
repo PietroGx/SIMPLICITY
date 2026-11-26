@@ -10,9 +10,11 @@ fig1_plots._through_origin only to keep full precision, and the build stops if
 they differ from the lines and annotations the pipeline drew.
 
 Writes <store>/fig1/fig1.json and <store>/fig1/index.json; `load(store)` reads
-them for /api/fig1.
+them for /api/fig1, stale when the code or the real-world inputs differ from
+the build's. Built locally only: the inputs include patient data that is not on
+the cluster, and fig1/ is never packed (layout.SECTIONS).
 """
-import argparse, contextlib, io, json, os, sys, time
+import argparse, contextlib, hashlib, io, json, os, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -24,6 +26,22 @@ SOURCES = [os.path.abspath(__file__)] + [os.path.join(NP, f) for f in (
     "fig1_save.py", "fig1_preprocess_data.py", "fig1_plots.py", "_scenarios.py")] + [
     os.path.join(ROOT, "simplicity", "tuning", "evolutionary_rate.py")]
 REAL = "Data/RealWorldData/"
+INPUTS = ("literature_long_shedders_data.csv", "patient_global_clock.csv",
+          "patient_intrahost_clock.csv")
+
+
+def inputs_sig():
+    """{file: sha256 prefix, or None when absent}: a build without the patient
+    files quietly loses D's and E's patient series, so the build records them."""
+    out = {}
+    for f in INPUTS:
+        p = os.path.join(ROOT, REAL, f)
+        try:
+            with open(p, "rb") as fh:
+                out[f] = hashlib.sha256(fh.read()).hexdigest()[:16]
+        except OSError:
+            out[f] = None
+    return out
 
 
 def code_hash():
@@ -45,8 +63,11 @@ def load(store):
         out = json.load(fh)
     with open(ij) as fh:
         ix = json.load(fh)
-    now = code_hash()
-    out["index"] = dict(ix, current_hash=now, stale=ix.get("code_hash") != now)
+    now, sig = code_hash(), inputs_sig()
+    why = (["code"] if ix.get("code_hash") != now else []) + \
+          (["inputs"] if ix.get("inputs") != sig else [])
+    out["index"] = dict(ix, current_hash=now, stale=bool(why), stale_why=why,
+                        inputs_missing=[f for f, v in sig.items() if v is None])
     return out
 
 
@@ -319,7 +340,7 @@ def build(stamp, exp_name, store):
     with open(os.path.join(d, "fig1.json.tmp"), "w") as fh:
         fh.write(body)
     os.replace(os.path.join(d, "fig1.json.tmp"), os.path.join(d, "fig1.json"))
-    ix = dict(code_hash=code_hash(), built=time.strftime("%Y-%m-%dT%H:%M:%S"),
+    ix = dict(code_hash=code_hash(), inputs=inputs_sig(), built=time.strftime("%Y-%m-%dT%H:%M:%S"),
               stamp=stamp, exp_name=exp_name, bytes=len(body),
               secs=round(time.time() - t0, 1), sources=[os.path.relpath(p, ROOT) for p in SOURCES])
     with open(os.path.join(d, "index.json"), "w") as fh:

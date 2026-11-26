@@ -24,9 +24,14 @@ async function presetsPost(name, values) {
   dataPresets = d;
 }
 const presetNow = () => Object.fromEntries(DATA_PRESET_KEYS.map(k => [k, settings[k]]));
+/* A set saved before a rule existed was measured under what the code did then,
+   not under today's default: before v2.5.22 the prominence bar was a share of
+   the clade maximum and rule 1 was the only cryptic rule. */
+const PRESET_LEGACY = {sdPromRef: "clade", brkRule: "launch"};
+const presetOf = n => dataPresets && dataPresets[n] ? Object.assign({}, PRESET_LEGACY, dataPresets[n]) : null;
 /* a set saved before it held every key matches on the keys it has */
 const presetMatch = () => Object.keys(dataPresets || {}).find(n => {
-  const p = dataPresets[n], ks = DATA_PRESET_KEYS.filter(k => k in p);
+  const p = presetOf(n), ks = DATA_PRESET_KEYS.filter(k => k in p);
   return ks.length && ks.every(k => String(p[k]) === String(settings[k]));
 });
 /* The saved set the settings in force started from: the one they match, else
@@ -60,7 +65,7 @@ function presetWire(P, rerender) {
   const fail = e => alert(`Could not save: ${e.message}`);
   if (el("pload")) el("pload").onchange = ev => {
     const n = ev.target.value;
-    if (n && dataPresets[n]) { presetRemember(n); presetApply(dataPresets[n]); }
+    if (n && dataPresets[n]) { presetRemember(n); presetApply(presetOf(n)); }
   };
   if (el("psave")) el("psave").onclick = () => {
     const n = (prompt("Save these data settings as:", presetMatch() || "") || "").trim();

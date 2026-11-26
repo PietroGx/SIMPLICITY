@@ -27,8 +27,8 @@ let sweepMuller = null;
 
    These tabs' settings are their own (sd*), never the build parameters
    win/prom/lo: dragging the window to 45 days here must not point every other
-   tab at a build that does not exist. SD_FIG5 is what Figure 5 measured with;
-   at those values explore.py IS the build's measurement. */
+   tab at a build that does not exist. SD_FIG5 is what Figure 5 measures with, not
+   the build's rules: exploreQuery sends gate=start, dip=low; the build is trunc, any (explore.py FIG5). */
 const SD_WIN = [1, 2, 3, 5, 7, 10, 15, 21, 30, 45, 60, 90, 120, 180];
 const SD_PROM = [0, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7, 0.9];
 const SD_TROUGH = [0, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5];
@@ -595,7 +595,7 @@ async function renderCryScen(main, mode = "crystats") {
   /* off a saved set, the same measurement under it, to mark what moved */
   const refName = presetRef(), live = refName && refName !== presetMatch();
   const [cur, ref] = await Promise.all([swCryMeasure(null),
-    live ? swCryMeasure(dataPresets[refName]).catch(() => null) : null]);
+    live ? swCryMeasure(presetOf(refName)).catch(() => null) : null]);
   if (tok !== swCryTok) return;
   const {C, scs, T, terr} = cur;
   const R = ref && ref.T ? ref : null;

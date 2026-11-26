@@ -46,7 +46,7 @@ const SETTING_DEFAULTS = {
   brkF: 0.05, brkH: 60, brkLo: 0.01, brkQuiet: 1, brkRule: "launch",
   // the detection tabs' rules, their own so exploring cannot move a build
   // parameter; tab_sweep.js SD_FIG5 says which values are Figure 5's
-  sdKernel: "box", sdWin: 15, sdSpace: "lin", sdProm: 0.10, sdPromRef: "peak",
+  sdKernel: "box", sdWin: 15, sdProm: 0.10, sdPromRef: "peak",
   sdWidth: 0, sdCens: 1, sdStart: "trough", sdTrough: 0.0001,
   sdFrac: 0.1, sdPick: "first", sdGate: "start",
   // the detection tabs' views: which cells, every episode drawn (tab_sweep.js)

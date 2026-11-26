@@ -7,7 +7,7 @@
             cache/_panels/      the exploration tabs' panel cache (across, daily, episodes)
             tx/                 the transmission table (export_transmissions.py)
             runs/               the per-seed export behind the Muller plots
-        fig1/                   Figure 1 (fig1.py)
+        fig1/                   Figure 1 (fig1.py), built locally, never packed
         fig3/ fig4/ fig5/       cache/: that figure's panel cache
         supplementary/S1/       cache/: Figure S1's panel cache
 
@@ -25,7 +25,9 @@ ROOT = os.path.dirname(HERE)
 BASE = os.path.join(ROOT, "Data", "figures")
 EXPORT = os.path.join(ROOT, "Data_Export", "figures")
 EXPLORATION = "exploration"
-SECTIONS = (EXPLORATION, "fig1", "fig2", "fig3", "fig4", "fig5", "supplementary")
+# what pack archives. Not fig1/: it holds values derived from patient data that
+# may not leave this machine, and the studio builds it locally (fig1.py)
+SECTIONS = (EXPLORATION, "fig2", "fig3", "fig4", "fig5", "supplementary")
 # panel-cache tag -> the figure it serves; tags not listed serve the exploration tabs
 MEMO_HOME = {"p1": "fig4", "p1c": "fig4", "p1h": "fig4", "d1": "fig4",
              "p2": "fig3", "d2": "fig3",

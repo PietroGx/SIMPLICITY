@@ -5,6 +5,105 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.27 — 2026-11-26 — pietro gerletti
+
+One command prepares the figure data, on the cluster or here
+-------------------------------------------------------------
+
+New `figures_gui/prepare.py` runs every step between the simulations and the
+studio: `--slurm` hands the chain to `run_precompute.sh` (its login-node
+checks, then the grid array, tx, runs, explore, warm and, with `--pack`, the
+pack job, linked by afterany); `--local` runs the same scripts here in order,
+each on `--procs` cores (check, tx, runs, explore, grid, warm, pack). Locally
+the grid is the operating point only (`compute.DEFAULTS`); `--all-builds`
+builds all 168, about a day on 4 cores. A step whose prerequisite failed is
+skipped, and the exit code says so. `--only`/`--skip` pick steps.
+
+`run_precompute.sh` gains the per-seed export as a job (new `slurm_runs.sh`,
+which nothing on the cluster wrote before, so an HPC store had no `runs/`) and
+`--no-pack`. `pack_cache.sh` waits on it and warns about a missing `runs/`.
+
+The pipeline: --prepare-figures and --pack-results
+--------------------------------------------------
+
+`run_impact_long_shedders_pipeline.py` takes `--prepare-figures`: once the
+experiments are sealed it runs `prepare.py` for each consensus mode's
+experiment, `--slurm --yes` under `--runner slurm` (it returns once the jobs
+are submitted), `--local` otherwise. A failure is logged with the command to
+rerun and does not fail the run. `--pack-results` packs the run's data into
+`Data_Export/*.tar.xz` as before, and with `--prepare-figures` adds `--pack`,
+so the figure data lands in `Data_Export/figures/` too. **Packing is now
+opt-in**: `--no-compress` is gone, and a run without `--pack-results` packs
+nothing. `scripts/launchers/run_pipeline_and_grid.sh` keeps its interface:
+stage 1 gets `--pack-results` unless `--no-compress`, and stage 2 is
+`prepare.py --slurm --yes` (with `--pack` unless `--no-compress`) instead of
+`run_precompute.sh`. `tests/test_calibrated_grid.py` no longer passes
+`--no-compress`. Checked by running the runner's `main()` with every dispatch
+stubbed: no flag calls nothing, `--pack-results` packs, `--prepare-figures`
+calls `prepare.py --slurm --yes` (`--local` under `--runner multiprocessing`),
+both together add `--pack` and pack, and `--no-compress` is refused.
+
+Figure 1 is built here, never on the cluster
+--------------------------------------------
+
+Figure 1 reads `Data/RealWorldData/patient_global_clock.csv`, which is not
+public, is gitignored and is not on the cluster. Without it `fig1.py` only
+warned and panels D and E lost their patient series, and `run_precompute.sh`'s
+Figure 1 check refused to submit anything while it was missing -- so on the
+cluster the figure chain never started. Figure 1 has left the chain:
+`slurm_fig1.sh` is deleted, `run_precompute.sh` neither builds nor checks it
+(`--no-fig1` is accepted and ignored), and `layout.SECTIONS` no longer packs
+`fig1/`, which holds values derived from that file.
+
+`fig1.py build` records a fingerprint of its three input files
+(`fig1.inputs_sig`), and `fig1.load` marks the data stale when the code or the
+inputs differ from the build's (`stale_why`), listing any input missing here
+(`inputs_missing`). The server runs `fig1.py build` as a job
+(`POST /api/rebuild/fig1`, one job at a time, loopback only), and the Figure 1
+tab starts it on its own when `fig1/` is missing or stale, showing the old
+panels with a note meanwhile, and redraws when it ends (`tab_fig1.js`
+`f1Rebuild`). Checked against a server on this box: the build ran 366 s, exit
+0; a second request while it ran was refused as already running; the data was
+then fresh with all three inputs fingerprinted. `check_app.js` lets exactly
+that one POST through to a stub, never to the server, and asserts it happens
+only when Figure 1 is stale.
+
+The per-seed export counts transmissions as the build does
+----------------------------------------------------------
+
+`tests/export_clade_explorer.py` moves to `figures_gui/` (the studio reads
+what it writes, and nothing in `tests/` may be on a read path). Its per-lineage
+`hosts`, from which the browser applies the m_T floor (`rundata.js`), counted
+every host's `inherited_lineage`, the 90 seeded infections included, so after
+v2.5.24 the browser's floor sat 0.9 transmissions above the build's and 3 of
+680 clades differed (HIV_high seed_0006, 10 seeds per scenario, k = 7,
+m_T = 1%). It now reads `clustering.transmitted_lineages`. Checked on that
+seed: the hosts sum to 21,220, `transmission_total`, where the old export
+summed to 21,310. **Re-export `runs/`** (`prepare.py ... --only runs`): done
+locally for experiment #2 (250 files, 10.9 min through `prepare.py --local`).
+
+Also
+----
+
+* Saved data-settings sets made before a rule existed load under what the
+  code did then, not under today's default: a set without `sdPromRef` is the
+  clade maximum, one without `brkRule` is rule 1 (`presets.js`
+  `PRESET_LEGACY`). "Preset 1" had matched under either prominence reference.
+* The Method tab: about 45 file:line references repointed to the code they
+  describe; rule B's T counts exclude seeded infections; Figure 5's removed
+  controls (hidden-time start, colour modes, whisker) are gone from its text;
+  "run" reads "simulation" where it means one. `tab_sweep.js`'s comment no
+  longer claims Figure 5's rules are the build's.
+* `server.py` `PRESET_KEYS` drops `sdSpace` and `sdAnchor`; `settings.js`
+  drops `sdSpace`. `panels.panel1_hosts`'s docstring no longer says seeded
+  infections are counted (the code hash ignores docstrings: unchanged).
+* `figures_gui/README.md` describes `prepare.py`, the flags and Figure 1's local
+  build; the note about `pending_compute_ntx_post.patch`, applied in v2.5.19,
+  is gone. `BACKLOG.md`: `archive_paper_runs.sh` would ship the patient file
+  and every `fig1/`.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.26 — 2026-11-26 — pietro gerletti
 
 BACKLOG.md is tracked

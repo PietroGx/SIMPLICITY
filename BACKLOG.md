@@ -11,7 +11,14 @@ it invalidates output produced before it.
 
 ## Bugs
 
-None open.
+- **`scripts/archive_paper_runs.sh` ships the patient data.** Line 79 copies
+  all of `Data/RealWorldData` into its archive, which on a machine that holds
+  `patient_global_clock.csv` (non-public, gitignored) would put it in a file
+  meant to be shared. Line 78 collects all of `Data/figures`, which includes
+  each experiment's `fig1/` (values derived from that file). Exclude the
+  gitignored `patient_global_clock.csv` and every `fig1/`, or collect only
+  tracked inputs. The script also still uses the pre-stamp bound/unbound
+  numbering.
 
 ------------------------------------------------------------------------
 
@@ -21,12 +28,14 @@ None open.
   v2.5.20 (the move to `figures_gui/`), v2.5.24 (`mt_seeded_fix`: seeded
   infections are not transmissions) and v2.5.25 (`prom_peak_fix`: the
   prominence bar is a fraction of each peak's own height) all change the build
-  hash, so no build on disk is readable. Rerun `figures_gui/run_precompute.sh`
-  for experiment 2 and pack with the warm pass (`pack_cache.sh`). Then run
+  hash, so no build on disk is readable. On the HPC:
+  `python -I figures_gui/prepare.py --stamp 2 --slurm --pack`, which also
+  re-exports `runs/` (v2.5.27: its host counts no longer include the 90
+  seeded infections, so the browser's clades match the build's). Then run
   `figures_gui/check_explore.py`, `figures_gui/test_censored_episodes.py --real`
   and `check_app.js` against the studio. **Recalibration required** for every
-  figure-2 number taken from a build before v2.5.25. Figure 1's build is stale
-  too (v2.5.22 changed `fig1.py` and `prep/fig1_plots.py`).
+  figure-2 number taken from a build before v2.5.25. Figure 1 rebuilds itself
+  locally when its tab is opened (v2.5.27).
 
 - **`check_completed_simulations` counts a seed valid whose end time is
   unknown.** `check_seeded_simulation_output` tests `os.path.isfile` only, so a
@@ -49,7 +58,8 @@ None open.
   does.
 
 - **Label the composition shares as shares of NON-founding clades when the
-  figures are regenerated.** `tests/export_fig2_builder.py:208` keeps only
+  figures are regenerated.** `tests/export_fig2_builder.py:208` (deleted in
+  v2.5.20; find where the studio applies the same exclusion) keeps only
   clades with a parent and `n_defining > 0`, which excludes exactly the
   founding clade. The exclusion is intended, the labelling was not: the
   figures reported 2026-10-31 (edge_case 33.7 / 17.7 / 26.9 / 21.7) are

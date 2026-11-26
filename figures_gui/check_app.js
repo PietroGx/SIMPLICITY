@@ -43,9 +43,15 @@ function httpGet(url) {
 }
 
 /* Every fetch the app makes, in order, so a repeat is visible. */
-let fetchLog = [];
+let fetchLog = [], postLog = [];
 global.fetch = async (u, opt) => {
   const url = String(u);
+  /* one exception: Figure 1 starts its own local build when stale or missing
+     (tab_fig1.js f1Rebuild). Answered here, never sent: no check builds it. */
+  if (opt && opt.method === "POST" && url === "/api/rebuild/fig1") {
+    postLog.push(url);
+    return {ok: false, status: 409, async json() { return {started: false, msg: "check_app does not build"}; }};
+  }
   if (opt && opt.method === "POST") throw new Error("a render must not POST");
   fetchLog.push(url);
   const r = await httpGet(url.startsWith("http") ? url : BASE + (url.startsWith("/") ? "" : "/") + url);
@@ -208,6 +214,10 @@ async function main() {
       ck(fetchLog.length === 0, `${label}: revisiting fetched nothing`);
     }
   }
+
+  const f1Stale = !!(peek("f1Last") && peek("f1Last").index && peek("f1Last").index.stale);
+  ck(postLog.length === (f1Stale ? 1 : 0),
+     `Figure 1 asks for its local build only when stale: ${postLog.length} POST(s), stale=${f1Stale}`);
 
   // every endpoint the app uses must have a pending label to show
   const labelled = Object.keys(peek("API_LABELS") || {});

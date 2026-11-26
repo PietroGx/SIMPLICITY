@@ -19,7 +19,7 @@ make net divergence non-monotone.
 Frequencies are downsampled in time and quantised to uint16; they feed a
 stacked area plot, nothing numerical.
 
-  python tests/export_clade_explorer.py --stamp 1 --out <dir>
+  python -I figures_gui/export_clade_explorer.py --stamp 1 --out <store>/runs
 """
 import os
 import sys
@@ -96,10 +96,11 @@ def _export_seed(job):
     # ---- infections attributable to each lineage --------------------------
     # Clade size in lineages counts intra-host diversification; long shedders
     # produce that by construction. The epidemiological size is how many
-    # individuals carry the clade, so ship it alongside.
+    # individuals carry the clade, so ship it alongside. Transmission events
+    # only, as the build counts them: the seeded hosts had no transmitter.
     try:
         ind = om.read_individuals_data(ssod)
-        per = ind["inherited_lineage"].value_counts()
+        per = cl.transmitted_lineages(ind).value_counts()
         hosts = np.array([int(per.get(m, 0)) for m in names], np.uint32)
     except Exception as exc:
         return tag, 0, f"individuals_data failed: {exc}"
