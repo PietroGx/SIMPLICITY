@@ -68,7 +68,10 @@ CENSOR_TOL = 1e-9    # relative; "at the maximum" for a censored peak, see episo
 
 
 def episodes_of(ys, prom):
-    """(peak height, [(start index, peak index, censored)]). An episode's start
+    """(peak height, [(start index, peak index, censored)]). A peak counts when
+    its prominence is at least `prom` times ITS OWN height, not the clade's
+    maximum: against the maximum, a peak at 32% under one at 64% needed all of
+    its height, so no earlier, smaller peak could count. An episode's start
     is the local minimum DIRECTLY before its peak -- not the prominence base,
     which tunnels left to the start of the record on most clades.
 
@@ -113,8 +116,8 @@ def episodes_of(ys, prom):
     h = float(np.max(ys)) if n else 0.0
     if not (h > 0):
         return 0.0, []
-    pk, _ = find_peaks(ys, prominence=prom * h)
-    peaks = [(int(i), False) for i in pk]
+    pk, props = find_peaks(ys, prominence=0.0)
+    peaks = [(int(i), False) for i in pk[props["prominences"] >= prom * ys[pk]]]
     m = int(np.argmax(ys >= h * (1 - CENSOR_TOL)))
     if (m < n - 1 and h - ys[:m + 1].min() >= prom * h
             and h - ys[m:].min() < prom * h):
