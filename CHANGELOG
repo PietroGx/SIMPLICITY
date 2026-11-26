@@ -5,6 +5,25 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.26 — 2026-11-26 — pietro gerletti
+
+BACKLOG.md is tracked
+---------------------
+
+`BACKLOG.md` leaves `.gitignore` and is committed, so open work travels with
+the code. `GLOSSARY.md`, `CLAUDE.md` and the other agent notes stay ignored.
+
+The backlog is brought up to date: the three technical-debt items done since
+(Stage 8, v2.4.94; the code version a run records, v2.5.23; the reservoir stop
+in the config grid, v2.5.23) and the two to-dos already fixed in the code
+(`om.save_final_time` writes beside the file and renames, v2.5.12;
+`om.read_lineage_frequency` turns `EOFError` into `TruncatedOutputError`) are
+removed. The studio rebuild item names the current build hash, `6e55b23492c7`,
+and the four versions that moved it. GLOSSARY.md's "prominence" no longer
+says the build waits for `prom_peak_fix`.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.25 — 2026-11-26 — pietro gerletti
 
 Merges branch `prom_peak_fix`.

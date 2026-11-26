@@ -34,12 +34,11 @@ Data/RealWorldData/data_fig1_D.csv
 Data_Export/
 
 # Working notes for agents, not part of the published project. The repo is
-# public; these are internal and change constantly. CHANGELOG and README.md
-# are the only docs that belong to it.
+# public; these are internal and change constantly. CHANGELOG, README.md and
+# BACKLOG.md are the docs that belong to it.
 GLOSSARY.md
 CLAUDE.md
 DECISIONS.md
-BACKLOG.md
 RUNS.md
 UPSTREAM_TODO.md
 tests/HPC_7C_VALIDATION.md
