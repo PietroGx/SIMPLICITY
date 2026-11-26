@@ -64,8 +64,8 @@ GATES = ("trunc", "start")
 # dip at least the prominence bar below the peak -- one the episode can be said
 # to rise from
 DIPS = ("any", "low")
-# what the prominence bar is a fraction of: the clade's highest frequency (the
-# build's, until branch prom_peak_fix) or each peak's own height
+# what the prominence bar is a fraction of: each peak's own height (the
+# build's, clade_preprocess.episodes_of) or the clade's highest frequency
 PROMREFS = ("clade", "peak")
 LOG_FLOOR = 1e-6          # added before log10, so an absent clade is -6, not -inf
 
@@ -74,7 +74,7 @@ LOG_FLOOR = 1e-6          # added before log10, so an absent clade is -6, not -i
 # (web/episodes.js exploreQuery), so FIG5 names the origin, not the figure
 FIG5 = dict(kernel="box", space="lin", prom_abs=0.0, sep=0.0, width=0.0,
             cens=True, start="trough", trough=cp.TROUGH_PROM, anchor="emergence",
-            gate="trunc", dip="any", promref="clade")
+            gate="trunc", dip="any", promref="peak")
 
 
 def read_params(q):

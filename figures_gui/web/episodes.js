@@ -37,7 +37,7 @@ function smooth(y, times, winDays){
   return out;
 }
 
-function findPeaks(ys, minProm){
+function findPeaks(ys, minProm, rel = 0){
   const n = ys.length, out = [];
   for (let i = 1; i < n - 1; i++){
     if (!(ys[i] > ys[i-1])) continue;
@@ -49,7 +49,7 @@ function findPeaks(ys, minProm){
     for (let k = mid; k >= 0 && ys[k] <= ys[mid]; k--) if (ys[k] < lmin) lmin = ys[k];
     let rmin = ys[mid];
     for (let k = mid; k < n && ys[k] <= ys[mid]; k++) if (ys[k] < rmin) rmin = ys[k];
-    if (ys[mid] - Math.max(lmin, rmin) >= minProm) out.push(mid);
+    if (ys[mid] - Math.max(lmin, rmin) >= Math.max(minProm, rel * ys[mid])) out.push(mid);
     i = j;
   }
   return out;
@@ -76,7 +76,7 @@ function episodesOf(ys, prom){
   let h = 0;
   for (let i = 0; i < ys.length; i++) if (ys[i] > h) h = ys[i];
   if (!(h > 0)) return {h:0, eps:[]};
-  const pk = findPeaks(ys, prom * h).map(i => [i, false]);
+  const pk = findPeaks(ys, 0, prom).map(i => [i, false]);
   const cm = censoredPeak(ys, h, prom * h);
   if (cm >= 0) pk.push([cm, true]);
   pk.sort((a, b) => a[0] - b[0]);

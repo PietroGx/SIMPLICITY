@@ -35,7 +35,7 @@ const SD_TROUGH = [0, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5];
 const SD_FRAC = [0.001, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5];
 const BRK_LO = [0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2];
 const SD_FIG5 = {sdKernel: "box", sdWidth: 0,
-                 sdCens: 1, sdStart: "trough", sdTrough: 0.0001, sdPromRef: "clade",
+                 sdCens: 1, sdStart: "trough", sdTrough: 0.0001, sdPromRef: "peak",
                  sdPick: "first", sdGate: "start"};
 const SD_LABEL = {sdKernel: "kernel", sdWin: "window",
   sdProm: "prominence", sdPromRef: "prominence reference", sdWidth: "width", sdCens: "censored peaks", sdStart: "episode start",
@@ -183,7 +183,7 @@ function detectionRail(rail) {
       options: [
         ["peak", "Each peak", "A share of the peak's own height: a small peak before a big one can count."],
         ["clade", "Clade maximum", "A share of the clade's highest frequency: a small peak before a big one "
-          + "rarely counts. The clade build's rule until branch prom_peak_fix is merged."]],
+          + "rarely counts. The rule before v2.5.25."]],
       hint: "What the prominence is a share of."}),
     sliderControl({setting: "sdWidth", label: "Min width",
       values: SW_WIDTH, format: v => v ? v + " d" : "any",

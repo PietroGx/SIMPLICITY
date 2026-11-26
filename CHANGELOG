@@ -5,6 +5,60 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.5.25 — 2026-11-26 — pietro gerletti
+
+Merges branch `prom_peak_fix`.
+
+The prominence bar is a fraction of each peak's own height
+-----------------------------------------------------------
+
+A peak counted as an episode when its prominence cleared `prom` times the
+clade's highest frequency over the whole record. Against that maximum, an
+earlier, smaller peak needed nearly all of its height: at prom = 0.5, a bump to
+32% under a 64% sweep needed a prominence of 32%. Now the bar is `prom` times
+the peak's own height. scipy's prominence itself was already local (the peak
+minus the higher of its two bases); only the bar's reference moves. The
+censored peak is the clade's maximum, so its bar is unchanged.
+
+`clade_preprocess.episodes_of` and its browser mirror `episodesOf`
+(`figures_gui/web/episodes.js`, the fallback axis) both change. This edits
+`clade_preprocess.py`, so the build hash changes: every clade build is orphaned
+until `figures_gui/run_precompute.sh` is rerun on the HPC. **Recompute required.**
+
+Measured on the local experiment #2 under Preset 1 (Gaussian 30 d, prom 0.5,
+min width 30 d, start at 10% of the peak, F = 30%, H = 60 d), 50 runs per
+scenario, through `explore.py`: episodes rise from 633 to 844 (control), 667 to
+912 (SOT), 799 to 1105 (HIV low), 1110 to 1407 (HIV high) and 768 to 972
+(edge case). 129 outbreaks move to an earlier peak, their hidden time shorter
+by a median of 15 d (interquartile range 7-126 d). Cryptic outbreaks change
+little: 84 -> 82, 101 -> 101, 143 -> 141, 33 -> 33, 228 -> 229.
+
+Checked before the merge: on 10 runs per scenario at the build's rules (box
+15 d, prom 0.1 and 0.5), this `episodes_of` returns the same episodes as
+`explore.episodes` with `promref=peak` on 1,358 of 1,358 clades (3,122
+episodes; the still-rising-at-the-end peak that only explore.py counts left
+out), and the JS `episodesOf` matches it on 300 of 300.
+
+At the merge: `settings_data_flow` adds the studio switch "Prominence relative
+to" (`settings.sdPromRef`, `/api/explore` rule `promref`, "peak" by default,
+"clade" for the old bar). Set `explore.FIG5["promref"]` and `tab_sweep.js`
+`SD_FIG5.sdPromRef` to "peak" (the build's rule from then on), drop the
+"until branch prom_peak_fix is merged" wording from the switch's hint,
+tab_method.js and GLOSSARY.md, and rerun check_explore.py after the
+recompute.
+
+At the merge, as the branch asked: `explore.FIG5["promref"]` and `tab_sweep.js`
+`SD_FIG5.sdPromRef` are "peak", so a query that omits the rule, and the
+detection tabs' "Figure 5 rules" reset, measure as the build now does; the
+"until branch prom_peak_fix is merged" wording is gone from the switch's hint,
+`explore.py` and `tab_method.js` (GLOSSARY.md's "prominence" still has it);
+`check_explore.py`'s
+every-rule-moves-something check flips `promref` to the old "clade". Not yet
+run: `check_explore.py` compares against a clade build, and none exists at the
+new hash until the recompute.
+
+------------------------------------------------------------------------
+
 ## Version 2.5.24 — 2026-11-26 — pietro gerletti
 
 Merges branch `mt_seeded_fix` (2026-11-25).

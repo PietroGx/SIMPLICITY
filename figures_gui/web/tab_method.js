@@ -246,7 +246,7 @@ const MTH_SECTIONS = [
       [mthT`\text{other kernels}`, "Gaussian σ = w/2.3548 (full width at half maximum W), median; always on the frequency itself"]],
      "figures_gui/prep/clade_preprocess.py:48-63 · figures_gui/explore.py:120-143"]]},
   {h: "Episodes", items: [
-    ["A peak counts when its prominence clears a bar set as a fraction of its own height (Prominence relative to: Each peak), or of the clade's highest frequency (Clade maximum, the clade build's until branch prom_peak_fix is merged).",
+    ["A peak counts when its prominence clears a bar set as a fraction of its own height (Prominence relative to: Each peak, the clade build's), or of the clade's highest frequency (Clade maximum, the rule before v2.5.25).",
      [mthT`\beta_i = \max(p\,\tilde y_i,\ p_{\text{abs}})\ \text{(each peak)},\qquad \beta_i = \max(p\,h,\ p_{\text{abs}}),\ h = \max_j \tilde y_j\ \text{(clade maximum)},\qquad i \text{ is a peak} \iff \operatorname{prom}(i) \ge \beta_i`,
       mthT`\operatorname{prom}(i) = \tilde y_i - \max\!\Big(\min_{[L_i,\,i]} \tilde y,\ \min_{[i,\,R_i]} \tilde y\Big)`],
      [[mthT`p`, "prominence, 0.10; p_abs is held at 0"],
