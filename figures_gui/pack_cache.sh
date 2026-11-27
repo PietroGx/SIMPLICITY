@@ -169,8 +169,10 @@ if [ "$WARM" -eq 1 ]; then
     fi
 fi
 
-# Only builds at the current hash are packed; stale builds and caches stay
-# behind (layout.py migrate --prune deletes them).
+# Stale builds, caches and stray sections go before packing, so the archive
+# carries only what the current code reads; pack then deletes older sets.
+python -I figures_gui/layout.py prune --base "$STORE" --stamp "$STAMP" --exp-name "$EXP_NAME" \
+    --apply 2>&1 | sed -u 's/^/[pack] /'
 [ -f "$EXP_STORE/tx/index.json" ] \
     || echo "[pack] WARNING: no $EXP_STORE/tx -- Figures 3 and 4 will lack transmissions" >&2
 [ -n "$(ls "$EXP_STORE/runs" 2>/dev/null)" ] \

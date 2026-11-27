@@ -12,10 +12,14 @@
 
 Packed into Data_Export/figures/<exp_name>_<stamp>/, one archive per section,
 none over 1 GB; a section that does not fit is split into parts that each
-unpack on their own.
+unpack on their own. That folder holds one set: a pack deletes every other
+file in it. unpack checks the manifest and replaces each section whole, so an
+old file never survives next to a new one.
 
     python -I figures_gui/layout.py migrate [--apply] [--prune]
+    python -I figures_gui/layout.py prune --stamp 2 [--exp-name NAME] [--apply]
     python -I figures_gui/layout.py pack --stamp 2 [--exp-name NAME]
+    python -I figures_gui/layout.py unpack <manifest.txt>
 """
 import argparse, datetime, gzip, hashlib, os, shutil, subprocess, sys, tarfile
 
@@ -27,6 +31,8 @@ EXPLORATION = "exploration"
 # what pack archives. Not fig1/: it holds values derived from patient data that
 # may not leave this machine, and the studio builds it locally (fig1.py)
 SECTIONS = (EXPLORATION, "fig2", "fig3", "fig4", "fig5")
+# sections a machine builds for itself; anything else under an experiment is stray
+LOCAL = ("fig1",)
 # panel-cache tag -> the figure it serves; tags not listed serve the exploration tabs
 MEMO_HOME = {"p1": "fig4", "p1c": "fig4", "p1h": "fig4",
              "p2": "fig3", "p3": "fig5", "p3b": "fig5"}
@@ -145,6 +151,18 @@ def prune(store, apply, log):
     cur = [os.path.join(cache, n, "index.json") for n in names if n.endswith("__" + h)]
     cur = [f for f in cur if os.path.isfile(f)]
     freed = 0
+    if os.path.basename(os.path.normpath(store)) == EXPLORATION:
+        root = root_of(store)
+        for n in sorted(os.listdir(root)):
+            if n not in SECTIONS + LOCAL:
+                p = os.path.join(root, n)
+                freed += _du(p)
+                log.append(f"delete {p}  (not a section of this layout)")
+                if apply:
+                    shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+    if names and not cur:
+        log.append(f"keep   {cache}  (no build at {h}: edited hashed files? nothing deleted)")
+        return freed
     for n in names:
         p = os.path.join(cache, n)
         why = ("build at another code hash" if os.path.isdir(p) and not n.startswith("_")
@@ -254,15 +272,19 @@ def pack(base, stamp, exp_name, out, limit=LIMIT):
     return h, dest, made
 
 
+def _sha256(p):
+    s = hashlib.sha256()
+    with open(p, "rb") as fh:
+        for b in iter(lambda: fh.read(1 << 20), b""):
+            s.update(b)
+    return s.hexdigest()
+
+
 def manifest(h, dest, made, stamp, exp_name, extra):
     tag, day = exp_tag(stamp, exp_name), datetime.date.today().strftime("%Y%m%d")
     rows = []
     for section, p, n in made:
-        s = hashlib.sha256()
-        with open(p, "rb") as fh:
-            for b in iter(lambda: fh.read(1 << 20), b""):
-                s.update(b)
-        rows.append(f"  {os.path.basename(p)}  {os.path.getsize(p)/1e6:8.1f} MB  {n:6d} files  sha256 {s.hexdigest()}")
+        rows.append(f"  {os.path.basename(p)}  {os.path.getsize(p)/1e6:8.1f} MB  {n:6d} files  sha256 {_sha256(p)}")
     try:
         commit = subprocess.run(["git", "-C", ROOT, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     except Exception:
@@ -279,13 +301,106 @@ def manifest(h, dest, made, stamp, exp_name, extra):
         "",
         *rows,
         "",
-        "extract on the studio box, from the repo root (every part unpacks on its own):",
-        f"    for f in {tag}_*_{h}_{day}*.tar.gz; do tar -xzf \"$f\" -C Data/figures; done",
+        "on the studio box, from the repo root, with the studio stopped (checks every",
+        "archive, then replaces each section whole):",
+        f"    python -I figures_gui/layout.py unpack <path to>/{tag}_{h}_{day}.manifest.txt",
         "",
     ])
     f = os.path.join(dest, f"{tag}_{h}_{day}.manifest.txt")
     open(f, "w").write(txt)
     return f, txt
+
+
+def drop_other_sets(dest, keep):
+    """Everything in an experiment's export folder that is not the set just made."""
+    gone = []
+    for n in sorted(os.listdir(dest)):
+        p = os.path.join(dest, n)
+        if os.path.isfile(p) and p not in keep:
+            os.remove(p)
+            gone.append(n)
+    return gone
+
+
+# ---------------------------------------------------------------- unpack
+
+def read_manifest(path):
+    name = stamp = h = None
+    rows = []
+    for line in open(path):
+        if line.startswith("studio data, "):
+            name, _, stamp = line[len("studio data, "):].strip().rpartition(" #")
+        elif line.startswith("build hash"):
+            h = line.split()[-1]
+        elif " sha256 " in line:
+            f = line.split()
+            rows.append((f[0], int(f[3]), f[-1]))
+    return name, stamp, h, rows
+
+
+def unpack(mpath, base, force=False):
+    """Check every archive a manifest lists, then replace each section whole.
+
+    Nothing changes unless every archive is present, matches its checksum and
+    holds only <tag>/<section>/ files. A section the manifest does not carry is
+    removed, as is anything that is not a section; LOCAL ones (fig1/) stay.
+    """
+    name, stamp, h, rows = read_manifest(mpath)
+    if not (name and stamp and h and rows):
+        raise SystemExit(f"[unpack] {mpath}: not a pack manifest")
+    here = _code_hash()
+    if h != here and not force:
+        raise SystemExit(f"[unpack] REFUSING: packed at build hash {h}, this checkout computes "
+                         f"{here}, so the studio would ignore every build. Check out the "
+                         f"manifest's commit, or pass --force.")
+    src = os.path.dirname(os.path.abspath(mpath))
+    bad = []
+    for f, _, sha in rows:
+        p = os.path.join(src, f)
+        if not os.path.isfile(p):
+            bad.append(f"{f}: missing")
+        elif _sha256(p) != sha:
+            bad.append(f"{f}: checksum differs (copy incomplete?)")
+    if bad:
+        raise SystemExit("[unpack] REFUSING, nothing changed:\n  " + "\n  ".join(bad))
+    tag = exp_tag(stamp, name)
+    root, stage = os.path.join(base, tag), os.path.join(base, f".unpack_{tag}")
+    shutil.rmtree(stage, ignore_errors=True)
+    os.makedirs(stage)
+    log, packed = [], set()
+    try:
+        for f, n, _ in rows:
+            with tarfile.open(os.path.join(src, f), "r:gz") as t:
+                ms = t.getmembers()
+                for m in ms:
+                    parts = m.name.split("/")
+                    if len(parts) < 3 or parts[0] != tag or parts[1] not in SECTIONS \
+                            or ".." in parts or not m.isreg():
+                        raise SystemExit(f"[unpack] REFUSING, nothing changed: {f} holds "
+                                         f"{m.name!r}, outside {tag}/<section>/")
+                    packed.add(parts[1])
+                if len(ms) != n:
+                    raise SystemExit(f"[unpack] REFUSING, nothing changed: {f} holds "
+                                     f"{len(ms)} files, the manifest says {n}")
+                t.extractall(stage, filter="data")
+        os.makedirs(root, exist_ok=True)
+        for s in SECTIONS:
+            p = os.path.join(root, s)
+            if os.path.exists(p):
+                shutil.rmtree(p)
+                log.append(f"{'replace' if s in packed else 'delete '} {s}/")
+            elif s in packed:
+                log.append(f"add     {s}/")
+            if s in packed:
+                os.rename(os.path.join(stage, tag, s), p)
+        for n in sorted(os.listdir(root)):
+            if n not in SECTIONS + LOCAL:
+                p = os.path.join(root, n)
+                shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+                log.append(f"delete  {n}  (not a section of this layout)")
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+    return root, h, log
 
 
 def main():
@@ -295,6 +410,15 @@ def main():
     m.add_argument("--base", default=BASE)
     m.add_argument("--apply", action="store_true", help="without it, only print the plan")
     m.add_argument("--prune", action="store_true", help="also delete stale builds and caches")
+    r = sub.add_parser("prune", help="delete one experiment's stale builds, caches and stray sections")
+    r.add_argument("--base", default=BASE)
+    r.add_argument("--stamp", required=True)
+    r.add_argument("--exp-name", default=None)
+    r.add_argument("--apply", action="store_true", help="without it, only print the plan")
+    u = sub.add_parser("unpack", help="check a pack manifest's archives and install them")
+    u.add_argument("manifest")
+    u.add_argument("--base", default=BASE)
+    u.add_argument("--force", action="store_true", help="install although the build hash differs")
     p = sub.add_parser("pack", help="archive one experiment into Data_Export/figures")
     p.add_argument("--base", default=BASE)
     p.add_argument("--out", default=EXPORT)
@@ -315,15 +439,28 @@ def main():
         if not a.apply:
             print("dry run: nothing changed. --apply to do it.")
         return 0
+    if a.cmd == "unpack":
+        root, h, log = unpack(a.manifest, a.base, a.force)
+        print("\n".join(f"[unpack] {l}" for l in log))
+        print(f"[unpack] {root} at build hash {h}. Restart the studio to drop its memory cache.")
+        return 0
     if a.exp_name is None:
         sys.path.insert(0, HERE)
         import compute
         a.exp_name = compute.EXP_NAME
+    if a.cmd == "prune":
+        log = []
+        freed = prune(store_dir(a.base, a.stamp, a.exp_name), a.apply, log)
+        print("\n".join(log) or "nothing to prune")
+        print(f"frees  {freed/1e9:.2f} GB" + ("" if a.apply else "\ndry run: nothing changed. --apply to do it."))
+        return 0
     h, dest, made = pack(a.base, a.stamp, a.exp_name, a.out, a.limit_mb * 1_000_000)
     if not made:
         print(f"[pack] nothing under {root_dir(a.base, a.stamp, a.exp_name)}", file=sys.stderr)
         return 1
     f, txt = manifest(h, dest, made, a.stamp, a.exp_name, [n.split("=", 1) for n in a.note])
+    for n in drop_other_sets(dest, {p for _, p, _ in made} | {f}):
+        print(f"[pack] deleted {n}: not part of this set")
     print(txt)
     print(f"[pack] manifest {f}")
     return 0

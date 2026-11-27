@@ -5,6 +5,39 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.6.5 — 2026-11-27 — pietro gerletti
+
+One set per folder: pack, prune and unpack keep builds apart
+-------------------------------------------------------------
+
+Exp 2's export folder on the HPC held two sets side by side (build hash
+`83607fd0aa7e` from 2026-11-24 and `eccccec8da18` from today), and the old one
+still carried `fig1` and `supplementary` archives the current layout no longer
+writes. The store held `fig1/` and `supplementary/` the HPC no longer builds,
+and an unpack by `tar -xzf` laid the new files over whatever was there.
+Nothing served a stale file (every cache key holds the code hash), but nothing
+kept a set whole either. `figures_gui/layout.py`:
+
+* `pack` deletes every other file in `Data_Export/figures/<exp>/` once its set
+  and manifest are written: one set per folder.
+* `prune` (now also `layout.py prune --stamp S [--apply]`, one experiment)
+  deletes anything under the experiment that is not a section (`SECTIONS`,
+  plus `LOCAL = fig1`, which a machine builds for itself), and deletes nothing
+  when no build exists at the current hash -- an edited hashed file would
+  otherwise have wiped the grid.
+* `pack_cache.sh` runs `prune --apply` before packing, so the archives carry
+  only what the current code reads.
+* `unpack <manifest>` replaces the manifest's `tar -xzf` line. It refuses,
+  changing nothing, unless every archive is present and matches its sha256,
+  holds the file count the manifest gives and only `<tag>/<section>/` files,
+  and the build hash equals this checkout's (`--force` to override). It then
+  replaces each section whole, deletes sections the set does not carry and
+  stray folders, and keeps `fig1/`.
+
+`figures_gui/test_layout_pack.py`: 17 checks on a throwaway store.
+
+------------------------------------------------------------------------
+
 ## Version 2.6.4 — 2026-11-27 — pietro gerletti
 
 BIG settings: per-task walltime 7 days -> 1 day
