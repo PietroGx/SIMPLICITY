@@ -1,23 +1,7 @@
-/* The chart forms a panel tab chooses between.
-
-   draw.js keeps the primitives every tab has always used -- grouped bars, day
-   lines, the burn-in rule. These are the forms the panels now PICK between, and
-   they all take the same series shape, so a tab maps its payload once:
-
-     {colour, label, vals: [CI|null, ...], runs: [[v, ...]|null, ...]}
-
-   `vals[i]` is the bootstrap CI for category i, exactly as panels.py sends it:
-   {n, mean, lo, hi}, with lo/hi null under three runs. `runs[i]` is the per-run
-   values behind it, from /api/dist -- optional, and drawn only when the panel's
-   distribution box is ticked. A chart handed no runs draws the interval alone;
-   none of them ever fabricates a spread.
-
-   The interval is a bootstrap CI of the MEAN (panels.py:146-156), so it is
-   narrower than the run-to-run scatter by construction. That is the whole
-   reason the distribution overlay exists: the whiskers answer "where is the
-   mean", the points answer "how much do runs differ", and a figure that shows
-   only the first invites the second to be read off it.
-*/
+/* The chart forms the panel tabs draw with: a scatter with interval arms and a
+   line over ordinal levels with an interval ribbon. Each interval is a
+   bootstrap CI of the MEAN, {n, mean, lo, hi} exactly as panels.py sends it,
+   with lo/hi null under three runs; no chart ever fabricates a spread. */
 
 const CHART_H = 250;
 
@@ -30,9 +14,9 @@ function jitter(i, span) {
 
 const isNum = v => v !== null && v !== undefined && isFinite(v);
 
-/* The y window, over the intervals AND over the points when they are shown --
+/* The y window, over the intervals --
    a cloud clipped by the frame reads as no cloud at all. */
-function yWindow(series, {points, zero, pct}) {
+function yWindow(series, {zero, pct}) {
   /* a share is read against the whole: 0-100%. pct "fit" (panel 2) is 0 to
      10% above the largest value drawn, for shares too small to read on 0-100 */
   if (pct && pct !== "fit") return [0, 100];
@@ -40,7 +24,6 @@ function yWindow(series, {points, zero, pct}) {
   const see = v => { if (isNum(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } };
   series.forEach(s => {
     (s.vals || []).forEach(b => { if (b) { see(b.mean); see(b.lo); see(b.hi); } });
-    if (points) (s.runs || []).forEach(r => (r || []).forEach(see));
   });
   if (!isFinite(lo)) return [0, 1];
   if (zero) lo = Math.min(0, lo);
@@ -62,79 +45,37 @@ function xLabels(g, w, h, pad, cats, slotW) {
   });
 }
 
-/* ------------------------------------------------------------------ dots */
-
-/* Dot and interval: the forest plot. x = category, one offset per series so
-   two intervals in the same category do not sit on top of each other. */
-function dots(cv, {cats, series, ylab, fmtY, height, points, zero, pct}) {
-  const {g, w, h} = fit(cv, height || CHART_H);
-  const pad = {l: 46, r: 10, t: 10, b: 30};
-  const [y0, y1] = yWindow(series, {points, zero, pct});
-  axes(g, w, h, pad, "", ylab, y0, y1, fmtY);
-  const slot = (w - pad.l - pad.r) / Math.max(cats.length, 1);
-  const Y = v => h - pad.b - (h - pad.b - pad.t) * ((v - y0) / (y1 - y0 || 1));
-  const step = slot / (series.length + 1);
-  cats.forEach((c, ci2) => series.forEach((s, si) => {
-    const x = pad.l + slot * ci2 + step * (si + 1);
-    const b = (s.vals || [])[ci2];
-    if (points) {
-      g.fillStyle = s.colour; g.globalAlpha = 0.28;
-      ((s.runs || [])[ci2] || []).forEach((v, ri) => {
-        if (!isNum(v)) return;
-        g.beginPath();
-        g.arc(x + jitter(ri, step * 0.7), Y(v), 1.6, 0, 6.2832);
-        g.fill();
-      });
-      g.globalAlpha = 1;
-    }
-    if (!b || !isNum(b.mean)) return;
-    if (isNum(b.lo) && isNum(b.hi)) {
-      g.strokeStyle = s.colour; g.lineWidth = 1.5;
-      g.beginPath(); g.moveTo(x, Y(b.lo)); g.lineTo(x, Y(b.hi));
-      g.moveTo(x - 3, Y(b.lo)); g.lineTo(x + 3, Y(b.lo));
-      g.moveTo(x - 3, Y(b.hi)); g.lineTo(x + 3, Y(b.hi)); g.stroke();
-    }
-    g.fillStyle = s.colour;
-    g.beginPath(); g.arc(x, Y(b.mean), 3.2, 0, 6.2832); g.fill();
-    g.strokeStyle = css("--panel"); g.lineWidth = 1; g.stroke();
-  }));
-  xLabels(g, w, h, pad, cats, slot);
-  return {g, w, h};
-}
-
 /* --------------------------------------------------------------- scatter */
 
 /* x against y, one marked point per group, arms = each axis's own interval.
-   `points` draws that group's runs as a cloud behind it; `diagonal` rules y=x,
+   `diagonal` rules y=x,
    which is what makes "above the line" a readable claim. `lines` rules any
    segment, [{x0, y0, x1, y1, colour, label}], or polyline ({pts: [[x, y], ...]}),
    dashed, clipped to the plot, label at its top end. `xticks`: x values labelled
    between the two end labels.
 
-   groups: [{colour, label, x: CI, y: CI, xruns: [], yruns: []}] -- xruns and
-   yruns are index-aligned by run, so a point is one run on both axes.
+   groups: [{colour, label, x: CI, y: CI}].
    Optional per group, each defaulting to the scenario-coloured dot: `shape`
    (a draw.js shapePoly name), `fill`, `stroke` (outline), `arm` (whisker
    colour), `alpha` (faded groups are drawn first), `tip` ({text, math} on hover). */
-function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
+function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height,
                         diagonal, zero, pctX, pctY, xlim, ylim, vlines, hlines, lines, xticks}) {
   const {g, w, h} = fit(cv, height || CHART_H);
   const pad = {l: 46, r: 12, t: 12, b: 34};
-  const win = (pick, runs) => {
+  const win = pick => {
     let lo = Infinity, hi = -Infinity;
     const see = v => { if (isNum(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } };
     groups.forEach(gr => {
       const b = gr[pick];
       if (b) { see(b.mean); see(b.lo); see(b.hi); }
-      if (points) (gr[runs] || []).forEach(see);
     });
     if (!isFinite(lo)) return [0, 1];
     if (zero) lo = Math.min(0, lo);
     const m = (hi - lo) * 0.1 || Math.abs(hi) * 0.1 || 1;
     return [zero ? lo : lo - m, hi + m];
   };
-  let [x0, x1] = win("x", "xruns");
-  let [y0, y1] = win("y", "yruns");
+  let [x0, x1] = win("x");
+  let [y0, y1] = win("y");
   if (pctX) [x0, x1] = [0, 100];
   if (pctY) [y0, y1] = [0, 100];
   if (xlim) [x0, x1] = xlim;
@@ -197,17 +138,6 @@ function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
   const al = gr => isNum(gr.alpha) ? gr.alpha : 1;
   [...groups.filter(gr => al(gr) < 1), ...groups.filter(gr => al(gr) >= 1)].forEach(gr => {
     const a = al(gr), fill = gr.fill || gr.colour;
-    if (points) {
-      const xs = gr.xruns || [], ys = gr.yruns || [];
-      g.fillStyle = fill; g.globalAlpha = (gr.fill ? 0.35 : 0.25) * a;
-      for (let i = 0; i < Math.max(xs.length, ys.length); i++) {
-        const xv = xs.length ? xs[i] : (gr.x || {}).mean;
-        const yv = ys.length ? ys[i] : (gr.y || {}).mean;
-        if (!isNum(xv) || !isNum(yv)) continue;
-        g.beginPath(); g.arc(X(xv), Y(yv), 1.8, 0, 6.2832); g.fill();
-      }
-      g.globalAlpha = 1;
-    }
     const bx = gr.x, by = gr.y;
     if (!bx || !by || !isNum(bx.mean) || !isNum(by.mean)) return;
     g.globalAlpha = a;
@@ -237,14 +167,13 @@ function scatterCI(cv, {groups, xlab, ylab, fmtX, fmtY, height, points,
 /* ----------------------------------------------------------- line across */
 
 /* One line per series over an ordinal x -- composition class j, or one axis of
-   the build grid. `ribbon` fills each series' interval; `points` draws one
-   faint line per run behind it, so a smooth mean over noisy runs is visible as
-   such. `mark` rules one level, for the operating point. */
+   the build grid. `ribbon` fills each series' interval; `mark` rules one
+   level, for the operating point. */
 function linesOverLevels(cv, {levels, series, xlab, ylab, fmtY, height,
-                              ribbon, points, mark, zero, pct}) {
+                              ribbon, mark, zero, pct}) {
   const {g, w, h} = fit(cv, height || CHART_H);
   const pad = {l: 46, r: 12, t: 10, b: 30};
-  const [y0, y1] = yWindow(series, {points, zero, pct});
+  const [y0, y1] = yWindow(series, {zero, pct});
   axes(g, w, h, pad, xlab, ylab, y0, y1, fmtY);
   const n = Math.max(levels.length, 1);
   const slot = (w - pad.l - pad.r) / n;
@@ -268,14 +197,7 @@ function linesOverLevels(cv, {levels, series, xlab, ylab, fmtY, height,
     }
     if (close) g.closePath();
   };
-  /* per-run lines first, then the ribbon, then the mean on top */
-  if (points) series.forEach(s => {
-    const runs = s.runs || [];
-    const nr = Math.max(0, ...runs.map(r => (r || []).length));
-    g.strokeStyle = s.colour; g.lineWidth = 0.8; g.globalAlpha = 0.16;
-    for (let r = 0; r < nr; r++) { path(i => (runs[i] || [])[r]); g.stroke(); }
-    g.globalAlpha = 1;
-  });
+  /* the ribbon first, then the mean on top */
   if (ribbon) series.forEach(s => {
     const v = s.vals || [];
     if (!v.some(b => b && isNum(b.lo))) return;
@@ -306,48 +228,5 @@ function linesOverLevels(cv, {levels, series, xlab, ylab, fmtY, height,
     }
   });
   xLabels(g, w, h, pad, levels, slot);
-  return {g, w, h};
-}
-
-/* --------------------------------------------------------------- stacked */
-
-/* 100% stacked bars: one bar per category, one band per part, each part's mean
-   over runs. No interval can be drawn on a stack and no per-run form of a
-   stack stays a stack, which is why the distribution box is DISABLED wherever
-   this form is selected rather than quietly ignored. Bands that reach 6% of
-   the bar carry their label. */
-function stacked(cv, {cats, parts, height, pct, fmtV}) {
-  const {g, w, h} = fit(cv, height || CHART_H);
-  const pad = {l: 46, r: 10, t: 10, b: 30};
-  const tot = cats.map((c, i) =>
-    parts.reduce((a, p) => a + (isNum(p.vals[i]) ? p.vals[i] : 0), 0));
-  const hi = pct ? 100 : Math.max(1, ...tot) * 1.05;
-  axes(g, w, h, pad, "", pct ? "% of the simulation" : "", 0, hi, v => fmt(v, 0));
-  const slot = (w - pad.l - pad.r) / Math.max(cats.length, 1);
-  const bw = Math.min(slot - 10, 54);
-  const Y = v => h - pad.b - (h - pad.b - pad.t) * (v / (hi || 1));
-  const f = fmtV || (v => fmt(v, 0));
-  cats.forEach((c, i) => {
-    const x = pad.l + slot * i + (slot - bw) / 2;
-    const scale = pct && tot[i] > 0 ? 100 / tot[i] : 1;
-    let base = 0;
-    parts.forEach(p => {
-      const v = isNum(p.vals[i]) ? p.vals[i] * scale : 0;
-      if (v <= 0) return;
-      g.fillStyle = p.colour;
-      g.fillRect(x, Y(base + v), bw, Y(base) - Y(base + v));
-      if (v / (hi || 1) > 0.06) {
-        g.fillStyle = css("--panel");
-        g.font = "9px " + css("--f-num");
-        const t = f(v);
-        g.fillText(t, x + bw / 2 - g.measureText(t).width / 2,
-                   (Y(base) + Y(base + v)) / 2 + 3);
-      }
-      base += v;
-    });
-    g.strokeStyle = css("--line"); g.lineWidth = 1;
-    g.strokeRect(x, Y(base), bw, Y(0) - Y(base));
-  });
-  xLabels(g, w, h, pad, cats, slot);
   return {g, w, h};
 }

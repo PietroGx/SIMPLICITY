@@ -125,7 +125,6 @@ const API_LABELS = {
   "/api/explore": "measuring under these rules",
   "/api/explore_panel": "measuring every simulation under these rules",
   "/api/rebuild": "starting the pass",
-  "/api/dist": "reading the individual simulations",
   "/api/presets": "reading the saved settings",
   "/api/count_tests": "testing the scenarios",
 };

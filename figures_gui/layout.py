@@ -1,7 +1,7 @@
 """Where the studio keeps one experiment's data, and how it travels.
 
     Data/figures/<exp_name>_<stamp>/
-        exploration/            the store: panels.py, explore.py, dist.py read it
+        exploration/            the store: panels.py and explore.py read it
             cache/<build>/      the clade grid, one build per parameter set
             cache/_explore/     the exploration tabs' cache (explore.py)
             cache/_panels/      the exploration tabs' panel cache (across, daily, episodes)
@@ -17,7 +17,7 @@ unpack on their own.
     python -I figures_gui/layout.py migrate [--apply] [--prune]
     python -I figures_gui/layout.py pack --stamp 2 [--exp-name NAME]
 """
-import argparse, datetime, gzip, hashlib, json, os, shutil, subprocess, sys, tarfile
+import argparse, datetime, gzip, hashlib, os, shutil, subprocess, sys, tarfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -28,9 +28,8 @@ EXPLORATION = "exploration"
 # may not leave this machine, and the studio builds it locally (fig1.py)
 SECTIONS = (EXPLORATION, "fig2", "fig3", "fig4", "fig5")
 # panel-cache tag -> the figure it serves; tags not listed serve the exploration tabs
-MEMO_HOME = {"p1": "fig4", "p1c": "fig4", "p1h": "fig4", "d1": "fig4",
-             "p2": "fig3", "d2": "fig3",
-             "p3": "fig5", "p3b": "fig5", "d3": "fig5"}
+MEMO_HOME = {"p1": "fig4", "p1c": "fig4", "p1h": "fig4",
+             "p2": "fig3", "p3": "fig5", "p3b": "fig5"}
 LIMIT = 1_000_000_000
 
 

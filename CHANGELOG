@@ -5,6 +5,32 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.6.3 — 2026-11-27 — pietro gerletti
+
+The per-run distribution feature is gone
+----------------------------------------
+
+Nothing in the studio drew per-run points any more: no tab passed `points` to
+a chart, the `dist1`-`dist4` settings had no control, and `/api/dist` was read
+only by the warm pass and two tests. Removed: `figures_gui/dist.py`,
+`web/dist.js`, the `/api/dist` route, the `d1`/`d2`/`d3` warm kinds (2 + 336 +
+1,344 keys, about 150 MB of cache) and their `MEMO_HOME`/`MEMO_DEPS` entries,
+the `dist1`-`dist4` settings, `test_dist_mirrors_panels.py` and
+`test_dist_cold_cost.py`, and in `web/charts.js` the `points` option of
+`scatterCI` and `linesOverLevels`. Three chart forms had no caller at all and
+are deleted with it: `dots` and `stacked` (`charts.js`), `bars` (`draw.js`).
+Two old lint warnings fixed on the way (`layout.py` imported `json` unused,
+`warm_panels.py` had an f-string with no placeholder).
+
+Locally, the caches nothing can read any more are deleted: 1,688 `d*` files
+(105 MB) under `fig3/` to `fig5/`, and the retired S1's 18,819 `p4row` files
+(75 MB) under `supplementary/`.
+
+`check_app.js`: 158 passed, 0 failed; `test_sa_tabs.js`: 22 passed;
+`warm_panels.py --list` now plans p2, p1, p1c, p1h, p3, episodes, across, daily.
+
+------------------------------------------------------------------------
+
 ## Version 2.6.2 — 2026-11-27 — pietro gerletti
 
 One cryptic rule: hidden means never above f

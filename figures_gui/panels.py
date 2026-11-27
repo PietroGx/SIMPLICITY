@@ -54,12 +54,6 @@ MEMO_DEPS = {
     "across": ("across", "across_the_set", "values_on_disk", "_load_builds",
                "_build_dir", "_doubling_bins", "_median_per_value", "_median"),
     "daily": ("run_daily", "_daily_series", "_load_builds", "_build_dir"),
-    # dist.py memoises through _memo as well. These name only what it reuses
-    # from HERE; its own code goes into `parts` as dist.code_hash(), because
-    # this file cannot hash a function it does not define.
-    "d1": ("@p1",),
-    "d2": ("@p2",),
-    "d3": ("@p3",),
 }
 
 # Deliberately outside every key, and checked as such by

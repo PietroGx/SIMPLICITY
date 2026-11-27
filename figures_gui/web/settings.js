@@ -51,9 +51,6 @@ const SETTING_DEFAULTS = {
   sdFrac: 0.1, sdPick: "first", sdGate: "start",
   // the detection tabs' views: which cells, every episode drawn (tab_sweep.js)
   sdShowDet: "all", sdEpsDet: 1, sdShow: "all", sdEps: 0,
-  // the per-run points behind the interval, one box per panel -- per panel and
-  // not one global switch, because each figure subpanel is captioned alone.
-  dist1: 0, dist2: 0, dist3: 0, dist4: 0,
   // the saved data-settings set last matched, loaded or saved: what Cryptic by
   // scenario compares against once the settings move off it (presets.js)
   presetRef: "",
@@ -70,7 +67,7 @@ const SETTING_DEFAULTS = {
 };
 
 /* Settings whose value changes what the rail OFFERS, not just what it shows:
-   the plot form decides whether the distribution box can be ticked at all. A rail is built once per tab so
+   the plot form decides which controls apply. A rail is built once per tab so
    that dragging a slider cannot lose its focus, so these ask for a rebuild. */
 const RAIL_SETTINGS = ["plot3", "focus", "p3Source", "sdStart", "sdKernel"];
 

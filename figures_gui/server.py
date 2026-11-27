@@ -27,7 +27,6 @@ WEB = os.path.join(HERE, "web")
 sys.path.insert(0, HERE)
 
 import compute
-import dist
 import explore
 import fig1
 import layout
@@ -284,8 +283,6 @@ class H(SimpleHTTPRequestHandler):
                 return self._send(JOBS.status())
             if u.path == "/api/panel":
                 return self._send(panels.panel(STORE, q))
-            if u.path == "/api/dist":
-                return self._send(dist.dist(STORE, q))
             if u.path == "/api/episodes":
                 return self._send(panels.episode_view(STORE, q))
             if u.path == "/api/across":

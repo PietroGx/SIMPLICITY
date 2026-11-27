@@ -312,11 +312,9 @@ async function main() {
      whichever grid corner the checks above left behind (m_T among them) */
   peek(`setSettings(Object.fromEntries(BUILD_SETTINGS.map(n => [n, SETTING_DEFAULTS[n]])))`);
 
-  /* A control that decides what the rail OFFERS has to rebuild it. The
-     distribution box is greyed by the selected plot form, and a rail is built
-     once per tab -- so without the rebuild the box kept whatever state it had
-     when the tab was first opened, and looked tickable under a stacked bar
-     chart that cannot carry per-run points. */
+  /* A control that decides what the rail OFFERS has to rebuild it: a rail is
+     built once per tab, so without the rebuild it kept whatever state it had
+     when the tab was first opened. */
   for (const [tabId, setting, form, want] of [
         ["panel1", "p1Pal", "cvd", null],
         ["panel1", "p1Pal", "texture", null],

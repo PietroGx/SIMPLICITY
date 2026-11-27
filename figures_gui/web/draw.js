@@ -10,10 +10,9 @@
                   lives in studio.css alone and dark mode needs no JS
      fmt()/ci()   one rendering of a number and of a bootstrap interval
 
-   `bars` is the generic chart. A phylogeny, a Muller plot
-   and an episode grid are not expressible through it, so those live in
-   paint.js as their own painters -- but they still take their canvas from
-   fit() and their colours from css().
+   The phylogeny, the Muller plot and the episode grid live in paint.js as
+   their own painters; they take their canvas from fit() and their colours
+   from css().
 */
 
 const SCENARIOS = ["control", "SOT", "HIV_low", "HIV_high", "edge_case"];
@@ -358,44 +357,6 @@ function axes(g, w, h, pad, xlab, ylab, y0, y1, fmtY) {
     if (help) hits.push({x0: 0, x1: 16, y0: cy - yw / 2, y1: cy + yw / 2, text: help});
   }
   if (cv) { cv._axHit = hits; axisTip(cv); }
-}
-
-/* Grouped bars with bootstrap whiskers: x = category, one series per scenario. */
-function bars(cv, {cats, series, ylab, fmtY, height, pct}) {
-  const {g, w, h} = fit(cv, height || 240);
-  const pad = {l: 44, r: 8, t: 10, b: 30};
-  let hi = 0;
-  series.forEach(s => s.vals.forEach(b => {
-    if (b && b.hi !== null && b.hi !== undefined) hi = Math.max(hi, b.hi);
-    if (b && b.mean) hi = Math.max(hi, b.mean);
-  }));
-  hi = pct === "fit" ? (hi > 0 ? hi * 1.1 : 1) : pct ? 100 : hi > 0 ? hi * 1.12 : 1;
-  axes(g, w, h, pad, "", ylab, 0, hi, fmtY);
-  const iw = (w - pad.l - pad.r) / Math.max(cats.length, 1);
-  const bw = Math.max(2, (iw - 6) / Math.max(series.length, 1));
-  const Y = v => h - pad.b - (h - pad.b - pad.t) * (v / hi);
-  cats.forEach((c, ci2) => {
-    const x0 = pad.l + iw * ci2 + 3;
-    series.forEach((s, si) => {
-      const b = s.vals[ci2];
-      if (!b || b.mean === null || b.mean === undefined) return;
-      const x = x0 + bw * si;
-      g.fillStyle = s.colour;
-      g.fillRect(x, Y(b.mean), bw - 1, h - pad.b - Y(b.mean));
-      if (b.lo !== null && b.lo !== undefined) {
-        g.strokeStyle = css("--ink-2"); g.lineWidth = 1;
-        const xm = x + (bw - 1) / 2;
-        g.beginPath(); g.moveTo(xm, Y(b.lo)); g.lineTo(xm, Y(b.hi));
-        g.moveTo(xm - 2, Y(b.lo)); g.lineTo(xm + 2, Y(b.lo));
-        g.moveTo(xm - 2, Y(b.hi)); g.lineTo(xm + 2, Y(b.hi)); g.stroke();
-      }
-    });
-    g.fillStyle = css("--ink-3");
-    g.font = "10px " + css("--f-num");
-    const t = String(c);
-    g.fillText(t, x0 + (iw - 6) / 2 - g.measureText(t).width / 2, h - pad.b + 12);
-  });
-  return {g, w, h};
 }
 
 /* The burn-in day: a haloed dashed rule with a label, `mini` for a grid cell

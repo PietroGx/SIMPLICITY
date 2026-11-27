@@ -64,7 +64,7 @@ never leaves the browser.
 
 ```
 Data/figures/<name>_<stamp>/    one experiment (layout.py, sweep.py --print-paths)
-  exploration/                  the store: what panels.py, explore.py, dist.py read
+  exploration/                  the store: what panels.py and explore.py read
     cache/<build>/              clade builds, keyed by parameters and a hash of
                                 the code that produced them
     cache/_explore/ _panels/    the exploration tabs' caches

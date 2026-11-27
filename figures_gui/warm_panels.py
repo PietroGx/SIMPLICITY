@@ -16,13 +16,6 @@ Measured cold, run #2, 168 builds:
     episodes    0.04 s   key [build, m_T, m_F]           1,344 keys
     across      1.0 s    key [build, present]              168 keys
     daily       0.8-3.3s key [k, scenario, seed, m_T]    5,250 keys
-    dist 1      0.04 s   key [build, burn-in, dist hash]    336 keys
-    dist 2      0.02 s   key [burn-in, dist hash]             2 keys
-    dist 3      0.02 s   key [build, m_F, dist hash]      1,344 keys
-
-The d* kinds are the per-run arrays behind the same CIs (dist.py), keyed as
-their panels are and cheaper, since they bootstrap only the derived keys.
-They add about 150 MB to _panels.
 
 m_T is both a build parameter and an argument, and the two always move
 together: the build is NAMED by m_T. So panels 1 and 3 are warmed at each
@@ -31,7 +24,7 @@ build's own m_T, not at the cross product.
 Requests go through panels.panel() and the other server entry points, so this
 cannot warm a key the page does not ask for. A key is skipped only if its file
 exists, and the file name hashes the code that computes it (panels.scoped_hash),
-so an edit to panel1 re-warms p1 and d1 without being told to.
+so an edit to panel1 re-warms p1 without being told to.
 
     python figures_gui/warm_panels.py --stamp 2 --procs 4
     python figures_gui/warm_panels.py --stamp 2 --what p1,p3,daily
@@ -55,7 +48,6 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 import compute
-import dist
 import layout
 import panels
 import sweep
@@ -70,7 +62,7 @@ BURNIN = (True, False)
 BASE = {"k": "7", "win": "15", "prom": "0.1", "lo": "0.1", "hi": "0.9",
         "window": "post"}
 
-KINDS = ("p2", "p1", "p1c", "p1h", "p3", "d2", "d1", "d3", "episodes", "across",
+KINDS = ("p2", "p1", "p1c", "p1h", "p3", "episodes", "across",
          "daily")
 
 
@@ -116,13 +108,6 @@ def plan(store, kinds):
         jobs += [("p1h", _q(p, n="1h", burnin=int(b))) for p in ps for b in BURNIN]
     if "p3" in kinds:
         jobs += [("p3", _q(p, n=3, mf=mf)) for p in ps for mf in MF_VALUES]
-    # the per-run arrays behind the same CIs, keyed as their panels are
-    if "d2" in kinds:
-        jobs += [("d2", dict(n="2", burnin=int(b), **BASE)) for b in BURNIN]
-    if "d1" in kinds:
-        jobs += [("d1", _q(p, n=1, burnin=int(b))) for p in ps for b in BURNIN]
-    if "d3" in kinds:
-        jobs += [("d3", _q(p, n=3, mf=mf)) for p in ps for mf in MF_VALUES]
     if "episodes" in kinds:
         jobs += [("episodes", _q(p, mf=mf)) for p in ps for mf in MF_VALUES]
     if "across" in kinds:
@@ -144,8 +129,6 @@ def _one(job):
     try:
         if kind in ("p1", "p1c", "p1h", "p2", "p3"):
             panels.panel(STORE, q)
-        elif kind in ("d1", "d2", "d3"):
-            dist.dist(STORE, q)
         elif kind == "episodes":
             panels.episode_view(STORE, q)
         elif kind == "across":
@@ -246,7 +229,7 @@ def main():
                       f"~{eta/60:.0f} min left, {nbad} failed", flush=True)
     size = sum(os.path.getsize(os.path.join(d, f)) for d in layout.memo_dirs(store)
                if os.path.isdir(d) for f in os.listdir(d))
-    print(f"[warm] core-seconds by kind: "
+    print("[warm] core-seconds by kind: "
           + ", ".join(f"{k}={v:.0f}" for k, v in sorted(seen.items())))
     print(f"[warm] done in {(time.time()-t0)/60:.1f} min, "
           f"panel caches {size/1e6:.1f} MB, {nbad} failed")

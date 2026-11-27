@@ -157,9 +157,8 @@ function showTab(id) {
    per pixel. */
 function onSettingsChanged(name, kind) {
   paintStateLine();
-  /* A control that decides what the rail offers has to rebuild it: the
-     distribution box is greyed by the selected plot form, and a rail built once
-     keeps whatever state it had when the tab was first opened. */
+  /* A control that decides what the rail offers has to rebuild it: a rail
+     built once keeps whatever state it had when the tab was first opened. */
   if (RAIL_SETTINGS.includes(name)) tabs.forEach(t => { t.railBuilt = false; });
   tabs.forEach(t => {
     if (!t.rerenderOn || t.rerenderOn.includes(kind)) staleTabs.add(t.id);

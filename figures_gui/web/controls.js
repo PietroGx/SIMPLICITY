@@ -95,9 +95,8 @@ function segmentControl({setting, label, hint, options, axis}) {
   return el;
 }
 
-/* `disabled` is for a box that CANNOT apply to what is selected -- the
-   distribution overlay under a stacked bar chart, which has no per-run form.
-   Shown and greyed, with `why` saying so, rather than quietly doing nothing. */
+/* `disabled` is for a box that CANNOT apply to what is selected. Shown and
+   greyed, with `why` saying so, rather than quietly doing nothing. */
 function checkControl({setting, label, hint, disabled, why}) {
   const el = document.createElement("div");
   el.className = "ctl";
