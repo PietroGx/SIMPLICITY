@@ -5,6 +5,23 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.6.4 — 2026-11-27 — pietro gerletti
+
+BIG settings: per-task walltime 7 days -> 1 day
+------------------------------------------------
+
+`impact_long_shedders_BIG_N10000_T1825.json` set `slurm.time` to
+`7-00:00:00`, meant as the length of the whole run. It is the walltime of each
+Slurm task, so stage 1 asked for 750 tasks of 7 days each under
+`SBATCH_QOS=standard` and sbatch refused the array; nothing was submitted.
+Now `1-00:00:00`. Concurrency was already capped at 200 tasks by
+`SIMPLICITY_MAX_PARALLEL_SEEDED_SIMULATIONS_SLURM`. No per-seed runtime has
+been measured at N=10000 over 1825 days: a seed that outlasts the wall stops
+gracefully before day 1825 and writes a truncated run, so check the first
+tasks' last simulated day.
+
+------------------------------------------------------------------------
+
 ## Version 2.6.3 — 2026-11-27 — pietro gerletti
 
 The per-run distribution feature is gone
