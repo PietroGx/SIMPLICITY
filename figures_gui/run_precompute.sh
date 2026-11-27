@@ -423,10 +423,12 @@ TXJ=$(sub tx figures_gui/slurm_tx.sh)
 echo "  tx         $TXJ   (transmission table, alongside the grid)"
 JOBS+=("$TXJ")
 # the Sweep tab's and Figure 5's live detection: daily records and anchors
-# per run, then the Figure 5 panel; needs only the run output (warm_explore.py)
-EXJ=$(sub explore figures_gui/slurm_explore.sh)
-EXPJ=$(sub explore_panel --dependency="afterany:$EXJ" --array=0-0 figures_gui/slurm_explore.sh)
-echo "  explore    $EXJ / $EXPJ   (detection inputs, then the Figure 5 panel)"
+# per run at every (k, m_T) of the grid (S2), then the Figure 5 panels at each
+# pair and at S3's levels; needs only the run output (warm_explore.py)
+EXJ=$(sub explore --export=ALL,PAIRS=all figures_gui/slurm_explore.sh)
+EXPJ=$(sub explore_panel --dependency="afterany:$EXJ" --array=0-0 --time=06:00:00 \
+       --export=ALL,PAIRS=all,PANEL_ONLY=1 figures_gui/slurm_explore.sh)
+echo "  explore    $EXJ / $EXPJ   (detection inputs at every (k, m_T), then the Figure 5 panels)"
 JOBS+=("$EXPJ")
 RUNSJ=$(sub runs figures_gui/slurm_runs.sh)
 echo "  runs       $RUNSJ   (per-seed export for Figure 2 and the Clustering tab)"

@@ -11,7 +11,7 @@
 # ============================================================================
 # pack_cache.sh -- one experiment's studio data, archived into
 # Data_Export/figures/<name>_<stamp>/: one tar.gz per section (exploration,
-# fig3..fig5, supplementary; never fig1, which holds patient-derived values), split into parts of at most 1 GB that each
+# fig3..fig5; never fig1, which holds patient-derived values), split into parts of at most 1 GB that each
 # unpack on their own (figures_gui/layout.py pack).
 #
 # `run_precompute.sh` submits this with --dependency=afterany on the array

@@ -71,6 +71,13 @@ def source_dir():
         return name
 
 
+def sa_levels():
+    """The sensitivity tabs' levels (sa_levels.json), the file warm_explore.py
+    warms from, so the page asks for exactly what was precomputed."""
+    with open(os.path.join(HERE, "sa_levels.json")) as fh:
+        return {k: v for k, v in json.load(fh).items() if not k.startswith("_")}
+
+
 def grid_axes():
     """The values the build grid was swept over, straight from sweep.py.
 
@@ -167,7 +174,7 @@ def cache_cap(limit_gb):
 PRESETS = os.path.join(BASE_STORE, "detection_presets.json")
 PRESET_KEYS = {"k", "mt", "originRule", "sdKernel", "sdWin", "sdProm", "sdPromRef", "sdWidth", "sdCens", "sdStart",
                "sdTrough", "sdFrac", "sdPick", "sdGate", "burnin",
-               "brkF", "brkH", "brkLo", "brkQuiet", "brkRule"}
+               "brkF", "brkH", "brkLo"}
 
 
 def presets_read():
@@ -271,6 +278,7 @@ class H(SimpleHTTPRequestHandler):
                 ix["experiment"] = dict(name=EXP_NAME, num=STAMP,
                                         source=source_dir())
                 ix["axes"] = grid_axes()
+                ix["sa_levels"] = sa_levels()
                 return self._send(ix)
             if u.path == "/api/jobs":
                 return self._send(JOBS.status())
@@ -278,8 +286,6 @@ class H(SimpleHTTPRequestHandler):
                 return self._send(panels.panel(STORE, q))
             if u.path == "/api/dist":
                 return self._send(dist.dist(STORE, q))
-            if u.path == "/api/sens":
-                return self._send(dist.sens(STORE, q))
             if u.path == "/api/episodes":
                 return self._send(panels.episode_view(STORE, q))
             if u.path == "/api/across":

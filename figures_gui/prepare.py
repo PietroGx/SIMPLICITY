@@ -14,7 +14,9 @@ afterany. Anything after `--` goes to it unchanged (--limit, --resubmit, ...).
     check    run_precompute.sh --check-only
     tx       export_transmissions.py     -> <store>/tx
     runs     export_clade_explorer.py    -> <store>/runs
-    explore  warm_explore.py             daily records, anchors, Figure 5's panel
+    explore  warm_explore.py             daily records, anchors, the Figure 5 panel and
+                                         S3's levels at the operating point (the
+                                         cluster does every (k, m_T) of the grid, for S2)
     grid     compute.py at the operating point (compute.DEFAULTS);
              --all-builds: sweep.py, the whole grid (about a day on 4 cores)
     warm     warm_panels.py              after grid, tx and explore

@@ -28,11 +28,14 @@ const SCENARIO_LABEL = {control: "control", SOT: "SOT", HIV_low: "HIV low",
    against a grid of [5,7,10]. Empty until the fetch lands, which is why
    index.html awaits it before the first render. */
 const AXES = {};
+/* the sensitivity tabs' levels (figures_gui/sa_levels.json, via /api/index) */
+const SA_LEVELS = {};
 
 async function loadAxes() {
   try {
     const ix = await apiGet("/api/index");
     if (ix && ix.axes) Object.assign(AXES, ix.axes);
+    if (ix && ix.sa_levels) Object.assign(SA_LEVELS, ix.sa_levels);
   } catch (e) { /* the rail says so: a build slider with no axis is disabled */ }
 }
 /* m_T is stored as a fraction and shown as a percentage. One conversion,
@@ -217,7 +220,7 @@ const AXIS_HELP = {
   "smoothing window": "The width of the centred moving average the daily frequency is read through before episodes are found.",
   "average cryptic outbreaks per simulation": "Per scenario: the mean, over its simulations, of how many cryptic outbreaks each one has. Each segment is one origin group's own mean, so the segments add up to the column.",
   "intra-host hidden time (days)": "Per outbreak: days from the clade's first appearance (its root lineage's emergence inside a host) to its first transmission, the earliest infection that inherited any of its lineages. How long the clade stayed inside the host where it arose.",
-  "between-host hidden time (days)": "Per outbreak: days from the clade's first transmission to the first day its smoothed frequency rises above f. How long it spread from host to host before it became visible. Under cryptic rule 2 the two hidden times add up to the hidden time; negative when the clade rose above f before its first transmission.",
+  "between-host hidden time (days)": "Per outbreak: days from the clade's first transmission to the first day its smoothed frequency rises above f. How long it spread from host to host before it became visible. The two hidden times add up to the hidden time; negative when the clade rose above f before its first transmission.",
   "prominence": "How far a peak must stand above its neighbouring dip, as a fraction of the clade's own peak height, to count as an episode.",
 };
 /* The same axes as formulas. s is one simulation (S of them), c a clade, f_c(t)

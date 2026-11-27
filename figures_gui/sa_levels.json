@@ -1,0 +1,10 @@
+{
+  "_note": "Levels the outbreak sensitivity tab (S3, web/tab_sa.js) steps through, one parameter at a time around the settings in force. warm_explore.py warms the server-side ones (sdWin, sdProm, brkLo) at the operating point; brkF and brkH are applied in the browser. Served to the page in /api/index as sa_levels.",
+  "outbreak": {
+    "brkF": [0.05, 0.1, 0.15, 0.2, 0.3, 0.5],
+    "brkH": [0, 15, 30, 60, 90, 120, 180, 365],
+    "brkLo": [0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
+    "sdWin": [1, 7, 15, 30, 60],
+    "sdProm": [0.05, 0.1, 0.2, 0.3, 0.5]
+  }
+}

@@ -21,7 +21,6 @@ import compute
 import dist
 import panels
 import sweep
-from dist import _same
 
 TOL = 1e-9
 FAIL = []
@@ -173,79 +172,6 @@ def check_p3(store, p, mf):
     return d
 
 
-def check_sens(store, q, axis, expect):
-    s = dist.sens(store, dict(q, axis=axis))
-    lab = f"sens axis={axis}"
-    lv = s["levels"]
-    if lv != sorted(lv, key=float):
-        FAIL.append(f"{lab}: levels not sorted numerically: {lv}")
-    if len(lv) != len(set(map(float, lv))):
-        FAIL.append(f"{lab}: {len(lv)} levels for {len(set(map(float,lv)))} values")
-    if sorted(map(float, lv)) != sorted(map(float, expect)):
-        FAIL.append(f"{lab}: levels {lv} != grid {expect}")
-    for o in dist.BUILD_AXES:
-        if o != axis and o not in s["pinned"]:
-            FAIL.append(f"{lab}: {o} is not pinned")
-    op = dist.operating_point()
-    if not _same(s["operating"], op[axis]):
-        FAIL.append(f"{lab}: operating {s['operating']} != {op[axis]}")
-    if s["operating_key"] != compute.params_key(op):
-        FAIL.append(f"{lab}: operating_key {s['operating_key']}")
-    if s["operating_key"] not in s["keys"]:
-        FAIL.append(f"{lab}: operating_key is not one of the levels")
-    # every level's CI must come from that level's own per-run array
-    for i, b in enumerate([dict(s["pinned"], **{axis: v}) for v in lv]):
-        b = {k: b[k] for k in dist.BUILD_AXES}
-        d1 = dist.dist1_cached(store, b, s["burnin"])
-        d3 = dist.dist3_cached(store, b, s["mf"])
-        for sc in panels.SCEN_ORDER:
-            cmp(f"{lab}[{lv[i]}] frac_burden_majority_long/{sc}",
-                d1["series"]["frac_burden_majority_long"][sc],
-                s["scenarios"][sc]["frac_burden_majority_long"][i])
-            for m in ("rise_days", "latent_days"):
-                cmp(f"{lab}[{lv[i]}] {m}/{sc}", d3["series"][m][sc],
-                    s["scenarios"][sc][m][i])
-            for m in dist.SENS_METRICS:
-                row = s["scenarios"][sc][m][i]
-                if set(row) != {"n", "mean", "lo", "hi"}:
-                    FAIL.append(f"{lab} {m}/{sc}[{i}]: keys {sorted(row)}")
-    return s
-
-
-def check_sens_vs_panel4(store, q):
-    """At the operating point, panel 4's row and /api/sens must agree on the
-    headline -- panel 4 sums the class means, /api/sens means the per-run sums."""
-    p4 = panels.panel4(store, panels.clean_params(q), float(q["mt"]),
-                       str(q["burnin"]) not in ("0", "false", ""),
-                       panels.read_mf(q))
-    # NOT p4["operating_point"]: _p4_operating_key (panels.py:457-463) matches on
-    # P4_AXES only, so with m_T out of that list it names k7_m0.001, not the
-    # m_T=0.01 operating point. Pick the row whose params ARE the build.
-    want = panels.clean_params(q)
-    row = next(r for r in p4["rows"]
-               if all(_same(r["params"].get(k2), want[k2])
-                      for k2 in dist.BUILD_AXES))
-    s = dist.sens(store, dict(q, axis="k"))
-    i = [float(v) for v in s["levels"]].index(float(row["params"]["k"]))
-    print(f"    panel4 row {row['key']}")
-    print(f"    panel4 operating_point says {p4['operating_point']}")
-    for sc in panels.SCEN_ORDER:
-        for m in dist.SENS_METRICS:
-            want = row["scenarios"][sc][m]
-            got = s["scenarios"][sc][m][i]["mean"]
-            lo, hi = s["scenarios"][sc][m][i]["lo"], s["scenarios"][sc][m][i]["hi"]
-            if (want is None) != (got is None):
-                FAIL.append(f"sens vs p4 {m}/{sc}: {got} vs {want}")
-            elif want is not None and abs(got - want) > TOL \
-                    and abs(got - want) / max(abs(want), 1e-300) > 1e-12:
-                FAIL.append(f"sens vs p4 {m}/{sc}: {got!r} vs {want!r}")
-            print(f"      {sc:9s} {m:26s} p4 {want if want is None else round(want,6):>10} "
-                  f"  sens {got if got is None else round(got,6):>10} "
-                  f"[{'' if lo is None else round(lo,4)}, "
-                  f"{'' if hi is None else round(hi,4)}]")
-    return p4
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--stamp", default="2")
@@ -279,18 +205,6 @@ def main():
     for burnin in (True, False):
         print(f"  panel2  burnin={int(burnin)}")
         check_p2(store, burnin)
-
-    q = {k: str(v) for k, v in op.items()}
-    q.update(burnin="1", mf="0")
-    grid = dict(k=sweep.K, mt=[float(v) for v in sweep.MT],
-                win=sweep.WIN, prom=sweep.PROM)
-    for axis in dist.SENS_AXES:
-        print(f"  sens    axis={axis}")
-        s = check_sens(store, q, axis, grid[axis])
-        print(f"    levels {s['levels']}  pinned {s['pinned']}")
-    print(f"  operating point {compute.params_key(dist.operating_point())}")
-    print("  sens vs panel4")
-    check_sens_vs_panel4(store, q)
 
     print(f"\n{NCMP[0]} mean/n comparisons")
     print(f"worst |diff| {WORST[0]:.3g} (rel {WORST[1]:.3g}) at {WORST[2]}")

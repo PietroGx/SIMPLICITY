@@ -1,6 +1,6 @@
 /* Figure 5: outbreaks. A clade's outbreak is its first sweep peaking at or
-   above F; cryptic if hidden at least H days (and, under brkQuiet, never above
-   its launch level in that time) -- breakoutOf in episodes.js. One figure:
+   above F; cryptic if hidden, never above f, for at least H days -- breakoutOf
+   in episodes.js. One figure:
    A, cryptic outbreaks per simulation in every scenario, control included,
    stacked by Figure 4's origin groups, starred where it differs from control;
    B-F, each cryptic outbreak's intra-host hidden time (first appearance to first
@@ -41,7 +41,7 @@ function rail_panel3(rail) {
   m.className = "card";
   m.innerHTML = `<h2>Data</h2><div class="hint" style="display:block">Every rule is set on the
     exploration tabs: <a href="#sweep">Outbreak detection</a> (smoothing, episodes, start, F),
-    <a href="#cryptic">Cryptic outbreaks</a> (hidden time, H, the launch rule, f) and the burn-in
+    <a href="#cryptic">Cryptic outbreaks</a> (H and f) and the burn-in
     rule. The counts and tests are <a href="#crystats">Cryptic by scenario</a>'s.</div>`;
   rail.append(m);
 }
@@ -477,8 +477,6 @@ function p3DrawPeek(cv, d, rec) {
   if (isNum(rec.tCross)) {
     g.strokeStyle = css("--ink-2"); g.lineWidth = 1; g.setLineDash([6, 2, 1, 2]);
     g.beginPath(); g.moveTo(X(rec.tCross), box.t); g.lineTo(X(rec.tCross), box.b);
-    /* rule 2 draws f already, as its ceiling */
-    if (!cryUnder()) { g.moveTo(box.l, Y(+settings.brkLo)); g.lineTo(box.r, Y(+settings.brkLo)); }
     g.stroke(); g.setLineDash([]); }
   g.strokeStyle = css("--ink"); g.lineWidth = 1.5; g.beginPath();
   const jE = emergedFrom(t, isNum(c.t_emerge) ? c.t_emerge : c.tem);

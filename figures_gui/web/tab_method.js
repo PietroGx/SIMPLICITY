@@ -13,8 +13,8 @@ const mthEsc = s => String(s).replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;"
    Shared definitions, then one section per figure, each a list of panels. */
 const MTH_SECTIONS = [
 {id: "mth-shared", title: "Used by every figure", panels: [
-  {h: "Bootstrap interval, Figures 3, 4 and S1", items: [
-    ["Every 95% interval in Figures 3, 4 and S1: a percentile bootstrap of the mean over simulations, never over clades or events.",
+  {h: "Bootstrap interval, Figures 3, 4, S2 and S3", items: [
+    ["Every 95% interval in Figures 3, 4, S2 and S3: a percentile bootstrap of the mean over simulations, never over clades or events.",
      [mthT`\bar v = \frac{1}{S}\sum_{s=1}^{S} v_s`,
       mthT`\bar v^{*}_b = \frac{1}{S}\sum_{i=1}^{S} v_{s_{bi}},\qquad s_{bi}\sim\mathcal U\{1,\dots,S\},\quad b = 1,\dots,2000`,
       mthT`[\,\text{lo},\ \text{hi}\,] = \big[\,P_{2.5}(\bar v^{*}),\ P_{97.5}(\bar v^{*})\,\big]`],
@@ -261,7 +261,7 @@ const MTH_SECTIONS = [
      [mthT`a(i) = \max\{\,m \in \{0\} \cup \mathcal T : m < i,\ \tilde y_m \le \tilde y_i - \beta_i\,\}\ \ (0 \text{ if none}),\qquad \mathcal T = \text{peaks of } -\tilde y \text{ with prominence} \ge \theta h`],
      [[mthT`\theta`, "dip depth, 10⁻⁴"],
       [mthT`\tilde y_m \le \tilde y_i - \beta_i`, "the “low” dip rule, which exploreQuery always sends"]],
-     "figures_gui/explore.py:188-197 · figures_gui/web/episodes.js:322-324"],
+     "figures_gui/explore.py:188-197 · figures_gui/web/episodes.js:309-311"],
     ["An episode's amplitude and top; its rise is days from 10% to 90% of that amplitude.",
      [mthT`\text{top} = \tilde y_{b},\qquad \text{amp} = \tilde y_{b} - \tilde y_{a},\qquad \text{rise} = t_{i_{90}} - t_{i_{10}},\quad i_q = \min\{\,i \ge a : \tilde y_i \ge \tilde y_a + q\cdot\text{amp}\,\}`],
      [[mthT`a,\ b`, "start and peak index"]],
@@ -271,20 +271,16 @@ const MTH_SECTIONS = [
      [mthT`e^{*} = \text{first } e \text{ with } \text{top}_e \ge F`],
      [[mthT`F`, "5%; the outbreak pick “largest” takes the tallest instead"]],
      "figures_gui/web/episodes.js:258-262 · figures_gui/explore.py:485-488"],
-    ["Hidden time runs from first appearance to the outbreak's start, clamped at first appearance; the launch frequency is the curve's value at the start.",
-     [mthT`t_{\text{start}} = \max\big(t_{a^*},\ t_{\text{em}}\big),\qquad \text{hidden} = t_{\text{start}} - t_{\text{em}},\qquad \text{launch} = \max\big(0,\ \text{top}^{*} - \text{amp}^{*}\big)`],
+    ["The outbreak's start is clamped at first appearance; the launch frequency is the curve's value at the start.",
+     [mthT`t_{\text{start}} = \max\big(t_{a^*},\ t_{\text{em}}\big),\qquad \text{launch} = \max\big(0,\ \text{top}^{*} - \text{amp}^{*}\big)`],
      [[mthT`t_{\text{em}}`, "first appearance (emergence in host), the root lineage's Time_emergence; hidden time always starts here (exploreQuery sends anchor=emergence)"]],
      "figures_gui/web/episodes.js:274-279 · figures_gui/explore.py:266-295, 478"],
-    ["Cryptic, rule 1: hidden at least H days and, under the launch rule, never above the launch frequency while hidden.",
-     [mthT`\text{cryptic} \iff \text{hidden} \ge H\ \wedge\ \neg\Big(\text{quiet} \wedge \max_{t_{\text{em}} \le t_i < t_{a^*}} \tilde y_i > \text{launch}\Big)`],
-     [[mthT`H`, "60 d"],
-      [mthT`\text{quiet}`, "the launch rule, on"]],
-     "figures_gui/web/episodes.js:280-291 · figures_gui/explore.py:373-380"],
-    ["Cryptic, rule 2: hidden means never above f. Hidden time ends the first day the smoothed curve is above f, and the outbreak is cryptic if that is at least H days.",
+    ["Cryptic: hidden means never above f. Hidden time ends the first day the smoothed curve is above f, and the outbreak is cryptic if that is at least H days.",
      [mthT`t_{\text{cross}} = \min\{\,t_i \ge t_{\text{em}} : \tilde y_i > f\,\},\qquad \text{hidden} = t_{\text{cross}} - t_{\text{em}},\qquad \text{cryptic} \iff \text{hidden} \ge H`],
-     [[mthT`f`, "the ceiling, set on Cryptic outbreaks (brkLo)"],
+     [[mthT`H`, "60 d"],
+      [mthT`f`, "the ceiling, set on Cryptic outbreaks (brkLo)"],
       [mthT`t_{\text{cross}}`, "the outbreak's start when the curve never exceeds f"]],
-     "figures_gui/web/episodes.js:284-287 · figures_gui/explore.py:363-370"],
+     "figures_gui/web/episodes.js:281-283 · figures_gui/explore.py:363-370"],
     ["The burn-in rule (“start”, the default): measured on the whole record; a simulation with no φ is left out, and a clade only counts if its outbreak starts after φ.",
      [mthT`\text{counted} \iff \varphi \text{ exists}\ \wedge\ t_{\text{start}} > \varphi`],
      [[mthT`\text{trunc}`, "the alternative: measure from φ and leave out clades with t_em < φ and frequency above 10⁻⁴ at φ"]],
@@ -304,7 +300,7 @@ const MTH_SECTIONS = [
      [[mthT`m`, "comparisons with control, 4"]],
      "figures_gui/web/tab_panel3.js:188-201"],
     ["B–F: one point per cryptic outbreak. x, intra-host hidden time: first appearance to first transmission, inside the host where the clade arose; y, between-host hidden time: first transmission to the first day the smoothed frequency rises above f (<code>t_cross</code>, with each clade from <code>/api/explore_panel</code>). y shared by all five panels, x scaled to each.",
-     [mthT`x = t_{\text{tx}} - t_{\text{em}},\qquad y = t_{>f} - t_{\text{tx}},\qquad \text{rule 2: } x + y = \text{hidden}`],
+     [mthT`x = t_{\text{tx}} - t_{\text{em}},\qquad y = t_{>f} - t_{\text{tx}},\qquad x + y = \text{hidden}`],
      [[mthT`t_{\text{tx}}`, "first transmission, the earliest infection with a transmitter that inherited any of the clade's lineages"],
       [mthT`t_{>f}`, "the first day from first appearance on that the smoothed frequency is above f"]],
      "figures_gui/web/tab_panel3.js:104, 150-152, 333-351 · figures_gui/explore.py:282-292, 484"]]},
@@ -317,33 +313,27 @@ const MTH_SECTIONS = [
      "figures_gui/server.py count_tests · figures_gui/web/tab_sweep.js:504-527, 542-557, 602, 606-607"]]},
 ]},
 
-{id: "mth-s1", title: "Supplementary S1 · Clustering sensitivity", note: "One row per clade build on disk made by the current code. Rise and latency are the clade build's emergence-episode measures (<code>panels.panel3</code>), not Figure 5's outbreaks.", panels: [
-  {h: "Frequency AUC in the majority-long classes", items: [
-    ["Per simulation, the frequency AUC share of classes with more than half of k defining mutations long-born; clades whose n_defining is not k are not in it.",
-     [mthT`y = \frac{1}{S}\sum_s \frac{\sum_{c : n_c = k,\ j_c > k/2} B_c}{\sum_c B_c}`],
-     [],
-     "figures_gui/dist.py:80, 115-120 · figures_gui/panels.py:660-668"]]},
-  {h: "Mean emergence rise time", items: [
-    ["The clade build's episodes (box smoothing W, prominence p, dips at any depth over 10⁻⁴h), its emergence episode the one holding the clade's maximum.",
-     [mthT`e^{\text{emg}} = \arg\min_e \big(\mathbf 1[\,i_{\max} \notin [a_e, b_e]\,],\ -\text{amp}_e\big),\qquad T_c = t_{i_{90}} - t_{i_{10}}`,
-      mthT`y = \frac{1}{S}\sum_s \operatorname{mean}_{c \in s} T_c`],
-     [[mthT`i_{\max}`, "index of the clade's smoothed maximum"]],
-     "figures_gui/compute.py:367-390 · figures_gui/prep/clade_preprocess.py:70-147 · figures_gui/panels.py:511-528, 572-606"]]},
-  {h: "Mean latent interval", items: [
-    ["Days from first appearance to the emergence episode's start; none for a truncated clade, or when negative.",
-     [mthT`L_c = t_{a^{\text{emg}}} - t_{\text{em}}(c),\qquad y = \frac{1}{S}\sum_s \operatorname{mean}_{c \in s,\ L_c \ge 0} L_c`,
-      mthT`\text{truncated} \iff \varphi \text{ exists}\ \wedge\ t_{\text{em}} < \varphi\ \wedge\ F_c(\varphi) > 10^{-4}`],
-     [],
-     "figures_gui/panels.py:589-603, 617-619 · figures_gui/compute.py:354"]]},
-  {h: "Sensitivity lines and summary", items: [
-    ["Lines: one axis moved (k, m_T, window or prominence), every other build parameter pinned at the operating point; each level carries the bootstrap above.",
-     [mthT`\text{levels} = \{\,b : b_{a'} = \text{op}_{a'}\ \ \forall a' \ne a\,\}`],
-     [[mthT`\text{op}`, "k = 7, m_T = 1%, window 15 d, prominence 0.10, rise band 10–90%, post burn-in"]],
-     "figures_gui/dist.py:274-335"],
-    ["Summary: the operating point's value, beneath it the range over every build on disk.",
-     [mthT`\text{span} = \max_b y_b - \min_b y_b`],
-     [],
-     "figures_gui/panels.py:740-784"]]},
+{id: "mth-s1", title: "Supplementary S1 · All trees", note: "Every simulation of one scenario from the per-seed export (<code>/api/run</code>), each phylogeny coloured by the clade partition recomputed in the browser, as on Clustering and in Figure 2.", panels: [
+  {h: "Cells", items: [
+    ["One cell per simulation, seeds in index order; each cell has its own x range, so branch lengths compare within a cell only.",
+     [], [], "figures_gui/web/tab_trees.js:44-91 · figures_gui/web/paint.js:77"]]},
+]},
+{id: "mth-s2", title: "Supplementary S2 · Sensitivity to clustering", note: "One clustering parameter moved over the build grid's values, the other as set on Clustering; each point is its figure's own measurement at that clade definition. Figure 3 does not enter: the transmission table carries no clade definition.", panels: [
+  {h: "Figure 2: clades per simulation, median clade size", items: [
+    ["From the clade build at each level (<code>/api/across</code>), the mean over simulations of the per-simulation value.",
+     [mthT`y = \frac{1}{S}\sum_s x_s`], [], "figures_gui/web/tab_sa.js:79-87 · figures_gui/panels.py:974-1038"]]},
+  {h: "Figure 4: frequency AUC and infections, clades with long-born mutations", items: [
+    ["Figure 4's panel at each level (<code>/api/panel?n=1h</code>): the any-long share is mostly standard + mostly long + only long.",
+     [], [], "figures_gui/web/tab_sa.js:67-76 · figures_gui/panels.py:344-400"]]},
+  {h: "Figure 5: outbreaks, cryptic outbreaks, hidden times", items: [
+    ["Figure 5's per-clade pass (<code>p3Breakouts</code>) on <code>/api/explore_panel</code> at each level, under the detection rules in force. Counts are means per simulation; the share is pooled over the resampled simulations; hidden times are the median over cryptic outbreaks with both times defined.",
+     [mthT`\text{share} = 100\,\frac{\sum_s \text{cry}_s}{\sum_s \text{brk}_s}`],
+     [], "figures_gui/web/tab_sa.js:41-64 · figures_gui/web/tab_panel3.js:81-113"]]},
+]},
+{id: "mth-s3", title: "Supplementary S3 · Sensitivity to outbreak detection", note: "Figure 5's metrics as in S2, with one outbreak or cryptic rule moved and every other as set on the exploration tabs. The levels are <code>figures_gui/sa_levels.json</code>, plus the value in force.", panels: [
+  {h: "Rules", items: [
+    ["F, H and the cryptic rule are applied in the browser to one measurement; the smoothing window, prominence and f each need their own (<code>exploreQuery</code>).",
+     [], [], "figures_gui/web/tab_sa.js:191-249 · figures_gui/web/episodes.js:274-284"]]},
 ]},
 ];
 
@@ -351,7 +341,7 @@ const MTH_SECTIONS = [
 const MTH_STORES = `<div class="def"><h3>Where the numbers come from</h3>
   <p><b>transmission table</b> · <code>figures_gui/export_transmissions.py</code> → <code>tx/</code>: Figure 3, the hosts bar of Figure 4.</p>
   <p><b>per-seed export</b> · <code>figures_gui/export_clade_explorer.py</code> → <code>runs/</code>: Figure 2's phylogeny and frequency plot.</p>
-  <p><b>clade build</b> · <code>figures_gui/compute.py</code> → <code>cache/&lt;parameters&gt;__&lt;hash&gt;/clades_&lt;scenario&gt;.json</code>: Figures 4 and S1, named for k, m<sub>T</sub>, window, prominence, rise band, burn-in window and the code hash.</p>
+  <p><b>clade build</b> · <code>figures_gui/compute.py</code> → <code>cache/&lt;parameters&gt;__&lt;hash&gt;/clades_&lt;scenario&gt;.json</code>: Figures 4 and S2, named for k, m<sub>T</sub>, window, prominence, rise band, burn-in window and the code hash.</p>
   <p><b>daily record</b> · the simulation's own <code>lineage_frequency</code>, read on first request and memoised: Figure 5 and the exploration tabs.</p>
   <p><b>panel cache</b> · <code>figures_gui/panels.py</code> → <code>cache/_panels/</code>: each panel's answer, keyed by the request and the code.</p></div>`;
 

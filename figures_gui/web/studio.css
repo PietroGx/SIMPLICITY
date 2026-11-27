@@ -306,6 +306,17 @@ header.top .src{font-family:var(--f-num);font-size:.72rem;color:var(--ink-3);mar
 .ovcell:hover,.ovcell:focus-visible{border-color:var(--accent)}
 .ovcell[aria-current=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .ovcell canvas{display:block;width:100%;height:auto}
+.trgrid{display:grid;gap:6px;margin-top:4px}
+.trcell{position:relative;min-width:0}
+.trcell canvas{display:block;width:100%}
+.trcell b{position:absolute;left:2px;top:0;font-family:var(--f-num);font-size:.56rem;font-weight:500;color:var(--ink-3)}
+.trcell.empty{min-height:20px;background:var(--panel)}
+.trkey{margin-top:8px}
+.sagrid{display:grid;grid-template-columns:1fr;gap:4px 18px}
+@media (min-width:720px){.sagrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1100px){.sagrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.sagrid h4{font-size:.74rem;font-weight:600;margin:8px 0 0;color:var(--ink-2)}
+.safig{font-size:.8rem;font-weight:600;margin:14px 0 2px}
 .ovcell .tag{position:absolute;left:3px;top:2px;font-family:var(--f-num);font-size:.58rem;
   color:var(--ink-3);background:var(--panel);padding:0 3px;border-radius:2px;opacity:.85}
 .ovcell .nofig{position:absolute;right:3px;top:3px;width:5px;height:5px;border-radius:50%;

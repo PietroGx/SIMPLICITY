@@ -49,7 +49,6 @@ MEMO_DEPS = {
     "p2": ("panel2", "_boot", "_jump_summary"),
     "p3": ("panel3", "_load_builds", "_build_dir", "classes_for", "class_of",
            "emergence_of", "_boot", "_prev", "_dur"),
-    "p4row": ("_panel4_row", "panel1_cached", "panel3_cached", "@p1", "@p3"),
     "episodes": ("episode_view", "_load_builds", "_build_dir", "emergence_of",
                  "class_of", "_boot"),
     "across": ("across", "across_the_set", "values_on_disk", "_load_builds",
@@ -642,112 +641,6 @@ def panel3(store, p, mt, mf=0.0):
                      "RUNS, so their n is a run count, not a clade count.")
 
 
-# ------------------------------------------------------------------ panel 4
-
-def _panel4_row(store, q, key, mt, burnin, mf=0.0):
-    """One sensitivity row: the headline of panels 1 and 3 at one clade build.
-
-    Cached per build, so adding a build costs one row rather than the whole
-    table, and moving m_T costs one row per build with each cached on its own.
-    Before this, panel 4 recomputed panels 1 and 3 from scratch for every build
-    on disk -- 30.4 s once the sweep put 24 builds there, against 2.8 s with 2.
-    """
-    p1 = panel1_cached(store, q, mt, burnin)
-    p3 = panel3_cached(store, q, mt, mf)
-    row = dict(key=key, params=q, scenarios={})
-    for sc in SCEN_ORDER:
-        a = p1["scenarios"].get(sc) or {}
-        b = p3["scenarios"].get(sc) or {}
-        cls = a.get("classes") or {}
-        # one headline per panel: burden percentage in the majority-long
-        # classes, and the mean emergence rise
-        k = int(q["k"])
-        maj = [str(j) for j in range(k // 2 + 1, k + 1)]   # j classes only
-        vals = [cls.get(c, {}).get("frac_burden", {}).get("mean") for c in maj]
-        vals = [v for v in vals if v is not None]
-        row["scenarios"][sc] = dict(
-            frac_burden_majority_long=sum(vals) if vals else None,
-            rise_days=(b.get("rise_days") or {}).get("mean"),
-            latent_days=(b.get("latent_days") or {}).get("mean"),
-            runs=a.get("runs"))
-    return row
-
-
-def panel4(store, p, mt, burnin, mf=0.0):
-    """Sensitivity of panels 1 and 3 to the clustering threshold and to the
-    episode rules -- whatever clade builds exist.
-
-    The assembly is not cached as a whole: each row is, so a new build adds one
-    row's work instead of invalidating the table.
-    """
-    cache = os.path.join(store, "cache")
-    keys = sorted(os.listdir(cache)) if os.path.isdir(cache) else []
-    rows = []
-    for kk in keys:
-        if kk.startswith("_"):
-            continue
-        f = os.path.join(cache, kk, "index.json")
-        if not os.path.exists(f):
-            continue
-        try:
-            idx = json.load(open(f))
-        except Exception:
-            continue
-        # A build stamped by older code cannot be read: _load_builds looks it up
-        # by params_key, which carries the CURRENT hash, so it would resolve to a
-        # directory that does not exist. Skip it rather than fill the table with
-        # rows whose only content is that 404.
-        if idx.get("code") != compute.code_hash():
-            continue
-        q = idx["params"]
-        try:
-            rows.append(_memo(store, "p4row", [kk, mt, burnin, mf],
-                              lambda q=q, kk=kk: _panel4_row(store, q, kk, mt,
-                                                             burnin, mf)))
-        except Exception as exc:
-            rows.append(dict(key=kk, params=q, error=str(exc)))
-    ok = [r for r in rows if "error" not in r]
-    return dict(kind="panel4", mt=mt, burnin=burnin, rows=rows,
-                cached=all(r.get("cached") for r in rows if "error" not in r),
-                axes=_p4_axes(ok), operating_point=_p4_operating_key(ok),
-                summary=_p4_summary(ok), by_axis=_p4_by_axis(ok),
-                metrics=P4_METRICS,
-                note="each row is one clade build. Only builds present in the "
-                     "cache appear; rebuild at another k or another episode "
-                     "setting to add a row.")
-
-
-# m_T is a BUILD parameter -- the build is named by it -- so it has to be
-# pinned like the rest. It was missing, and that single omission produced two
-# defects: _p4_operating_key matched k/win/prom only and returned the first row
-# in directory order, m_T = 0.1% rather than the operating point's 1% (control
-# latency 137.88 d against 183.53 d); and _p4_by_axis left it unpinned, so
-# by_axis["k"] came back with 21 levels for three values of k.
-P4_AXES = ["k", "mt", "win", "prom"]
-P4_METRICS = {
-    "frac_burden_majority_long": "burden in the majority-long classes "
-                                 "(fraction)",
-    "rise_days": "mean emergence rise (days)",
-    "latent_days": "mean latency (days)",
-}
-
-
-def _p4_axes(rows):
-    """The grid the builds on disk actually span, one sorted list per axis."""
-    return {a: sorted({r["params"][a] for r in rows if a in r["params"]})
-            for a in P4_AXES}
-
-
-def _p4_operating_key(rows):
-    """The build at the operating point: compute.DEFAULTS, the values a
-    rebuild uses when nothing is overridden."""
-    for r in rows:
-        q = r["params"]
-        if all(q.get(a) == compute.DEFAULTS[a] for a in P4_AXES):
-            return r["key"]
-    return None
-
-
 def _median(v):
     v = sorted(x for x in v if x is not None)
     if not v:
@@ -756,67 +649,11 @@ def _median(v):
     return v[m] if len(v) % 2 else (v[m - 1] + v[m]) / 2.0
 
 
-def _p4_summary(rows):
-    """Per scenario and metric, what the WHOLE grid does to the number.
-
-    `span` is max - min across every build on disk: the honest width of the
-    claim, as opposed to its value at one chosen setting. `at_operating_point`
-    is that chosen setting, so the two can be read against each other.
-    """
-    opkey = _p4_operating_key(rows)
-    out = {}
-    for sc in SCEN_ORDER:
-        per = {}
-        for m in P4_METRICS:
-            vals = [(r["scenarios"].get(sc) or {}).get(m) for r in rows]
-            vals = [v for v in vals if v is not None]
-            at = None
-            if opkey:
-                hit = next((r for r in rows if r["key"] == opkey), None)
-                at = (hit["scenarios"].get(sc) or {}).get(m) if hit else None
-            per[m] = dict(
-                n=len(vals),
-                min=min(vals) if vals else None,
-                max=max(vals) if vals else None,
-                median=_median(vals),
-                at_operating_point=at,
-                span=(max(vals) - min(vals)) if vals else None)
-        out[sc] = per
-    return out
-
-
-def _p4_by_axis(rows):
-    """One-at-a-time sensitivity: move one axis, pin the others at the
-    operating point.
-
-    The whole-grid span mixes the axes together, so a number can look unstable
-    because of a setting nobody would choose. This isolates each axis, which is
-    the form the question is usually asked in -- "does k change the answer?"
-    """
-    out = {}
-    for axis in P4_AXES:
-        others = [a for a in P4_AXES if a != axis]
-        sel = [r for r in rows
-               if all(r["params"].get(o) == compute.DEFAULTS[o] for o in others)]
-        sel.sort(key=lambda r: r["params"].get(axis))
-        out[axis] = dict(
-            levels=[r["params"].get(axis) for r in sel],
-            keys=[r["key"] for r in sel],
-            scenarios={sc: {m: [(r["scenarios"].get(sc) or {}).get(m)
-                                for r in sel]
-                            for m in P4_METRICS} for sc in SCEN_ORDER},
-            pinned={o: compute.DEFAULTS[o] for o in others})
-    return out
-
 
 # ------------------------------------------------------------------ dispatch
 
 def panel1_cached(store, p, mt, burnin):
-    """Panel 1 through the cache. Panel 4 builds a row per clade build from
-    panels 1 and 3, and used to call them directly -- recomputing both from
-    scratch for every build on disk, 24 times over after the parameter sweep.
-    Going through the cache means a row shares the very answer the Panel 1 tab
-    shows, so whichever is asked for first pays and the other is free."""
+    """Panel 1 through the cache."""
     return _memo(store, "p1", [p, mt, burnin],
                  lambda: panel1(store, p, mt, burnin))
 
@@ -863,8 +700,6 @@ def panel(store, q):
         return panel1_cached(store, p, mt, burnin)
     if which == "3":
         return panel3_cached(store, p, mt, mf)
-    if which == "4":
-        return panel4(store, p, mt, burnin, mf)
     raise ValueError(f"no panel {which}")
 
 

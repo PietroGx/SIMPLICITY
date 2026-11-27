@@ -5,6 +5,107 @@ Ordered by version number. Dates use YYYY-MM-DD.
 
 ------------------------------------------------------------------------
 
+## Version 2.6.2 — 2026-11-27 — pietro gerletti
+
+One cryptic rule: hidden means never above f
+--------------------------------------------
+
+Rule 1 is gone (hidden until the outbreak's start, optionally never above its
+launch frequency: `brkRule = "launch"`, `brkQuiet`). Rule 2 is the only rule,
+everywhere: an outbreak is cryptic if its clade stayed at or under f (`brkLo`)
+for at least H days from first appearance (`episodes.js` `breakoutOf`, now one
+branch). The `brkRule` and `brkQuiet` settings, their rail controls on Cryptic
+outbreaks, the "rose while hidden" reason, the launch-rule legend entries and
+the rule axis of the outbreak sensitivity tab are removed; saved settings sets
+that carry them load without them (`presets.js`, `server.py` `PRESET_KEYS`).
+The Method tab, the detection tabs' rule line and `GLOSSARY.md` say so.
+`check_app.js` checks Figure 5 against Cryptic by scenario, the f crossing and
+"intra-host + between-host = hidden" under the one rule.
+
+At the defaults this changes Figure 5 from empty to populated: under rule 1
+with the quiet condition (the old default) no scenario had a cryptic outbreak;
+under the f ceiling, experiment #2, k = 7, m_T = 1%, there are 0.7 (control)
+to 5.4 (HIV high) per simulation.
+
+Supplementary: S1 all trees, S2-S3 the sensitivity of Figures 2-5
+-----------------------------------------------------------------
+
+The old S1 (`tab_panel4.js`, "Clustering sensitivity": Figure 4's
+majority-long share and the clade build's emergence rise and latency, which
+are no longer Figure 5's measures) is retired with what only it used:
+`/api/sens` (`dist.sens`), `panels.panel4` and its `_p4_*` helpers, the `p4`
+warm kind (112 passes of about a minute each, the warm pass's long pole), the
+`axis4` setting, `test_sens_lines.js` and the sens checks in
+`test_dist_mirrors_panels.py`. Nothing is cached under `supplementary/` any
+more, so `layout.SECTIONS` drops it.
+
+**S1 · All trees** (`web/tab_trees.js`): every simulation of one scenario as a
+phylogeny, one figure per scenario (picked on the rail), coloured by the clade
+definition set on Clustering, with its colour-by, tree-axis and palette
+controls, cells per row, seed numbers and the burn-in rule. Reads only the
+per-seed export (`runs/`). The 50 simulations load under the loading note, then
+draw.
+
+**S2 · Sensitivity to clustering** (`web/tab_sa.js`): k or m_T moved over the
+build grid's values, the other as set on Clustering, and each figure's own
+metric recomputed at every level:
+
+* Figure 2 (`/api/across`): clades per simulation, median clade size.
+* Figure 4 (`/api/panel?n=1h`, the panel the figure draws): frequency AUC in
+  clades with any / only long-born mutations, infections by the former.
+* Figure 5 (`/api/explore_panel` under the detection rules in force, then
+  `p3Breakouts`, the figure's own per-clade pass): outbreaks and cryptic
+  outbreaks per simulation, those from clades with long-born mutations, the
+  cryptic share, and the median intra-host and between-host hidden times of
+  the cryptic outbreaks.
+
+Figure 3 is left out: the transmission table carries no clade definition.
+Figure 1 involves no clustering. Bands are the bootstrap 95% interval over
+simulations (`p3BootBy`, `panels._boot`). Figures 2 and 4 draw at once,
+Figure 5 level by level as each measurement arrives.
+
+**S3 · Sensitivity to outbreak detection** (same file): Figure 5's metrics
+with one rule moved -- outbreak peak F, hidden time H, ceiling f, smoothing
+window or prominence -- every other as set on the exploration tabs. The
+levels are `figures_gui/sa_levels.json`, served in `/api/index` and read by
+the warm pass, plus the value in force. F and H reuse one measurement; window,
+prominence and f each need their own.
+
+S1 and S2 stop fetching when their tab is left, so nothing keeps fetching into
+the next tab, and resume from the cache on the next visit.
+
+`figures_gui/test_sa_tabs.js` holds them to "the figure's own measurement at
+another setting": at no patch and under four patches `saFig5` equals
+`swScenCounts` per simulation (the counting Figure 5 and Cryptic by scenario
+share) in every scenario; a patch never leaks into the settings; every facet
+of S3 draws for all five rules; S2 has Figure 5 at every level; S1 draws 50
+trees. Spot check, k = 5 / 7 / 10: clades per simulation 13.9 / 10.1 / 6.3 in
+control, 30.9 / 21.7 / 14.5 in HIV high; frequency AUC in clades with
+long-born mutations 0% in control, 99.2 / 97.8 / 90.8% in HIV high.
+`test_sa_tabs.js`: 22 passed. `check_app.js`: 158 passed, 0 failed; it opens
+S2 over k (three pairs) rather than m_T (seven), and ran against a server on
+this box with clade builds at k = 5, 7, 10 and m_T = 1%, built here for the
+test, and the runs warmed at those three pairs.
+
+Preprocessing
+-------------
+
+* `warm_explore.py --pairs all` warms the daily records and anchors at every
+  (k, m_T) of the grid (21 pairs, 21 times the runs), then the Figure 5 panel
+  at each pair and at S3's server-side levels at the operating point (34
+  panels); `--panel-only` does the panels alone. Its queries are checked
+  equal to the page's own at the default settings.
+* `slurm_explore.sh` runs `PAIRS=all` by default (2 h, 16 GB a shard, was
+  45 min, 8 GB, for runs the size of the N = 10,000 experiment), and
+  `run_precompute.sh` submits its panel task with `PANEL_ONLY=1` and 6 h.
+* `warm_panels.py` warms Figure 4's panel (`p1h`) at every build, which S2
+  reads at each level, and no longer warms panel 4.
+* Locally, `prepare.py --local`'s explore step warms the operating point, its
+  Figure 5 panel and S3's levels; S2 needs the grid, so it is complete only
+  with the cluster's data.
+
+------------------------------------------------------------------------
+
 ## Version 2.6.1 — 2026-11-26 — pietro gerletti
 
 m_T is applied in one place; functions nothing called are gone

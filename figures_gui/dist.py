@@ -1,4 +1,4 @@
-"""Per-run values behind the panel CIs, and the sensitivity table with bands.
+"""Per-run values behind the panel CIs.
 
 Every number panels.py sends is already a mean with a bootstrap CI over runs
 (panels.py:146-156). The per-run values exist on the way there -- panel 1 builds
@@ -28,7 +28,6 @@ every `parts` list: an edit here discards the d* memos and nothing else.
 The contract is written out in web/dist.js.
 """
 import base64
-import hashlib
 import json
 import os
 
@@ -39,11 +38,6 @@ import codehash as ch
 import panels
 import simplicity.clustering as cl
 
-# Everything params_key names, i.e. what makes a build a different build
-# (compute.py:74-86).
-BUILD_AXES = ["k", "mt", "win", "prom", "lo", "hi", "window"]
-SENS_AXES = ["k", "mt", "win", "prom"]
-SENS_METRICS = ["frac_burden_majority_long", "rise_days", "latent_days"]
 # formed inside a run, so no panel field holds their interval
 DERIVED = ["frac_burden_long", "frac_burden_majority_long", "intensity_ratio"]
 
@@ -251,8 +245,6 @@ def dist(store, q):
     raise ValueError(f"no distribution for panel {which}")
 
 
-# ------------------------------------------------------------------ /api/sens
-
 def builds_on_disk(store):
     """Each build's own params, for the builds this code can read -- the filter
     warm_panels.builds_on_disk applies (warm_panels.py:61-78)."""
@@ -269,67 +261,3 @@ def builds_on_disk(store):
         if ix.get("code") == compute.code_hash():
             out.append(ix["params"])
     return out
-
-
-def operating_point():
-    """The operating point across EVERY build parameter: compute.DEFAULTS plus
-    window="post", the values a rebuild uses when nothing is overridden.
-
-    panels._p4_operating_key (panels.py:740-747) matches on P4_AXES only
-    (k, m_T, win, prom); this one also fixes lo, hi and window.
-    """
-    return dict(compute.DEFAULTS, window="post")
-
-
-def _same(a, b):
-    try:
-        return float(a) == float(b)
-    except (TypeError, ValueError):
-        return a == b
-
-
-def sens(store, q):
-    """Panel 4's sensitivity line, one axis at a time, with bands.
-
-    panel4's own by_axis cannot serve it: it pins P4_AXES (panels.py:725)
-    but not lo, hi or window. Here every build axis but the one asked for is
-    pinned, and levels sort numerically.
-
-    Each metric carries a full bootstrap CI over runs. Panel 4's rows take
-    .get("mean") and drop lo/hi (panels.py:646-672), and a sensitivity line
-    without a band invites a 2-day wiggle to be read as a real shift.
-    """
-    axis = q.get("axis")
-    if axis not in SENS_AXES:
-        raise ValueError(f"axis must be one of {', '.join(SENS_AXES)}")
-    p = panels.clean_params(q)
-    burnin = str(q.get("burnin", "1")) not in ("0", "false", "")
-    mf = panels.read_mf(q)
-    others = [a for a in BUILD_AXES if a != axis]
-    sel = [b for b in builds_on_disk(store)
-           if all(_same(b.get(o), p.get(o)) for o in others)]
-    sel.sort(key=lambda b: float(b[axis]))
-
-    scens = {sc: {m: [] for m in SENS_METRICS} for sc in panels.SCEN_ORDER}
-    cached = True
-    for b in sel:
-        # each level is read at its OWN m_T: the build is named by it
-        d1 = dist1_cached(store, b, burnin)
-        d3 = dist3_cached(store, b, mf)
-        cached = cached and d1.get("cached") and d3.get("cached")
-        for sc in panels.SCEN_ORDER:
-            for m, src in ((SENS_METRICS[0], d1), (SENS_METRICS[1], d3),
-                           (SENS_METRICS[2], d3)):
-                scens[sc][m].append(
-                    panels._boot((src["series"].get(m) or {}).get(sc) or []))
-    # the level to rule. operating_key is null unless this slice passes through
-    # the operating build, so a ruled level is never mistaken for it
-    op = operating_point()
-    okey = compute.params_key(op)
-    on_slice = any(compute.params_key(b) == okey for b in sel)
-    return dict(kind="sens", axis=axis, pinned={o: p[o] for o in others},
-                levels=[b[axis] for b in sel],
-                keys=[compute.params_key(b) for b in sel],
-                operating=op[axis], operating_key=okey if on_slice else None,
-                burnin=burnin, mf=mf, cached=bool(cached),
-                metrics=panels.P4_METRICS, scenarios=scens)

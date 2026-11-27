@@ -42,7 +42,9 @@ one means adding a file.
 | figures | 3 · Transmission | `web/tab_panel2.js` | `/api/panel?n=2` (`tx/`) |
 | figures | 4 · Frequency AUC | `web/tab_panel1.js` | `/api/panel?n=1`, `n=1h` |
 | figures | 5 · Breakouts | `web/tab_panel3.js` | `/api/explore_panel` |
-| supplementary | S1 · Clustering sensitivity | `web/tab_panel4.js` | `/api/panel?n=4`, `/api/sens` |
+| supplementary | S1 · All trees | `web/tab_trees.js` | `/api/runs`, `/api/run` |
+| supplementary | S2 · Sensitivity to clustering | `web/tab_sa.js` | `/api/across`, `/api/panel?n=1h`, `/api/explore_panel` at each (k, m_T) |
+| supplementary | S3 · Sensitivity to outbreak detection | `web/tab_sa.js` | `/api/explore_panel` at each level of `sa_levels.json` |
 | data exploration | Clustering | `web/tab_clustering.js` | `/api/runs`, `/api/run` |
 | data exploration | m_T effect on clades | `web/tab_across.js` | `/api/across` |
 | data exploration | Breakout detection (`#sweep`) | `web/tab_sweep.js` | `/api/explore` |
@@ -72,7 +74,6 @@ Data/figures/<name>_<stamp>/    one experiment (layout.py, sweep.py --print-path
                                 jump tables per transmitter type (export_transmissions.py)
   fig1/                         fig1.json + index.json, Figure 1's data (fig1.py build), local only
   fig3/ fig4/ fig5/ cache/      each figure's panel cache (layout.MEMO_HOME)
-  supplementary/S1/cache/       Figure S1's panel cache
 ```
 
 The builds stay at `exploration/cache/<build>`: `panels._build_dir` is in every
@@ -179,7 +180,7 @@ packs both the run data and the figure data unless `--no-compress`.
 | check | `run_precompute.sh --check-only` | the same checks, on the login node | -- |
 | tx | `export_transmissions.py` | `slurm_tx.sh` (30 min, 8G, 4 cpu) | -- |
 | runs | `export_clade_explorer.py` | `slurm_runs.sh` (1 h, 16G, 4 cpu) | -- |
-| explore | `warm_explore.py` | `slurm_explore.sh`, then its Figure 5 panel task | -- |
+| explore | `warm_explore.py` at the operating point, its Figure 5 panel and S3's levels | `slurm_explore.sh` at every (k, m_T) of the grid (2 h, 16G, 4 cpu), then one task for the Figure 5 panels at each pair and at S4's levels (6 h) | -- |
 | grid | `compute.py` at the operating point; `--all-builds`: `sweep.py` | `slurm_precompute.sh`, one build a task (1 h, 16G, 4 cpu) | -- |
 | warm | `warm_panels.py` | `slurm_warm.sh`, 32 shards (1 h, 8G, 4 cpu) | grid, tx, explore |
 | pack | `pack_cache.sh --here` (`--partial` unless `--all-builds`) | `pack_cache.sh` (3 h, 16G, 8 cpu) | everything, afterany |
@@ -197,7 +198,7 @@ Figure 1 with `fig1/` missing, or stale (its code or its input files changed,
 because it holds values derived from the patient data.
 
 The pack job (`layout.py pack`) writes `Data_Export/figures/<name>_<stamp>/`:
-one `.tar.gz` per section (exploration, fig2..fig5, supplementary), only
+one `.tar.gz` per section (exploration, fig2..fig5), only
 builds at the current hash, split into `_partNN` files of at most 1 GB that each
 unpack on their own, plus a manifest with checksums and the extract line. A
 missing `tx/` or `runs/` is a warning, a partial grid is a refusal (exit 3).
@@ -220,6 +221,7 @@ python -I tests/check_studio_api.py             #     the API a page actually re
 node    figures_gui/check_app.js               #     every tab rendered headlessly
 node    figures_gui/check_episodes.js          # 25  the tab's episodes against the build's
 python -I figures_gui/check_explore.py         #     /api/explore IS run_daily, explore_panel IS n=3b, at Figure 5's rules
+node    figures_gui/test_sa_tabs.js            #     S1-S3: the sensitivity metrics ARE Figure 5's counting, every facet draws
 ```
 
 `check_app.js` executes every tab against a running server, so a broken render

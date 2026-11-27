@@ -34,7 +34,7 @@ const SETTING_DEFAULTS = {
   overview: 0, sdOverview: 0, sdOvCols: 6, sdOvShow: "breakout", sdOvWhy: "all", crOverview: 0, crOvShow: "cryptic", crOvWhy: "all", yScale: "shared",
   // which plot each panel tab draws
   focus: "",
-  plot3: "breakouts", axis4: "k",
+  plot3: "breakouts",
   // Figure 4's colours: normal, colour-blind colours, or those plus a texture per class
   p1Pal: "normal",
   // the Export tab: which figure, file format, printed width (mm) and resolution (dpi)
@@ -42,8 +42,8 @@ const SETTING_DEFAULTS = {
   // what Figure 5 measures with: the detection tabs' rules (/api/explore_panel) or
   // the clade build's (/api/panel?n=3b)
   p3Source: "sweep",
-  // Figure 5 outbreaks: peak that makes a sweep big, hidden days, launch ceiling
-  brkF: 0.05, brkH: 60, brkLo: 0.01, brkQuiet: 1, brkRule: "launch",
+  // Figure 5 outbreaks: peak that makes a sweep big, hidden days, the ceiling f
+  brkF: 0.05, brkH: 60, brkLo: 0.01,
   // the detection tabs' rules, their own so exploring cannot move a build
   // parameter; tab_sweep.js SD_FIG5 says which values are Figure 5's
   sdKernel: "box", sdWin: 15, sdProm: 0.10, sdPromRef: "peak",
@@ -62,13 +62,17 @@ const SETTING_DEFAULTS = {
   f4Titles: 1, f4Dots: 1, f4LegLetters: 1, f4TextCol: 0,
   f3Titles: 1, f3ShowN: 1, f3Sub: 1, f3Dots: 1, f3LegLetters: 1, f3TextCol: 0,
   f2Seeds: "", f2Titles: 1, f2Dots: 1, f2DotsLeg: 1, f2TextCol: 0,
+  // S2 all trees: the scenario drawn, cells per row, seed tags, burn-in rule
+  trScen: "HIV_high", trCols: 10, trTags: 1, trBurnin: 1,
+  // S3 clustering sensitivity: the axis walked; S4 outbreak sensitivity: the rule walked
+  saVary: "mt", osAxis: "brkF",
   f1Titles: 1, f1ShowN: 1, f1Hist: 1, f1DotsData: 0, f1DotsModel: 0, f1Cloud: 0,
 };
 
 /* Settings whose value changes what the rail OFFERS, not just what it shows:
    the plot form decides whether the distribution box can be ticked at all. A rail is built once per tab so
    that dragging a slider cannot lose its focus, so these ask for a rebuild. */
-const RAIL_SETTINGS = ["plot3", "axis4", "focus", "p3Source", "sdStart", "sdKernel", "brkRule"];
+const RAIL_SETTINGS = ["plot3", "focus", "p3Source", "sdStart", "sdKernel"];
 
 const BUILD_SETTINGS = ["k", "mt", "win", "prom", "lo", "hi", "window"];
 const READ_SETTINGS = ["burnin", "mf"];

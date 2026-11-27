@@ -5,7 +5,7 @@
 
 const DATA_PRESET_KEYS = ["k", "mt", "originRule", "burnin",
   "sdKernel", "sdWin", "sdProm", "sdPromRef", "sdWidth", "sdCens", "sdStart",
-  "sdTrough", "sdFrac", "sdPick", "sdGate", "brkF", "brkH", "brkQuiet", "brkRule", "brkLo"];
+  "sdTrough", "sdFrac", "sdPick", "sdGate", "brkF", "brkH", "brkLo"];
 const DATA_TABS = ["clustering", "across", "sweep", "cryptic", "crystats"];
 const presetEsc = v => String(v).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
 
@@ -26,8 +26,9 @@ async function presetsPost(name, values) {
 const presetNow = () => Object.fromEntries(DATA_PRESET_KEYS.map(k => [k, settings[k]]));
 /* A set saved before a rule existed was measured under what the code did then,
    not under today's default: before v2.5.22 the prominence bar was a share of
-   the clade maximum and rule 1 was the only cryptic rule. */
-const PRESET_LEGACY = {sdPromRef: "clade", brkRule: "launch"};
+   the clade maximum. (A set's brkRule and brkQuiet, from before v2.6.2, are
+   ignored: the f ceiling is the only cryptic rule now.) */
+const PRESET_LEGACY = {sdPromRef: "clade"};
 const presetOf = n => dataPresets && dataPresets[n] ? Object.assign({}, PRESET_LEGACY, dataPresets[n]) : null;
 /* a set saved before it held every key matches on the keys it has */
 const presetMatch = () => Object.keys(dataPresets || {}).find(n => {

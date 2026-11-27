@@ -59,51 +59,9 @@
    and bootstrapped from there. Same for intensity_ratio, which is a per-run
    ratio and not one mean divided by another.
 
-   GET /api/sens?axis=<k|mt|win|prom>&<build and read parameters>
-
-     {kind: "sens", axis, pinned: {...}, levels: [...], operating: <level>,
-      scenarios: {scenario: {metric: [{n, mean, lo, hi} per level, ...]}}}
-
-   The panel-4 sensitivity line, regrouped and with intervals. panel4's own
-   by_axis cannot serve it: P4_AXES is ["k","win","prom"] (panels.py:442), m_T
-   is a build parameter that is not in that list, so _p4_by_axis (:503-523)
-   leaves it unpinned and by_axis["k"] comes back with 21 levels for three
-   values of k -- seven m_T rows per k, ordered lexicographically by directory
-   name so m0 lands after m0.1. /api/sens pins every axis but the one asked for.
-
-   `operating` is resolved from compute.DEFAULTS across every build parameter,
-   m_T included, and NOT from panels._p4_operating_key (panels.py:458-465) --
-   which matches on P4_AXES only, so it ignores m_T and answers
-   k7_m0.001_... , m_T = 0.1% rather than the operating point's 1%. That key
-   feeds _p4_summary's at_operating_point (panels.py:432-437), so panel 4's
-   summary numbers are at the wrong m_T. Same root cause, one layer up.
-
    ---------------------------------------------------------------- caching
 
-   Both go through apiGetSlot, so a repeat is free and a superseded request is
+   It goes through apiGetSlot, so a repeat is free and a superseded request is
    aborted. A tab asks for the distribution only when its own box is ticked:
    nothing fetches per-run values to then not draw them.
 */
-
-/* The per-run series for one panel, or null when the server has none -- an
-   older store, or a build dist.py has not warmed. A tab must render without it:
-   the overlay is an addition to a chart that already stands up alone. */
-/* An endpoint this store does not serve is remembered. api.js caches only
-   successes (api.js:96), and a tab whose box is ticked re-renders on every
-   slider move -- so a 404 would be refetched each time. A supersede is NOT an
-   absence: it means a newer render is already on its way. Cleared by a page
-   reload, which is when dist.py could have appeared. */
-const DIST_ABSENT = new Set();
-
-/* The sensitivity table for one axis of the build grid, or null. */
-async function sensFor(axis) {
-  if (DIST_ABSENT.has("sens")) return null;
-  try {
-    const d = await apiGetSlot(`/api/sens?axis=${encodeURIComponent(axis)}&`
-                               + buildQuery());
-    return d && d.levels ? d : null;
-  } catch (e) {
-    if (!isSuperseded(e)) DIST_ABSENT.add("sens");
-    return null;
-  }
-}

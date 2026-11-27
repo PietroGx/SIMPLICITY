@@ -232,9 +232,8 @@ function drawBreakout(g, X, Y, box, b, {labels = false, r = 3.5, hidden = true, 
     g.strokeStyle = css(hi ? "--ink" : "--ink-2"); g.lineWidth = hi ? 1.8 : 1; g.setLineDash(dash);
     g.beginPath(); g.moveTo(x, box.t); g.lineTo(x, box.b); g.stroke(); g.setLineDash([]); };
   if (hidden) vline(xa, [], "anchor");
-  /* the ceiling across the hidden time: the launch level (rule 1, brkQuiet)
-     or f (rule 2), which the curve must stay under while hidden */
-  const ceil = b.ceil !== undefined ? b.ceil : settings.brkQuiet ? b.launch : null;
+  /* the ceiling across the hidden time: f, which the curve stays under while hidden */
+  const ceil = b.ceil !== undefined ? b.ceil : +settings.brkLo;
   if (hidden && isNum(ceil) && xh > xa) { const hi = lay("ceil"), y = Y(ceil);
     g.strokeStyle = css("--long"); g.lineWidth = hi ? 2 : 1.3; g.setLineDash([2, 3]);
     g.beginPath(); g.moveTo(xa, y); g.lineTo(xh, y); g.stroke(); g.setLineDash([]); }
@@ -261,15 +260,13 @@ function breakoutKey(curve = "clade frequency (smoothed)", anchor = "first appea
     ...(tx ? [[sv(`<line x1="11" y1="0" x2="11" y2="12" stroke="${ink2}" stroke-width="1.2" stroke-dasharray="1 2"/>`),
      "first transmission: intra-host hidden time before it, between-host hidden time after"],
     [sv(`<line x1="11" y1="0" x2="11" y2="12" stroke="${ink2}" stroke-width="1" stroke-dasharray="6 2 1 2"/>`),
-     "first day above f: between-host hidden time ends"],
-    ...(cryUnder() ? [] : [[sv(`<line x1="1" y1="6" x2="21" y2="6" stroke="${ink2}" stroke-width="1" stroke-dasharray="6 2 1 2"/>`),
-     "f"]])] : []),
+     "first day above f: between-host hidden time ends"]] : []),
     [vl("3 2"), "outbreak sweep starts"],
     [dot(lng), "launch frequency"],
     [dot(ink), "outbreak peak"],
     [hl("4 3"), "F: big-sweep threshold"],
-    ...(cryCeilText() ? [[sv(`<line x1="1" y1="6" x2="21" y2="6" stroke="${lng}" stroke-width="1.4" stroke-dasharray="2 3"/>`),
-     cryCeilText()]] : []),
+    [sv(`<line x1="1" y1="6" x2="21" y2="6" stroke="${lng}" stroke-width="1.4" stroke-dasharray="2 3"/>`),
+     cryCeilText()],
   ];
   return `<div class="bkey">${items.map(([i, t]) => `<span>${i}${t}</span>`).join("")}</div>`;
 }

@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=fig2_explore
 #SBATCH --array=0-9
-#SBATCH --time=00:45:00
-#SBATCH --mem=8G
+#SBATCH --time=02:00:00
+#SBATCH --mem=16G
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=main
 #SBATCH --qos=standard
@@ -33,6 +33,10 @@ STORE="${STORE:-$ROOT/Data/figures}"
 K="${K:-7}"
 MT="${MT:-0.01}"
 SEEDS="${SEEDS:-50}"
+# all: every (k, m_T) of the grid, for S2; op: K and MT only
+PAIRS="${PAIRS:-all}"
+# 1: the Figure 5 panels only, after the shards warmed the runs
+PANEL_ONLY="${PANEL_ONLY:-0}"
 IDX="${SLURM_ARRAY_TASK_ID:-0}"
 N="${SLURM_ARRAY_TASK_COUNT:-1}"
 
@@ -43,9 +47,9 @@ PATHS=$(python -I figures_gui/sweep.py --print-paths --store "$STORE" \
         --stamp "$STAMP" --exp-name "$EXP_NAME")
 read -r EXP_NAME STAMP _REL EXP_STORE _CACHE EXP_ROOT <<<"$PATHS"
 
-echo "explore warm: shard $IDX/$N on $(hostname -s), $EXP_NAME #$STAMP, k=$K m_T=$MT"
+echo "explore warm: shard $IDX/$N on $(hostname -s), $EXP_NAME #$STAMP, pairs=$PAIRS (op k=$K m_T=$MT) panel_only=$PANEL_ONLY"
 date
 python -I figures_gui/warm_explore.py --store "$EXP_STORE" \
     --stamp "$STAMP" --exp-name "$EXP_NAME" --k "$K" --mt "$MT" --seeds "$SEEDS" \
-    --procs "${SLURM_CPUS_PER_TASK:-4}" --shard "$IDX/$N" \
-    $([ "$N" -gt 1 ] && echo --no-panel)
+    --procs "${SLURM_CPUS_PER_TASK:-4}" --shard "$IDX/$N" --pairs "$PAIRS" \
+    $([ "$N" -gt 1 ] && echo --no-panel) $([ "$PANEL_ONLY" = 1 ] && echo --panel-only)

@@ -114,7 +114,7 @@ def read_params(q):
         gate=choice("gate", GATES, FIG5["gate"]),
         dip=choice("dip", DIPS, FIG5["dip"]),
         promref=choice("promref", PROMREFS, FIG5["promref"]),
-        # cryptic rule 2's ceiling f: hidden time ends when the curve first exceeds it
+        # the cryptic ceiling f: hidden time ends when the curve first exceeds it
         under=num("under", 0.01, 0.0, 1.0),
         mf=panels.read_mf(q),
         burnin=str(q.get("burnin", "1")) not in ("0", "", "false", "False"))
@@ -362,7 +362,7 @@ def detect(y, t, r):
 
 def _cross(ys, t, tem, f):
     """The first day, from the anchor on, that the smoothed curve is above f:
-    where cryptic rule 2's hidden time ends. None when it never is."""
+    where cryptic hidden time ends. None when it never is."""
     if tem is None:
         return None
     ja = int(np.searchsorted(t, float(tem)))

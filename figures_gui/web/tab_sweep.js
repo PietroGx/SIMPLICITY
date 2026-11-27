@@ -195,8 +195,7 @@ function detectionRail(rail) {
     "Where each episode begins: the red dot.", [
     segmentControl({setting: "sdStart", label: "Rule",
       options: [
-        ["trough", "Last dip", "The low point just before the peak. With the launch rule it leaves "
-          + "no cryptic outbreaks: the clade was above that low earlier."],
+        ["trough", "Last dip", "The low point just before the peak."],
         ["frac", "Below %", "The last day the clade was under a share of the peak, set below."],
         ["base", "Base", "scipy's prominence base: the lowest point back to a taller peak. Often far left."]],
       hint: "Where each episode begins."}),
@@ -226,32 +225,21 @@ function crypticRail(rail) {
 }
 function crypticCards(rail) {
   rail.append(swCard("hidden", "1 · Hidden time",
-    "The red band: from the solid line to the outbreak's start, the red dot.", [
+    "The red band: from the solid line to the first day the curve is above f.", [
     (() => { const d = document.createElement("div");
       d.innerHTML = `<div class="hint" style="display:block">From <b>emergence in host</b>, when the
         clade's root lineage arose inside a host.</div>`; return d; })(),
   ]));
-  const under = settings.brkRule === "under";
   rail.append(swCard("cryptic", "2 · Cryptic if",
-    "Tinted cells: cryptic outbreaks under the rule chosen.", [
-    segmentControl({setting: "brkRule", label: "Rule",
-      options: [
-        ["launch", "Rule 1", "Hidden until the outbreak starts. With the box below ticked, the curve "
-          + "must also stay under its launch level while hidden."],
-        ["under", "Rule 2", "Hidden while the curve stays under f: hidden time ends the first day "
-          + "it rises above f."]],
-      hint: "What hidden means."}),
+    "Tinted cells: cryptic outbreaks.", [
     sliderControl({setting: "brkH", label: "Hidden ≥ <i>H</i>", values: BRK_H,
       format: v => v + " d",
       hint: "Cryptic only if the hidden time, the red band, lasts at least H."}),
-    sliderControl({setting: "brkLo", label: under ? "Under <i>f</i>" : "<i>f</i> (Figure 5)", values: BRK_LO,
+    sliderControl({setting: "brkLo", label: "Under <i>f</i>", values: BRK_LO,
       format: v => brkPct(v),
-      hint: (under ? "Rule 2's ceiling: the clade is hidden while its smoothed frequency stays at or under f. "
-          : "Under rule 1, f decides no cryptic outbreak. ")
-          + "Figure 5's between-host hidden time ends on the first day the smoothed frequency rises above f."}),
-    under ? null : checkControl({setting: "brkQuiet", label: "No rise above the launch before it",
-      hint: "Hidden time counts only if the curve never rose above the launch level, "
-          + "the red dotted line, during it."}),
+      hint: "The clade is hidden while its smoothed frequency stays at or under f: hidden time "
+          + "ends the first day it rises above f, which is also where Figure 5's between-host "
+          + "hidden time ends."}),
   ]));
 }
 
@@ -325,10 +313,9 @@ function swRuleLine(mode, offRules) {
       dips${+settings.sdWidth ? `, at least <b>${settings.sdWidth} d</b> wide` : ""}, on a
       <b>${kern} ${settings.sdWin} d</b>. Each starts at <b>${swStartText()}</b>.
       The outbreak is ${brk}. <a href="#cryptic">Which are cryptic →</a></div>`;
-  return `<div class="sw-rule hintpop-on">${swChip(mode, offRules)} <b>Rule ${cryUnder() ? 2 : 1}</b>: hidden from
-    <b>emergence in host</b> to ${cryUnder() ? `the first day above <b>f = ${brkPct(+settings.brkLo)}</b>` : "the outbreak's start"}.
-    Cryptic: hidden ≥ <b>${settings.brkH} d</b>${!cryUnder() && settings.brkQuiet
-      ? ", <b>never above its launch level before it</b>" : ""}.
+  return `<div class="sw-rule hintpop-on">${swChip(mode, offRules)} Hidden from
+    <b>emergence in host</b> to the first day above <b>f = ${brkPct(+settings.brkLo)}</b>.
+    Cryptic: hidden ≥ <b>${settings.brkH} d</b>.
     <span class="sw-sub">Outbreaks from <a href="#sweep">← Outbreak detection</a>:
     ${brk.replace(/<\/?b>/g, "")}, starting at ${swStartText()}.</span></div>`;
 }
@@ -695,8 +682,7 @@ const SW_WHY = [
   ["nopeak", "no peak", "No peak passes the episode rules."]];
 const CR_WHY = [
   ["all", "All", "Every outbreak that is not cryptic."],
-  ["short", "hidden < H", "Hidden for less than H days."],
-  ["rose", "rose while hidden", "Rule 1 with the launch rule: hidden long enough, but the curve rose above its launch level while hidden."]];
+  ["short", "hidden < H", "Hidden for less than H days."]];
 /* the scenario view's settings, per tab */
 const SW_OV = {
   sweep: {on: "sdOverview", show: "sdOvShow", why: "sdOvWhy", eps: "sdEpsDet", whys: SW_WHY,
@@ -708,8 +694,7 @@ const SW_OV = {
                   ["notcry", "Not cryptic", "Outbreaks that are not cryptic, each saying why."]], filtered: "notcry"},
 };
 const swOvOn = mode => SW_OV[mode] && !!settings[SW_OV[mode].on];
-/* the reasons that can occur under the rules in force: rule 2 has no launch rule */
-const swOvWhys = O => O.whys.filter(([v]) => !(v === "rose" && cryUnder()));
+const swOvWhys = O => O.whys;
 
 async function swOverview(mode, main) {
   const O = SW_OV[mode], P = SW_MODES[mode].p, cry = SW_MODES[mode].cryptic;
@@ -717,7 +702,7 @@ async function swOverview(mode, main) {
   const show = settings[O.show], showEps = !!settings[O.eps];
   const filtered = show === O.filtered;
   const whyKey = cry
-    ? r => r.brk.hidden < H ? "short" : "rose"
+    ? () => "short"
     : r => isNum(r.preBurn) ? "pre" : r.trunc ? "at" : r.eps.length ? "below" : "nopeak";
   const whyText = Object.fromEntries(O.whys.map(([v, t]) => [v, t]));
   const why = r => whyText[whyKey(r)];

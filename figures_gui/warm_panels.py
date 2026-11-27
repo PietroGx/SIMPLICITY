@@ -10,31 +10,28 @@ Measured cold, run #2, 168 builds:
 
     panel 1     0.12 s   key [build, m_T, burn-in]        336 keys
     panel 1c  not timed  key [build, m_T, burn-in]        336 keys  (Figure 4 points)
+    panel 1h  not timed  key [build, burn-in]             336 keys  (Figure 4; S2 reads it at every build)
     panel 2        ~0 s  key [burn-in]                      2 keys
     panel 3     0.18 s   key [build, m_T, m_F]           1,344 keys
     episodes    0.04 s   key [build, m_T, m_F]           1,344 keys
     across      1.0 s    key [build, present]              168 keys
     daily       0.8-3.3s key [k, scenario, seed, m_T]    5,250 keys
-    panel 4     59 s     key [build, m_T, burn-in, m_F]    112 passes
-                         -- one row per build, so 112 x 168 = 18,816 rows
     dist 1      0.04 s   key [build, burn-in, dist hash]    336 keys
     dist 2      0.02 s   key [burn-in, dist hash]             2 keys
     dist 3      0.02 s   key [build, m_F, dist hash]      1,344 keys
 
 The d* kinds are the per-run arrays behind the same CIs (dist.py), keyed as
 their panels are and cheaper, since they bootstrap only the derived keys.
-/api/sens assembles from d1 and d3 and is not memoised itself, so warming those
-warms it. They add about 150 MB to _panels.
+They add about 150 MB to _panels.
 
 m_T is both a build parameter and an argument, and the two always move
 together: the build is NAMED by m_T. So panels 1 and 3 are warmed at each
-build's own m_T, not at the cross product. Panel 4 is the exception -- it walks
-every build at the slider's m_T -- which is why it is the long pole.
+build's own m_T, not at the cross product.
 
 Requests go through panels.panel() and the other server entry points, so this
 cannot warm a key the page does not ask for. A key is skipped only if its file
 exists, and the file name hashes the code that computes it (panels.scoped_hash),
-so an edit to panel1 re-warms p1, p4 rows and d1 without being told to.
+so an edit to panel1 re-warms p1 and d1 without being told to.
 
     python figures_gui/warm_panels.py --stamp 2 --procs 4
     python figures_gui/warm_panels.py --stamp 2 --what p1,p3,daily
@@ -44,7 +41,7 @@ so an edit to panel1 re-warms p1, p4 rows and d1 without being told to.
 
 --shard I/N takes every N-th job from I, so each shard gets a mix of kinds.
 figures_gui/slurm_warm.sh runs the N shards as an array; a key two shards
-both reach (panel 4 fills p1/p3 rows) is just computed twice.
+both reach is just computed twice.
 """
 import argparse
 import json
@@ -69,13 +66,12 @@ import sweep
 MF_VALUES = [0.0, 0.01, 0.02, 0.05, 0.10, 0.20, 0.30, 0.50]
 BURNIN = (True, False)
 
-# Panel 4 ignores these for row selection -- each row uses its own build's
-# params -- but panel() validates them, so send a point that exists.
+# panel() validates these, so send a point that exists.
 BASE = {"k": "7", "win": "15", "prom": "0.1", "lo": "0.1", "hi": "0.9",
         "window": "post"}
 
-KINDS = ("p2", "p1", "p1c", "p3", "d2", "d1", "d3", "episodes", "across",
-         "daily", "p4")
+KINDS = ("p2", "p1", "p1c", "p1h", "p3", "d2", "d1", "d3", "episodes", "across",
+         "daily")
 
 
 def builds_on_disk(store):
@@ -116,10 +112,11 @@ def plan(store, kinds):
         jobs += [("p1", _q(p, n=1, burnin=int(b))) for p in ps for b in BURNIN]
     if "p1c" in kinds:
         jobs += [("p1c", _q(p, n="1c", burnin=int(b))) for p in ps for b in BURNIN]
+    if "p1h" in kinds:
+        jobs += [("p1h", _q(p, n="1h", burnin=int(b))) for p in ps for b in BURNIN]
     if "p3" in kinds:
         jobs += [("p3", _q(p, n=3, mf=mf)) for p in ps for mf in MF_VALUES]
-    # the per-run arrays behind the same CIs, keyed as their panels are. /api/sens
-    # assembles from d1 and d3, so warming those warms it too.
+    # the per-run arrays behind the same CIs, keyed as their panels are
     if "d2" in kinds:
         jobs += [("d2", dict(n="2", burnin=int(b), **BASE)) for b in BURNIN]
     if "d1" in kinds:
@@ -135,9 +132,6 @@ def plan(store, kinds):
                                 mt=str(mt)))
                  for k in ks for mt in mts
                  for sc in panels.SCEN_ORDER for i in range(50)]
-    if "p4" in kinds:
-        jobs += [("p4", dict(BASE, n="4", mt=str(mt), burnin=int(b), mf=str(mf)))
-                 for mt in mts for b in BURNIN for mf in MF_VALUES]
     return ps, jobs
 
 
@@ -148,7 +142,7 @@ def _one(job):
     kind, q = job
     t0 = time.time()
     try:
-        if kind in ("p1", "p1c", "p2", "p3", "p4"):
+        if kind in ("p1", "p1c", "p1h", "p2", "p3"):
             panels.panel(STORE, q)
         elif kind in ("d1", "d2", "d3"):
             dist.dist(STORE, q)

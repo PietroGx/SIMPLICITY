@@ -17,10 +17,18 @@ not precomputed: it costs milliseconds and its rules are what you explore.
     python -I figures_gui/warm_explore.py --stamp 2 --procs 3
     python -I figures_gui/warm_explore.py --stamp 2 --k 7 --mt 0.01 --shard 3/8
 
-k and m_T default to the studio's operating point (web/settings.js). --shard
-I/N takes every N-th run from I; figures_gui/slurm_explore.sh runs the shards
-as an array and run_precompute.sh submits it with the grid.
+k and m_T default to the studio's operating point (web/settings.js).
+--pairs all does every (k, m_T) of the build grid instead, which S2 (the
+clustering sensitivity tab) measures Figure 5 at: 21 pairs, 21 times the work.
+After the runs, the Figure 5 panel is warmed at each pair, and at the operating
+point once per server-side level of S3 (sa_levels.json: smoothing window,
+prominence, ceiling f); S3's other rules are applied in the browser.
+
+--shard I/N takes every N-th job from I; figures_gui/slurm_explore.sh runs the
+shards as an array, then one --panel-only task for the panels, and
+run_precompute.sh submits both with the grid.
 """
+import json
 import argparse
 import os
 import sys
@@ -42,6 +50,35 @@ FIG5_Q = dict(  # the detection tabs' defaults, which Figure 5 measures with
               kernel="box", space="lin", prom_abs="0", sep="0", width="0", cens="1",
               start="trough", trough=str(explore.FIG5["trough"]), anchor="emergence",
               gate="start", dip="low")
+# S3's levels whose answer is a different /api/explore_panel request, and the
+# query parameter each one sets (web/episodes.js exploreQuery)
+SA_SERVER = {"sdWin": "win", "sdProm": "prom", "brkLo": "under"}
+
+
+def sa_levels():
+    with open(os.path.join(HERE, "sa_levels.json")) as fh:
+        return json.load(fh)["outbreak"]
+
+
+def grid_pairs():
+    return [(k, float(m)) for k in sweep.K for m in compute.MT_VALUES]
+
+
+def panels_to_warm(pairs, k0, mt0):
+    """Every Figure 5 panel query the sensitivity tabs and Figure 5 ask for at
+    the default rules: each pair at Figure 5's rules, then S3's server-side
+    levels at the operating point."""
+    qs = [dict(FIG5_Q, k=str(k), mt=str(mt)) for k, mt in pairs]
+    for name, param in SA_SERVER.items():
+        qs += [dict(FIG5_Q, k=str(k0), mt=str(mt0), **{param: str(v)})
+               for v in sa_levels()[name]]
+    seen, out = set(), []
+    for q in qs:
+        key = json.dumps(explore.read_params(q), sort_keys=True)
+        if key not in seen:
+            seen.add(key)
+            out.append(q)
+    return out
 
 
 def _one(job):
@@ -65,8 +102,12 @@ def main():
     ap.add_argument("--seeds", type=int, default=50)
     ap.add_argument("--procs", type=int, default=3)
     ap.add_argument("--shard", default="0/1")
+    ap.add_argument("--pairs", choices=("op", "all"), default="op",
+                    help="op: --k and --mt only; all: every (k, m_T) of the build grid")
     ap.add_argument("--no-panel", action="store_true",
-                    help="skip warming the Figure 5 panel at Figure 5's rules")
+                    help="skip warming the Figure 5 panels")
+    ap.add_argument("--panel-only", action="store_true",
+                    help="only the Figure 5 panels; the runs were warmed by the shards")
     a = ap.parse_args()
     from _scenarios import resolve_stamp
     a.stamp = resolve_stamp(a.stamp, a.exp_name)
@@ -75,10 +116,12 @@ def main():
         sweep.store_dir(sweep.DEFAULT_STORE, a.stamp, a.exp_name)
     si, sn = (int(x) for x in a.shard.split("/"))
 
-    jobs = [(store, a.stamp, a.exp_name, sc, seed, a.k, a.mt)
-            for sc in compute.SCEN_ORDER
-            for seed in explore._seed_names(sc)[:a.seeds]][si::sn]
-    print(f"[warm_explore] {a.exp_name} #{a.stamp}  k={a.k} m_T={a.mt}  "
+    pairs = grid_pairs() if a.pairs == "all" else [(a.k, a.mt)]
+    jobs = [] if a.panel_only else [
+        (store, a.stamp, a.exp_name, sc, seed, k, mt)
+        for k, mt in pairs for sc in compute.SCEN_ORDER
+        for seed in explore._seed_names(sc)[:a.seeds]][si::sn]
+    print(f"[warm_explore] {a.exp_name} #{a.stamp}  {len(pairs)} (k, m_T) pair(s)  "
           f"{len(jobs)} runs (shard {si}/{sn})  store={store}", flush=True)
     t0, bad = time.time(), []
     with Pool(max(1, a.procs)) as pool:
@@ -89,11 +132,18 @@ def main():
                 print(f"  {i}/{len(jobs)}  {sc}/{seed}  {s} s{'  ' + err if err else ''}"
                       f"   elapsed {time.time() - t0:.0f} s", flush=True)
     if not a.no_panel and sn == 1 and not bad:
-        t1 = time.time()
-        explore.explore_panel(store, dict(FIG5_Q, k=str(a.k), mt=str(a.mt),
-                                          seeds=str(a.seeds)))
-        print(f"[warm_explore] Figure 5 panel at Figure 5's rules: "
-              f"{time.time() - t1:.1f} s", flush=True)
+        qs = panels_to_warm(pairs, a.k, a.mt)
+        for i, q in enumerate(qs, 1):
+            t1 = time.time()
+            try:
+                explore.explore_panel(store, dict(q, seeds=str(a.seeds)))
+                err = ""
+            except Exception as exc:                             # noqa: BLE001
+                err = f"  FAILED {type(exc).__name__}: {exc}"
+                bad.append(f"panel k={q['k']} m_T={q['mt']}: {exc}")
+            print(f"[warm_explore] Figure 5 panel {i}/{len(qs)} k={q['k']} m_T={q['mt']} "
+                  f"win={q['win']} prom={q['prom']} f={q.get('under', 'default')}: "
+                  f"{time.time() - t1:.1f} s{err}", flush=True)
     print(f"[warm_explore] {len(jobs) - len(bad)}/{len(jobs)} runs in "
           f"{time.time() - t0:.0f} s{'; FAILED: ' + '; '.join(bad[:5]) if bad else ''}",
           flush=True)

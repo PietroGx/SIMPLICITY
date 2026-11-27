@@ -142,6 +142,9 @@ async function main() {
   ck(JSON.stringify(axes) === JSON.stringify(upAxes),
      "the rail's axes are the server's, not a second copy");
 
+  /* S2 over m_T measures Figure 5 at seven (k, m_T) pairs, minutes each where
+     the runs are not warmed (the cluster warms all 21); over k it is three */
+  peek(`settings.saVary = "k"`);
   peek("startStudio()");
 
   /* Nav groups: the shell's order is the contract, every tab names one of
@@ -344,30 +347,29 @@ async function main() {
 
   /* Figure 5 under the detection tabs' source counts what Cryptic by scenario
      counts: same request, and per scenario the same outbreak and cryptic totals
-     as swScenCounts, with the brkQuiet rule both off and on. */
+     as swScenCounts. */
   peek(`setSetting("p3Source", "sweep")`);
   const p3d = await peek(`apiGet(p3Url())`);
   ck(peek(`p3Url()`) === "/api/explore_panel?" + peek(`exploreQuery({mf: 0})`),
      "Figure 5 asks /api/explore_panel exactly what Cryptic by scenario asks");
-  for (const q of [0, 1]) {
-    peek(`setSetting("brkQuiet", ${q})`);
+  {
     ctx.__p3d = p3d;
     const cmp = peek(`(() => { const B = p3Breakouts(__p3d), C = swScenCounts(__p3d);
       return SCENARIOS.map(sc => { const s = a => a.reduce((t, x) => t + x, 0);
         return [sc, B[sc].nRuns, B[sc].cl.filter(c => c.ev).length, B[sc].cl.filter(c => c.cry).length,
                 C[sc].brk.length, s(C[sc].brk), s(C[sc].cry)]; }); })()`);
     ck(cmp.every(([, a, b, c, d, e, f]) => a === d && b === e && c === f),
-       `brkQuiet=${q}: Figure 5's simulations/outbreaks/cryptic equal Cryptic by scenario's: `
+       `Figure 5's simulations/outbreaks/cryptic equal Cryptic by scenario's: `
        + cmp.map(r => `${r[0]} ${r[1]}/${r[2]}/${r[3]} vs ${r[4]}/${r[5]}/${r[6]}`).join("; "));
   }
 
   /* B-F's between-host hidden time runs from first transmission to the first day the
-     smoothed curve is above f. Under rule 1 f used to stay off the request, so
-     the server measured at its own default (0.01) whatever the rail said: set f
-     away from that default, and recompute the crossing from the daily series
-     /api/explore sends, for every cryptic outbreak of one simulation per scenario */
-  for (const rule of ["launch", "under"]) {
-    peek(`setSettings({brkRule: ${JSON.stringify(rule)}, brkLo: 0.02, brkQuiet: 0})`);
+     smoothed curve is above f. f once stayed off the request, so the server
+     measured at its own default (0.01) whatever the rail said: set f away from
+     that default, and recompute the crossing from the daily series /api/explore
+     sends, for every cryptic outbreak of one simulation per scenario */
+  {
+    peek(`setSettings({brkLo: 0.02})`);
     ctx.__p3d2 = await peek(`apiGet(p3Url())`);
     const sel = peek(`(() => { const B = p3Breakouts(__p3d2), out = [];
       SCENARIOS.forEach(sc => { const c = B[sc].cl.filter(c => c.cry && isNum(c.bh));
@@ -382,13 +384,13 @@ async function main() {
       const want = k < 0 ? null : T[k] - tTx;
       n++;
       if (want === null || Math.abs(bh - want) > 0.02) bad.push(`${sc} ${name}: ${bh} vs ${want}`);
-      if (rule === "under" && Math.abs(ih + bh - t) > 0.02) sum++;
+      if (Math.abs(ih + bh - t) > 0.02) sum++;
     }
-    ck(n > 0 && !bad.length, `brkRule=${rule}, f=2%: between-host hidden time = first transmission to first day above f, `
+    ck(n > 0 && !bad.length, `f=2%: between-host hidden time = first transmission to first day above f, `
        + `recomputed from /api/explore: ${bad.length} of ${n} off ${bad.slice(0, 3).join("; ")}`);
-    if (rule === "under") ck(!sum, `rule 2: intra-host + between-host hidden time = hidden time: ${sum} of ${n} off`);
+    ck(!sum, `intra-host + between-host hidden time = hidden time: ${sum} of ${n} off`);
   }
-  peek(`setSettings({brkRule: "launch", brkLo: SETTING_DEFAULTS.brkLo, brkQuiet: SETTING_DEFAULTS.brkQuiet})`);
+  peek(`setSettings({brkLo: SETTING_DEFAULTS.brkLo})`);
 
   /* Every share the server sends is a fraction now. A tab that forgot to
      convert shows 0.36 where 36% belongs, which no other check would catch:

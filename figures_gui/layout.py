@@ -9,7 +9,6 @@
             runs/               the per-seed export behind the Muller plots
         fig1/                   Figure 1 (fig1.py), built locally, never packed
         fig3/ fig4/ fig5/       cache/: that figure's panel cache
-        supplementary/S1/       cache/: Figure S1's panel cache
 
 Packed into Data_Export/figures/<exp_name>_<stamp>/, one archive per section,
 none over 1 GB; a section that does not fit is split into parts that each
@@ -27,12 +26,11 @@ EXPORT = os.path.join(ROOT, "Data_Export", "figures")
 EXPLORATION = "exploration"
 # what pack archives. Not fig1/: it holds values derived from patient data that
 # may not leave this machine, and the studio builds it locally (fig1.py)
-SECTIONS = (EXPLORATION, "fig2", "fig3", "fig4", "fig5", "supplementary")
+SECTIONS = (EXPLORATION, "fig2", "fig3", "fig4", "fig5")
 # panel-cache tag -> the figure it serves; tags not listed serve the exploration tabs
 MEMO_HOME = {"p1": "fig4", "p1c": "fig4", "p1h": "fig4", "d1": "fig4",
              "p2": "fig3", "d2": "fig3",
-             "p3": "fig5", "p3b": "fig5", "d3": "fig5",
-             "p4row": "supplementary/S1"}
+             "p3": "fig5", "p3b": "fig5", "d3": "fig5"}
 LIMIT = 1_000_000_000
 
 

@@ -267,38 +267,25 @@ function breakoutPick(eps, pick = "first") {
 const sdGateDay = (burnin, phi) =>
   burnin && settings.sdGate === "start" && isNum(phi) ? phi : null;
 
-/* Two cryptic rules. Rule 1 ("launch"): hidden time runs to the outbreak's
-   start, and with brkQuiet the curve must stay under the launch level inside
-   it. Rule 2 ("under"): hidden time runs to tCross, the first day the curve is
-   above f (brkLo); staying under f is what hidden means. */
+/* The cryptic rule: hidden time runs from the anchor to tCross, the first day
+   the smoothed curve is above f (brkLo) -- staying under f is what hidden
+   means -- and the outbreak is cryptic if that lasts at least H. Without a
+   tCross (the clade build's source, /api/panel?n=3b) it runs to the start. */
 function breakoutOf(eps, tem, pick = "first", gate = null, tCross = null) {
-  const H = +settings.brkH, under = settings.brkRule === "under";
+  const H = +settings.brkH;
   const e = breakoutPick(eps, pick);
   /* the gate tests the outbreak's start as hidden time uses it, clamped to the anchor */
   if (!e || !isNum(tem) || (isNum(gate) && !(Math.max(e.aDay, tem) > gate))) return null;
-  const start = Math.max(e.aDay, tem), launch = Math.max(0, e.top - e.amp), hidden = start - tem;
-  /* brkQuiet: hidden time only counts if the curve never rose above the launch
-     level (the red dot) inside it -- e.pre is its highest value there */
-  const rose = isNum(e.pre) && e.pre > launch + 1e-9;
+  const start = Math.max(e.aDay, tem), launch = Math.max(0, e.top - e.amp);
   const peakDay = isNum(e.bDay) ? e.bDay : null;
-  if (under) {
-    const hEnd = Math.max(tem, isNum(tCross) ? tCross : start), h2 = hEnd - tem;
-    return {tem, start, clamped: e.aDay < tem, hidden: h2, hEnd, launch, peak: e.top, pre: e.pre, rose,
-            peakDay, rise: e.days, ceil: +settings.brkLo, cry: h2 >= H};
-  }
-  return {tem, start, clamped: e.aDay < tem, hidden, hEnd: start, launch, peak: e.top, pre: e.pre, rose,
-          peakDay, rise: e.days, ceil: settings.brkQuiet ? launch : null,
-          cry: hidden >= H && !(settings.brkQuiet && rose)};
+  const hEnd = Math.max(tem, isNum(tCross) ? tCross : start), hidden = hEnd - tem;
+  return {tem, start, clamped: e.aDay < tem, hidden, hEnd, launch, peak: e.top, pre: e.pre,
+          peakDay, rise: e.days, ceil: +settings.brkLo, cry: hidden >= H};
 }
 
-/* the cryptic rule in force, in prose: what "hidden" means, and the dotted
-   ceiling's key; null when rule 1 runs without the launch rule */
-const cryUnder = () => settings.brkRule === "under";
-const cryHiddenText = () => cryUnder()
-  ? `never above f = ${brkPct(+settings.brkLo)} while hidden`
-  : settings.brkQuiet ? "never above its launch frequency while hidden" : "";
-const cryCeilText = () => cryUnder() ? `f = ${brkPct(+settings.brkLo)}: hidden ends when the curve rises above it`
-  : settings.brkQuiet ? "launch level: the curve must stay under it while hidden" : null;
+/* the cryptic rule in prose: what "hidden" means, and the dotted ceiling's key */
+const cryHiddenText = () => `never above f = ${brkPct(+settings.brkLo)} while hidden`;
+const cryCeilText = () => `f = ${brkPct(+settings.brkLo)}: hidden ends when the curve rises above it`;
 
 /* what the prominence bar is a fraction of, in prose */
 const promRefText = () => settings.sdPromRef === "clade" ? "the clade's highest frequency" : "the peak's own height";
@@ -314,7 +301,7 @@ function exploreQuery(extra) {
        the build's: measured on 50 runs they moved no outbreak at the useful
        stops (#2, k = 7, m_T = 1%, 2026-11-22), so they left the rail */
     prom: settings.sdProm, promref: settings.sdPromRef, prom_abs: 0, sep: 0,
-    /* f: rule 2's ceiling, and under either rule where Figure 5's between-host hidden time ends */
+    /* f: the cryptic ceiling, where hidden time and Figure 5's between-host hidden time end */
     under: settings.brkLo,
     width: settings.sdWidth, cens: settings.sdCens ? 1 : 0, start: settings.sdStart,
     trough: settings.sdTrough, frac: settings.sdFrac, lo: settings.lo,
